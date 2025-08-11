@@ -1,0 +1,73 @@
+flowchart TB
+  subgraph User_Workstation[User Workstation]
+    API[API / Search Service]
+    Ingestion[Ingestion Scanner]
+    TaskQ[(Task Queue DB\nSQLite)]
+    Thumbs[Thumbnail Worker]
+    Embed[Embedding Worker GPU]
+    Caption[Caption Worker GPU]
+    Faces[Face Worker]
+    Albums[Album Generator]
+  end
+
+  subgraph GPU[GPU Device]
+    CLIP[CLIP Model]
+    BLIP2[BLIP2 Model]
+    ArcFace[Face Embedding Model]
+  end
+
+  subgraph Local_NVMe[Local NVMe Derived Store]
+    DerivFS[/Derived Artifacts store/]
+    VectorIdx[(FAISS Index)]
+    MetaDB[(metadata.sqlite)]
+  end
+
+  subgraph NAS[NAS / Originals Storage]
+    Originals[/Originals Files/]
+    Snapshots[/Backups & Snapshots/]
+  end
+
+  API -->|query / search| VectorIdx
+  API -->|metadata CRUD| MetaDB
+  Ingestion -->|scan paths| Originals
+  Ingestion -->|write assets| MetaDB
+  Ingestion -->|schedule tasks| TaskQ
+  TaskQ --> Thumbs
+  TaskQ --> Embed
+  TaskQ --> Caption
+  TaskQ --> Faces
+  Thumbs --> DerivFS
+  Embed --> DerivFS
+  Caption --> DerivFS
+  Faces --> DerivFS
+  Embed --> VectorIdx
+  Faces --> MetaDB
+  Thumbs --> MetaDB
+  Caption --> MetaDB
+  Albums --> MetaDB
+  Albums --> VectorIdx
+  API --> Albums
+
+  CLIP -.loaded by .-> Embed
+  BLIP2 -.loaded by .-> Caption
+  ArcFace -.loaded by .-> Faces
+
+  Originals -->|read| Thumbs
+  Originals -->|read| Embed
+  Originals -->|read| Caption
+  Originals -->|read| Faces
+
+  DerivFS -->|periodic rsync| Snapshots
+  MetaDB -->|snapshot| Snapshots
+  VectorIdx -->|snapshot| Snapshots
+
+  subgraph Optionals[Alternative / Future]
+    Qdrant[(Qdrant Vector DB)]
+    Postgres[(Postgres DB)]
+    RemoteGPU[Remote GPU Host]
+  end
+
+  VectorIdx -.optional replace .-> Qdrant
+  MetaDB -.migrate to .-> Postgres
+  Embed -.offload jobs .-> RemoteGPU
+  Caption -.offload jobs .-> RemoteGPU
