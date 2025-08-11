@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+deploy/env
+model-cache/
+.qdrant/
+*.pt
+*.onnx
+*.jpg
+*.png
+index.db
