@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, Body, Query, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import create_engine, MetaData, func, inspect
 from sqlalchemy.orm import sessionmaker, Session
 import os, threading, time
@@ -21,6 +21,7 @@ from . import schemas
 from typing import Generator, List
 from .services import assets as asset_service
 from .paths import DERIVED_PATH
+from . import metrics as metrics_mod
 
 settings = get_settings()
 DATABASE_URL = settings.database_url
@@ -100,6 +101,35 @@ def task_worker_loop():
         worked = executor.run_once()
         time.sleep(settings.worker_poll_interval if not worked else 0.05)
 
+# --- Test-only helpers ---
+def reinit_executor_for_tests():
+    """Reinitialize settings and executor to pick up env overrides in tests.
+
+    Safe to call multiple times. Does not recreate the engine; assumes DATABASE_URL unchanged.
+    """
+    global settings, executor, engine, SessionLocal
+    try:
+        executor.stop_workers()
+    except Exception:
+        pass
+    # Refresh cached settings (caller should have called get_settings.cache_clear if needed)
+    settings = get_settings()
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+    # Recreate engine and session factory to honor DATABASE_URL overrides
+    new_engine = create_engine(settings.database_url, future=True, echo=False)
+    engine = new_engine
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    # Ensure DB schema exists for the new engine
+    try:
+        db.Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass
+    executor = TaskExecutor(SessionLocal, settings)
+    return executor
+
 @app.on_event("startup")
 def on_startup():
     if settings.auto_migrate:
@@ -111,8 +141,12 @@ def on_startup():
     else:
         init_db()
     if settings.enable_inline_worker and settings.run_mode in ("api", "all"):
-        t = threading.Thread(target=task_worker_loop, daemon=True)
-        t.start()
+        # Backwards compatibility: if concurrency==1 use legacy single loop else multi-worker
+        if settings.worker_concurrency <= 1:
+            t = threading.Thread(target=task_worker_loop, daemon=True)
+            t.start()
+        else:
+            executor.start_workers(settings.worker_concurrency)
     # Optionally load existing embeddings into index
     if settings.vector_index_autoload and INDEX_SINGLETON is not None and not settings.vector_index_rebuild_on_demand_only:
         try:
@@ -246,6 +280,15 @@ def metrics(db_s: Session = Depends(get_db)):
         except Exception:
             pass
     avg_duration = sum(durations)/len(durations) if durations else None
+    # Update gauges (cheap) for exporter
+    try:
+        pending = by_state.get('pending', 0)
+        running = by_state.get('running', 0)
+        metrics_mod.update_queue_gauges(pending, running)
+        metrics_mod.update_vector_index_size(index_size)
+        metrics_mod.update_persons_total(persons)
+    except Exception:
+        pass
     return {
         'api_version': schemas.API_VERSION,
         'assets': {'total': assets_total, 'active': assets_active, 'deleted': assets_deleted},
@@ -445,3 +488,27 @@ app.include_router(people_router.router, prefix='')
 
 # --- Plugin comment placeholder ---
 # Add any plugin-specific initialization or route inclusion here
+
+@app.get('/metrics.prom')
+def metrics_prometheus(db_s: Session = Depends(get_db)):
+    """Prometheus exposition endpoint."""
+    # ensure gauges roughly current
+    try:
+        from .db import Task, Person
+        pending = db_s.query(Task).filter(Task.state=='pending').count()
+        running = db_s.query(Task).filter(Task.state=='running').count()
+        persons = db_s.query(Person).count()
+        metrics_mod.update_queue_gauges(pending, running)
+        metrics_mod.update_persons_total(persons)
+        metrics_mod.update_vector_index_size(len(INDEX_SINGLETON) if INDEX_SINGLETON else 0)
+    except Exception:
+        pass
+    blob = metrics_mod.render_prometheus()
+    return Response(content=blob, media_type='text/plain; version=0.0.4')
+
+@app.on_event("shutdown")
+def on_shutdown():
+    try:
+        executor.stop_workers()
+    except Exception:
+        pass

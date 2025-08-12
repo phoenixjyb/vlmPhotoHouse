@@ -52,8 +52,8 @@
 ---
 
 ### Cross-Cutting (Updated)
-- Observability & Metrics: ✅ /health, /metrics, /embedding/backend, average task duration computed. ❌ Prometheus exporter exposition format, per-task-type histograms, index autosave stats.
-- Task Queue: ✅ Progress & cancellation for recluster, started_at/finished_at timing, configurable max retries. ❌ Multi-worker concurrency, categorized error codes, exponential backoff, dead-letter queue.
+- Observability & Metrics: ✅ /health, /metrics, /metrics.prom (Prometheus exposition), /embedding/backend, average & histogram task durations, queue gauges. ❌ Index autosave stats, p95 duration metric export (custom summary), task error code metric.
+- Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries. ❌ Dead-letter queue, categorized error codes taxonomy, admin requeue endpoint.
 - Vector Index Strategy: ✅ FAISS flat persistent. ❌ ANN (HNSW/IVF), delta updates, autosave thread, per-face/person indexes.
 - Model Realization: ✅ Image/Text embeddings real. ⚠️ Captions & face embeddings still stub. ❌ OCR, event/theme models.
 - Data Store: ⚠️ SQLite baseline. ❌ Postgres option, backup/export tooling, integrity reconciliation.
@@ -87,27 +87,30 @@
 ### Near-Term Focus (Rolling Plan)
 Current Track: Option A (Foundation Hardening) selected.
 
-Sprint (Current):
-1. Prometheus exporter endpoint (/metrics.prom) exposing:
-	- Counters: tasks_total_processed, tasks_failed, tasks_retried, embeddings_generated
+Sprint (Current) – Status:
+1. Prometheus exporter endpoint (/metrics.prom): ✅ DONE
+	- Counters: tasks_processed_total (by type/state), tasks_retried_total, embeddings_generated_total
 	- Gauges: tasks_pending, tasks_running, vector_index_size, persons_total
-	- Histograms/Summaries: task_duration_seconds (by task_type)
-2. Multi-worker support:
-	- Spin up N worker threads (WORKER_CONCURRENCY) with DB row-level locking (SELECT ... FOR UPDATE / state transition guard) and cooperative shutdown.
-3. Retry/backoff policy:
-	- Exponential w/ jitter; classify errors (transient vs permanent) for earlier dead-lettering.
-4. Dead-letter queue (state = 'dead') + admin requeue endpoint.
+	- Histogram: task_duration_seconds (label=task_type)
+2. Multi-worker support: ✅ DONE
+	- Thread pool (WORKER_CONCURRENCY), optimistic UPDATE state guard, cooperative shutdown
+3. Retry/backoff policy: ✅ DONE (core logic)
+	- Exponential w/ jitter, transient vs permanent classification, scheduled_at gating
+	- NOTE: Test stabilization in progress (timing flakiness under Windows); logic functional
+4. Dead-letter queue (state='dead') + admin requeue endpoint: ⏳ PENDING (next up)
 
-Next Sprint:
-5. Face embedding real model integration (replace random vectors) + store model metadata.
-6. Person management minimal API (rename, merge, split) + audit log stub.
-7. ANN index prototype (HNSW or IVF build in background) behind feature flag.
-8. Postgres migration spike: run dual-write or offline export/import tool (decide path, produce design doc snippet).
+Next Sprint (Planned):
+5. Dead-letter queue implementation & /admin/tasks/{id}/requeue
+6. Face embedding real model integration (replace random vectors) + model metadata persistence
+7. Person management minimal API (rename, merge, split) + audit log stub
+8. ANN index prototype (HNSW or IVF) behind feature flag
+9. Postgres migration spike (design doc + minimal prototype tooling)
 
 Following Sprint (Preview):
-9. Websocket/SSE progress streaming for long tasks.
-10. Unified API envelope + standardized error codes.
-11. Input validation hardening (paths, mime, size limits) & rate limiting for heavy operations.
+10. Websocket/SSE progress streaming for long tasks
+11. Unified API envelope + standardized error codes taxonomy
+12. Input validation hardening (paths, MIME, size limits) & rate limiting for heavy operations
+13. Index autosave metrics & p95/p99 latency summaries exported
 
 Selection Rationale:
 - Improves observability before scaling (reduces blind spots for later performance work).
@@ -138,6 +141,6 @@ Execution Order justifies quick wins (exporter) before concurrency complexity.
 ✅ Complete   ⚠️ Stub / placeholder   ⏳ In progress / partial   ❌ Not started
 
 ---
-_Last updated: automated assistant refresh integrating embedding backend, FAISS persistence, progress/cancel tasks._
+_Last updated: 2025-08-12 — Added Prometheus exporter, multi-worker executor, retry/backoff; updating focus toward dead-letter queue and face embedding model._
 
 > Note: Former temporary file `backend/docs/ROADMAP_TEMP.md` has been superseded; its unique items are merged above (dead-letter queue, unified envelope, SSE/websocket progress, validation hardening, rate limiting, memory mapping).

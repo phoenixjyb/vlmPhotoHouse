@@ -11,3 +11,11 @@ model-cache/
 *.jpg
 *.png
 index.db
+metadata.sqlite
+app.db
+*.sqlite
+*.db
+derived/
+backend/derived/
+backend/derived/**
+*.npy
