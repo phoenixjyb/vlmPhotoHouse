@@ -19,3 +19,5 @@ derived/
 backend/derived/
 backend/derived/**
 *.npy
+deploy/data/
+deploy/data/**
