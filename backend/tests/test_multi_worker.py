@@ -1,10 +1,8 @@
 import os, time
 from fastapi.testclient import TestClient
-from app.main import app, executor
+import app.main as app_main
 from app.db import Task
 from app.config import get_settings
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 # This test simulates two embed tasks where we artificially slow one and verify both complete quickly under concurrency>1.
 
@@ -13,18 +11,17 @@ def test_multi_worker_embed_parallel(override_settings, temp_env_root):
     os.environ['ENABLE_INLINE_WORKER'] = 'true'
     os.environ['EMBED_TASK_SLEEP'] = '0.2'  # artificial per-task latency
     os.environ['WORKER_POLL_INTERVAL'] = '0.05'
-    # Recreate settings to pick env changes
+    # Recreate settings and app executor to pick env changes
     get_settings.cache_clear()  # type: ignore
     settings = get_settings()
+    app_main.reinit_executor_for_tests()
     # Start app client (triggers startup); then explicitly start multi workers (executor may have been constructed earlier)
-    client = TestClient(app)
-    executor.start_workers(2)
+    client = TestClient(app_main.app)
+    app_main.executor.start_workers(2)
     # Insert two fake embed tasks referencing non-existent assets (will fail fast) plus a dim_backfill for variety
     # Instead create two assets so embed tasks succeed fast after delay
-    from app.db import Asset, Base
-    engine = create_engine(settings.database_url, future=True)
-    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-    Base.metadata.create_all(bind=engine)
+    from app.db import Asset
+    SessionLocal = app_main.SessionLocal
     with SessionLocal() as s:
         a1 = Asset(path=str(temp_env_root['originals']) + '/a1.jpg', hash_sha256='h1')
         a2 = Asset(path=str(temp_env_root['originals']) + '/a2.jpg', hash_sha256='h2')
@@ -38,6 +35,7 @@ def test_multi_worker_embed_parallel(override_settings, temp_env_root):
     start = time.time()
     deadline = start + 3.0
     done = False
+    rows = []
     while time.time() < deadline and not done:
         with SessionLocal() as s:
             rows = s.query(Task.id, Task.state).filter(Task.id.in_(target_ids)).all()

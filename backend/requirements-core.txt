@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0.0
+pydantic
+Pillow
+ExifRead
+numpy
+alembic
+typer
+pytest
+pytest-cov
+imagehash
+prometheus-client

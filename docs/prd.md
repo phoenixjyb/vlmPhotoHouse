@@ -136,10 +136,38 @@ See `roadmap.md`. Acceptance criteria per phase:
 ## 13. Dependencies & Assumptions
 | Category | Assumption |
 |----------|-----------|
-| Hardware | Access to GPU (>=8GB VRAM) improves performance, but CPU-only path required |
-| Storage | Sufficient NAS capacity with sustained read throughput |
+| Hardware | Single PC; GPU (>=8GB VRAM) improves performance, CPU-only path supported |
+| Storage | Local internal/external storage (NVMe/SATA/USB); NAS optional, not required |
 | Libraries | Stable availability of PyTorch & CLIP/BLIP2 weights locally |
-| OS | Linux primary; macOS developer compatibility |
+| OS | Linux primary; Windows 11 (WSL2 + Docker Desktop) and macOS supported |
+
+## 13.1 Target Hardware Profile (Single PC)
+- Form factor: One machine running the full stack (API, workers, vector index, DB)
+- CPU/RAM: ≥8 cores, 64 GB RAM recommended (32 GB minimum) for smooth derivation and search
+- GPU: Optional NVIDIA GPU (≥8 GB VRAM) accelerates embeddings/captions/faces; CPU fallback available
+- Storage:
+	- Originals: internal SSD/HDD or external drive; configured as read-mostly root path
+	- Derived & DB: NVMe SSD preferred (separate path) to keep latency low
+	- Backup: snapshot/mirror/cold backup strategy (local mirror + cloud optional)
+- Deployment modes:
+	- Linux bare-metal or Docker Compose
+	- Windows 11 via WSL2 + Docker Desktop (GPU enabled)
+	- macOS via Docker (GPU acceleration limited; CPU fallback)
+- Networking: Localhost access by default; LAN share optional for ingestion only
+
+### 13.1.1 Reference Mapping (Windows single PC)
+- Drives and roles
+	- C: Windows OS and applications
+	- D: App data (derived artifacts, caches, optional DB backups)
+	- E: NAS/Library (original photos and shared datasets)
+	- F: WSL VM storage (VHDX) – does not change host mount paths, available under `/mnt/f`
+- GPUs
+	- GPU 0: Quadro P2000 for desktop/normal use and light ML tasks
+	- GPU 1: RTX 3090 for LLM/VLM inference and light LoRA/fine-tuning
+- WSL2/Docker mappings (examples)
+	- PHOTOS_PATH → `/mnt/e/photos`
+	- DERIVED_PATH → `/mnt/d/vlm/derived`
+	- GPU selection via `NVIDIA_VISIBLE_DEVICES` (verify index with `nvidia-smi`)
 
 ## 14. Risks & Mitigations
 | Risk | Impact | Mitigation |

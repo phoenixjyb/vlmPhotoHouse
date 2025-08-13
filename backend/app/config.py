@@ -34,7 +34,46 @@ class Settings(BaseModel):
     face_recluster_batch_limit: int = Field(default=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')))
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
+    retry_backoff_base: float = Field(default=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))))
+    retry_backoff_cap_seconds: float = Field(default=float(os.getenv('RETRY_BACKOFF_CAP_SECONDS', os.getenv('RETRY_BACKOFF_CAP','300'))))
+    retry_backoff_jitter: float = Field(default=float(os.getenv('RETRY_BACKOFF_JITTER','0.25')))
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    # Read environment variables at call time so overrides (e.g., in tests) take effect
+    return Settings(
+        deploy_profile=os.getenv("DEPLOY_PROFILE", "P1"),
+        run_mode=os.getenv("RUN_MODE", "api"),
+        database_url=os.getenv("DATABASE_URL", "sqlite:///./metadata.sqlite"),
+        vector_backend=os.getenv("VECTOR_BACKEND", "faiss"),
+        originals_path=os.getenv("ORIGINALS_PATH", "./originals"),
+        derived_path=os.getenv("DERIVED_PATH", "./derived"),
+        enable_inline_worker=os.getenv("ENABLE_INLINE_WORKER", "true").lower() == "true",
+        worker_poll_interval=float(os.getenv("WORKER_POLL_INTERVAL", "2.0")),
+        max_task_batch=int(os.getenv("WORKER_MAX_BATCH", "10")),
+        auto_migrate=os.getenv('AUTO_MIGRATE', 'true').lower()=='true',
+        alembic_script_location=os.getenv('ALEMBIC_SCRIPT_LOCATION','migrations'),
+        log_format=os.getenv('LOG_FORMAT','text'),
+        log_level=os.getenv('LOG_LEVEL','INFO'),
+        request_log_body=os.getenv('REQUEST_LOG_BODY','false').lower()=='true',
+        slow_request_ms=int(os.getenv('SLOW_REQUEST_MS','1000')),
+        vector_index_backend=os.getenv('VECTOR_INDEX_BACKEND','memory'),
+        vector_index_path=os.getenv('VECTOR_INDEX_PATH', 'derived/vector.index'),
+        vector_index_autosave=os.getenv('VECTOR_INDEX_AUTOSAVE','true').lower()=='true',
+        vector_index_save_interval=int(os.getenv('VECTOR_INDEX_SAVE_INTERVAL','300')),
+        embed_model_image=os.getenv('EMBED_MODEL_IMAGE','stub-clip'),
+        embed_model_text=os.getenv('EMBED_MODEL_TEXT','stub-clip'),
+        embed_device=os.getenv('EMBED_DEVICE', 'cpu'),
+        embed_model_version=os.getenv('EMBED_MODEL_VERSION',''),
+        embed_reembed_startup_limit=int(os.getenv('EMBED_REEMBED_STARTUP_LIMIT','1000')),
+        max_index_load=int(os.getenv('MAX_INDEX_LOAD','200000')),
+        vector_index_autoload=os.getenv('VECTOR_INDEX_AUTOLOAD','true').lower()=='true',
+        vector_index_rebuild_on_demand_only=os.getenv('VECTOR_INDEX_REBUILD_ON_DEMAND_ONLY','false').lower()=='true',
+        face_cluster_threshold=float(os.getenv('FACE_CLUSTER_THRESHOLD','0.35')),
+        face_recluster_batch_limit=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')),
+        worker_concurrency=int(os.getenv('WORKER_CONCURRENCY','1')),
+        max_task_retries=int(os.getenv('MAX_TASK_RETRIES','3')),
+        retry_backoff_base=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),
+        retry_backoff_cap_seconds=float(os.getenv('RETRY_BACKOFF_CAP_SECONDS', os.getenv('RETRY_BACKOFF_CAP','300'))),
+        retry_backoff_jitter=float(os.getenv('RETRY_BACKOFF_JITTER','0.25')),
+    )

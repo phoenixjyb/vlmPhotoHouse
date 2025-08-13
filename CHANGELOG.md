@@ -9,12 +9,9 @@ All notable changes are tracked here. Dates in UTC.
 - Person management API (rename/merge/split)
 - ANN index prototype (HNSW/IVF)
 - Postgres migration spike
+# Changelog
 
 ## [2025-08-12]
-### Added
-- Prometheus metrics exporter endpoint `/metrics.prom` with counters (`tasks_processed_total`, `tasks_retried_total`, `embeddings_generated_total`), gauges (queue size, running, vector index size, persons), histogram (`task_duration_seconds`).
-- Multi-worker task executor with configurable `WORKER_CONCURRENCY`, optimistic task claiming, cooperative shutdown.
-- Exponential retry with jitter backoff using `scheduled_at`, transient vs permanent error classification, `max_task_retries` enforcement.
 - Test coverage for metrics exporter, multi-worker concurrency, and retry/backoff scheduling logic.
 - Environment guidance and pinned dependency snapshot `backend/requirements-lock.txt`.
 - Added `prometheus-client` dependency.

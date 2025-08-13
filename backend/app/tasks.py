@@ -1,12 +1,15 @@
 import os, json, time, random, numpy as np
+import threading
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
+from .config import get_settings
 from pathlib import Path
 from PIL import Image
 import imagehash
-from datetime import datetime
+from datetime import datetime, timedelta
+from . import metrics as metrics_mod
 
 EMBED_DIM = 512  # default; may be updated after loading real model
 DERIVED_DIR = Path(os.getenv('DERIVED_PATH','./derived'))
@@ -28,32 +31,49 @@ class TaskExecutor:
         self.settings = settings
         self._last_dim_backfill_scan = 0.0
         self._dim_backfill_interval = 300  # seconds
-        global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM
+        self._workers = []
+        self._stop_event = threading.Event()
+        global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
-            EMBED_SERVICE = EmbeddingService(settings.embed_model_image, settings.embed_model_text, EMBED_DIM, getattr(settings,'embed_device','cpu'))
+            EMBED_SERVICE = EmbeddingService(self.settings.embed_model_image, self.settings.embed_model_text, EMBED_DIM, getattr(self.settings,'embed_device','cpu'))
             if EMBED_SERVICE.dim != EMBED_DIM:
                 EMBED_DIM = EMBED_SERVICE.dim
         if INDEX_SINGLETON is None:
-            if settings.vector_index_backend == 'faiss':
-                INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(settings,'vector_index_path',None))  # type: ignore
+            if self.settings.vector_index_backend == 'faiss':
+                INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(self.settings,'vector_index_path',None))  # type: ignore
             else:
                 INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
         # override cluster threshold if provided
-        global FACE_CLUSTER_DIST_THRESHOLD
-        if getattr(settings, 'face_cluster_threshold', None):
-            FACE_CLUSTER_DIST_THRESHOLD = settings.face_cluster_threshold
+        if getattr(self.settings, 'face_cluster_threshold', None):
+            FACE_CLUSTER_DIST_THRESHOLD = self.settings.face_cluster_threshold
 
     def run_once(self):
         with self.session_factory() as session:
+            # refresh dynamic settings (tests may override via env + cache clear)
+            runtime_settings = get_settings()
+            # Only consider tasks ready to run (scheduled_at <= now) to honor backoff
+            now = datetime.utcnow()
             task = session.execute(
-                select(Task).where(Task.state=='pending').order_by(Task.priority, Task.id).limit(1)
+                select(Task).where(Task.state=='pending', or_(Task.scheduled_at==None, Task.scheduled_at <= now))
+                .order_by(Task.priority, Task.id).limit(1)
             ).scalar_one_or_none()
             if not task:
                 # maybe enqueue dim backfill batch periodically
                 self._maybe_enqueue_dim_backfill(session)
                 return False
-            task.state = 'running'
-            task.started_at = datetime.utcnow()
+            # Optimistic claim: transition to running if still pending
+            rows = session.execute(
+                update(Task)
+                .where(Task.id==task.id, Task.state=='pending')
+                .values(state='running', started_at=datetime.utcnow(), last_error=None)
+                .execution_options(synchronize_session=False)
+            ).rowcount
+            if not rows:
+                session.rollback()
+                return False
+            session.commit()
+            # Reload the claimed task
+            task = session.get(Task, task.id)
             # initialize progress fields for known long-running tasks
             if task.type in ('person_recluster',):
                 task.progress_current = 0
@@ -85,30 +105,93 @@ class TaskExecutor:
                     self._handle_dim_backfill(session, task)
                 elif task.type == 'phash':
                     self._handle_phash(session, task)
+                elif task.type == 'fail_transient':
+                    raise OSError('transient error for testing')
                 else:
                     raise ValueError(f'Unknown task type {task.type}')
                 # Only mark done if not canceled mid-execution
                 if task.state == 'running':
                     task.state = 'done'
                     task.finished_at = datetime.utcnow()
+                # metrics: duration and processed counter
+                try:
+                    if task.started_at and task.finished_at:
+                        metrics_mod.task_duration.labels(task.type).observe((task.finished_at - task.started_at).total_seconds())
+                    metrics_mod.tasks_processed.labels(task.type, task.state).inc()
+                except Exception:
+                    pass
                 session.commit()
             except Exception as e:
                 task.retry_count +=1
                 task.last_error = str(e)
-                if task.retry_count > self.settings.max_task_retries:
-                    task.state='failed'
-                else:
-                    task.state='pending'
-                if task.retry_count > self.settings.max_task_retries:
+                # metrics retry counter
+                try:
+                    metrics_mod.tasks_retried.labels(task.type).inc()
+                except Exception:
+                    pass
+                if task.retry_count > runtime_settings.max_task_retries:
+                    task.state='dead'
                     task.finished_at = datetime.utcnow()
+                    # processed counter for failures
+                    try:
+                        metrics_mod.tasks_processed.labels(task.type, task.state).inc()
+                    except Exception:
+                        pass
+                else:
+                    # reschedule with exponential backoff + jitter
+                    delay = self._compute_backoff_delay(task.retry_count, runtime_settings)
+                    task.scheduled_at = datetime.utcnow() + delay
+                    task.state='pending'
                 session.commit()
             return True
+
+    def _compute_backoff_delay(self, retry_count: int, runtime_settings=None):
+        # allow passing in settings (fresh) or fetch at call time
+        s = runtime_settings or get_settings()
+        base = s.retry_backoff_base
+        cap = s.retry_backoff_cap_seconds
+        jitter = s.retry_backoff_jitter
+        # seconds as float, capped
+        delay = min((base ** max(0, retry_count-1)), cap)
+        # apply +- jitter fraction
+        jitter_range = delay * jitter
+        final = max(0.0, delay + random.uniform(-jitter_range, jitter_range))
+        return timedelta(seconds=final)
+
+    def start_workers(self, n: int):
+        if self._workers:
+            return
+        self._stop_event.clear()
+        def loop():
+            while not self._stop_event.is_set():
+                worked = self.run_once()
+                time.sleep(self.settings.worker_poll_interval if not worked else 0.01)
+        for _ in range(max(1, n)):
+            t = threading.Thread(target=loop, daemon=True)
+            t.start()
+            self._workers.append(t)
+
+    def stop_workers(self):
+        self._stop_event.set()
+        for t in self._workers:
+            try:
+                t.join(timeout=1.0)
+            except Exception:
+                pass
+        self._workers.clear()
 
     def _handle_embed(self, session: Session, task: Task):
         asset_id = task.payload_json['asset_id']
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
+        # test hook: optional sleep to simulate work
+        try:
+            slp = float(os.getenv('EMBED_TASK_SLEEP','0') or '0')
+            if slp > 0:
+                time.sleep(slp)
+        except Exception:
+            pass
         vec = EMBED_SERVICE.embed_image(asset.path) if EMBED_SERVICE else np.random.rand(EMBED_DIM).astype('float32')
         emb_path = DERIVED_DIR / 'embeddings' / f'{asset_id}.npy'
         np.save(emb_path, vec)
@@ -125,6 +208,10 @@ class TaskExecutor:
         session.commit()
         if INDEX_SINGLETON:
             INDEX_SINGLETON.add([asset_id], vec.reshape(1, -1))
+        try:
+            metrics_mod.embeddings_generated.inc()
+        except Exception:
+            pass
 
     def _handle_thumb(self, session: Session, task: Task):
         asset_id = task.payload_json['asset_id']
