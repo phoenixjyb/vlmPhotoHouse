@@ -53,13 +53,13 @@
 
 ### Cross-Cutting (Updated)
 - Observability & Metrics: ✅ /health, /metrics, /metrics.prom (Prometheus exposition), /embedding/backend, average & histogram task durations, queue gauges. ❌ Index autosave stats, p95 duration metric export (custom summary), task error code metric.
-- Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries. ❌ Dead-letter queue, categorized error codes taxonomy, admin requeue endpoint.
+- Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries, dead-letter queue (state='dead') and admin requeue endpoint. ❌ Categorized error codes taxonomy.
 - Vector Index Strategy: ✅ FAISS flat persistent. ❌ ANN (HNSW/IVF), delta updates, autosave thread, per-face/person indexes.
 - Model Realization: ✅ Image/Text embeddings real. ⚠️ Captions & face embeddings still stub. ❌ OCR, event/theme models.
 - Data Store: ⚠️ SQLite baseline. ❌ Postgres option, backup/export tooling, integrity reconciliation.
 - Security / Auth: ❌ No auth, no RBAC, no auditing.
 - Governance & Compliance: ❌ PII purge / face/person deletion workflows.
-- Developer Experience: ⚠️ Basic tests. ❌ Coverage for clustering/index, CLI task ops, performance benchmarks.
+- Developer Experience: ⚠️ Basic tests; macOS fast smoke path (core-only deps, no migrations/workers by default), split requirements (core vs ML), Dockerfile INCLUDE_ML toggle, compose GPU override for WSL2, docs updated. ❌ Coverage for clustering/index, CLI task ops, performance benchmarks.
 - Scalability: ❌ GPU batching, resource limits, sharded re-embed orchestration.
  - API & Schema Consistency: ⚠️ Mixed envelope styles. ❌ Unified {api_version,data,meta,error} wrapper, standardized error codes.
  - Reliability & Resilience: ❌ Dead-letter queue, requeue endpoint, rate limiting / batching heavy tasks.
@@ -97,14 +97,13 @@ Sprint (Current) – Status:
 3. Retry/backoff policy: ✅ DONE (core logic)
 	- Exponential w/ jitter, transient vs permanent classification, scheduled_at gating
 	- NOTE: Test stabilization in progress (timing flakiness under Windows); logic functional
-4. Dead-letter queue (state='dead') + admin requeue endpoint: ⏳ PENDING (next up)
+4. Dead-letter queue (state='dead') + admin requeue endpoint: ✅ DONE
 
 Next Sprint (Planned):
-5. Dead-letter queue implementation & /admin/tasks/{id}/requeue
-6. Face embedding real model integration (replace random vectors) + model metadata persistence
-7. Person management minimal API (rename, merge, split) + audit log stub
-8. ANN index prototype (HNSW or IVF) behind feature flag
-9. Postgres migration spike (design doc + minimal prototype tooling)
+5. Face embedding real model integration (replace random vectors) + model metadata persistence
+6. Person management minimal API (rename, merge, split) + audit log stub
+7. ANN index prototype (HNSW or IVF) behind feature flag
+8. Postgres migration spike (design doc + minimal prototype tooling)
 
 Following Sprint (Preview):
 10. Websocket/SSE progress streaming for long tasks
@@ -141,6 +140,6 @@ Execution Order justifies quick wins (exporter) before concurrency complexity.
 ✅ Complete   ⚠️ Stub / placeholder   ⏳ In progress / partial   ❌ Not started
 
 ---
-_Last updated: 2025-08-12 — Added Prometheus exporter, multi-worker executor, retry/backoff; updating focus toward dead-letter queue and face embedding model._
+_Last updated: 2025-08-13 — Added Prometheus exporter, multi-worker executor, retry/backoff; implemented dead-letter queue + admin requeue; improved dev/deploy ergonomics (mac smoke path, split deps, WSL2 GPU compose)._ 
 
 > Note: Former temporary file `backend/docs/ROADMAP_TEMP.md` has been superseded; its unique items are merged above (dead-letter queue, unified envelope, SSE/websocket progress, validation hardening, rate limiting, memory mapping).
