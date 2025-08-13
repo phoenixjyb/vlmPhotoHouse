@@ -6,7 +6,7 @@
 ## Phase 1: Core Ingestion & Metadata  **[PARTIAL]**
 - Implement hashing + EXIF extraction  ✅ (hashing + EXIF in pipeline)
 - SQLite schema & migrations  ✅ (Alembic set up; multiple revisions)
-- CLI ingest command  ⏳ (ingest API exists; CLI minimal or pending expansion)
+ - CLI ingest command  ✅ (Typer CLI `ingest-scan` added; further expansion pending)
 - Dedup logic  ✅ (sha256 + perceptual hash + near-duplicate clustering endpoint)
 
 ## Phase 2: Thumbnails & Embeddings (Search v1)  **[PARTIAL]**
@@ -51,6 +51,12 @@
 
 ---
 
+### Milestone v0.1.0 (mac smoke) — DONE
+• Docker Desktop on macOS verified healthy (hello-world) and compose CLI working (`cli ping`).
+• Fixed compose CLI entrypoint/command; backend `requirements.txt` includes core deps by default.
+• Docs: Added Docker/VPN troubleshooting note (Clash/proxies) in README and deployment guide.
+• Dev ergonomics: split requirements (core vs ML), INCLUDE_ML toggle, mac smoke defaults.
+
 ### Cross-Cutting (Updated)
 - Observability & Metrics: ✅ /health, /metrics, /metrics.prom (Prometheus exposition), /embedding/backend, average & histogram task durations, queue gauges. ❌ Index autosave stats, p95 duration metric export (custom summary), task error code metric.
 - Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries, dead-letter queue (state='dead') and admin requeue endpoint. ❌ Categorized error codes taxonomy.
@@ -59,10 +65,10 @@
 - Data Store: ⚠️ SQLite baseline. ❌ Postgres option, backup/export tooling, integrity reconciliation.
 - Security / Auth: ❌ No auth, no RBAC, no auditing.
 - Governance & Compliance: ❌ PII purge / face/person deletion workflows.
-- Developer Experience: ⚠️ Basic tests; macOS fast smoke path (core-only deps, no migrations/workers by default), split requirements (core vs ML), Dockerfile INCLUDE_ML toggle, compose GPU override for WSL2, docs updated. ❌ Coverage for clustering/index, CLI task ops, performance benchmarks.
+- Developer Experience: ⚠️ macOS fast smoke path (core-only deps, no migrations/workers by default), split requirements (core vs ML), Dockerfile INCLUDE_ML toggle, compose GPU override for WSL2, Typer CLI (ping/init-db/ingest-scan), VPN troubleshooting note in docs. ❌ Coverage for clustering/index, CLI task ops, performance benchmarks, broader tests.
 - Scalability: ❌ GPU batching, resource limits, sharded re-embed orchestration.
  - API & Schema Consistency: ⚠️ Mixed envelope styles. ❌ Unified {api_version,data,meta,error} wrapper, standardized error codes.
- - Reliability & Resilience: ❌ Dead-letter queue, requeue endpoint, rate limiting / batching heavy tasks.
+- Reliability & Resilience: ✅ Dead-letter queue and requeue endpoint; ❌ rate limiting / batching heavy tasks.
  - Real-Time UX Hooks: ❌ Websocket/SSE for task progress, live clustering updates.
  - Validation & Safety: ⚠️ Basic path handling. ❌ Ingest path/mime/size validation hardening, face/person deletion safety checks.
  - Performance Engineering: ❌ Memory-mapped embeddings, batched clustering DB writes.
@@ -78,7 +84,7 @@
 8. Bulk re-embed orchestrator (checkpointing, resumable, rate-limited).
 9. Backup/export (DB + derived metadata manifest) & restore.
 10. Auth layer (API tokens / future multi-user roles).
-11. Dead-letter queue & manual requeue workflows.
+11. Dead-letter queue & manual requeue workflows. [Addressed]
 12. Websocket/SSE progress streaming channel.
 13. Unified response envelope & error taxonomy.
 14. Input validation hardening (ingest path, MIME, size, EXIF trust boundaries).
@@ -140,6 +146,6 @@ Execution Order justifies quick wins (exporter) before concurrency complexity.
 ✅ Complete   ⚠️ Stub / placeholder   ⏳ In progress / partial   ❌ Not started
 
 ---
-_Last updated: 2025-08-13 — Added Prometheus exporter, multi-worker executor, retry/backoff; implemented dead-letter queue + admin requeue; improved dev/deploy ergonomics (mac smoke path, split deps, WSL2 GPU compose)._ 
+_Last updated: 2025-08-13 — Added Prometheus exporter, multi-worker executor, retry/backoff; implemented dead-letter queue + admin requeue; improved dev/deploy ergonomics (mac smoke path, split deps, WSL2 GPU compose), macOS Docker milestone with CLI ping; added VPN troubleshooting note._ 
 
 > Note: Former temporary file `backend/docs/ROADMAP_TEMP.md` has been superseded; its unique items are merged above (dead-letter queue, unified envelope, SSE/websocket progress, validation hardening, rate limiting, memory mapping).
