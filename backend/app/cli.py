@@ -1,3 +1,92 @@
+from __future__ import annotations
+
+import os
+import typer
+from typing import List, Optional
+from sqlalchemy import create_engine, func
+from sqlalchemy.orm import sessionmaker
+
+from . import db
+from .config import get_settings
+from . import ingest as ingest_mod
+
+app = typer.Typer(add_completion=False, help="VLM Photo Engine CLI (dev)")
+
+
+def _session_factory():
+    settings = get_settings()
+    engine = create_engine(settings.database_url, future=True, echo=False)
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    return engine, SessionLocal
+
+
+@app.command("init-db")
+def init_db() -> None:
+    """Create database tables (no Alembic)."""
+    engine, _ = _session_factory()
+    db.Base.metadata.create_all(bind=engine)
+    typer.echo("DB initialized (create_all)")
+
+
+@app.command("ingest-scan")
+def ingest_scan(paths: List[str] = typer.Argument(..., help="Directories to scan")) -> None:
+    """Scan directories and populate assets (hash + EXIF)."""
+    engine, SessionLocal = _session_factory()
+    db.Base.metadata.create_all(bind=engine)
+    with SessionLocal() as session:
+        result = ingest_mod.ingest_paths(session, paths)
+        typer.echo(f"Ingest complete: {result}")
+
+
+@app.command("list-dead")
+def list_dead(page: int = 1, page_size: int = 50) -> None:
+    """List dead-letter tasks."""
+    _, SessionLocal = _session_factory()
+    from .db import Task
+    with SessionLocal() as session:
+        q = session.query(Task).filter(Task.state == 'dead')
+        total = q.count()
+        items = q.order_by(Task.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+        typer.echo(f"total={total}")
+        for t in items:
+            typer.echo(f"id={t.id} type={t.type} retry={t.retry_count} err={t.last_error}")
+
+
+@app.command("requeue")
+def requeue(task_id: int) -> None:
+    """Requeue a dead/failed/canceled task."""
+    _, SessionLocal = _session_factory()
+    from .db import Task
+    with SessionLocal() as session:
+        task = session.get(Task, task_id)
+        if not task:
+            typer.echo("Task not found", err=True)
+            raise typer.Exit(1)
+        if task.state not in ('dead', 'failed', 'canceled'):
+            typer.echo(f"Cannot requeue from state {task.state}", err=True)
+            raise typer.Exit(2)
+        task.state = 'pending'
+        task.retry_count = 0
+        task.started_at = None
+        task.finished_at = None
+        task.last_error = None
+        task.scheduled_at = func.now()
+        session.commit()
+        typer.echo(f"Requeued task {task.id}")
+
+
+@app.command("ping")
+def ping() -> None:
+    """Simple heartbeat to verify CLI wiring."""
+    typer.echo("cli-ok")
+
+
+def main():
+    app()
+
+
+if __name__ == "__main__":
+    main()
 import os, sys
 import typer
 from alembic.config import Config as AlembicConfig

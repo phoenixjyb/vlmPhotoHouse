@@ -26,3 +26,5 @@ Steps:
 	 - GPU/WSL2 (optional): set `INCLUDE_ML=true` and use the GPU override file:
 		 - `export INCLUDE_ML=true`
 		 - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile vlm up -d`
+
+Tip: If Docker hangs or errors with unexpected EOF on macOS/WSL2, a VPN/proxy (e.g., Clash) may be interfering. Disable it or exclude local Docker traffic, clear Docker Desktop proxy settings, and restart Docker.

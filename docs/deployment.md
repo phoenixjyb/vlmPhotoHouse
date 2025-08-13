@@ -67,6 +67,12 @@ Services:
   - `docker compose logs -f api`
   - `docker compose logs -f proxy`
 
+## Docker + VPN note (macOS/WSL2)
+Some VPNs or local proxies (e.g., Clash/ClashX/Clash Verge) can break Docker networking or container startup with errors like unexpected EOF or containers hanging. If you see issues:
+- Temporarily disable the VPN or set it to bypass Docker local traffic.
+- In Docker Desktop Settings, clear HTTP/HTTPS proxy and add No Proxy for 127.0.0.1, localhost, docker.internal, host.docker.internal.
+- Restart Docker Desktop after changes.
+
 ## WSL2 + GPU tips
 - Ensure Docker Desktop shows GPU support enabled for your WSL distro.
 - If the container reports no GPUs, verify:
