@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  api:
+    # Request GPU access; select device via NVIDIA_VISIBLE_DEVICES (API_GPU)
+    gpus: "all"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${API_GPU:-all}
+  vlm:
+    gpus: "all"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${VLM_GPU:-all}

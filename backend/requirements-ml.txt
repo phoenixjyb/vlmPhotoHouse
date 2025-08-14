@@ -1,0 +1,6 @@
+# Heavy ML deps (install only when needed)
+sentence-transformers
+open_clip_torch
+torch
+torchvision
+faiss-cpu

@@ -1,18 +1,5 @@
-fastapi
-uvicorn[standard]
-sqlalchemy>=2.0.0
-pydantic
-Pillow
-ExifRead
-numpy
-alembic
-typer
-pytest
-pytest-cov
-imagehash
-sentence-transformers
-open_clip_torch
-torch
-torchvision
-faiss-cpu
-prometheus-client
+# Optional heavy ML dependencies are moved to requirements-ml.txt
+# Install them only when needed (e.g., GPU/WSL2 profile) to keep mac dev fast.
+
+# Default install: core dependencies
+-r requirements-core.txt

@@ -1,9 +1,82 @@
-version: "3.9"
 services:
   api:
-    image: python:3.11-slim
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      args:
+        INCLUDE_ML: ${INCLUDE_ML:-false}
+    image: vlm-photo-backend:dev
+    container_name: vlm-photo-api
     working_dir: /app
     volumes:
       - ../backend:/app
-    command: bash -lc "pip install -U pip && pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    ports: ["8000:8000"]
+      - ${PHOTOS_PATH}:/photos:rw
+      - ${DERIVED_PATH}:/derived:rw
+      - api-data:/data:rw
+      - pip-cache:/root/.cache/pip:rw
+    env_file:
+      - ./env
+    environment:
+      ORIGINALS_PATH: /photos
+      DERIVED_PATH: /derived
+      AUTO_MIGRATE: ${AUTO_MIGRATE:-false}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      ENABLE_INLINE_WORKER: ${ENABLE_INLINE_WORKER:-false}
+      VECTOR_INDEX_BACKEND: memory
+      VECTOR_INDEX_AUTOLOAD: "false"
+      EMBED_MODEL_IMAGE: stub
+      EMBED_MODEL_TEXT: stub
+      NVIDIA_VISIBLE_DEVICES: ${API_GPU:-0}
+    command: ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]
+    ports:
+      - "8000:8000"
+
+  proxy:
+    image: nginx:alpine
+    container_name: vlm-photo-proxy
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  vlm:
+    profiles:
+      - vlm
+    image: your/vlm-image:latest
+    container_name: vlm-batch
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${VLM_GPU:-all}
+    volumes:
+      - ${PHOTOS_PATH}:/photos:ro
+      - ${DERIVED_PATH}:/derived:rw
+    command: ["--serve","--data","/derived","--photos","/photos","--host","0.0.0.0","--port","7860"]
+    ports:
+      - "7860:7860"
+
+  cli:
+    profiles:
+      - dev
+    image: vlm-photo-backend:dev
+    container_name: vlm-photo-cli
+    working_dir: /app
+    volumes:
+      - ../backend:/app
+      - ${PHOTOS_PATH}:/photos:rw
+      - ${DERIVED_PATH}:/derived:rw
+      - api-data:/data:rw
+      - pip-cache:/root/.cache/pip:rw
+    env_file:
+      - ./env
+    environment:
+      ORIGINALS_PATH: /photos
+      DERIVED_PATH: /derived
+      DATABASE_URL: sqlite:////data/app.sqlite
+      ENABLE_INLINE_WORKER: "false"
+    entrypoint: ["python3","-u","-m","app.cli"]
+    command: ["--help"]
+
+volumes:
+  api-data: {}
+  pip-cache: {}

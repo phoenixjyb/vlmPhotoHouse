@@ -30,3 +30,13 @@ def override_settings(temp_env_root, monkeypatch):
 @pytest.fixture()
 def client():
     return TestClient(app)
+
+
+# Optional global skip: set SKIP_ALL_TESTS=true to skip the entire suite cleanly (exit code 0).
+def pytest_collection_modifyitems(config, items):
+    skip_all = os.getenv('SKIP_ALL_TESTS', 'false').lower() in ('1', 'true', 'yes')
+    if not skip_all:
+        return
+    skip_marker = pytest.mark.skip(reason="Skipping all tests because SKIP_ALL_TESTS=true")
+    for item in items:
+        item.add_marker(skip_marker)

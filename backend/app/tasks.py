@@ -1,12 +1,14 @@
 import os, json, time, random, numpy as np
+import threading
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, text
+from sqlalchemy import select, or_, text, update
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
+from .config import get_settings
 from pathlib import Path
 from PIL import Image
 import imagehash
-from datetime import datetime
+from datetime import datetime, timedelta
 from . import metrics as metrics_mod
 
 EMBED_DIM = 512  # default; may be updated after loading real model
@@ -29,20 +31,25 @@ class TaskExecutor:
         self.settings = settings
         self._last_dim_backfill_scan = 0.0
         self._dim_backfill_interval = 300  # seconds
+        # Legacy single-worker fields (still used by tests)
         self._stop = False
         self._threads: list = []
+        # New multi-worker control
+        self._workers: list[threading.Thread] = []
+        self._stop_event = threading.Event()
         global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
-            EMBED_SERVICE = EmbeddingService(settings.embed_model_image, settings.embed_model_text, EMBED_DIM, getattr(settings,'embed_device','cpu'))
+            EMBED_SERVICE = EmbeddingService(self.settings.embed_model_image, self.settings.embed_model_text, EMBED_DIM, getattr(self.settings,'embed_device','cpu'))
             if EMBED_SERVICE.dim != EMBED_DIM:
                 EMBED_DIM = EMBED_SERVICE.dim
         if INDEX_SINGLETON is None:
-            if settings.vector_index_backend == 'faiss':
-                INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(settings,'vector_index_path',None))  # type: ignore
+            if self.settings.vector_index_backend == 'faiss':
+                INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(self.settings,'vector_index_path',None))  # type: ignore
             else:
                 INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
-        if getattr(settings, 'face_cluster_threshold', None):
-            FACE_CLUSTER_DIST_THRESHOLD = settings.face_cluster_threshold
+        # override cluster threshold if provided
+        if getattr(self.settings, 'face_cluster_threshold', None):
+            FACE_CLUSTER_DIST_THRESHOLD = self.settings.face_cluster_threshold
 
     def start_workers(self, concurrency: int):
         # Avoid double start
@@ -110,6 +117,7 @@ class TaskExecutor:
                 except Exception:
                     pass
                 return False
+            # task already transitioned to running by _claim_next_task
             # initialize progress fields for known long-running tasks
             if task.type in ('person_recluster',) and task.progress_current is None:
                 task.progress_current = 0
@@ -150,6 +158,13 @@ class TaskExecutor:
                 if task.state == 'running':
                     task.state = 'done'
                     task.finished_at = datetime.utcnow()
+                # metrics: duration and processed counter
+                try:
+                    if task.started_at and task.finished_at:
+                        metrics_mod.task_duration.labels(task.type).observe((task.finished_at - task.started_at).total_seconds())
+                    metrics_mod.tasks_processed.labels(task.type, task.state).inc()
+                except Exception:
+                    pass
                 session.commit()
                 # metrics: duration & processed
                 try:
@@ -177,6 +192,44 @@ class TaskExecutor:
                 except Exception:
                     pass
             return True
+
+    def _compute_backoff(self, retry_count: int):
+        """Compute jittered exponential backoff as timedelta.
+
+        Uses base^retries capped, with +/- jitter fraction (default 25%).
+        """
+        s = self.settings
+        base = getattr(s, 'retry_backoff_base_seconds', 2.0)
+        cap = getattr(s, 'retry_backoff_cap_seconds', 300.0)
+        jitter_fraction = getattr(s, 'retry_backoff_jitter', 0.25)
+        if base <= 0:
+            return timedelta(seconds=0)
+        raw = base * (2 ** (max(0, retry_count-1)))
+        raw = min(raw, cap)
+        jitter = raw * random.uniform(-jitter_fraction, jitter_fraction) if raw > 0 else 0
+        return timedelta(seconds=max(0.0, raw + jitter))
+
+    def start_workers(self, n: int):
+        if self._workers:
+            return
+        self._stop_event.clear()
+        def loop():
+            while not self._stop_event.is_set():
+                worked = self.run_once()
+                time.sleep(self.settings.worker_poll_interval if not worked else 0.01)
+        for _ in range(max(1, n)):
+            t = threading.Thread(target=loop, daemon=True)
+            t.start()
+            self._workers.append(t)
+
+    def stop_workers(self):
+        self._stop_event.set()
+        for t in self._workers:
+            try:
+                t.join(timeout=1.0)
+            except Exception:
+                pass
+        self._workers.clear()
 
     def _handle_embed(self, session: Session, task: Task):
         asset_id = task.payload_json['asset_id']

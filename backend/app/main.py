@@ -506,6 +506,51 @@ def metrics_prometheus(db_s: Session = Depends(get_db)):
     blob = metrics_mod.render_prometheus()
     return Response(content=blob, media_type='text/plain; version=0.0.4')
 
+# --- Admin: Dead-letter queue management ---
+@app.get('/admin/tasks/dead')
+def list_dead_tasks(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db_s: Session = Depends(get_db)):
+    from .db import Task
+    q = db_s.query(Task).filter(Task.state=='dead')
+    total = q.count()
+    items = q.order_by(Task.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'tasks': [
+            {
+                'id': t.id,
+                'type': t.type,
+                'state': t.state,
+                'retry_count': t.retry_count,
+                'last_error': t.last_error,
+                'created_at': str(t.created_at) if t.created_at else None,
+                'updated_at': str(t.updated_at) if t.updated_at else None,
+                'started_at': str(t.started_at) if t.started_at else None,
+                'finished_at': str(t.finished_at) if t.finished_at else None,
+            } for t in items
+        ]
+    }
+
+@app.post('/admin/tasks/{task_id}/requeue')
+def requeue_task(task_id: int, db_s: Session = Depends(get_db)):
+    from .db import Task
+    task = db_s.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail='task not found')
+    # Only allow requeue from dead|failed|canceled states
+    if task.state not in ('dead','failed','canceled'):
+        raise HTTPException(status_code=400, detail=f'cannot requeue from state {task.state}')
+    task.state = 'pending'
+    task.retry_count = 0
+    task.started_at = None
+    task.finished_at = None
+    task.last_error = None
+    task.scheduled_at = func.now()
+    db_s.commit()
+    return {'api_version': schemas.API_VERSION, 'task_id': task.id, 'state': task.state}
+
 @app.on_event("shutdown")
 def on_shutdown():
     try:
