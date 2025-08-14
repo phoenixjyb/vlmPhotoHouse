@@ -1,12 +1,13 @@
 import os, json, time, random, numpy as np
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, text
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
 from pathlib import Path
 from PIL import Image
 import imagehash
 from datetime import datetime
+from . import metrics as metrics_mod
 
 EMBED_DIM = 512  # default; may be updated after loading real model
 DERIVED_DIR = Path(os.getenv('DERIVED_PATH','./derived'))
@@ -28,7 +29,9 @@ class TaskExecutor:
         self.settings = settings
         self._last_dim_backfill_scan = 0.0
         self._dim_backfill_interval = 300  # seconds
-        global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM
+        self._stop = False
+        self._threads: list = []
+        global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
             EMBED_SERVICE = EmbeddingService(settings.embed_model_image, settings.embed_model_text, EMBED_DIM, getattr(settings,'embed_device','cpu'))
             if EMBED_SERVICE.dim != EMBED_DIM:
@@ -38,28 +41,81 @@ class TaskExecutor:
                 INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(settings,'vector_index_path',None))  # type: ignore
             else:
                 INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
-        # override cluster threshold if provided
-        global FACE_CLUSTER_DIST_THRESHOLD
         if getattr(settings, 'face_cluster_threshold', None):
             FACE_CLUSTER_DIST_THRESHOLD = settings.face_cluster_threshold
 
-    def run_once(self):
+    def start_workers(self, concurrency: int):
+        # Avoid double start
+        if self._threads:
+            return
+        for wid in range(concurrency):
+            import threading
+            t = threading.Thread(target=self._worker_loop, args=(wid,), daemon=True, name=f"worker-{wid}")
+            t.start()
+            self._threads.append(t)
+
+    def stop_workers(self):
+        self._stop = True
+
+    def _worker_loop(self, worker_id: int):
+        base_idle = self.settings.worker_poll_interval
+        while not self._stop:
+            worked = self.run_once(worker_id=worker_id)
+            if not worked:
+                # jittered backoff when idle
+                sleep_for = base_idle * (0.5 + random.random())
+                time.sleep(min(2.0, sleep_for))
+            else:
+                # brief yield
+                time.sleep(0.01)
+
+    def _claim_next_task(self, session: Session):
+        """Atomically claim the next pending task using optimistic update.
+
+        Works on SQLite by performing an UPDATE guarded by state predicate.
+        Returns the Task object if claim succeeded else None.
+        """
+        # Fetch candidate id first (simple query) then attempt guarded update
+        now = datetime.utcnow()
+        candidate = session.execute(
+            select(Task.id).where(
+                Task.state=='pending',
+                (Task.scheduled_at==None) | (Task.scheduled_at <= now)
+            ).order_by(Task.priority, Task.id).limit(1)
+        ).scalar_one_or_none()
+        if candidate is None:
+            return None
+        # Optimistic claim
+        now = datetime.utcnow()
+        updated = session.execute(
+            text("UPDATE tasks SET state='running', started_at=:now WHERE id=:tid AND state='pending'").bindparams(now=now, tid=candidate)
+        )
+        if updated.rowcount != 1:  # lost race
+            session.rollback()
+            return None
+        session.commit()  # persist state change before loading full row
+        return session.get(Task, candidate)
+
+    def run_once(self, worker_id: int | None = None):
         with self.session_factory() as session:
-            task = session.execute(
-                select(Task).where(Task.state=='pending').order_by(Task.priority, Task.id).limit(1)
-            ).scalar_one_or_none()
+            task = self._claim_next_task(session)
             if not task:
                 # maybe enqueue dim backfill batch periodically
                 self._maybe_enqueue_dim_backfill(session)
+                # update gauges (pending / running) periodically when idle
+                try:
+                    pending = session.query(Task).filter(Task.state=='pending').count()
+                    running = session.query(Task).filter(Task.state=='running').count()
+                    metrics_mod.update_queue_gauges(pending, running)
+                except Exception:
+                    pass
                 return False
-            task.state = 'running'
-            task.started_at = datetime.utcnow()
             # initialize progress fields for known long-running tasks
-            if task.type in ('person_recluster',):
+            if task.type in ('person_recluster',) and task.progress_current is None:
                 task.progress_current = 0
-                # progress_total will be set inside handler when data size known
-            session.commit()
+                session.commit()
             try:
+                start_time = time.time()
                 if task.type == 'embed':
                     self._handle_embed(session, task)
                 elif task.type == 'thumb':
@@ -85,6 +141,9 @@ class TaskExecutor:
                     self._handle_dim_backfill(session, task)
                 elif task.type == 'phash':
                     self._handle_phash(session, task)
+                elif task.type == 'fail_transient':
+                    # Simulated transient failure for tests
+                    raise OSError('Simulated transient failure')
                 else:
                     raise ValueError(f'Unknown task type {task.type}')
                 # Only mark done if not canceled mid-execution
@@ -92,16 +151,31 @@ class TaskExecutor:
                     task.state = 'done'
                     task.finished_at = datetime.utcnow()
                 session.commit()
+                # metrics: duration & processed
+                try:
+                    duration = (task.finished_at - task.started_at).total_seconds() if task.finished_at and task.started_at else (time.time()-start_time)
+                    metrics_mod.task_duration.labels(task.type).observe(duration)
+                    metrics_mod.tasks_processed.labels(task.type, task.state).inc()
+                except Exception:
+                    pass
             except Exception as e:
                 task.retry_count +=1
                 task.last_error = str(e)
-                if task.retry_count > self.settings.max_task_retries:
+                is_permanent = self._classify_permanent(e)
+                if task.retry_count >= self.settings.max_task_retries or is_permanent:
                     task.state='failed'
-                else:
-                    task.state='pending'
-                if task.retry_count > self.settings.max_task_retries:
                     task.finished_at = datetime.utcnow()
+                else:
+                    delay = self._compute_backoff(task.retry_count)
+                    task.scheduled_at = datetime.utcnow() + delay
+                    task.state='pending'
                 session.commit()
+                try:
+                    metrics_mod.tasks_retried.labels(task.type).inc()
+                    if task.state in ('failed', 'canceled'):
+                        metrics_mod.tasks_processed.labels(task.type, task.state).inc()
+                except Exception:
+                    pass
             return True
 
     def _handle_embed(self, session: Session, task: Task):
@@ -109,6 +183,9 @@ class TaskExecutor:
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
+        embed_sleep = float(os.getenv('EMBED_TASK_SLEEP','0') or '0')
+        if embed_sleep > 0:
+            time.sleep(embed_sleep)
         vec = EMBED_SERVICE.embed_image(asset.path) if EMBED_SERVICE else np.random.rand(EMBED_DIM).astype('float32')
         emb_path = DERIVED_DIR / 'embeddings' / f'{asset_id}.npy'
         np.save(emb_path, vec)
@@ -125,12 +202,20 @@ class TaskExecutor:
         session.commit()
         if INDEX_SINGLETON:
             INDEX_SINGLETON.add([asset_id], vec.reshape(1, -1))
+        try:
+            metrics_mod.embeddings_generated.inc()
+            metrics_mod.update_vector_index_size(len(INDEX_SINGLETON) if INDEX_SINGLETON else 0)
+        except Exception:
+            pass
 
     def _handle_thumb(self, session: Session, task: Task):
         asset_id = task.payload_json['asset_id']
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
+        thumb_sleep = float(os.getenv('THUMB_TASK_SLEEP','0') or '0')
+        if thumb_sleep > 0:
+            time.sleep(thumb_sleep)
         src = Path(asset.path)
         if not src.exists():
             raise FileNotFoundError(src)
@@ -456,5 +541,19 @@ class TaskExecutor:
             session.commit()
         except Exception:
             pass
+
+    # ---- Retry Classification & Backoff ----
+    def _classify_permanent(self, exc: Exception) -> bool:
+        transient = (TimeoutError, ConnectionError, OSError)
+        return not isinstance(exc, transient)
+
+    def _compute_backoff(self, retry_count: int):
+        base = self.settings.retry_backoff_base_seconds
+        cap = self.settings.retry_backoff_cap_seconds
+        raw = base * (2 ** (max(0, retry_count-1)))
+        raw = min(raw, cap)
+        jitter = raw * random.uniform(0.2, 0.6)
+        from datetime import timedelta
+        return timedelta(seconds=raw + jitter)
 
 

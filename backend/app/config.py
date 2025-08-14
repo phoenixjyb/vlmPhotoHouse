@@ -34,6 +34,8 @@ class Settings(BaseModel):
     face_recluster_batch_limit: int = Field(default=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')))
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
+    retry_backoff_base_seconds: float = Field(default=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS','2.0')))
+    retry_backoff_cap_seconds: float = Field(default=float(os.getenv('RETRY_BACKOFF_CAP_SECONDS','300')))
 
 @lru_cache
 def get_settings() -> Settings:
