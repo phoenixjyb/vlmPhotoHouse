@@ -59,7 +59,7 @@
 
 ### Cross-Cutting (Updated)
 - Observability & Metrics: ✅ /health, /metrics, /metrics.prom (Prometheus exposition), /embedding/backend, average & histogram task durations, queue gauges. ❌ Index autosave stats, p95 duration metric export (custom summary), task error code metric.
-- Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries, dead-letter queue (state='dead') and admin requeue endpoint. ❌ Categorized error codes taxonomy.
+- Task Queue: ✅ Multi-worker concurrency (thread pool), optimistic locking claim, progress & cancellation (recluster), started_at/finished_at timing, exponential retry w/ jitter backoff & transient/permanent classification, configurable max retries, dead-letter queue (state='dead') + admin requeue (API + CLI). ❌ Categorized error codes taxonomy; ❌ DLQ metrics (count gauge) pending.
 - Vector Index Strategy: ✅ FAISS flat persistent. ❌ ANN (HNSW/IVF), delta updates, autosave thread, per-face/person indexes.
 - Model Realization: ✅ Image/Text embeddings real. ⚠️ Captions & face embeddings still stub. ❌ OCR, event/theme models.
 - Data Store: ⚠️ SQLite baseline. ❌ Postgres option, backup/export tooling, integrity reconciliation.
@@ -91,31 +91,28 @@
 15. Rate limiting / task throttling for heavy GPU ops.
 
 ### Near-Term Focus (Rolling Plan)
-Current Track: Option A (Foundation Hardening) selected.
+Current Track: Option A (Foundation Hardening) — initial hardening items completed.
 
-Sprint (Current) – Status:
-1. Prometheus exporter endpoint (/metrics.prom): ✅ DONE
-	- Counters: tasks_processed_total (by type/state), tasks_retried_total, embeddings_generated_total
-	- Gauges: tasks_pending, tasks_running, vector_index_size, persons_total
-	- Histogram: task_duration_seconds (label=task_type)
-2. Multi-worker support: ✅ DONE
-	- Thread pool (WORKER_CONCURRENCY), optimistic UPDATE state guard, cooperative shutdown
-3. Retry/backoff policy: ✅ DONE (core logic)
-	- Exponential w/ jitter, transient vs permanent classification, scheduled_at gating
-	- NOTE: Test stabilization in progress (timing flakiness under Windows); logic functional
-4. Dead-letter queue (state='dead') + admin requeue endpoint: ✅ DONE
+Completed Sprint (Hardening Set 1): ✅
+1. Prometheus exporter (/metrics.prom) with counters/gauges/histogram
+2. Multi-worker executor (configurable concurrency) + optimistic claim
+3. Retry/backoff (exponential + jitter, transient vs permanent) with Windows timing test stabilized
+4. Dead-letter queue + admin & CLI requeue
+5. Dev environment split (core vs ml) + dual lock files (requirements-lock-core.txt / requirements-lock-ml.txt) + setup scripts
 
-Next Sprint (Planned):
-5. Face embedding real model integration (replace random vectors) + model metadata persistence
-6. Person management minimal API (rename, merge, split) + audit log stub
-7. ANN index prototype (HNSW or IVF) behind feature flag
-8. Postgres migration spike (design doc + minimal prototype tooling)
+Upcoming Sprint (Hardening Set 2):
+1. Real face embedding model integration (replace random vectors) + device/model metadata
+2. Person management minimal API (rename, merge, split) + audit log stub
+3. ANN index prototype (HNSW or IVF) behind feature flag (evaluate memory & recall)
+4. Postgres migration spike (schema diff strategy, export/import tooling draft)
+5. DLQ metrics (expose dead task count gauge) & p95 task duration summary job
 
 Following Sprint (Preview):
-10. Websocket/SSE progress streaming for long tasks
-11. Unified API envelope + standardized error codes taxonomy
-12. Input validation hardening (paths, MIME, size limits) & rate limiting for heavy operations
-13. Index autosave metrics & p95/p99 latency summaries exported
+1. Websocket/SSE progress streaming for long tasks
+2. Unified API envelope + standardized error taxonomy
+3. Input validation hardening (path/MIME/size) & rate limiting heavy GPU ops
+4. Index autosave metrics & p95/p99 latency summaries exported
+5. GPU batching & embedding batch inference (prework for scalability)
 
 Selection Rationale:
 - Improves observability before scaling (reduces blind spots for later performance work).
@@ -146,6 +143,6 @@ Execution Order justifies quick wins (exporter) before concurrency complexity.
 ✅ Complete   ⚠️ Stub / placeholder   ⏳ In progress / partial   ❌ Not started
 
 ---
-_Last updated: 2025-08-13 — Added Prometheus exporter, multi-worker executor, retry/backoff; implemented dead-letter queue + admin requeue; improved dev/deploy ergonomics (mac smoke path, split deps, WSL2 GPU compose), macOS Docker milestone with CLI ping; added VPN troubleshooting note._ 
+_Last updated: 2025-08-14 — Added DLQ & requeue (API+CLI), dual environment lock strategy (core / ml), setup scripts, stabilized retry/backoff test on Windows; prior: Prometheus exporter, multi-worker executor, retry/backoff, dev split (mac core vs GPU ml), Docker compose enhancements, VPN troubleshooting._ 
 
 > Note: Former temporary file `backend/docs/ROADMAP_TEMP.md` has been superseded; its unique items are merged above (dead-letter queue, unified envelope, SSE/websocket progress, validation hardening, rate limiting, memory mapping).
