@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, Body, Query, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi import UploadFile, File, Body
 from sqlalchemy import create_engine, MetaData, func, inspect
 from sqlalchemy.orm import sessionmaker, Session
 import os, threading, time
@@ -11,7 +12,7 @@ from .config import get_settings
 from . import ingest as ingest_mod
 from .tasks import TaskExecutor, INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM  # vector search globals
 from .vector_index import load_index_from_embeddings, load_faiss_index_from_embeddings, FaissVectorIndex
-from .db import Asset
+from .db import Asset, Task
 from pathlib import Path
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
@@ -132,14 +133,14 @@ def reinit_executor_for_tests():
 
 @app.on_event("startup")
 def on_startup():
-    if settings.auto_migrate:
+    # Skip Alembic migrations for tests or when AUTO_MIGRATE disabled
+    if settings.run_mode == 'tests' or not settings.auto_migrate:
+        init_db()
+    else:
         alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), '..', 'alembic.ini'))
         alembic_cfg.set_main_option('script_location', settings.alembic_script_location)
-        # ensure URL aligns with runtime settings
         alembic_cfg.set_main_option('sqlalchemy.url', settings.database_url)
         alembic_command.upgrade(alembic_cfg, 'head')
-    else:
-        init_db()
     if settings.enable_inline_worker and settings.run_mode in ("api", "all"):
         # Backwards compatibility: if concurrency==1 use legacy single loop else multi-worker
         if settings.worker_concurrency <= 1:
@@ -239,6 +240,22 @@ def health(request: Request, db_s: Session = Depends(get_db)):
     index_initialized = INDEX_SINGLETON is not None
     index_size = len(INDEX_SINGLETON) if INDEX_SINGLETON else 0
     index_dim = EMBED_DIM if INDEX_SINGLETON else None
+    # active face embedding provider (lazy; protected by try to avoid import failures on lightweight envs)
+    face_embed_provider = None
+    face_detect_provider = None
+    face_device = settings.embed_device
+    try:
+        from .face_embedding_service import get_face_embedding_provider
+        prov = get_face_embedding_provider()
+        face_embed_provider = prov.__class__.__name__
+    except Exception:
+        face_embed_provider = 'unavailable'
+    try:
+        from .face_detection_service import get_face_detection_provider
+        dprov = get_face_detection_provider()
+        face_detect_provider = dprov.__class__.__name__
+    except Exception:
+        face_detect_provider = 'unavailable'
     return {
         'api_version': schemas.API_VERSION,
         'ok': db_ok,
@@ -249,6 +266,11 @@ def health(request: Request, db_s: Session = Depends(get_db)):
         'index': {'initialized': index_initialized, 'size': index_size, 'dim': index_dim},
         'profile': settings.deploy_profile,
         'worker_enabled': settings.enable_inline_worker and settings.run_mode in ("api","all"),
+        'face': {
+            'embed_provider': face_embed_provider,
+            'detect_provider': face_detect_provider,
+            'device': face_device,
+        },
     }
 
 @app.get('/metrics', response_model=schemas.MetricsResponse)
@@ -284,7 +306,9 @@ def metrics(db_s: Session = Depends(get_db)):
     try:
         pending = by_state.get('pending', 0)
         running = by_state.get('running', 0)
+        dead = by_state.get('dead', 0)
         metrics_mod.update_queue_gauges(pending, running)
+        metrics_mod.update_dead_tasks(dead)
         metrics_mod.update_vector_index_size(index_size)
         metrics_mod.update_persons_total(persons)
     except Exception:
@@ -450,6 +474,127 @@ def vector_search(text: str | None = Body(None), asset_id: int | None = Body(Non
         result_items.append({'asset_id': mid, 'score': float(score), 'path': aobj.path if aobj else None})
     return {'api_version': schemas.API_VERSION, 'query': {'text': text, 'asset_id': asset_id}, 'k': k, 'results': result_items}
 
+# --- Asset ingestion (upload) ---
+
+def _ingest_asset_from_bytes(data: bytes, filename: str, db_s: Session) -> tuple[Asset, int]:
+    """Create an Asset (or fetch existing by sha256) from raw bytes and enqueue tasks.
+
+    Returns (asset, tasks_enqueued_count).
+    """
+    suffix = ''.join(['.', filename.split('.')[-1]]) if '.' in filename else '.jpg'
+    if suffix.lower() not in ('.jpg', '.jpeg', '.png', '.webp'):
+        raise HTTPException(status_code=400, detail='unsupported file type')
+    originals_root = Path(settings.originals_path)
+    originals_root.mkdir(parents=True, exist_ok=True)
+    import hashlib
+    sha = hashlib.sha256(data).hexdigest()
+    existing = db_s.query(Asset).filter(Asset.hash_sha256 == sha).first()
+    if existing:
+        return existing, 0
+    fname = f"u_{int(time.time()*1000)}_{sha[:8]}{suffix or '.jpg'}"
+    out_path = originals_root / fname
+    with out_path.open('wb') as f:
+        f.write(data)
+    width = height = None
+    try:
+        from PIL import Image
+        with Image.open(out_path) as im:
+            width, height = im.size
+    except Exception:
+        pass
+    asset = Asset(path=str(out_path.resolve()), hash_sha256=sha, width=width, height=height, file_size=len(data))
+    db_s.add(asset)
+    db_s.flush()
+    enqueue = [
+        Task(type='embed', priority=50, payload_json={'asset_id': asset.id, 'modality': 'image'}),
+        Task(type='phash', priority=60, payload_json={'asset_id': asset.id}),
+        Task(type='thumb', priority=80, payload_json={'asset_id': asset.id}),
+        Task(type='caption', priority=110, payload_json={'asset_id': asset.id}),
+        Task(type='face', priority=120, payload_json={'asset_id': asset.id}),
+    ]
+    for t in enqueue:
+        db_s.add(t)
+    db_s.commit()
+    return asset, len(enqueue)
+
+@app.post('/assets/upload', response_model=schemas.AssetUploadResponse)
+async def upload_asset(data: bytes = Body(..., description='Raw image bytes'), filename: str = Query('upload.jpg'), db_s: Session = Depends(get_db)):
+    """Upload a single image via raw body (no multipart)."""
+    asset, enqueued = _ingest_asset_from_bytes(data, filename, db_s)
+    return {
+        'api_version': schemas.API_VERSION,
+        'asset': {
+            'id': asset.id,
+            'path': asset.path,
+            'hash_sha256': asset.hash_sha256,
+            'perceptual_hash': getattr(asset, 'perceptual_hash', None),
+            'width': asset.width,
+            'height': asset.height,
+            'file_size': getattr(asset, 'file_size', None),
+            'taken_at': str(getattr(asset, 'taken_at', None)) if getattr(asset, 'taken_at', None) else None,
+            'status': getattr(asset, 'status', None)
+        },
+        'tasks_enqueued': enqueued
+    }
+
+@app.get('/assets', response_model=schemas.AssetsListResponse)
+def list_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500), db_s: Session = Depends(get_db)):
+    q = db_s.query(Asset)
+    total = q.count()
+    rows = q.order_by(Asset.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+    assets = []
+    for a in rows:
+        assets.append({
+            'id': a.id,
+            'path': a.path,
+            'hash_sha256': a.hash_sha256,
+            'perceptual_hash': getattr(a,'perceptual_hash', None),
+            'width': a.width,
+            'height': a.height,
+            'file_size': getattr(a,'file_size', None),
+            'taken_at': str(getattr(a,'taken_at', None)) if getattr(a,'taken_at', None) else None,
+            'status': getattr(a,'status', None)
+        })
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'assets': assets
+    }
+
+@app.post('/assets/upload/multipart', response_model=schemas.AssetUploadResponse)
+async def upload_asset_multipart(file: UploadFile = File(...), db_s: Session = Depends(get_db)):
+    """Upload a single image using multipart/form-data.
+
+    Requires python-multipart to be installed; environment guard in tests ensures this.
+    """
+    data = await file.read()
+    asset, enqueued = _ingest_asset_from_bytes(data, file.filename or 'upload.jpg', db_s)
+    return {
+        'api_version': schemas.API_VERSION,
+        'asset': {
+            'id': asset.id,
+            'path': asset.path,
+            'hash_sha256': asset.hash_sha256,
+            'perceptual_hash': getattr(asset, 'perceptual_hash', None),
+            'width': asset.width,
+            'height': asset.height,
+            'file_size': getattr(asset, 'file_size', None),
+            'taken_at': str(getattr(asset, 'taken_at', None)) if getattr(asset, 'taken_at', None) else None,
+            'status': getattr(asset, 'status', None)
+        },
+        'tasks_enqueued': enqueued
+    }
+
+@app.get('/debug/multipart')
+def debug_multipart():
+    try:
+        import multipart  # type: ignore
+        return {'ok': True, 'version': getattr(multipart, '__version__', None)}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
 @app.get('/embedding/backend', response_model=schemas.EmbeddingBackendStatus)
 def embedding_backend_status(db_s: Session = Depends(get_db)):
     from .db import Asset, Embedding, Task
@@ -486,6 +631,82 @@ def rebuild_vector_index(limit: int = Body(None), db_s: Session = Depends(get_db
 from .routers import people as people_router
 app.include_router(people_router.router, prefix='')
 
+# --- Albums: Time hierarchy (year -> month -> day)
+@app.get('/albums/time', response_model=schemas.TimeAlbumsResponse)
+def albums_time(limit_per_bucket: int = Query(5, ge=1, le=50), path_prefix: str | None = Query(None, description="Optional prefix to restrict asset paths (test isolation)"), db_s: Session = Depends(get_db)):
+    """Return hierarchical time albums (year/month/day) with counts and sample asset ids.
+
+    Uses Asset.taken_at when available; falls back to created_at if taken_at is NULL.
+    """
+    from sqlalchemy import func, case
+    from .db import Asset
+    # Determine effective timestamp
+    ts_col = case((Asset.taken_at != None, Asset.taken_at), else_=Asset.created_at)  # type: ignore
+    # SQLite strftime tokens: %Y, %m, %d
+    year_expr = func.strftime('%Y', ts_col)
+    month_expr = func.strftime('%m', ts_col)
+    day_expr = func.strftime('%d', ts_col)
+    # Aggregate counts
+    y_l = year_expr.label('y')
+    m_l = month_expr.label('m')
+    d_l = day_expr.label('d')
+    base_q = db_s.query(y_l, m_l, d_l, func.count(Asset.id).label('cnt'))
+    if path_prefix:
+        base_q = base_q.filter(Asset.path.like(f"{path_prefix}%"))
+    rows = base_q.group_by(y_l, m_l, d_l).order_by(y_l, m_l, d_l).all()
+    # Fetch sample assets per (y,m,d) using window or fallback simple query per bucket (bounded by total rows * limit)
+    # Build mapping for faster second pass
+    from collections import defaultdict
+    day_map = defaultdict(list)
+    for r in rows:
+        day_map[(r.y, r.m, r.d)] = [r.cnt]  # store count first
+    # Collect samples in one query limited to recent assets per date (heuristic: order by id desc)
+    # Simpler: iterate (bounded) and query per bucket while respecting limit_per_bucket
+    for (y,m,d), meta in day_map.items():
+        filt = [func.strftime('%Y', ts_col)==y, func.strftime('%m', ts_col)==m, func.strftime('%d', ts_col)==d]
+        if path_prefix:
+            filt.append(Asset.path.like(f"{path_prefix}%"))
+        q = db_s.query(Asset.id).filter(*filt)\
+            .order_by(Asset.id.desc()).limit(limit_per_bucket).all()
+        ids = [rid for (rid,) in q]
+        day_map[(y,m,d)] = [meta[0], ids]
+    # Organize hierarchy
+    from collections import OrderedDict
+    years: OrderedDict[str, dict] = OrderedDict()
+    for r in rows:
+        y, m, d, cnt = r.y, r.m, r.d, r.cnt
+        y_int = int(y)
+        m_int = int(m)
+        d_int = int(d)
+        total_cnt, sample_ids = day_map[(y,m,d)]
+        if y_int not in years:
+            years[y_int] = {'count':0, 'months': OrderedDict(), 'sample': set()}
+        y_entry = years[y_int]
+        y_entry['count'] += cnt
+        if m_int not in y_entry['months']:
+            y_entry['months'][m_int] = {'count':0, 'days': OrderedDict(), 'sample': set()}
+        m_entry = y_entry['months'][m_int]
+        m_entry['count'] += cnt
+        # Day
+        m_entry['days'][d_int] = {'count': cnt, 'sample': sample_ids}
+        # Accumulate samples (union up to limit_per_bucket)
+        for sid in sample_ids:
+            if len(y_entry['sample']) < limit_per_bucket:
+                y_entry['sample'].add(sid)
+            if len(m_entry['sample']) < limit_per_bucket:
+                m_entry['sample'].add(sid)
+    # Convert to schema objects
+    year_objs: list[schemas.TimeAlbumYear] = []
+    for y_int, y_entry in years.items():
+        month_objs: list[schemas.TimeAlbumMonth] = []
+        for m_int, m_entry in y_entry['months'].items():
+            day_objs: list[schemas.TimeAlbumDay] = []
+            for d_int, d_entry in m_entry['days'].items():
+                day_objs.append(schemas.TimeAlbumDay(day=d_int, count=d_entry['count'], sample_asset_ids=d_entry['sample']))
+            month_objs.append(schemas.TimeAlbumMonth(month=m_int, count=m_entry['count'], days=day_objs, sample_asset_ids=list(m_entry['sample'])))
+        year_objs.append(schemas.TimeAlbumYear(year=y_int, count=y_entry['count'], months=month_objs, sample_asset_ids=list(y_entry['sample'])))
+    return schemas.TimeAlbumsResponse(api_version=schemas.API_VERSION, years=year_objs)
+
 # --- Plugin comment placeholder ---
 # Add any plugin-specific initialization or route inclusion here
 
@@ -497,8 +718,10 @@ def metrics_prometheus(db_s: Session = Depends(get_db)):
         from .db import Task, Person
         pending = db_s.query(Task).filter(Task.state=='pending').count()
         running = db_s.query(Task).filter(Task.state=='running').count()
+        dead = db_s.query(Task).filter(Task.state=='dead').count()
         persons = db_s.query(Person).count()
         metrics_mod.update_queue_gauges(pending, running)
+        metrics_mod.update_dead_tasks(dead)
         metrics_mod.update_persons_total(persons)
         metrics_mod.update_vector_index_size(len(INDEX_SINGLETON) if INDEX_SINGLETON else 0)
     except Exception:

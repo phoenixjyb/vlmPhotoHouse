@@ -1,8 +1,17 @@
-import os, tempfile, shutil
+import os, tempfile, shutil, sys
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app, settings
 from app.config import get_settings
+
+# Early environment guard BEFORE importing application modules that may rely on optional deps.
+if os.getenv('DISABLE_ENV_GUARD','false').lower() not in ('1','true','yes'):
+    exe = sys.executable
+    if os.sep + '.venv' + os.sep not in exe:
+        raise RuntimeError(f"Interpreter {exe} does not look like project .venv (expected path containing /.venv/). Set DISABLE_ENV_GUARD=1 to bypass.")
+    try:
+        import multipart  # type: ignore
+    except Exception as e:
+        raise RuntimeError(f"python-multipart not importable at test startup: {e}")
 
 @pytest.fixture(scope='session')
 def temp_env_root():
@@ -19,8 +28,10 @@ def override_settings(temp_env_root, monkeypatch):
     monkeypatch.setenv('DATABASE_URL', f'sqlite:///{temp_env_root["root"]}/test.sqlite')
     monkeypatch.setenv('ORIGINALS_PATH', temp_env_root['originals'])
     monkeypatch.setenv('DERIVED_PATH', temp_env_root['derived'])
-    monkeypatch.setenv('AUTO_MIGRATE', 'true')
+    # Use fallback ensure_db column addition logic instead of full Alembic migrations
+    monkeypatch.setenv('AUTO_MIGRATE', 'false')
     monkeypatch.setenv('ENABLE_INLINE_WORKER', 'false')
+    monkeypatch.setenv('RUN_MODE', 'tests')
     # clear cache
     from functools import lru_cache
     get_settings.cache_clear()  # type: ignore
@@ -29,6 +40,8 @@ def override_settings(temp_env_root, monkeypatch):
 
 @pytest.fixture()
 def client():
+    # Import app lazily after environment guard
+    from app.main import app
     return TestClient(app)
 
 

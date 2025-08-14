@@ -15,6 +15,27 @@ class AssetBrief(BaseModel):
     id: int
     path: str
 
+class AssetDetail(BaseModel):
+    id: int
+    path: str
+    hash_sha256: str
+    perceptual_hash: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    file_size: Optional[int] = None
+    taken_at: Optional[str] = None
+    status: Optional[str] = None
+
+class AssetUploadResponse(APIBase):
+    asset: AssetDetail
+    tasks_enqueued: int
+
+class AssetsListResponse(APIBase):
+    page: int
+    page_size: int
+    total: int
+    assets: List[AssetDetail]
+
 class SearchResponse(APIBase):
     page: int
     page_size: int
@@ -175,3 +196,24 @@ class EmbeddingBackendStatus(APIBase):
     model_version: Optional[str] = None
     reembed_scheduled: int
     total_assets: int
+
+# --- Albums ---
+class TimeAlbumDay(BaseModel):
+    day: int
+    count: int
+    sample_asset_ids: List[int]
+
+class TimeAlbumMonth(BaseModel):
+    month: int
+    count: int
+    days: List[TimeAlbumDay]
+    sample_asset_ids: List[int]
+
+class TimeAlbumYear(BaseModel):
+    year: int
+    count: int
+    months: List[TimeAlbumMonth]
+    sample_asset_ids: List[int]
+
+class TimeAlbumsResponse(APIBase):
+    years: List[TimeAlbumYear]

@@ -32,6 +32,10 @@ class Settings(BaseModel):
     vector_index_rebuild_on_demand_only: bool = Field(default=os.getenv('VECTOR_INDEX_REBUILD_ON_DEMAND_ONLY','false').lower()=='true')
     face_cluster_threshold: float = Field(default=float(os.getenv('FACE_CLUSTER_THRESHOLD','0.35')))
     face_recluster_batch_limit: int = Field(default=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')))
+    face_embed_provider: str = Field(default=os.getenv('FACE_EMBED_PROVIDER', 'stub'))  # stub|facenet|insight
+    face_embed_model: str = Field(default=os.getenv('FACE_EMBED_MODEL', 'stub-v1'))
+    face_embed_dim: int = Field(default=int(os.getenv('FACE_EMBED_DIM', '128')))
+    lvface_model_path: str = Field(default=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'))
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
     # Backoff configuration (supports legacy env var synonyms)
@@ -71,7 +75,10 @@ def get_settings() -> Settings:
         vector_index_autoload=os.getenv('VECTOR_INDEX_AUTOLOAD','true').lower()=='true',
         vector_index_rebuild_on_demand_only=os.getenv('VECTOR_INDEX_REBUILD_ON_DEMAND_ONLY','false').lower()=='true',
         face_cluster_threshold=float(os.getenv('FACE_CLUSTER_THRESHOLD','0.35')),
-        face_recluster_batch_limit=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')),
+    face_recluster_batch_limit=int(os.getenv('FACE_RECLUSTER_BATCH_LIMIT','2000')),
+    face_embed_provider=os.getenv('FACE_EMBED_PROVIDER','stub'),
+    face_embed_model=os.getenv('FACE_EMBED_MODEL','stub-v1'),
+    face_embed_dim=int(os.getenv('FACE_EMBED_DIM','128')),
         worker_concurrency=int(os.getenv('WORKER_CONCURRENCY','1')),
         max_task_retries=int(os.getenv('MAX_TASK_RETRIES','3')),
     retry_backoff_base_seconds=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),

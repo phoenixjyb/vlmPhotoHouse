@@ -11,3 +11,5 @@ pytest
 pytest-cov
 imagehash
 prometheus-client
+python-multipart
+httpx

@@ -178,7 +178,8 @@ class TaskExecutor:
                 task.last_error = str(e)
                 is_permanent = self._classify_permanent(e)
                 if task.retry_count >= self.settings.max_task_retries or is_permanent:
-                    task.state='failed'
+                    # move to dead-letter queue (distinct from generic failed)
+                    task.state='dead'
                     task.finished_at = datetime.utcnow()
                 else:
                     delay = self._compute_backoff(task.retry_count)
@@ -187,7 +188,7 @@ class TaskExecutor:
                 session.commit()
                 try:
                     metrics_mod.tasks_retried.labels(task.type).inc()
-                    if task.state in ('failed', 'canceled'):
+                    if task.state in ('failed', 'canceled', 'dead'):
                         metrics_mod.tasks_processed.labels(task.type, task.state).inc()
                 except Exception:
                     pass
@@ -308,26 +309,43 @@ class TaskExecutor:
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError(f'Asset {asset_id} not found for face task')
-        w = asset.width or 1000
-        h = asset.height or 1000
         src = Path(asset.path)
         if not src.exists():
             raise FileNotFoundError(src)
         faces = session.query(FaceDetection).filter(FaceDetection.asset_id==asset.id).all()
         if not faces:
-            num_faces = random.randint(1, 4)
-            for _ in range(num_faces):
-                fw = random.uniform(0.15, 0.35) * w
-                fh = random.uniform(0.15, 0.35) * h
-                fx = random.uniform(0, max(1, w - fw))
-                fy = random.uniform(0, max(1, h - fh))
-                face = FaceDetection(asset_id=asset.id, bbox_x=fx, bbox_y=fy, bbox_w=fw, bbox_h=fh, embedding_path=None)
+            # Run detection provider
+            try:
+                from .face_detection_service import get_face_detection_provider
+                provider = get_face_detection_provider()
+                from PIL import Image as _Im
+                import time as _t
+                t0_det = _t.time()
+                with _Im.open(src) as im_det:
+                    dets = provider.detect(im_det.convert('RGB'))
+                try:  # pragma: no cover
+                    import app.metrics as m
+                    prov_name = type(provider).__name__.replace('DetectionProvider','').lower()
+                    m.face_detection_inference_seconds.labels(prov_name or 'unknown').observe(_t.time()-t0_det)
+                except Exception:
+                    pass
+            except Exception:
+                # Fallback: single centered box
+                from PIL import Image as _Im
+                with _Im.open(src) as im_det:
+                    w,h = im_det.size
+                dets = []
+                size = min(w,h)*0.4
+                dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size})())
+            for d in dets:
+                face = FaceDetection(asset_id=asset.id, bbox_x=float(d.x), bbox_y=float(d.y), bbox_w=float(d.w), bbox_h=float(d.h), embedding_path=None)
                 session.add(face)
             session.flush()
             faces = session.query(FaceDetection).filter(FaceDetection.asset_id==asset.id).all()
         # Generate / ensure crops
         out_dir = DERIVED_DIR / 'faces' / '256'
         with Image.open(src) as im:
+            w, h = im.size
             for face in faces:
                 crop_path = out_dir / f"{face.id}.jpg"
                 if crop_path.exists():
@@ -346,6 +364,11 @@ class TaskExecutor:
             if not face.embedding_path:
                 session.add(Task(type='face_embed', priority=135, payload_json={'face_id': face.id}))
         session.commit()
+        try:
+            import app.metrics as m
+            m.faces_detected.inc(len(faces))
+        except Exception:
+            pass
         return faces
 
     def _handle_face_embed(self, session: Session, task: Task):
@@ -357,12 +380,31 @@ class TaskExecutor:
             raise ValueError(f'FaceDetection {face_id} not found')
         if face.embedding_path:
             return  # already done
-        # placeholder face embedding (later switch to model)
-        vec = np.random.rand(EMBED_DIM).astype('float32')
+        crop_path = DERIVED_DIR / 'faces' / '256' / f'{face.id}.jpg'
+        if not crop_path.exists():
+            raise ValueError('face crop missing for embedding')
+        from PIL import Image
+        from .face_embedding_service import get_face_embedding_provider
+        provider = get_face_embedding_provider()
+        with Image.open(crop_path) as im:
+            import time as _t
+            t0_emb = _t.time()
+            vec = provider.embed_face(im.convert('RGB'))
+        try:  # pragma: no cover
+            import app.metrics as m
+            prov_name = type(provider).__name__.replace('FaceEmbeddingProvider','').replace('EmbeddingProvider','').lower()
+            m.face_embedding_inference_seconds.labels(prov_name or 'unknown').observe(_t.time()-t0_emb)
+        except Exception:
+            pass
         emb_path = DERIVED_DIR / 'face_embeddings' / f'{face_id}.npy'
-        np.save(emb_path, vec)
+        np.save(emb_path, vec.astype('float32'))
         face.embedding_path = str(emb_path)
         session.commit()
+        try:
+            import app.metrics as m
+            m.face_embeddings_generated.inc()
+        except Exception:
+            pass
         pending_cluster = session.query(Task).filter(Task.type=='person_cluster', Task.state=='pending').first()
         if not pending_cluster:
             unassigned_faces = session.query(FaceDetection).filter(FaceDetection.person_id==None, FaceDetection.embedding_path!=None).count()
