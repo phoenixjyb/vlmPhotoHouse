@@ -1,4 +1,10 @@
 # Heavy ML deps (install only when needed)
+# CPU default installs lightweight FAISS. For GPU:
+#   1) Install appropriate CUDA toolkit drivers
+#   2) Optionally pre-install torch/torchvision from official index, e.g.:
+#        pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision
+#   3) Replace faiss-cpu with faiss-gpu (if wheel available) OR keep faiss-cpu fallback.
+
 sentence-transformers
 open_clip_torch
 torch

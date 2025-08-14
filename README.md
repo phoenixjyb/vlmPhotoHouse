@@ -16,6 +16,30 @@ To skip all tests locally during fast iteration, set `SKIP_ALL_TESTS=true` (docu
 - macOS (fast): builds only core dependencies. Heavy ML packages (torch, faiss, open-clip, sentence-transformers) are deferred.
 - GPU/WSL2: enable heavy ML packages for full functionality.
 
+### Environment Matrix
+
+| Platform | Intent | Install | Lock File |
+|----------|--------|---------|-----------|
+| macOS / lightweight | Core only (no GPU) | `pip install -r backend/requirements-core.txt` | `backend/requirements-lock-core.txt` (optional exact) |
+| Windows / Linux (GPU) | Core + ML | `pip install -r backend/requirements-core.txt && pip install -r backend/requirements-ml.txt` | `backend/requirements-lock-ml.txt` (full superset) |
+
+Generate / refresh locks after intentional upgrades:
+```
+pip freeze > backend/requirements-lock-core.txt        # in a core-only venv
+pip freeze > backend/requirements-lock-ml.txt          # in a full (core+ml) venv
+```
+Use the appropriate lock to reproduce an environment:
+```
+pip install -r backend/requirements-lock-core.txt   # mac
+pip install -r backend/requirements-lock-ml.txt     # gpu
+```
+
+Scripts (after commit) will live in `backend/scripts/`:
+- `setup-core.sh` / `setup-core.ps1`
+- `setup-ml.sh` / `setup-ml.ps1`
+
+These automate venv creation, pip upgrade, and installs.
+
 Steps:
 
 1. Copy `deploy/env.sample` to `deploy/.env` and adjust paths. On macOS keep `INCLUDE_ML=false`.
