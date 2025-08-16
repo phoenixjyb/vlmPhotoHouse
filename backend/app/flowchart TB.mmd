@@ -1,73 +1,120 @@
 flowchart TB
-  subgraph User_Workstation[User Workstation]
-    API[API / Search Service]
+  subgraph User_Workstation[User Workstation - vlmPhotoHouse]
+    API[FastAPI Server\nPort 8001]
     Ingestion[Ingestion Scanner]
-    TaskQ[(Task Queue DB\nSQLite)]
+    TaskQ[(Task Queue\nSQLite)]
     Thumbs[Thumbnail Worker]
-    Embed[Embedding Worker GPU]
-    Caption[Caption Worker GPU]
-    Faces[Face Worker]
+    Embed[Embedding Worker]
+    Caption[Caption Worker\nSubprocess Provider]
+    Faces[Face Worker\nMulti-Provider]
     Albums[Album Generator]
+    Health[Health Monitor\n/health endpoints]
   end
 
-  subgraph GPU[GPU Device]
-    CLIP[CLIP Model]
-    BLIP2[BLIP2 Model]
-    ArcFace[Face Embedding Model]
+  subgraph External_Models[External Model Environment - vlmCaptionModels]
+    BLIP2[BLIP2 Model\n13.96 GB Local]
+    Qwen[Qwen2.5-VL Model\n7.00 GB Local]
+    LVFace[LVFace Model\n38 MB ONNX]
+    InferenceScripts[Inference Scripts\nJSON Interface]
   end
 
-  subgraph Local_NVMe[Local NVMe Derived Store]
-    DerivFS[/Derived Artifacts store/]
-    VectorIdx[(FAISS Index)]
+  subgraph Built_In_Models[Built-in Models]
+    CLIP[CLIP Model\nImage Embeddings]
+    MTCNN[MTCNN\nFace Detection]
+    Facenet[Facenet Provider]
+    InsightFace[InsightFace Provider]
+  end
+
+  subgraph Local_Storage[Local Storage - backend/derived]
+    DerivFS[/Derived Artifacts/]
+    VectorIdx[(FAISS Vector Index)]
     MetaDB[(metadata.sqlite)]
+    Embeddings[/Image Embeddings .npy/]
+    FaceEmbeds[/Face Embeddings .npy/]
+    PersonEmbeds[/Person Embeddings .npy/]
+    Thumbnails[/Thumbnails/]
   end
 
-  subgraph NAS[NAS / Originals Storage]
-    Originals[/Originals Files/]
-    Snapshots[/Backups & Snapshots/]
+  subgraph Photo_Storage[Photo Collection]
+    Originals[/Original Photos/]
+    Backups[/Backups & Snapshots/]
   end
 
-  API -->|query / search| VectorIdx
-  API -->|metadata CRUD| MetaDB
-  Ingestion -->|scan paths| Originals
-  Ingestion -->|write assets| MetaDB
-  Ingestion -->|schedule tasks| TaskQ
+  %% Main API flow
+  API -->|vector search| VectorIdx
+  API -->|metadata queries| MetaDB
+  API -->|health checks| Health
+  Health -->|validate providers| External_Models
+  Health -->|check models| Built_In_Models
+
+  %% Ingestion flow
+  Ingestion -->|scan directories| Originals
+  Ingestion -->|create asset records| MetaDB
+  Ingestion -->|enqueue processing| TaskQ
+
+  %% Task processing
   TaskQ --> Thumbs
   TaskQ --> Embed
   TaskQ --> Caption
   TaskQ --> Faces
-  Thumbs --> DerivFS
-  Embed --> DerivFS
-  Caption --> DerivFS
-  Faces --> DerivFS
+
+  %% Worker outputs
+  Thumbs --> Thumbnails
+  Embed --> Embeddings
   Embed --> VectorIdx
-  Faces --> MetaDB
-  Thumbs --> MetaDB
   Caption --> MetaDB
+  Faces --> FaceEmbeds
+  Faces --> PersonEmbeds
+  Faces --> MetaDB
+
+  %% Model connections
+  CLIP -.loaded by.-> Embed
+  MTCNN -.loaded by.-> Faces
+  Facenet -.option for.-> Faces
+  InsightFace -.option for.-> Faces
+
+  %% External model communication (JSON subprocess)
+  Caption -.JSON IPC.-> InferenceScripts
+  InferenceScripts -.loads.-> BLIP2
+  InferenceScripts -.loads.-> Qwen
+  Faces -.JSON IPC.-> LVFace
+
+  %% Photo access
+  Originals -->|read for processing| Thumbs
+  Originals -->|read for processing| Embed
+  Originals -->|read for processing| Caption
+  Originals -->|read for processing| Faces
+
+  %% Album generation
   Albums --> MetaDB
   Albums --> VectorIdx
   API --> Albums
 
-  CLIP -.loaded by .-> Embed
-  BLIP2 -.loaded by .-> Caption
-  ArcFace -.loaded by .-> Faces
+  %% Backup strategy
+  DerivFS -->|periodic backup| Backups
+  MetaDB -->|database backup| Backups
+  VectorIdx -->|index backup| Backups
 
-  Originals -->|read| Thumbs
-  Originals -->|read| Embed
-  Originals -->|read| Caption
-  Originals -->|read| Faces
-
-  DerivFS -->|periodic rsync| Snapshots
-  MetaDB -->|snapshot| Snapshots
-  VectorIdx -->|snapshot| Snapshots
-
-  subgraph Optionals[Alternative / Future]
+  subgraph Future_Scaling[Future Scaling Options]
     Qdrant[(Qdrant Vector DB)]
-    Postgres[(Postgres DB)]
-    RemoteGPU[Remote GPU Host]
+    Postgres[(PostgreSQL)]
+    GPU_Workers[Dedicated GPU Workers]
+    WebUI[Web User Interface]
   end
 
-  VectorIdx -.optional replace .-> Qdrant
-  MetaDB -.migrate to .-> Postgres
-  Embed -.offload jobs .-> RemoteGPU
-  Caption -.offload jobs .-> RemoteGPU
+  %% Future connections
+  VectorIdx -.upgrade to.-> Qdrant
+  MetaDB -.migrate to.-> Postgres
+  Caption -.scale with.-> GPU_Workers
+  API -.serve.-> WebUI
+
+  %% Styling
+  classDef production fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+  classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+  classDef storage fill:#fff8e1,stroke:#f57c00,stroke-width:2px
+  classDef future fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+  class API,TaskQ,Health,BLIP2,LVFace,InferenceScripts production
+  class External_Models,Built_In_Models external
+  class DerivFS,VectorIdx,MetaDB,Embeddings,FaceEmbeds,PersonEmbeds,Thumbnails,Originals storage
+  class Qdrant,Postgres,GPU_Workers,WebUI future

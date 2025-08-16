@@ -2,7 +2,23 @@
 
 **Date**: 2025-08-16  
 **Status**: Production Implementation  
-**Major Update**: Dual Environment & Multi-Provider Architecture
+**Major Update**: Dual Environment & Multi-Provider Architecture  
+**Visual Diagrams**: See `architecture-diagrams.md` for comprehensive Mermaid charts
+
+---
+
+## 📊 Visual Architecture Overview
+
+> **Note**: For comprehensive visual diagrams including system architecture, data flows, provider patterns, and deployment diagrams, see [architecture-diagrams.md](./architecture-diagrams.md)
+
+### Quick Reference Diagrams:
+- **System Overview**: Dual environment architecture with model isolation
+- **Data Flow**: End-to-end photo processing pipeline  
+- **Search Architecture**: Multi-modal search with vector similarity
+- **Provider System**: Pluggable AI model providers with health monitoring
+- **Task Processing**: Async job processing with retry logic
+- **Health Monitoring**: Comprehensive system status validation
+- **Deployment Options**: Development to production scaling path
 
 ---
 
