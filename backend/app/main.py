@@ -119,13 +119,23 @@ def reinit_executor_for_tests():
         engine.dispose()
     except Exception:
         pass
-    # Recreate engine and session factory to honor DATABASE_URL overrides
+    # Recreate engine and update existing SessionLocal to honor DATABASE_URL overrides
     new_engine = create_engine(settings.database_url, future=True, echo=False)
     engine = new_engine
-    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-    # Ensure DB schema exists for the new engine
+    if 'SessionLocal' in globals() and SessionLocal is not None:
+        try:
+            SessionLocal.configure(bind=engine)
+        except Exception:
+            # Fallback: recreate if configure not possible
+            SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    else:
+        SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    # Ensure DB schema exists for the new engine (fail fast instead of swallowing silently for tests)
+    db.Base.metadata.create_all(bind=engine)
+    # Mark readiness so ensure_db() short-circuits
     try:
-        db.Base.metadata.create_all(bind=engine)
+        global _DB_READY
+        _DB_READY = True
     except Exception:
         pass
     executor = TaskExecutor(SessionLocal, settings)
@@ -133,6 +143,10 @@ def reinit_executor_for_tests():
 
 @app.on_event("startup")
 def on_startup():
+    # Validate configuration before starting
+    from .lvface_validation import validate_startup_config
+    validate_startup_config()
+    
     # Skip Alembic migrations for tests or when AUTO_MIGRATE disabled
     if settings.run_mode == 'tests' or not settings.auto_migrate:
         init_db()
@@ -248,14 +262,38 @@ def health(request: Request, db_s: Session = Depends(get_db)):
         from .face_embedding_service import get_face_embedding_provider
         prov = get_face_embedding_provider()
         face_embed_provider = prov.__class__.__name__
+        try:
+            embed_dim = getattr(prov, 'dim', None)
+        except Exception:
+            embed_dim = None
     except Exception:
         face_embed_provider = 'unavailable'
+        embed_dim = None
+    # Detection provider info
+    try:
+        from .face_detection_service import get_face_detection_provider
+        _det = get_face_detection_provider()
+        face_detect_provider = _det.__class__.__name__
+    except Exception:
+        face_detect_provider = 'unavailable'
     try:
         from .face_detection_service import get_face_detection_provider
         dprov = get_face_detection_provider()
         face_detect_provider = dprov.__class__.__name__
     except Exception:
         face_detect_provider = 'unavailable'
+    
+    # Caption provider info
+    caption_provider = None
+    caption_device = settings.caption_device
+    caption_model = settings.caption_model
+    try:
+        from .caption_service import get_caption_provider
+        cprov = get_caption_provider()
+        caption_provider = cprov.__class__.__name__
+    except Exception:
+        caption_provider = 'unavailable'
+    
     return {
         'api_version': schemas.API_VERSION,
         'ok': db_ok,
@@ -268,10 +306,75 @@ def health(request: Request, db_s: Session = Depends(get_db)):
         'worker_enabled': settings.enable_inline_worker and settings.run_mode in ("api","all"),
         'face': {
             'embed_provider': face_embed_provider,
+            'embed_dim': embed_dim,
+            'lvface_model_path': settings.lvface_model_path if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
+            'lvface_external_dir': settings.lvface_external_dir if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
+            'lvface_model_name': settings.lvface_model_name if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'detect_provider': face_detect_provider,
             'device': face_device,
         },
+        'caption': {
+            'provider': caption_provider,
+            'device': caption_device,
+            'model': caption_model,
+            'external_dir': settings.caption_external_dir if caption_provider and 'external' in caption_provider.lower() else None,
+        },
     }
+
+@app.get('/health/lvface')
+def health_lvface():
+    """Detailed LVFace configuration and status."""
+    from .lvface_validation import get_config_summary
+    return get_config_summary()
+
+@app.get('/health/caption')
+def health_caption():
+    """Detailed caption provider configuration and status."""
+    try:
+        from .caption_service import get_caption_provider
+        provider = get_caption_provider()
+        provider_name = provider.__class__.__name__
+        model_name = provider.get_model_name()
+        
+        status = {
+            'provider': provider_name,
+            'model': model_name,
+            'device': settings.caption_device,
+            'configured_provider': settings.caption_provider,
+            'configured_model': settings.caption_model,
+            'external_dir': settings.caption_external_dir,
+            'mode': 'external' if settings.caption_external_dir and 'external' in model_name.lower() else 'builtin',
+            'available_providers': ['stub', 'llava-next', 'qwen2.5-vl', 'blip2'],
+        }
+        
+        # Test caption generation (if possible without long model loading)
+        if provider_name == 'StubCaptionProvider':
+            status['test_result'] = 'Stub provider active (filename-based heuristics)'
+        elif 'external' in model_name.lower():
+            status['test_result'] = f'External model provider active: {model_name}'
+        else:
+            status['test_result'] = f'Built-in model provider active: {model_name}'
+            
+        # Validate external directory if configured
+        if settings.caption_external_dir:
+            from pathlib import Path
+            external_dir = Path(settings.caption_external_dir)
+            status['external_validation'] = {
+                'dir_exists': external_dir.exists(),
+                'python_exists': (external_dir / ".venv" / "Scripts" / "python.exe").exists() or (external_dir / ".venv" / "bin" / "python").exists(),
+                'inference_script_exists': (external_dir / "inference.py").exists(),
+            }
+            
+        return status
+        
+    except Exception as e:
+        return {
+            'error': str(e),
+            'provider': 'unavailable',
+            'configured_provider': settings.caption_provider,
+            'external_dir': settings.caption_external_dir,
+            'available_providers': ['stub', 'llava-next', 'qwen2.5-vl', 'blip2'],
+        }
 
 @app.get('/metrics', response_model=schemas.MetricsResponse)
 def metrics(db_s: Session = Depends(get_db)):

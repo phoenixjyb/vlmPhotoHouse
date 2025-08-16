@@ -10,3 +10,10 @@ open_clip_torch
 torch
 torchvision
 faiss-cpu
+onnxruntime  # for LVFaceEmbeddingProvider (use onnxruntime-gpu if CUDA desired)
+onnx  # needed only to generate dummy/testing ONNX models (not required at runtime if you already have a model file)
+
+# Caption model dependencies
+transformers  # for LLaVA-NeXT, BLIP2
+pillow  # for image processing (PIL)
+qwen-vl-utils  # for Qwen2-VL model support

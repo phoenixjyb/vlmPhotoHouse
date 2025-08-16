@@ -35,7 +35,15 @@ class Settings(BaseModel):
     face_embed_provider: str = Field(default=os.getenv('FACE_EMBED_PROVIDER', 'stub'))  # stub|facenet|insight
     face_embed_model: str = Field(default=os.getenv('FACE_EMBED_MODEL', 'stub-v1'))
     face_embed_dim: int = Field(default=int(os.getenv('FACE_EMBED_DIM', '128')))
+    face_detect_provider: str = Field(default=os.getenv('FACE_DETECT_PROVIDER','stub'))  # stub|mtcnn|auto
+    face_crop_margin: float = Field(default=float(os.getenv('FACE_CROP_MARGIN','0.0')))  # fraction of max(w,h) to expand each side
     lvface_model_path: str = Field(default=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'))
+    lvface_external_dir: str = Field(default=os.getenv('LVFACE_EXTERNAL_DIR', ''))  # Path to external LVFace installation
+    lvface_model_name: str = Field(default=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'))  # Model filename in external dir
+    caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|auto
+    caption_device: str = Field(default=os.getenv('CAPTION_DEVICE', 'cpu'))  # cpu|cuda
+    caption_model: str = Field(default=os.getenv('CAPTION_MODEL', 'auto'))  # model name override
+    caption_external_dir: str = Field(default=os.getenv('CAPTION_EXTERNAL_DIR', ''))  # Path to external caption models installation
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
     # Backoff configuration (supports legacy env var synonyms)
@@ -79,6 +87,15 @@ def get_settings() -> Settings:
     face_embed_provider=os.getenv('FACE_EMBED_PROVIDER','stub'),
     face_embed_model=os.getenv('FACE_EMBED_MODEL','stub-v1'),
     face_embed_dim=int(os.getenv('FACE_EMBED_DIM','128')),
+    face_detect_provider=os.getenv('FACE_DETECT_PROVIDER','stub'),
+    face_crop_margin=float(os.getenv('FACE_CROP_MARGIN','0.0')),
+        lvface_model_path=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'),
+        lvface_external_dir=os.getenv('LVFACE_EXTERNAL_DIR', ''),
+        lvface_model_name=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'),
+        caption_provider=os.getenv('CAPTION_PROVIDER', 'stub'),
+        caption_device=os.getenv('CAPTION_DEVICE', 'cpu'),
+        caption_model=os.getenv('CAPTION_MODEL', 'auto'),
+        caption_external_dir=os.getenv('CAPTION_EXTERNAL_DIR', ''),
         worker_concurrency=int(os.getenv('WORKER_CONCURRENCY','1')),
         max_task_retries=int(os.getenv('MAX_TASK_RETRIES','3')),
     retry_backoff_base_seconds=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),
