@@ -20,3 +20,7 @@ derived/
 backend/derived/
 backend/derived/**
 *.npy
+.coverage
+coverage.xml
+backend/.coverage
+backend/coverage.xml
