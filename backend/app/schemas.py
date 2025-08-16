@@ -168,6 +168,8 @@ class HealthResponse(APIBase):
     index: HealthIndexStatus
     profile: str
     worker_enabled: bool
+    face: Optional[dict] = None
+    caption: Optional[dict] = None
 
 class MetricsTasks(BaseModel):
     total: int

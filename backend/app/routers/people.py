@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Body, Query, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import List
+from typing import List, Optional
 
 from ..db import Person, FaceDetection, Asset, Task
 from ..main import get_db, DERIVED_PATH  # reuse existing get_db and path constants
@@ -251,3 +251,193 @@ def cancel_task(task_id: int, db_s: Session = Depends(get_db)):
     # Optionally transition pending running tasks; executor will honor later when progress added
     db_s.commit()
     return {'api_version': schemas.API_VERSION, 'task_id': t.id, 'state': t.state}
+
+# --- Person-based search endpoints ---
+
+@router.get('/search/person/{person_id}', response_model=schemas.SearchResponse)
+def search_photos_by_person(
+    person_id: int,
+    page: int = Query(1, ge=1), 
+    page_size: int = Query(20, ge=1, le=200),
+    db_s: Session = Depends(get_db)
+):
+    """Find all photos containing a specific person."""
+    # Verify person exists
+    person = db_s.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail='person not found')
+    
+    # Get asset IDs for photos containing this person
+    asset_ids_subquery = (
+        db_s.query(FaceDetection.asset_id)
+        .filter(FaceDetection.person_id == person_id)
+        .distinct()
+        .subquery()
+    )
+    
+    # Query assets with pagination
+    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery))
+    total = base_query.count()
+    
+    assets = (
+        base_query
+        .order_by(Asset.id.desc())
+        .offset((page-1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'person_id': person_id,
+        'person_name': person.display_name,
+        'items': [{'id': a.id, 'path': a.path} for a in assets]
+    }
+
+@router.get('/search/person/name/{name}', response_model=schemas.SearchResponse)
+def search_photos_by_person_name(
+    name: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    db_s: Session = Depends(get_db)
+):
+    """Find all photos containing a person with the given name (case-insensitive partial match)."""
+    # Find persons matching the name
+    persons = (
+        db_s.query(Person)
+        .filter(Person.display_name.ilike(f"%{name}%"))
+        .all()
+    )
+    
+    if not persons:
+        return {
+            'api_version': schemas.API_VERSION,
+            'page': page,
+            'page_size': page_size,
+            'total': 0,
+            'search_name': name,
+            'matched_persons': [],
+            'items': []
+        }
+    
+    person_ids = [p.id for p in persons]
+    
+    # Get asset IDs for photos containing any of these persons
+    asset_ids_subquery = (
+        db_s.query(FaceDetection.asset_id)
+        .filter(FaceDetection.person_id.in_(person_ids))
+        .distinct()
+        .subquery()
+    )
+    
+    # Query assets with pagination
+    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery))
+    total = base_query.count()
+    
+    assets = (
+        base_query
+        .order_by(Asset.id.desc())
+        .offset((page-1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'search_name': name,
+        'matched_persons': [{'id': p.id, 'name': p.display_name} for p in persons],
+        'items': [{'id': a.id, 'path': a.path} for a in assets]
+    }
+
+@router.post('/search/person/vector', response_model=schemas.VectorSearchResponse)
+def vector_search_with_person_filter(
+    text: Optional[str] = Body(None),
+    asset_id: Optional[int] = Body(None),
+    person_id: Optional[int] = Body(None),
+    k: int = Body(10),
+    db_s: Session = Depends(get_db)
+):
+    """Vector search with optional person filtering."""
+    # Import vector search dependencies
+    from ..tasks import INDEX_SINGLETON, EMBED_SERVICE
+    
+    if INDEX_SINGLETON is None or EMBED_SERVICE is None:
+        raise HTTPException(status_code=503, detail='Vector index not initialized')
+    
+    if not text and not asset_id:
+        raise HTTPException(status_code=400, detail='Provide text or asset_id')
+    
+    # Generate query vector
+    if text:
+        query_vec = EMBED_SERVICE.embed_text_stub(text)
+    else:
+        asset = db_s.get(Asset, asset_id)
+        if not asset:
+            raise HTTPException(status_code=404, detail='asset not found')
+        apath = asset.path if isinstance(asset.path, str) else str(asset.path)
+        query_vec = EMBED_SERVICE.embed_image_stub(apath)
+    
+    # Perform vector search
+    matches = INDEX_SINGLETON.search(query_vec, k=k*2)  # Get more results for filtering
+    
+    # If person filter is specified, filter results
+    if person_id is not None:
+        # Verify person exists
+        person = db_s.get(Person, person_id)
+        if not person:
+            raise HTTPException(status_code=404, detail='person not found')
+        
+        # Get asset IDs containing this person
+        person_asset_ids = set(
+            row[0] for row in 
+            db_s.query(FaceDetection.asset_id)
+            .filter(FaceDetection.person_id == person_id)
+            .distinct()
+            .all()
+        )
+        
+        # Filter matches to only include assets with this person
+        filtered_matches = [
+            (asset_id, score) for asset_id, score in matches 
+            if asset_id in person_asset_ids
+        ][:k]  # Take only k results after filtering
+        
+        matches = filtered_matches
+    else:
+        matches = matches[:k]
+    
+    # Get asset details
+    assets_map = {
+        a.id: a for a in 
+        db_s.query(Asset).filter(Asset.id.in_([mid for mid, _ in matches])).all()
+    }
+    
+    result_items = []
+    for mid, score in matches:
+        aobj = assets_map.get(mid)
+        result_items.append({
+            'asset_id': mid,
+            'score': float(score),
+            'path': aobj.path if aobj else None
+        })
+    
+    response = {
+        'api_version': schemas.API_VERSION,
+        'query': {'text': text, 'asset_id': asset_id},
+        'k': k,
+        'results': result_items
+    }
+    
+    if person_id is not None:
+        response['person_filter'] = {
+            'person_id': person_id,
+            'person_name': person.display_name if person else None
+        }
+    
+    return response

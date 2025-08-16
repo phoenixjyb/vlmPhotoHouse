@@ -287,18 +287,41 @@ class TaskExecutor:
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
-        # Simple heuristic stub caption: based on filename tokens
-        filename = Path(asset.path).name
-        base = os.path.splitext(filename)[0]
-        tokens = [t for t in base.replace('-', ' ').replace('_',' ').split() if t]
-        if not tokens:
-            text = 'Photo'
-        else:
-            text = ' '.join(tokens[:8])
+        
+        # Check if caption already exists
         existing = session.get(Caption, asset_id)
         if existing:
-            return
-        cap = Caption(asset_id=asset_id, text=text, model='stub-blip2', user_edited=False)
+            return existing
+        
+        try:
+            # Use the caption service to generate real captions
+            from .caption_service import get_caption_provider
+            from PIL import Image
+            
+            provider = get_caption_provider()
+            
+            # Load and process image
+            image = Image.open(asset.path).convert('RGB')
+            
+            # Generate caption
+            text = provider.generate_caption(image)
+            model_name = provider.get_model_name()
+            
+            logger.info(f"Generated caption for {asset.path}: '{text}' (model: {model_name})")
+            
+        except Exception as e:
+            # Fallback to heuristic caption on error
+            logger.warning(f"Caption generation failed for {asset.path}, using fallback: {e}")
+            filename = Path(asset.path).name
+            base = os.path.splitext(filename)[0]
+            tokens = [t for t in base.replace('-', ' ').replace('_',' ').split() if t]
+            if not tokens:
+                text = 'Photo'
+            else:
+                text = ' '.join(tokens[:8])
+            model_name = 'stub-fallback'
+        
+        cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False)
         session.add(cap)
         session.commit()
         return cap
@@ -354,6 +377,19 @@ class TaskExecutor:
                 y1 = int(max(0, face.bbox_y))
                 x2 = int(min(w, face.bbox_x + face.bbox_w))
                 y2 = int(min(h, face.bbox_y + face.bbox_h))
+                # Optional margin expansion
+                try:
+                    from .config import get_settings as _gs
+                    _s = _gs()
+                    margin = getattr(_s, 'face_crop_margin', 0.0)
+                except Exception:
+                    margin = 0.0
+                if margin > 0:
+                    mw = int(margin * max(w,h))
+                    x1 = max(0, x1 - mw)
+                    y1 = max(0, y1 - mw)
+                    x2 = min(w, x2 + mw)
+                    y2 = min(h, y2 + mw)
                 if x2 <= x1 or y2 <= y1:
                     continue
                 face_crop = im.crop((x1, y1, x2, y2))

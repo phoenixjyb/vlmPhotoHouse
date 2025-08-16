@@ -14,6 +14,8 @@ services:
       - ${DERIVED_PATH}:/derived:rw
       - api-data:/data:rw
       - pip-cache:/root/.cache/pip:rw
+      # Mount external LVFace directory if available
+      - ${LVFACE_PATH:-/dev/null}:/lvface:ro
     env_file:
       - ./env
     environment:
@@ -26,6 +28,11 @@ services:
       VECTOR_INDEX_AUTOLOAD: "false"
       EMBED_MODEL_IMAGE: stub
       EMBED_MODEL_TEXT: stub
+      # LVFace configuration
+      FACE_EMBED_PROVIDER: ${FACE_EMBED_PROVIDER:-stub}
+      LVFACE_EXTERNAL_DIR: ${LVFACE_EXTERNAL_DIR:-}
+      LVFACE_MODEL_NAME: ${LVFACE_MODEL_NAME:-lvface.onnx}
+      FACE_EMBED_DIM: ${FACE_EMBED_DIM:-128}
       NVIDIA_VISIBLE_DEVICES: ${API_GPU:-0}
     command: ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]
     ports:

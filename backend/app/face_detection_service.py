@@ -60,7 +60,7 @@ def get_face_detection_provider() -> FaceDetectionProvider:
     # Force stub in test mode unless overridden to keep CI fast
     if s.run_mode == 'tests' and os.getenv('FORCE_REAL_FACE_PROVIDER','0') not in ('1','true','yes'):
         return StubDetectionProvider()
-    provider = os.getenv('FACE_DETECT_PROVIDER', 'mtcnn').lower()
+    provider = s.face_detect_provider.lower() if hasattr(s,'face_detect_provider') else os.getenv('FACE_DETECT_PROVIDER','mtcnn').lower()
     device = s.embed_device
     if provider in ('mtcnn','facenet','auto'):
         try:

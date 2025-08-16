@@ -158,7 +158,7 @@ def get_face_embedding_provider() -> FaceEmbeddingProvider:
 
     # Auto provider selection: try insightface then facenet then stub
     if provider_req in ('auto','best'):
-        for candidate in ('insight','facenet','stub'):
+        for candidate in ('lvface','insight','facenet','stub'):
             os.environ['FACE_EMBED_PROVIDER'] = candidate  # update for introspection
             try:
                 _prov = _build_provider(candidate, device_req, s.face_embed_dim)
@@ -223,5 +223,14 @@ def _build_provider(provider: str, device_req: str, target_dim: int) -> FaceEmbe
     if provider == 'lvface':
         from .config import get_settings as _gs
         s = _gs()
-        return LVFaceEmbeddingProvider(s.lvface_model_path, 'cuda' if device_req=='cuda' else 'cpu', target_dim)
+        
+        # Check if we should use subprocess (external LVFace)
+        lvface_external_dir = os.getenv('LVFACE_EXTERNAL_DIR')
+        if lvface_external_dir:
+            from .lvface_subprocess import LVFaceSubprocessProvider
+            model_name = os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx')
+            return LVFaceSubprocessProvider(lvface_external_dir, model_name, target_dim)
+        else:
+            # Use built-in ONNX provider
+            return LVFaceEmbeddingProvider(s.lvface_model_path, 'cuda' if device_req=='cuda' else 'cpu', target_dim)
     raise RuntimeError(f'Unknown provider {provider}')

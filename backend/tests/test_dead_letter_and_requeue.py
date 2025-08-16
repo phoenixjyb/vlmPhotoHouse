@@ -14,12 +14,21 @@ def test_dead_letter_and_requeue(override_settings):
     client = TestClient(app_main.app)
     SessionLocal = app_main.SessionLocal
     with SessionLocal() as s:
+        from datetime import datetime, timedelta
         t = Task(type='fail_transient', priority=10, payload_json={})
+        # Force scheduled_at to be in the past to guarantee immediate execution even if
+        # DB default timestamp resolution or clock skew would otherwise delay claiming.
+        t.scheduled_at = datetime.utcnow() - timedelta(seconds=5)
         s.add(t)
         s.commit()
         tid = t.id
-    # run once should mark dead immediately due to max retries 0
-    app_main.executor.run_once()
+    # Run executor until task processed (allow a few iterations in case of race)
+    for _ in range(5):
+        app_main.executor.run_once()
+        with SessionLocal() as s:
+            t = s.get(Task, tid)
+            if t and t.state != 'pending':
+                break
     with SessionLocal() as s:
         t = s.get(Task, tid)
         assert t is not None

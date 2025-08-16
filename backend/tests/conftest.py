@@ -1,4 +1,8 @@
 import os, tempfile, shutil, sys
+# Ensure backend directory (parent of this tests folder) is on sys.path so 'app' package resolves after relocations
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if _BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, _BACKEND_ROOT)
 import pytest
 from fastapi.testclient import TestClient
 from app.config import get_settings
@@ -35,6 +39,10 @@ def override_settings(temp_env_root, monkeypatch):
     # clear cache
     from functools import lru_cache
     get_settings.cache_clear()  # type: ignore
+    # Reinitialize executor/engine to pick up DATABASE_URL override and create tables
+    from app.main import reinit_executor_for_tests, init_db
+    reinit_executor_for_tests()
+    init_db()
     yield
     get_settings.cache_clear()  # type: ignore
 
