@@ -2,11 +2,12 @@
 
 ## Stages
 1. Discovery: walk roots; maintain seen set & modification cursor
-2. Filtering: extension whitelist (jpg,jpeg,png,heic,mp4), min/max size
+2. Filtering: extension whitelist (jpg,jpeg,png,heic,mp4,mov,mkv), min/max size
 3. Hashing: compute SHA256 (stream) + perceptual hash (fast pHash placeholder)
 4. Metadata Extraction: EXIF (timestamp, camera, GPS), fallback to file mtime
 5. Dedup: if SHA256 exists → link/skip; else create Asset
 6. Scheduling: create tasks for thumbnails, embeddings, caption, faces (configurable)
+	- Video (planned): probe → segment → keyframes → caption/embed/transcribe per segment
 7. Persistence: commit in single transaction (Asset + tasks) for atomicity
 
 ## Idempotency
@@ -28,3 +29,4 @@ Outputs summary: new, updated, duplicates, errors.
 ## Future Enhancements
 - Watch mode (inotify / fswatch) for incremental updates
 - Rate limiting for IO burst control
+ - Scene/shot boundary detection for video segmentation (planned)

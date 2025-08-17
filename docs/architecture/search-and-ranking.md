@@ -6,18 +6,19 @@
 - Tag filter (must/any/exclude)
 - Time range
 - Event / album scoping
+ - Video segment search (returns segments with start/end + keyframe)  <!-- planned -->
 
 ## Processing Flow
 1. Parse user query into: text_terms, filters
 2. If text_terms → text embedding
-3. Retrieve top K via vector similarity
+3. Retrieve top K via vector similarity (images and/or video segments)
 4. Apply metadata filters (post-filter if small K, pre-filter candidate set if large)
 5. Compute hybrid score
 6. Re-rank & paginate
 
 ## Hybrid Score Example
 ```
-score = w_img * sim_img + w_txt * sim_txt + w_person * person_bonus + w_recency * recency_decay
+score = w_img * sim_img + w_txt * sim_txt + w_person * person_bonus + w_recency * recency_decay + w_transcript * bm25_transcript
 ```
 
 ## Re-ranking Signals
@@ -34,3 +35,4 @@ score = w_img * sim_img + w_txt * sim_txt + w_person * person_bonus + w_recency 
 - Multi-vector queries (image + text combined)
 - Pseudo-relevance feedback (expand tags from top results)
 - Diversification to avoid near-duplicate clutter
+ - Fusion of multi-frame evidence per segment / per scene (video) (planned)

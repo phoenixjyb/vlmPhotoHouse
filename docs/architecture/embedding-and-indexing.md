@@ -4,6 +4,7 @@
 - Image Embedding: CLIP ViT-B/32 (initial) → upgrade path to ViT-L/14 or SigLIP
 - Caption Text Embedding: same CLIP text tower or sentence-transformer
 - Face Embeddings: InsightFace model (ArcFace) small variant
+ - Video Segment Embeddings: CLIP on keyframes, mean-pooled per segment (planned)
 
 ## Generation Workflow
 1. Queue embedding task after Asset creation
@@ -14,6 +15,7 @@
 ## Vector Index Options
 - Phase 1: FAISS (Flat / IVFFlat) local file
 - Phase 2: Qdrant container (HNSW) with persistence
+ - Video: either shared index (image + video segments) with a modality flag, or a dedicated video_segment index (planned)
 
 ## Hybrid Ranking
 score = α * image_sim + β * text_sim + γ * metadata_boost
@@ -33,8 +35,10 @@ score = α * image_sim + β * text_sim + γ * metadata_boost
 ```
 embeddings/{model_version}/{asset_id}.npy
 faces/{asset_id}/{face_idx}.json (with bbox + embedding ref)
+video_embeddings/{asset_id}_{t_start}.npy  # planned
 ```
 
 ## Open Decisions
 - Which sentence transformer for caption text? (all-MiniLM vs CLIP text)
 - Index quantization (PQ) when > 5M vectors (future)
+ - Separate FAISS index for video segments vs shared with images (planned)

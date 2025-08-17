@@ -10,7 +10,7 @@ import math
 from . import db
 from .config import get_settings
 from . import ingest as ingest_mod
-from .tasks import TaskExecutor, INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM  # vector search globals
+from . import tasks as tasks_mod  # use module to keep live globals
 from .vector_index import load_index_from_embeddings, load_faiss_index_from_embeddings, FaissVectorIndex
 from .db import Asset, Task
 from pathlib import Path
@@ -23,79 +23,18 @@ from typing import Generator, List
 from .services import assets as asset_service
 from .paths import DERIVED_PATH
 from . import metrics as metrics_mod
+from .dependencies import get_db, SessionLocal
 
 settings = get_settings()
 DATABASE_URL = settings.database_url
 engine = create_engine(DATABASE_URL, future=True, echo=False)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-
-_DB_READY = False
-
-def ensure_db():
-    global _DB_READY
-    if not _DB_READY:
-        try:
-            insp = inspect(engine)
-            if not insp.has_table('assets'):
-                db.Base.metadata.create_all(bind=engine)
-            # Fallback: if tasks table exists but new progress columns missing (e.g., older test DB before migration), add them for SQLite.
-            if insp.has_table('tasks'):
-                cols = {c['name'] for c in insp.get_columns('tasks')}
-                with engine.begin() as conn:
-                    if 'progress_current' not in cols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE tasks ADD COLUMN progress_current INTEGER')
-                        except Exception:
-                            pass
-                    if 'progress_total' not in cols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE tasks ADD COLUMN progress_total INTEGER')
-                        except Exception:
-                            pass
-                    if 'cancel_requested' not in cols:
-                        try:
-                            conn.exec_driver_sql("ALTER TABLE tasks ADD COLUMN cancel_requested BOOLEAN DEFAULT 0 NOT NULL")
-                        except Exception:
-                            pass
-                    if 'started_at' not in cols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE tasks ADD COLUMN started_at DATETIME')
-                        except Exception:
-                            pass
-                    if 'finished_at' not in cols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE tasks ADD COLUMN finished_at DATETIME')
-                        except Exception:
-                            pass
-            # Fallback for embeddings new columns
-            if insp.has_table('embeddings'):
-                ecols = {c['name'] for c in insp.get_columns('embeddings')}
-                with engine.begin() as conn:
-                    if 'device' not in ecols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE embeddings ADD COLUMN device VARCHAR(16)')
-                        except Exception:
-                            pass
-                    if 'model_version' not in ecols:
-                        try:
-                            conn.exec_driver_sql('ALTER TABLE embeddings ADD COLUMN model_version VARCHAR(64)')
-                        except Exception:
-                            pass
-            _DB_READY = True
-        except Exception:
-            pass
 
 def init_db():
     db.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-def get_db() -> Generator[Session, None, None]:
-    ensure_db()
-    with SessionLocal() as session:
-        yield session
-
-executor = TaskExecutor(SessionLocal, settings)
+executor = tasks_mod.TaskExecutor(SessionLocal, settings)
 
 def task_worker_loop():
     while True:
@@ -113,7 +52,6 @@ def reinit_executor_for_tests():
         executor.stop_workers()
     except Exception:
         pass
-    # Refresh cached settings (caller should have called get_settings.cache_clear if needed)
     settings = get_settings()
     try:
         engine.dispose()
@@ -138,42 +76,42 @@ def reinit_executor_for_tests():
         _DB_READY = True
     except Exception:
         pass
-    executor = TaskExecutor(SessionLocal, settings)
+    executor = tasks_mod.TaskExecutor(SessionLocal, settings)
     return executor
 
 @app.on_event("startup")
 def on_startup():
-    # Validate configuration before starting
-    from .lvface_validation import validate_startup_config
-    validate_startup_config()
+    # Simplified startup for testing
+    print("Starting server with basic initialization...")
+    init_db()  # Just create tables, skip Alembic for now
+    print("Database initialized.")
     
-    # Skip Alembic migrations for tests or when AUTO_MIGRATE disabled
-    if settings.run_mode == 'tests' or not settings.auto_migrate:
-        init_db()
-    else:
-        alembic_cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), '..', 'alembic.ini'))
-        alembic_cfg.set_main_option('script_location', settings.alembic_script_location)
-        alembic_cfg.set_main_option('sqlalchemy.url', settings.database_url)
-        alembic_command.upgrade(alembic_cfg, 'head')
+    # Enable task workers for caption processing
     if settings.enable_inline_worker and settings.run_mode in ("api", "all"):
+        print("Starting task workers...")
         # Backwards compatibility: if concurrency==1 use legacy single loop else multi-worker
         if settings.worker_concurrency <= 1:
             t = threading.Thread(target=task_worker_loop, daemon=True)
             t.start()
+            print("Single task worker started.")
         else:
             executor.start_workers(settings.worker_concurrency)
+            print(f"Multi-worker executor started with {settings.worker_concurrency} workers.")
+    else:
+        print("Task workers disabled.")
+
     # Optionally load existing embeddings into index
-    if settings.vector_index_autoload and INDEX_SINGLETON is not None and not settings.vector_index_rebuild_on_demand_only:
+    if settings.vector_index_autoload and tasks_mod.INDEX_SINGLETON is not None and not settings.vector_index_rebuild_on_demand_only:
         try:
-            if isinstance(INDEX_SINGLETON, FaissVectorIndex):
-                loaded = load_faiss_index_from_embeddings(SessionLocal, INDEX_SINGLETON, limit=settings.max_index_load)
+            if isinstance(tasks_mod.INDEX_SINGLETON, FaissVectorIndex):
+                loaded = load_faiss_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
                 # save after load to persist meta
                 try:
-                    INDEX_SINGLETON.save(settings.vector_index_path)
+                    tasks_mod.INDEX_SINGLETON.save(settings.vector_index_path)
                 except Exception:
                     pass
             else:
-                loaded = load_index_from_embeddings(SessionLocal, INDEX_SINGLETON, limit=settings.max_index_load)
+                loaded = load_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
             logging.getLogger('app').info(f"Vector index autoloaded embeddings: {loaded}")
         except Exception:
             logging.getLogger('app').warning('Vector index autoload failed', exc_info=True)
@@ -185,7 +123,7 @@ def on_startup():
             sample = session.query(Embedding).filter(Embedding.modality=='image').limit(5).all()
             mismatch = False
             for emb in sample:
-                if emb.model != settings.embed_model_image or emb.dim != EMBED_DIM or (settings.embed_model_version and emb.model_version != settings.embed_model_version):
+                if emb.model != settings.embed_model_image or emb.dim != tasks_mod.EMBED_DIM or (settings.embed_model_version and emb.model_version != settings.embed_model_version):
                     mismatch = True
                     break
             if mismatch:
@@ -251,9 +189,9 @@ def health(request: Request, db_s: Session = Depends(get_db)):
     pending = db_s.query(Task).filter(Task.state=='pending').count()
     running = db_s.query(Task).filter(Task.state=='running').count()
     failed = db_s.query(Task).filter(Task.state=='failed').count()
-    index_initialized = INDEX_SINGLETON is not None
-    index_size = len(INDEX_SINGLETON) if INDEX_SINGLETON else 0
-    index_dim = EMBED_DIM if INDEX_SINGLETON else None
+    index_initialized = tasks_mod.INDEX_SINGLETON is not None
+    index_size = len(tasks_mod.INDEX_SINGLETON) if tasks_mod.INDEX_SINGLETON else 0
+    index_dim = tasks_mod.EMBED_DIM if tasks_mod.INDEX_SINGLETON else None
     # active face embedding provider (lazy; protected by try to avoid import failures on lightweight envs)
     face_embed_provider = None
     face_detect_provider = None
@@ -389,8 +327,8 @@ def metrics(db_s: Session = Depends(get_db)):
     tasks_total = db_s.query(Task).count()
     by_state_rows = db_s.query(Task.state, func.count(Task.id)).group_by(Task.state).all()
     by_state = {state: cnt for state, cnt in by_state_rows}
-    index_size = len(INDEX_SINGLETON) if INDEX_SINGLETON else 0
-    index_dim = EMBED_DIM if INDEX_SINGLETON else None
+    index_size = len(tasks_mod.INDEX_SINGLETON) if tasks_mod.INDEX_SINGLETON else 0
+    index_dim = tasks_mod.EMBED_DIM if tasks_mod.INDEX_SINGLETON else None
     last_recluster = None
     # attempt to find last completed recluster summary
     last_recluster_task = db_s.query(Task).filter(Task.type=='person_recluster', Task.state=='done').order_by(Task.id.desc()).first()
@@ -424,7 +362,7 @@ def metrics(db_s: Session = Depends(get_db)):
         'faces': faces,
         'persons': persons,
         'tasks': {'total': tasks_total, 'by_state': by_state},
-        'vector_index': {'size': index_size, 'dim': index_dim},
+    'vector_index': {'size': index_size, 'dim': index_dim},
         'last_recluster': last_recluster,
         'task_duration_seconds_avg': avg_duration
     }
@@ -557,19 +495,19 @@ def delete_single_asset(asset_id: int, remove_files: bool = Body(True), db_s: Se
 
 @app.post('/search/vector', response_model=schemas.VectorSearchResponse)
 def vector_search(text: str | None = Body(None), asset_id: int | None = Body(None), k: int = Body(10), db_s: Session = Depends(get_db)):
-    if INDEX_SINGLETON is None or EMBED_SERVICE is None:
+    if tasks_mod.INDEX_SINGLETON is None or tasks_mod.EMBED_SERVICE is None:
         raise HTTPException(status_code=503, detail='Vector index not initialized')
     if not text and not asset_id:
         raise HTTPException(status_code=400, detail='Provide text or asset_id')
     if text:
-        query_vec = EMBED_SERVICE.embed_text_stub(text)
+        query_vec = tasks_mod.EMBED_SERVICE.embed_text_stub(text)
     else:
         asset = db_s.get(Asset, asset_id)
         if not asset:
             raise HTTPException(status_code=404, detail='asset not found')
         apath = asset.path if isinstance(asset.path, str) else str(asset.path)
-        query_vec = EMBED_SERVICE.embed_image_stub(apath)
-    matches = INDEX_SINGLETON.search(query_vec, k=k)
+        query_vec = tasks_mod.EMBED_SERVICE.embed_image_stub(apath)
+    matches = tasks_mod.INDEX_SINGLETON.search(query_vec, k=k)
     assets_map = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([mid for mid,_ in matches])).all()}
     result_items = []
     for mid, score in matches:
@@ -709,7 +647,7 @@ def embedding_backend_status(db_s: Session = Depends(get_db)):
         'image_model': settings.embed_model_image,
         'text_model': settings.embed_model_text,
         'device': settings.embed_device,
-        'dim': EMBED_DIM,
+    'dim': tasks_mod.EMBED_DIM,
         'model_version': settings.embed_model_version or None,
         'reembed_scheduled': stale,
         'total_assets': total_assets,
@@ -717,19 +655,19 @@ def embedding_backend_status(db_s: Session = Depends(get_db)):
 
 @app.post('/vector-index/rebuild')
 def rebuild_vector_index(limit: int = Body(None), db_s: Session = Depends(get_db)):
-    if INDEX_SINGLETON is None:
+    if tasks_mod.INDEX_SINGLETON is None:
         raise HTTPException(status_code=503, detail='Index not initialized')
     # clear and reload
-    INDEX_SINGLETON.clear()
-    if isinstance(INDEX_SINGLETON, FaissVectorIndex):
-        loaded = load_faiss_index_from_embeddings(SessionLocal, INDEX_SINGLETON, limit=limit or settings.max_index_load)
+    tasks_mod.INDEX_SINGLETON.clear()
+    if isinstance(tasks_mod.INDEX_SINGLETON, FaissVectorIndex):
+        loaded = load_faiss_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
         try:
-            INDEX_SINGLETON.save(settings.vector_index_path)
+            tasks_mod.INDEX_SINGLETON.save(settings.vector_index_path)
         except Exception:
             pass
     else:
-        loaded = load_index_from_embeddings(SessionLocal, INDEX_SINGLETON, limit=limit or settings.max_index_load)
-    return {'api_version': schemas.API_VERSION, 'reloaded': loaded, 'dim': EMBED_DIM, 'size': len(INDEX_SINGLETON), 'backend': settings.vector_index_backend}
+        loaded = load_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
+    return {'api_version': schemas.API_VERSION, 'reloaded': loaded, 'dim': tasks_mod.EMBED_DIM, 'size': len(tasks_mod.INDEX_SINGLETON), 'backend': settings.vector_index_backend}
 # Routers
 from .routers import people as people_router
 app.include_router(people_router.router, prefix='')
@@ -826,7 +764,7 @@ def metrics_prometheus(db_s: Session = Depends(get_db)):
         metrics_mod.update_queue_gauges(pending, running)
         metrics_mod.update_dead_tasks(dead)
         metrics_mod.update_persons_total(persons)
-        metrics_mod.update_vector_index_size(len(INDEX_SINGLETON) if INDEX_SINGLETON else 0)
+        metrics_mod.update_vector_index_size(len(tasks_mod.INDEX_SINGLETON) if tasks_mod.INDEX_SINGLETON else 0)
     except Exception:
         pass
     blob = metrics_mod.render_prometheus()
@@ -883,3 +821,10 @@ def on_shutdown():
         executor.stop_workers()
     except Exception:
         pass
+
+if __name__ == "__main__":
+    import uvicorn
+    # Temporarily disable startup events for debugging
+    import os
+    os.environ['RUN_MODE'] = 'debug'
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")

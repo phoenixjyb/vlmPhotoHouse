@@ -33,6 +33,12 @@ A local-first AI photo engine that unifies personal photo collections into a sem
 - **Hybrid Search Enhancement**: Combine text + image + person + metadata ranking
 - **Web UI Development**: User interface for photo browsing and person management
 
+### 2.4 🎬 Video Understanding & Retrieval (New Scope)
+- **Objective**: Add robust video ingestion, understanding, and retrieval while reusing the dual-environment and provider architecture.
+- **Scope (v1)**: Probe metadata, segment videos, extract keyframes, caption segments, embed segment frames, optional Whisper transcript; enable segment-level search and preview.
+- **Dependencies**: ffmpeg/ffprobe available on host; optional Whisper install in caption environment.
+- **Non-Goals (v1)**: Full scene graph, multi-modal fusion beyond CLIP + transcript BM25; advanced ANN tuning.
+
 ## 3. Updated Target Users & Personas
 
 | Persona | Description | Status | Key Satisfied Needs |
@@ -99,6 +105,16 @@ A local-first AI photo engine that unifies personal photo collections into a sem
 - **JSON Communication Protocol**: Standardized interface for external model calls
 - **Configuration Validation**: Startup validation of model and provider availability
 
+### 6.3 🎬 Video Requirements (Planned)
+- Ingest videos (mp4, mov, mkv) with media_type=video; probe duration/fps/resolution/codecs
+- Segment by fixed interval (config: VIDEO_SAMPLE_SEC) or scene detection (optional)
+- Extract keyframes; store derived frames and VideoSegment rows (t_start, t_end, keyframe_path)
+- Generate captions per segment via existing caption provider (external subprocess)
+- Generate embeddings for keyframes via existing embedding service (CLIP) and mean-pool per segment
+- Optional: transcribe audio via Whisper; store full transcript and segment slices
+- Expose APIs: list videos, list segments, text search returning segments (asset_id, t_start, t_end, scores)
+- Hybrid ranking: combine segment embedding similarity with transcript BM25 and recency
+
 ## 7. Updated Non-Functional Requirements
 
 | Dimension | Original Target | Current Achievement | Notes |
@@ -150,6 +166,16 @@ Face Embedding Providers:
 - **Health Endpoints**: Real-time model status validation
 - **Configuration Management**: Environment-specific settings and validation
 
+### 8.4 🎬 Video Processing Architecture (Planned)
+```
+Ingestion → Probe (ffprobe) → Segment (N sec / scenes) → Keyframes →
+   [Captions (BLIP2 external)] + [Embeddings (CLIP)] + [Transcript (Whisper, optional)] →
+   Segment Store (DB) + Derived Artifacts (frames, npy) →
+   Indexing (vector + text) → Search API (segment-level)
+```
+Derived paths: derived/video_frames/{asset}/{ts}.jpg, derived/video_embeddings/{asset}_{ts}.npy, derived/video_previews/{asset}_{ts}.mp4
+Config: VIDEO_ENABLED, VIDEO_SAMPLE_SEC, VIDEO_SCENE_DETECT, WHISPER_MODEL
+
 ## 9. Updated Data Model
 
 ### 9.1 New Entities (Implemented)
@@ -172,6 +198,19 @@ HealthStatus: component, status, last_check, details
 Task: id, type, status, retry_count, created_at, started_at, finished_at
 TaskProgress: task_id, current_step, total_steps, percentage
 DeadLetterQueue: task_id, failure_reason, retry_attempts, requeue_count
+
+### 9.3 🎬 Video Entities (Planned)
+```sql
+-- Asset additions
+Asset.media_type ENUM('image','video') DEFAULT 'image'
+Asset.duration_seconds FLOAT NULL, Asset.fps FLOAT NULL, Asset.video_codec TEXT NULL, Asset.audio_codec TEXT NULL
+
+-- Video segments
+VideoSegment(id, asset_id, t_start_seconds, t_end_seconds, keyframe_path, caption TEXT NULL, transcript_slice TEXT NULL, embedding_path TEXT NULL, created_at)
+
+-- Optional transcripts
+Transcript(asset_id, text, model, language, created_at)
+```
 ```
 
 ## 10. Production Deployment Architecture
