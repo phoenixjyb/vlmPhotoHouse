@@ -1,7 +1,7 @@
 # Starts the API using the repo venv and validates external caption models in a separate venv
 # Usage: run from anywhere: powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1 [-Port 8001] [-Host 127.0.0.1] [-Reload]
 param(
-  [int]$Port = 8001,
+  [int]$Port = 8002,
   [string]$Host = '127.0.0.1',
   [switch]$Reload
 )
