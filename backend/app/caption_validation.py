@@ -38,10 +38,13 @@ def validate_caption_external_setup() -> None:
     if not python_exe.exists():
         raise CaptionValidationError(f"Caption Python executable not found in {external_dir}/.venv/")
     
-    # Check inference script exists
-    inference_script = external_dir / "inference.py"
-    if not inference_script.exists():
-        raise CaptionValidationError(f"Caption inference script not found: {inference_script}")
+    # Check inference script exists (prefer backend-specific but allow generic)
+    inference_backend = external_dir / "inference_backend.py"
+    inference_py = external_dir / "inference.py"
+    if not inference_backend.exists() and not inference_py.exists():
+        raise CaptionValidationError(
+            f"Caption inference script not found. Expected one of: {inference_backend} or {inference_py}"
+        )
     
     # Check if there's a requirements.txt file
     requirements_file = external_dir / "requirements.txt"
@@ -81,6 +84,7 @@ def get_caption_config_summary() -> Dict[str, Any]:
             "python_executable": str(python_exe),
             "python_exists": python_exe.exists(),
             "dir_exists": external_dir.exists(),
+            "inference_backend_exists": (external_dir / "inference_backend.py").exists(),
             "inference_script_exists": (external_dir / "inference.py").exists(),
             "requirements_exists": (external_dir / "requirements.txt").exists(),
             "models_dir_exists": (external_dir / "models").exists(),

@@ -47,29 +47,34 @@ class LlavaNextCaptionProvider:
     """LLaVA-NeXT (LLaVA-1.6) caption provider."""
     
     def __init__(self, model_name: str = "llava-hf/llava-v1.6-mistral-7b-hf", device: str = "cpu"):
+        # Lightweight init in tests
         try:
-            from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+            from .config import get_settings
+            if getattr(get_settings(), 'run_mode', '') == 'tests':
+                self.device = device
+                self.model_name = model_name
+                self.processor = None
+                self.model = None
+                return
+        except Exception:
+            pass
+        try:
+            from transformers import AutoProcessor, LlavaNextForConditionalGeneration
             import torch
         except ImportError as e:
             raise RuntimeError("LLaVA dependencies not available. Install with 'pip install transformers torch pillow'") from e
-        
         self.device = device
         self.model_name = model_name
-        
         logger.info(f"Loading LLaVA-NeXT model: {model_name}")
         t0 = time.time()
-        
-        self.processor = LlavaNextProcessor.from_pretrained(model_name)
+        self.processor = AutoProcessor.from_pretrained(model_name)
         self.model = LlavaNextForConditionalGeneration.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
             low_cpu_mem_usage=True
         ).to(device)
-        
         load_time = time.time() - t0
         logger.info(f"LLaVA-NeXT model loaded in {load_time:.1f}s")
-        
-        # Log metrics if available
         try:
             import app.metrics as m
             m.face_embedding_model_load_seconds.labels('llava').observe(load_time)
@@ -116,25 +121,30 @@ class Qwen2VLCaptionProvider:
     
     def __init__(self, model_name: str = "Qwen/Qwen2-VL-7B-Instruct", device: str = "cpu"):
         try:
-            from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+            from .config import get_settings
+            if getattr(get_settings(), 'run_mode', '') == 'tests':
+                self.device = device
+                self.model_name = model_name
+                self.model = None
+                self.processor = None
+                return
+        except Exception:
+            pass
+        try:
+            from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
             import torch
         except ImportError as e:
             raise RuntimeError("Qwen2-VL dependencies not available. Install with 'pip install transformers torch pillow qwen-vl-utils'") from e
-        
         self.device = device
         self.model_name = model_name
-        
         logger.info(f"Loading Qwen2-VL model: {model_name}")
         t0 = time.time()
-        
         self.model = Qwen2VLForConditionalGeneration.from_pretrained(
             model_name,
             torch_dtype="auto" if device == "cuda" else torch.float32,
             device_map="auto" if device == "cuda" else None
         )
-        
         self.processor = AutoProcessor.from_pretrained(model_name)
-        
         load_time = time.time() - t0
         logger.info(f"Qwen2-VL model loaded in {load_time:.1f}s")
     
@@ -199,23 +209,29 @@ class BLIP2CaptionProvider:
     
     def __init__(self, model_name: str = "Salesforce/blip2-opt-2.7b", device: str = "cpu"):
         try:
-            from transformers import Blip2Processor, Blip2ForConditionalGeneration
+            from .config import get_settings
+            if getattr(get_settings(), 'run_mode', '') == 'tests':
+                self.device = device
+                self.model_name = model_name
+                self.processor = None
+                self.model = None
+                return
+        except Exception:
+            pass
+        try:
+            from transformers import AutoProcessor, Blip2ForConditionalGeneration
             import torch
         except ImportError as e:
             raise RuntimeError("BLIP2 dependencies not available. Install with 'pip install transformers torch pillow'") from e
-        
         self.device = device
         self.model_name = model_name
-        
         logger.info(f"Loading BLIP2 model: {model_name}")
         t0 = time.time()
-        
-        self.processor = Blip2Processor.from_pretrained(model_name)
+        self.processor = AutoProcessor.from_pretrained(model_name)
         self.model = Blip2ForConditionalGeneration.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if device == "cuda" else torch.float32
         ).to(device)
-        
         load_time = time.time() - t0
         logger.info(f"BLIP2 model loaded in {load_time:.1f}s")
     
@@ -243,14 +259,15 @@ class BLIP2CaptionProvider:
 @lru_cache()
 def get_caption_provider() -> CaptionProvider:
     """Get the configured caption provider."""
-    from .config import get_settings
+    from .config import get_settings, settings as settings_obj
     
-    settings = get_settings()
+    # Prefer module-level settings object for tests that patch app.config.settings
+    settings = settings_obj or get_settings()
     provider_name = getattr(settings, 'caption_provider', 'stub').lower()
     device = getattr(settings, 'caption_device', 'cpu').lower()
     
-    # In test mode, always use stub
-    if settings.run_mode == 'tests':
+    # In test mode, always use stub to avoid heavy model loading
+    if getattr(settings, 'run_mode', '') == 'tests':
         return StubCaptionProvider()
     
     # Auto provider selection
@@ -264,6 +281,9 @@ def get_caption_provider() -> CaptionProvider:
         return StubCaptionProvider()
     
     try:
+        # In tests, restrict to stub only
+        if getattr(settings, 'run_mode', '') == 'tests' and provider_name != 'stub':
+            return StubCaptionProvider()
         return _build_caption_provider(provider_name, device)
     except Exception as e:
         logger.warning(f"Caption provider {provider_name} failed, falling back to stub: {e}")
@@ -285,20 +305,16 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
             BLIP2SubprocessProvider,
             CaptionSubprocessProvider
         )
-        
         model_name = getattr(settings, 'caption_model', 'auto')
-        if model_name == 'auto':
-            model_name = 'default'
-        
         if provider in ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl'):
-            return Qwen2VLSubprocessProvider(caption_external_dir, model_name)
+            return Qwen2VLSubprocessProvider(caption_external_dir, model_name, device)
         elif provider in ('llava', 'llava_next', 'llava-next'):
-            return LlavaNextSubprocessProvider(caption_external_dir, model_name)
+            return LlavaNextSubprocessProvider(caption_external_dir, model_name, device)
         elif provider == 'blip2':
-            return BLIP2SubprocessProvider(caption_external_dir, model_name)
+            return BLIP2SubprocessProvider(caption_external_dir, model_name, device)
         else:
             # Generic subprocess provider for any other provider
-            return CaptionSubprocessProvider(caption_external_dir, provider, model_name)
+            return CaptionSubprocessProvider(caption_external_dir, provider, model_name, device)
     
     # Fallback to built-in providers
     if provider == 'stub':

@@ -81,12 +81,7 @@ def ping() -> None:
     typer.echo("cli-ok")
 
 
-def main():
-    app()
-
-
-if __name__ == "__main__":
-    main()
+# (Defer CLI invocation to the very end of file after all commands are registered)
 import os, sys
 import typer
 from alembic.config import Config as AlembicConfig
@@ -97,7 +92,7 @@ from .tasks import INDEX_SINGLETON, EMBED_DIM
 from .vector_index import load_index_from_embeddings
 from .main import SessionLocal
 
-app = typer.Typer(add_completion=False)
+# Reuse the same Typer app defined above; do not reassign.
 
 @app.command()
 def migrate(action: str = typer.Argument('upgrade', help='upgrade|downgrade|stamp'), target: str = typer.Argument('head')):
@@ -147,8 +142,7 @@ def stamp_existing(head: str = typer.Option('head', help='Revision to stamp as c
     alembic_command.stamp(alembic_cfg, head)
     typer.echo(f'Stamped existing schema as {head}.')
 
-if __name__ == '__main__':
-    app()
+## NOTE: Keep the CLI invocation at the very end so all @app.command functions are registered
 
 @app.command()
 def rebuild_index(limit: int = typer.Option(None, help='Max embeddings to load (default settings.MAX_INDEX_LOAD)')):
@@ -176,3 +170,167 @@ def recluster_persons():
         session.add(t)
         session.commit()
         typer.echo(f"Enqueued person_recluster task {t.id}")
+
+@app.command()
+def rebuild_video_indices() -> None:
+    """Rebuild both video-level and segment-level in-memory indices from derived embeddings."""
+    import numpy as np
+    from glob import glob
+    from pathlib import Path as _Path
+    settings = get_settings()
+    from . import tasks as tasks_mod
+    # Ensure index singletons exist
+    if getattr(tasks_mod, 'VIDEO_INDEX_SINGLETON', None) is None:
+        tasks_mod.VIDEO_INDEX_SINGLETON = tasks_mod.InMemoryVectorIndex(tasks_mod.EMBED_DIM)
+    if getattr(tasks_mod, 'VIDEO_SEG_INDEX_SINGLETON', None) is None:
+        tasks_mod.VIDEO_SEG_INDEX_SINGLETON = tasks_mod.InMemoryVectorIndex(tasks_mod.EMBED_DIM)
+    # Clear both
+    tasks_mod.VIDEO_INDEX_SINGLETON.clear()
+    tasks_mod.VIDEO_SEG_INDEX_SINGLETON.clear()
+    # Load video-level embeddings
+    vid_ids, vid_vecs = [], []
+    for fp in glob(str(_Path(settings.derived_path) / 'video_embeddings' / '*.npy')):
+        p = _Path(fp)
+        if p.stem.startswith('seg_'):
+            continue
+        try:
+            vid_ids.append(int(p.stem))
+            vid_vecs.append(np.load(fp).astype('float32'))
+        except Exception:
+            continue
+    if vid_ids:
+        tasks_mod.VIDEO_INDEX_SINGLETON.add(vid_ids, np.stack(vid_vecs))
+    # Load segment-level embeddings
+    seg_ids, seg_vecs = [], []
+    for fp in glob(str(_Path(settings.derived_path) / 'video_embeddings' / 'seg_*.npy')):
+        p = _Path(fp)
+        try:
+            seg_ids.append(int(p.stem.split('_',1)[1]))
+            seg_vecs.append(np.load(fp).astype('float32'))
+        except Exception:
+            continue
+    if seg_ids:
+        tasks_mod.VIDEO_SEG_INDEX_SINGLETON.add(seg_ids, np.stack(seg_vecs))
+    typer.echo(f"video_index loaded={len(vid_ids)}; segment_index loaded={len(seg_ids)}")
+
+
+@app.command()
+def validate_lvface() -> None:
+    """Validate LVFace configuration and attempt a minimal embedding inference."""
+    from .config import get_settings
+    from pathlib import Path as _Path
+    import numpy as _np
+    from PIL import Image as _Image
+    from .face_embedding_service import StubFaceEmbeddingProvider  # type: ignore
+    s = get_settings()
+    # Show config (avoid printing MODEL_PATH when external dir is used)
+    typer.echo(f"LVFACE_EXTERNAL_DIR={s.lvface_external_dir or '(none)'}")
+    if s.lvface_external_dir:
+        typer.echo(f"LVFACE_MODEL_NAME={s.lvface_model_name}")
+    else:
+        typer.echo(f"LVFACE_MODEL_PATH={s.lvface_model_path}")
+    # Basic file checks
+    if s.lvface_external_dir:
+        ext = _Path(s.lvface_external_dir)
+        py = ext / ('.venv/Scripts/python.exe' if os.name=='nt' else '.venv/bin/python')
+        inf = ext / 'inference.py'
+        mdl = ext / 'models' / s.lvface_model_name
+        typer.echo(f"external_dir exists: {ext.exists()}")
+        typer.echo(f"python exists: {py.exists()}")
+        typer.echo(f"inference.py exists: {inf.exists()}")
+        typer.echo(f"model exists: {mdl.exists()}")
+    else:
+        typer.echo(f"builtin onnx model exists: {_Path(s.lvface_model_path).exists()}")
+    # Try provider init and one dummy inference
+    try:
+        os.environ['FACE_EMBED_PROVIDER'] = 'lvface'
+        # Clear cached settings and provider so env var takes effect
+        try:
+            from .config import get_settings as _gs
+            _gs.cache_clear()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        from .face_embedding_service import get_face_embedding_provider
+        try:
+            get_face_embedding_provider.cache_clear()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        prov = get_face_embedding_provider()
+        # Create a tiny dummy face crop (gray)
+        img = _Image.new('RGB', (112,112), color=(128,128,128))
+        vec = prov.embed_face(img)
+        provider_cls = prov.__class__.__name__
+        norm = float(_np.linalg.norm(vec))
+        # Detect fallback
+        if isinstance(prov, StubFaceEmbeddingProvider):
+            typer.secho(
+                f"LVFace validation fell back to stub provider (no real LVFace loaded). dim={vec.shape[0]} norm={norm:.3f}",
+                fg=typer.colors.YELLOW
+            )
+            # Provide actionable tip
+            if not s.lvface_external_dir and not _Path(s.lvface_model_path).exists():
+                typer.echo(
+                    "Hint: Provide an ONNX at LVFACE_MODEL_PATH or use an external LVFace via LVFACE_EXTERNAL_DIR.\n"
+                    "Dev option: generate a dummy model with 'python tools/generate_dummy_lvface_model.py --out models/lvface.onnx --dim "
+                    f"{s.face_embed_dim}'."
+                )
+            raise typer.Exit(2)
+        else:
+            # Distinguish builtin vs external
+            mode = 'external-subprocess' if provider_cls == 'LVFaceSubprocessProvider' else 'builtin-onnx'
+            typer.secho(
+                f"LVFace provider OK ({mode}). Embedding dim={vec.shape[0]} norm={norm:.3f}",
+                fg=typer.colors.GREEN
+            )
+    except typer.Exit:
+        raise
+    except Exception as e:
+        typer.secho(f"LVFace validation failed: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def validate_caption() -> None:
+    """Validate external caption setup and attempt a minimal caption generation."""
+    from .caption_validation import get_caption_config_summary, validate_caption_external_setup
+    from .config import get_settings
+    from PIL import Image as _Image
+    from .caption_service import StubCaptionProvider  # type: ignore
+    s = get_settings()
+    # Print summary
+    summary = get_caption_config_summary()
+    typer.echo(f"Caption config: {summary}")
+    # Validate external if configured
+    if s.caption_external_dir:
+        try:
+            validate_caption_external_setup()
+            typer.secho("External caption setup validated.", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"Caption external validation failed: {e}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    # Try provider init and one dummy caption
+    try:
+        from .caption_service import get_caption_provider
+        prov = get_caption_provider()
+        img = _Image.new('RGB', (640, 360), color=(180, 200, 220))
+        cap = prov.generate_caption(img)
+        preview = (cap or '').strip()
+        if len(preview) > 120:
+            preview = preview[:117] + '...'
+        if isinstance(prov, StubCaptionProvider) and summary.get('provider') != 'stub':
+            typer.secho(
+                f"Caption validation fell back to stub provider (requested '{summary.get('provider')}').",
+                fg=typer.colors.YELLOW
+            )
+            raise typer.Exit(2)
+        typer.secho(f"Caption provider OK. Model={prov.get_model_name()} Caption='{preview}'", fg=typer.colors.GREEN)
+    except typer.Exit:
+        raise
+    except Exception as e:
+        typer.secho(f"Caption validation failed: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+if __name__ == '__main__':
+    # Invoke the CLI after all command functions have been registered
+    app()
