@@ -35,11 +35,16 @@ This section contains the technical architecture documentation for the VLM Photo
 The VLM Photo Engine uses a **dual environment architecture**:
 
 ### Backend Environment (`vlmPhotoHouse/.venv`)
-- FastAPI server on port 8001
+- FastAPI server on port 8002
 - Database operations (SQLite)
 - Task queue management
 - Health monitoring
 - API endpoints
+
+### Voice Integration (via external service)
+- Thin proxy endpoints under `/voice/*` in the backend
+- Proxies to LLMyTranslate (default: `http://127.0.0.1:8001`)
+- Env-configurable base URL and paths; proxy bypasses system proxies
 
 ### External Models Environment (`vlmCaptionModels/.venv`)
 - AI model inference (BLIP2, Qwen2.5-VL)
@@ -101,3 +106,11 @@ The system uses a **pluggable provider pattern** for AI models:
 ---
 
 *For implementation details, see the individual architecture documents listed above.*
+
+---
+
+## 🚀 Developer Experience
+
+- Windows Terminal multi-pane launcher starts API, LVFace, Caption, and Voice panes in one window
+- Standard ports: API 8002; Voice 8001 (overridable)
+- See Quick Start: [../quick-start-dev.md](../quick-start-dev.md)

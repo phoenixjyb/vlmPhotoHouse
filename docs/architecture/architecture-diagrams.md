@@ -2,9 +2,8 @@
 
 **Visual Architecture Documentation with Mermaid Charts**  
 **Date**: 2025-08-16  
-**Status**: Production Implementation
+**Status**: Production Implementation (API 8002, Voice 8001 via proxy)
 
----
 
 ## 1. System Overview Architecture
 
@@ -12,7 +11,7 @@
 graph TB
     subgraph "Production Environment"
         subgraph "Backend Environment (vlmPhotoHouse/.venv)"
-            API[FastAPI Server<br/>Port 8001]
+            API[FastAPI Server<br/>Port 8002]
             DB[(SQLite Database<br/>Metadata & Tasks)]
             QUEUE[Task Queue<br/>Async Processing]
             VECTOR[FAISS Vector Index<br/>Image & Face Embeddings]

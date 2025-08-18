@@ -30,7 +30,7 @@
 │                        Production System                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Backend Environment (vlmPhotoHouse/.venv)                        │
-│  ├── FastAPI Server (Port 8001)                                    │
+│  ├── FastAPI Server (Port 8002)                                    │
 │  ├── SQLite Database + Alembic Migrations                          │
 │  ├── Task Queue & Worker Pool                                      │
 │  ├── FAISS Vector Index                                            │
@@ -138,6 +138,7 @@ FastAPI Application
 │   ├── /health (general system status)
 │   ├── /health/caption (caption provider status)
 │   └── /health/lvface (face embedding status)
+│   └── /voice/health (voice proxy status)
 │
 ├── Search Services
 │   ├── Vector Search (CLIP embeddings + FAISS)
@@ -162,6 +163,11 @@ FastAPI Application
     ├── Face Provider Factory
     ├── Configuration Validation
     └── Runtime Health Monitoring
+
+### 3.1.1 Voice Proxy (LLMyTranslate)
+```text
+Backend `/voice/*` endpoints proxy to an external LLMyTranslate service (default http://127.0.0.1:8001). The proxy uses env-configured base URL and API paths, adds optional auth headers, sets timeouts, and bypasses system proxies for localhost. This keeps the browser on a single origin (8002) while enabling STT/TTS and conversation features.
+```
 ```
 
 ### 3.2 External Model Integration ✅
