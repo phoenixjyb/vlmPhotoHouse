@@ -16,6 +16,38 @@ To skip all tests locally during fast iteration, set `SKIP_ALL_TESTS=true` (docu
 - macOS (fast): builds only core dependencies. Heavy ML packages (torch, faiss, open-clip, sentence-transformers) are deferred.
 - GPU/WSL2: enable heavy ML packages for full functionality.
 
+Quickstart for the full dev stack (Windows): see `docs/quick-start-dev.md`.
+WSL/Linux setup and tmux launcher: see `docs/wsl-setup.md`.
+
+### Local dev launchers
+
+- Windows (multi‑pane): `scripts/start-dev-multiproc.ps1`
+	- Presets: `-Preset LowVRAM` (facenet + vitgpt2) or `-Preset RTX3090` (lvface + qwen2.5-vl)
+	- Use `-UseWindowsTerminal` for panes and `-KillExisting` to reset the session
+	- Explicit flags override presets: `-FaceProvider`, `-CaptionProvider`, `-Gpu`, `-ApiPort`
+- WSL/Linux (tmux): `scripts/start-dev-tmux.sh`
+	- Same presets and flags as the Windows launcher (see `--help`)
+
+Warmup/validation (backend CLI):
+- `python -m app.cli validate-lvface`
+- `python -m app.cli validate-caption`
+- `python -m app.cli warmup`
+
+### Video support (optional)
+
+Video ingestion is disabled by default. To enable basic support:
+
+- Set environment variables:
+	- `VIDEO_ENABLED=true`
+	- Optionally adjust `VIDEO_EXTENSIONS` and `VIDEO_KEYFRAME_INTERVAL_SEC`.
+- Install ffmpeg locally for keyframe extraction and metadata probing:
+	- Windows: Use winget or choco, e.g. `winget install Gyan.FFmpeg` or `choco install ffmpeg`.
+	- macOS: `brew install ffmpeg`.
+	- Linux: `apt-get install -y ffmpeg`.
+
+Without ffmpeg, video tasks will no-op gracefully and create stub markers.
+
+Scene detection (optional): set `VIDEO_SCENE_DETECT=true` to enable a scene detection task. If `pyscenedetect` is available, it will be used; otherwise the system falls back to fixed windows of a few seconds. You can install it by adding it to requirements-ml.txt or pip installing `scenedetect`.
 ### Environment Matrix
 
 | Platform | Intent | Install | Lock File |

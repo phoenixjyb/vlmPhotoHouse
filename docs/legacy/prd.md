@@ -2,8 +2,8 @@
 
 Product: VLM Photo Engine  
 Owner: Gareth  
-Date: 2025-08-11  
-Version: Draft v0.1
+Date: 2025-08-18  
+Version: Draft v0.2
 
 ## 1. Executive Summary
 A local-first AI photo engine that unifies a decade (0.5–2M) of personal photos from disparate storage into a single, semantically searchable, privacy-preserving library. It auto-generates captions, tags, person/time/event/theme albums without duplicating originals, enabling fast retrieval and rich organization while running entirely on user-owned hardware.
@@ -69,7 +69,7 @@ A local-first AI photo engine that unifies a decade (0.5–2M) of personal photo
 - Search: semantic embedding retrieval + filters + hybrid rerank
 - Albums: person/time/event/theme/manual queries
 - Face workflow: detection → cluster → user label → refine
-- Annotation: user edits override model; voice-to-text (later)
+- Annotation: user edits override model; voice-to-text via external service (LLMyTranslate) proxied by API
 - Task system: async jobs, retry, backoff, idempotency
 - Configuration: env + optional file; introspection endpoint
 
@@ -87,9 +87,9 @@ A local-first AI photo engine that unifies a decade (0.5–2M) of personal photo
 
 ## 8. System Architecture Summary
 Reference: `architecture.md`.
-Core services: Ingestion Scanner, Task Queue, Derivation Workers (embeddings, thumbnails, captions, faces), Vector Index, Search API, Album Generator.
+Core services: Ingestion Scanner, Task Queue, Derivation Workers (embeddings, thumbnails, captions, faces), Vector Index, Search API (with voice proxy), Album Generator.
 State layers: Metadata DB (SQLite initially), Vector Index (FAISS), Derived FS store, Config/Settings.
-Data flow: discover → extract → dedup → schedule tasks → derive artifacts → update indices → query/album materialization.
+Data flow: discover → extract → dedup → schedule tasks → derive artifacts → update indices → query/album materialization. Voice user flows use API `/voice/*` proxy to LLMyTranslate for STT/TTS.
 
 ## 9. Data Model Summary
 Reference: `data-model.md`.
@@ -121,7 +121,7 @@ See `roadmap.md`. Acceptance criteria per phase:
 - Phase 1: Ingest + hash + EXIF + dedup; DB integrity; basic CLI metrics.
 - Phase 2: Embeddings + search returning relevant images for simple queries.
 - Phase 3: Captions generated for ≥90% of sampled assets; hybrid score improves MRR vs image-only baseline.
-- Phase 4: ≥80% precision in top-1 person cluster assignments before user correction.
+- Phase 4: ≥80% precision in top-1 person cluster assignments before user correction. Voice: STT/TTS smoke test via `/voice/demo` succeeds.
 
 ## 12. Success Metrics
 | Metric | Target (Post Phase 4) |
@@ -139,7 +139,7 @@ See `roadmap.md`. Acceptance criteria per phase:
 | Hardware | Single PC; GPU (>=8GB VRAM) improves performance, CPU-only path supported |
 | Storage | Local internal/external storage (NVMe/SATA/USB); NAS optional, not required |
 | Libraries | Stable availability of PyTorch & CLIP/BLIP2 weights locally |
-| OS | Linux primary; Windows 11 (WSL2 + Docker Desktop) and macOS supported |
+| OS | Linux primary; Windows 11 (WSL2 + Docker Desktop) and macOS supported. Windows quick-start launcher available. |
 
 ## 13.1 Target Hardware Profile (Single PC)
 - Form factor: One machine running the full stack (API, workers, vector index, DB)

@@ -48,3 +48,10 @@
 
 ## Configuration
 Environment variables + optional `config.yaml` override.
+
+## Addendum: Voice Proxy & Dev Topology (2025-08)
+- Voice is provided by an external service (LLMyTranslate) running on `127.0.0.1:8001` by default.
+- The API exposes thin proxy endpoints under `/voice/*` (health, transcribe, tts, conversation). These forward to LLMyTranslate using an env-configured base URL and path mapping and intentionally bypass system proxies.
+- Benefits of the proxy: single-origin UI, consistent auth/timeout policy, and ability to swap providers later.
+- Ports: API on `8002`; Voice on `8001` (overridable via launcher `-VoicePort`).
+- Dev ergonomics: a Windows Terminal multi-pane launcher starts API, LVFace, Caption, and Voice panes; a Quick Start guide documents one-command startup.
