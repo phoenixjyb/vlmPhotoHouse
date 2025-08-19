@@ -37,6 +37,46 @@ Open UI:
 - Main: http://127.0.0.1:8002/ui
 - Voice demo: http://127.0.0.1:8002/voice/demo
 
+## Enable TTS
+By default, if the upstream service doesn't return audio, the API falls back to JSON. You can enable audio in two ways:
+
+1) Upstream LLMyTranslate TTS
+- Ensure LLMyTranslate exposes TTS at `/api/tts/synthesize` (default). If different, set `VOICE_TTS_PATH` accordingly.
+- Verify capabilities show `tts.available=true`:
+```powershell
+Invoke-WebRequest -Uri 'http://127.0.0.1:8001/api/voice-chat/capabilities' -UseBasicParsing | Select-Object -ExpandProperty Content
+```
+
+2) Local Piper fallback (Windows)
+- Install Piper (download piper.exe) and a voice model `.onnx`.
+- Add to repo root `.env` (or export in the API pane):
+```ini
+TTS_FALLBACK_PROVIDER=piper
+PIPER_EXE_PATH=C:\path\to\piper.exe
+PIPER_MODEL_PATH=C:\path\to\voices\en_US-libritts-high.onnx
+```
+- Restart the API pane. When external TTS has no audio, the API will synthesize WAV via Piper.
+
+Verify TTS (expect audio):
+```powershell
+$body = @{ text = 'Hello from PhotoHouse'; language = 'en'; speed = 1.0 } | ConvertTo-Json
+Invoke-WebRequest -Uri 'http://127.0.0.1:8002/voice/tts' -Method Post -ContentType 'application/json' -Body $body -OutFile .\tts.wav
+Test-Path .\tts.wav; (Get-Item .\tts.wav).Length
+```
+
+## Verify ASR (Speech-to-Text)
+- Browser: open the Voice demo and use the “Microphone Transcribe” section; results appear as JSON.
+- API: send a short audio sample (webm/wav) to /voice/transcribe:
+```powershell
+# Example using a local file sample.webm
+$fd = New-Object System.Net.Http.MultipartFormDataContent
+$fileContent = New-Object System.Net.Http.StreamContent([System.IO.File]::OpenRead("sample.webm"))
+$fileContent.Headers.ContentType = 'audio/webm'
+$fd.Add($fileContent, 'file', 'sample.webm')
+$client = New-Object System.Net.Http.HttpClient
+($client.PostAsync('http://127.0.0.1:8002/voice/transcribe', $fd).Result.Content.ReadAsStringAsync().Result)
+```
+
 ## Manual startup (no Windows Terminal)
 1) LLMyTranslate (choose one):
 ```powershell
@@ -63,6 +103,11 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8002 --reload
 VOICE_ENABLED=true
 VOICE_EXTERNAL_BASE_URL=http://127.0.0.1:8001
 VOICE_TTS_PATH=/api/tts/synthesize
+TTS_FALLBACK_PROVIDER=none
+# For Piper fallback on Windows (optional)
+# TTS_FALLBACK_PROVIDER=piper
+# PIPER_EXE_PATH=C:\tools\piper\piper.exe
+# PIPER_MODEL_PATH=C:\tools\piper\voices\en_US-libritts-high.onnx
 ```
 
 ## Troubleshooting

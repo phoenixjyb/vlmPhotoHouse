@@ -50,6 +50,28 @@ class Settings(BaseModel):
     retry_backoff_base_seconds: float = Field(default=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))))
     retry_backoff_cap_seconds: float = Field(default=float(os.getenv('RETRY_BACKOFF_CAP_SECONDS', os.getenv('RETRY_BACKOFF_CAP','300'))))
     retry_backoff_jitter: float = Field(default=float(os.getenv('RETRY_BACKOFF_JITTER','0.25')))
+    # --- Video (MVP scaffolding) ---
+    video_enabled: bool = Field(default=os.getenv('VIDEO_ENABLED', 'false').lower() == 'true')
+    video_keyframe_interval_sec: float = Field(default=float(os.getenv('VIDEO_KEYFRAME_INTERVAL_SEC', '2.0')))
+    video_extensions: str = Field(default=os.getenv('VIDEO_EXTENSIONS', '.mp4,.mov,.mkv,.avi,.m4v'))
+    video_scene_detect: bool = Field(default=os.getenv('VIDEO_SCENE_DETECT', 'false').lower() == 'true')
+    video_scene_min_sec: float = Field(default=float(os.getenv('VIDEO_SCENE_MIN_SEC', '1.0')))
+    # --- Voice/ASR/TTS (optional external service) ---
+    voice_enabled: bool = Field(default=os.getenv('VOICE_ENABLED', 'false').lower() == 'true')
+    voice_provider: str = Field(default=os.getenv('VOICE_PROVIDER', 'external'))  # external|local
+    voice_external_base_url: str = Field(default=os.getenv('VOICE_EXTERNAL_BASE_URL', ''))
+    # Defaults aligned to llmytranslate API
+    voice_asr_path: str = Field(default=os.getenv('VOICE_ASR_PATH', '/api/voice-chat/transcribe'))
+    voice_tts_path: str = Field(default=os.getenv('VOICE_TTS_PATH', '/api/tts/synthesize'))
+    voice_conversation_path: str = Field(default=os.getenv('VOICE_CONVERSATION_PATH', '/api/voice-chat/conversation'))
+    voice_health_path: str = Field(default=os.getenv('VOICE_HEALTH_PATH', '/api/voice-chat/health'))
+    voice_capabilities_path: str = Field(default=os.getenv('VOICE_CAPABILITIES_PATH', '/api/voice-chat/capabilities'))
+    voice_api_key: str = Field(default=os.getenv('VOICE_API_KEY', ''))
+    voice_timeout_sec: float = Field(default=float(os.getenv('VOICE_TIMEOUT_SEC', '30')))
+    # Optional local TTS fallback (e.g., Piper) when external TTS is unavailable
+    tts_fallback_provider: str = Field(default=os.getenv('TTS_FALLBACK_PROVIDER', 'none'))  # none|piper
+    piper_exe_path: str = Field(default=os.getenv('PIPER_EXE_PATH', ''))
+    piper_model_path: str = Field(default=os.getenv('PIPER_MODEL_PATH', ''))
 
 @lru_cache
 def get_settings() -> Settings:
@@ -101,4 +123,28 @@ def get_settings() -> Settings:
     retry_backoff_base_seconds=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),
     retry_backoff_cap_seconds=float(os.getenv('RETRY_BACKOFF_CAP_SECONDS', os.getenv('RETRY_BACKOFF_CAP','300'))),
     retry_backoff_jitter=float(os.getenv('RETRY_BACKOFF_JITTER','0.25')),
+    # --- Video (MVP scaffolding) ---
+    video_enabled=os.getenv('VIDEO_ENABLED', 'false').lower() == 'true',
+    video_keyframe_interval_sec=float(os.getenv('VIDEO_KEYFRAME_INTERVAL_SEC', '2.0')),
+    video_extensions=os.getenv('VIDEO_EXTENSIONS', '.mp4,.mov,.mkv,.avi,.m4v'),
+    video_scene_detect=os.getenv('VIDEO_SCENE_DETECT', 'false').lower() == 'true',
+    video_scene_min_sec=float(os.getenv('VIDEO_SCENE_MIN_SEC', '1.0')),
+    # --- Voice/ASR/TTS ---
+    voice_enabled=os.getenv('VOICE_ENABLED', 'false').lower() == 'true',
+    voice_provider=os.getenv('VOICE_PROVIDER', 'external'),
+    voice_external_base_url=os.getenv('VOICE_EXTERNAL_BASE_URL', ''),
+    voice_asr_path=os.getenv('VOICE_ASR_PATH', '/api/voice-chat/transcribe'),
+    voice_tts_path=os.getenv('VOICE_TTS_PATH', '/api/tts/synthesize'),
+    voice_conversation_path=os.getenv('VOICE_CONVERSATION_PATH', '/api/voice-chat/conversation'),
+    voice_health_path=os.getenv('VOICE_HEALTH_PATH', '/api/voice-chat/health'),
+    voice_capabilities_path=os.getenv('VOICE_CAPABILITIES_PATH', '/api/voice-chat/capabilities'),
+    voice_api_key=os.getenv('VOICE_API_KEY', ''),
+    voice_timeout_sec=float(os.getenv('VOICE_TIMEOUT_SEC', '30')),
+    tts_fallback_provider=os.getenv('TTS_FALLBACK_PROVIDER', 'none'),
+    piper_exe_path=os.getenv('PIPER_EXE_PATH', ''),
+    piper_model_path=os.getenv('PIPER_MODEL_PATH', ''),
     )
+
+# Expose a module-level settings object for tests to patch easily (e.g., `patch('app.config.settings')`).
+# Note: Most application code should call get_settings() to pick up env changes; tests may mock this object.
+settings = get_settings()
