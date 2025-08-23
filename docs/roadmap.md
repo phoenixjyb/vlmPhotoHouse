@@ -1,4 +1,4 @@
-# Project Roadmap — status as of 2025-08-18
+# Project Roadmap — status as of 2025-08-23
 
 Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 
@@ -76,15 +76,18 @@ Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 - [x] Voice proxy integration via LLMyTranslate: `/voice/*` endpoints (health, TTS, conversation, transcribe), env‑driven base URL/paths, proxy bypasses system proxies (trust_env=False)
 - [x] Minimal server-rendered UI pages: `/ui`, `/ui/search`, `/ui/admin`, `/voice/demo` (TTS test)
 - [x] Port standardization: API on 8002; Voice on 8001 (overridable)
+- [x] **RTX 3090 + Quadro P2000 dual-GPU setup**: Validated Windows CUDA support, optimized device assignments (RTX 3090 for ML workloads, P2000 for display), RTX3090 preset with BLIP2 + LVFace
+- [x] **TTS end-to-end enablement**: Local Piper fallback when upstream TTS unavailable, browser speech synthesis backup, graceful degradation to JSON responses
+- [x] **ASR browser integration**: MediaRecorder microphone transcription demo, graceful error handling for voice endpoints
 
 ---
 
 ## Next 2-week priorities (proposed)
-1) UI gallery and admin improvements: basic search/gallery grid, simple filters, surface health/config on `/ui/admin`.
-2) Caption profiles: Fast (vitgpt2), Balanced (blip2), Quality (qwen2.5-vl/llava-next). Wire to external inference.py; batch job + inline editor.
-3) API polish: search pagination/filters and basic response envelope.
-4) Observability: structured JSON logs; Prometheus metrics for caption/voice latency and provider/device labels.
-5) Tests: UI route smoke tests; caption pipeline (vitgpt2 happy path), voice proxy health; ingest+video e2e.
+1) **Performance optimization with RTX 3090**: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
+2) UI gallery and admin improvements: basic search/gallery grid, simple filters, surface health/config on `/ui/admin`
+3) Caption profiles: Fast (vitgpt2), Balanced (blip2), Quality (qwen2.5-vl/llava-next). Wire to external inference.py; batch job + inline editor
+4) API polish: search pagination/filters and basic response envelope
+5) Observability: structured JSON logs; Prometheus metrics for caption/voice latency and provider/device labels; GPU utilization monitoring
 
 ## Quick wins (1–2 days)
 - Add DB indexes for caption/tag search columns (and any slow query surfaces)

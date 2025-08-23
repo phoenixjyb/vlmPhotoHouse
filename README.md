@@ -5,6 +5,26 @@ Local-first AI photo engine. See docs/ for Rev-B specs.
 ## Deployment (Hybrid Workstation)
 See `docs/deployment.md` for Docker Compose on Windows + WSL2 with NVIDIA GPUs.
 
+## Hardware Requirements
+
+### Production Configuration ✅ (Validated)
+- **RTX 3090 (24GB VRAM)**: Primary ML workloads (LVFace, BLIP2, OpenCLIP, TTS/ASR)
+- **Quadro P2000 (5GB VRAM)**: Display output and light tasks
+- **Dual GPU Setup**: Automatic device assignment (cuda:0 → RTX 3090, cuda:1 → P2000)
+- **Windows CUDA**: PyTorch 2.6.0+cu124 with CUDA 12.4 support
+
+### Performance Metrics (RTX 3090)
+- **LVFace Face Embeddings**: 4.24s warmup time
+- **BLIP2 Caption Generation**: 35.2s warmup time
+- **Memory Capacity**: 24GB enables large model batching
+- **Concurrent Workloads**: Face detection + caption generation + embeddings
+
+### Minimum Requirements
+- **8GB+ VRAM**: For basic ML functionality (use LowVRAM preset)
+- **CUDA Compatible GPU**: GTX 1060 or better
+- **16GB+ System RAM**: For model loading and data processing
+- **SSD Storage**: Recommended for model loading performance
+
 ## Operations
 Runbook in `docs/operations.md`. Security notes in `docs/security.md`.
 
@@ -22,7 +42,7 @@ WSL/Linux setup and tmux launcher: see `docs/wsl-setup.md`.
 ### Local dev launchers
 
 - Windows (multi‑pane): `scripts/start-dev-multiproc.ps1`
-	- Presets: `-Preset LowVRAM` (facenet + vitgpt2) or `-Preset RTX3090` (lvface + qwen2.5-vl)
+	- Presets: `-Preset LowVRAM` (facenet + vitgpt2) or `-Preset RTX3090` (lvface + blip2)
 	- Use `-UseWindowsTerminal` for panes and `-KillExisting` to reset the session
 	- Explicit flags override presets: `-FaceProvider`, `-CaptionProvider`, `-Gpu`, `-ApiPort`
 - WSL/Linux (tmux): `scripts/start-dev-tmux.sh`

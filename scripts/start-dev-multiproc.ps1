@@ -75,7 +75,7 @@ if ($Preset) {
         }
         'rtx3090' {
             $effectiveFace = 'lvface'
-            $effectiveCaption = 'qwen2.5-vl'
+            $effectiveCaption = 'blip2'
             $effectiveUseGpu = $true
         }
         default {
@@ -105,8 +105,14 @@ if (-not $env:VOICE_TTS_PATH) { $env:VOICE_TTS_PATH = '/api/tts/synthesize' }
 
 # Device selection
 if ($effectiveUseGpu) {
-    $env:EMBED_DEVICE = 'cuda'
-    $env:CAPTION_DEVICE = 'cuda'
+    if ($Preset -eq 'RTX3090') {
+        # RTX 3090 is GPU 0, Quadro P2000 is GPU 1
+        $env:EMBED_DEVICE = 'cuda:0'
+        $env:CAPTION_DEVICE = 'cuda:0'
+    } else {
+        $env:EMBED_DEVICE = 'cuda'
+        $env:CAPTION_DEVICE = 'cuda'
+    }
 } else {
     $env:EMBED_DEVICE = 'cpu'
     $env:CAPTION_DEVICE = 'cpu'

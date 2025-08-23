@@ -1,8 +1,8 @@
 # Architecture Overview v2.0
 
-**Date**: 2025-08-16  
+**Date**: 2025-08-23  
 **Status**: Production Implementation  
-**Major Update**: Dual Environment & Multi-Provider Architecture  
+**Major Update**: Dual Environment & Multi-Provider Architecture + RTX 3090 GPU Integration  
 **Visual Diagrams**: See `architecture-diagrams.md` for comprehensive Mermaid charts
 
 ---
@@ -74,6 +74,38 @@
 │  └── AutoFaceDetector (automatic selection)                        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+### 1.3 Hardware Configuration ✅ **RTX 3090 PRODUCTION**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      GPU Configuration                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  RTX 3090 (GPU 0) - Primary ML Compute                            │
+│  ├── 24GB VRAM - High-capacity ML workloads                       │
+│  ├── CUDA 12.4 + PyTorch 2.6.0+cu124                             │
+│  ├── LVFace Face Embeddings (4.24s warmup)                       │
+│  ├── BLIP2 Caption Generation (35.2s warmup)                      │
+│  ├── OpenCLIP Image Embeddings                                    │
+│  └── TTS/ASR Model Inference                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│  Quadro P2000 (GPU 1) - Display & Light Tasks                    │
+│  ├── 5GB VRAM - Display output & secondary tasks                  │
+│  ├── Dedicated display driver                                     │
+│  └── Fallback processing capability                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  Device Assignment Strategy                                        │
+│  ├── cuda:0 → RTX 3090 (primary ML workloads)                    │
+│  ├── cuda:1 → Quadro P2000 (display + light tasks)               │
+│  ├── Automatic device detection in launcher                       │
+│  └── GPU-specific model routing                                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Performance Metrics (RTX 3090):**
+- **LVFace**: 4.24s warmup time (excellent)
+- **BLIP2**: 35.2s warmup time (good for 13GB model)
+- **Memory Efficiency**: 24GB enables large model batching
+- **Windows CUDA**: Native support validated
 
 ## 2. Data Flow Architecture (End-to-End)
 
