@@ -1,15 +1,19 @@
-fastapi
-uvicorn[standard]
-sqlalchemy>=2.0.0
-pydantic
-Pillow
-ExifRead
-numpy
-alembic
-typer
+# Core dependencies - updated August 24, 2025
+# Modern versions matching current environment
+
+fastapi>=0.116.1
+uvicorn[standard]>=0.35.0
+sqlalchemy>=2.0.43
+pydantic>=2.11.7
+Pillow>=11.3.0
+ExifRead>=3.4.0
+numpy>=2.3.0
+alembic>=1.16.4
+typer>=0.16.0
 pytest
 pytest-cov
-imagehash
-prometheus-client
-python-multipart
-httpx
+imagehash>=4.3.2
+prometheus-client>=0.22.2
+python-multipart>=0.0.20
+httpx>=0.28.1
+psutil>=6.3.0

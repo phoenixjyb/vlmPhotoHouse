@@ -1,5 +1,9 @@
+# VLM Photo Engine Requirements - Updated August 24, 2025
 # Optional heavy ML dependencies are moved to requirements-ml.txt
 # Install them only when needed (e.g., GPU/WSL2 profile) to keep mac dev fast.
 
 # Default install: core dependencies
 -r requirements-core.txt
+
+# For production deployment with exact versions:
+# Use requirements-lock-updated.txt instead

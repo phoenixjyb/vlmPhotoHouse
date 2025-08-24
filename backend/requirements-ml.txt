@@ -1,18 +1,23 @@
-# Heavy ML deps (install only when needed)
+# Heavy ML deps (install only when needed) - Updated August 24, 2025
+# Current versions matching RTX 3090 + CUDA 12.4 environment
 # CPU default installs lightweight FAISS. For GPU:
 #   1) Install appropriate CUDA toolkit drivers
 #   2) Optionally pre-install torch/torchvision from official index, e.g.:
-#        pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision
+#        pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision
 #   3) Replace faiss-cpu with faiss-gpu (if wheel available) OR keep faiss-cpu fallback.
 
-sentence-transformers
-open_clip_torch
-torch
-torchvision
+sentence-transformers>=5.1.0
+open_clip_torch>=3.1.0
+torch>=2.6.0+cu124
+torchvision>=0.21.0+cu124
 facenet-pytorch
-faiss-cpu
-onnxruntime  # for LVFaceEmbeddingProvider (use onnxruntime-gpu if CUDA desired)
-onnx  # needed only to generate dummy/testing ONNX models (not required at runtime if you already have a model file)
+faiss-cpu>=1.11.0.post1
+transformers>=4.55.0
+huggingface-hub>=0.34.4
+onnxruntime>=1.22.1  # for LVFaceEmbeddingProvider (use onnxruntime-gpu if CUDA desired)
+onnx>=1.18.0  # needed only to generate dummy/testing ONNX models (not required at runtime if you already have a model file)
+scikit-image>=0.24.0
+safetensors>=0.4.8
 
 # Caption model dependencies
 transformers  # for LLaVA-NeXT, BLIP2
