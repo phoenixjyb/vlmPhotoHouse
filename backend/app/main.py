@@ -14,27 +14,41 @@ from . import tasks as tasks_mod  # use module to keep live globals
 from .vector_index import load_index_from_embeddings, load_faiss_index_from_embeddings, FaissVectorIndex
 from .db import Asset, Task
 from pathlib import Path
-from alembic import command as alembic_command
-from alembic.config import Config as AlembicConfig
-from alembic.script import ScriptDirectory
-from alembic.runtime.migration import MigrationContext
+try:
+    from alembic import command as alembic_command  # type: ignore
+    from alembic.config import Config as AlembicConfig  # type: ignore
+    from alembic.script import ScriptDirectory  # type: ignore
+    from alembic.runtime.migration import MigrationContext  # type: ignore
+except Exception:
+    alembic_command = AlembicConfig = ScriptDirectory = MigrationContext = None  # Optional in tests/dev
 from . import schemas
 from typing import Generator, List
 from .services import assets as asset_service
 from .paths import DERIVED_PATH
-from . import metrics as metrics_mod
-from .dependencies import get_db, SessionLocal
+try:
+    from . import metrics as metrics_mod  # optional module; guard usage below
+except Exception:
+    metrics_mod = None
+from . import dependencies as deps
+from .dependencies import get_db, ensure_db
 
 settings = get_settings()
-DATABASE_URL = settings.database_url
-engine = create_engine(DATABASE_URL, future=True, echo=False)
 
 def init_db():
-    db.Base.metadata.create_all(bind=engine)
+    # Ensure dependencies are bound and schema exists
+    ensure_db()
+    try:
+        db.Base.metadata.create_all(bind=deps.engine)
+    except Exception:
+        pass
 
 app = FastAPI()
 
-executor = tasks_mod.TaskExecutor(SessionLocal, settings)
+# Initialize executor after DB is ensured (SessionLocal is defined in deps)
+ensure_db()
+# Backwards-compat: expose SessionLocal in this module for tests that import it from app.main
+SessionLocal = deps.SessionLocal  # type: ignore
+executor = tasks_mod.TaskExecutor(deps.SessionLocal, settings)
 
 def task_worker_loop():
     while True:
@@ -47,36 +61,19 @@ def reinit_executor_for_tests():
 
     Safe to call multiple times. Does not recreate the engine; assumes DATABASE_URL unchanged.
     """
-    global settings, executor, engine, SessionLocal
+    global settings, executor
     try:
         executor.stop_workers()
     except Exception:
         pass
     settings = get_settings()
+    # Rebind dependencies to the current DATABASE_URL and ensure schema
+    ensure_db()
     try:
-        engine.dispose()
+        db.Base.metadata.create_all(bind=deps.engine)
     except Exception:
         pass
-    # Recreate engine and update existing SessionLocal to honor DATABASE_URL overrides
-    new_engine = create_engine(settings.database_url, future=True, echo=False)
-    engine = new_engine
-    if 'SessionLocal' in globals() and SessionLocal is not None:
-        try:
-            SessionLocal.configure(bind=engine)
-        except Exception:
-            # Fallback: recreate if configure not possible
-            SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-    else:
-        SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-    # Ensure DB schema exists for the new engine (fail fast instead of swallowing silently for tests)
-    db.Base.metadata.create_all(bind=engine)
-    # Mark readiness so ensure_db() short-circuits
-    try:
-        global _DB_READY
-        _DB_READY = True
-    except Exception:
-        pass
-    executor = tasks_mod.TaskExecutor(SessionLocal, settings)
+    executor = tasks_mod.TaskExecutor(deps.SessionLocal, settings)
     return executor
 
 @app.on_event("startup")
@@ -104,21 +101,59 @@ def on_startup():
     if settings.vector_index_autoload and tasks_mod.INDEX_SINGLETON is not None and not settings.vector_index_rebuild_on_demand_only:
         try:
             if isinstance(tasks_mod.INDEX_SINGLETON, FaissVectorIndex):
-                loaded = load_faiss_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
+                loaded = load_faiss_index_from_embeddings(deps.SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
                 # save after load to persist meta
                 try:
                     tasks_mod.INDEX_SINGLETON.save(settings.vector_index_path)
                 except Exception:
                     pass
             else:
-                loaded = load_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
+                loaded = load_index_from_embeddings(deps.SessionLocal, tasks_mod.INDEX_SINGLETON, limit=settings.max_index_load)
             logging.getLogger('app').info(f"Vector index autoloaded embeddings: {loaded}")
         except Exception:
             logging.getLogger('app').warning('Vector index autoload failed', exc_info=True)
+    # Video index autoload (simple): scan derived/video_embeddings/*.npy
+    try:
+        from glob import glob
+        from pathlib import Path as _Path
+        if getattr(tasks_mod, 'VIDEO_INDEX_SINGLETON', None) is not None:
+            vecs = []
+            ids = []
+            for fp in glob(str(_Path(settings.derived_path) / 'video_embeddings' / '*.npy'))[: settings.max_index_load]:
+                try:
+                    import numpy as _np
+                    aid = int(_Path(fp).stem)
+                    vec = _np.load(fp).astype('float32')
+                    ids.append(aid); vecs.append(vec)
+                except Exception:
+                    continue
+            if ids:
+                tasks_mod.VIDEO_INDEX_SINGLETON.add(ids, __import__('numpy').stack(vecs))
+    except Exception:
+        logging.getLogger('app').warning('Video index autoload failed', exc_info=True)
+    # Video segment index autoload: scan derived/video_embeddings/seg_*.npy
+    try:
+        from glob import glob as _glob
+        from pathlib import Path as _P
+        if getattr(tasks_mod, 'VIDEO_SEG_INDEX_SINGLETON', None) is not None:
+            sids = []
+            svecs = []
+            for fp in _glob(str(_P(settings.derived_path) / 'video_embeddings' / 'seg_*.npy'))[: settings.max_index_load]:
+                try:
+                    import numpy as _np2
+                    sid = int(_P(fp).stem.split('_',1)[1])
+                    vec = _np2.load(fp).astype('float32')
+                    sids.append(sid); svecs.append(vec)
+                except Exception:
+                    continue
+            if sids:
+                tasks_mod.VIDEO_SEG_INDEX_SINGLETON.add(sids, __import__('numpy').stack(svecs))
+    except Exception:
+        logging.getLogger('app').warning('Video segment index autoload failed', exc_info=True)
     # Schedule re-embed tasks if model or dim changed (compare sample embedding rows)
     try:
         from .db import Embedding, Task, Asset
-        with SessionLocal() as session:
+        with deps.SessionLocal() as session:
             # pick a small sample to compare
             sample = session.query(Embedding).filter(Embedding.modality=='image').limit(5).all()
             mismatch = False
@@ -344,16 +379,17 @@ def metrics(db_s: Session = Depends(get_db)):
             pass
     avg_duration = sum(durations)/len(durations) if durations else None
     # Update gauges (cheap) for exporter
-    try:
-        pending = by_state.get('pending', 0)
-        running = by_state.get('running', 0)
-        dead = by_state.get('dead', 0)
-        metrics_mod.update_queue_gauges(pending, running)
-        metrics_mod.update_dead_tasks(dead)
-        metrics_mod.update_vector_index_size(index_size)
-        metrics_mod.update_persons_total(persons)
-    except Exception:
-        pass
+    if metrics_mod is not None:
+        try:
+            pending = by_state.get('pending', 0)
+            running = by_state.get('running', 0)
+            dead = by_state.get('dead', 0)
+            metrics_mod.update_queue_gauges(pending, running)
+            metrics_mod.update_dead_tasks(dead)
+            metrics_mod.update_vector_index_size(index_size)
+            metrics_mod.update_persons_total(persons)
+        except Exception:
+            pass
     return {
         'api_version': schemas.API_VERSION,
         'assets': {'total': assets_total, 'active': assets_active, 'deleted': assets_deleted},
@@ -380,6 +416,326 @@ def search(q: str = Query('', description='Query text (stub substring match on p
     total = base.count()
     items = base.order_by(Asset.id.desc()).offset((page-1)*page_size).limit(page_size).all()
     return {'api_version': schemas.API_VERSION, 'page': page, 'page_size': page_size, 'total': total, 'items': [{'id': a.id, 'path': a.path} for a in items]}
+
+# --- Captions management ---
+@app.get('/assets/{asset_id}/captions')
+def list_captions(asset_id: int, db_s: Session = Depends(get_db)):
+    from .db import Caption
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    caps = db_s.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
+    return {'asset_id': asset_id, 'captions': [{'id': c.id, 'text': c.text, 'model': c.model, 'user_edited': c.user_edited, 'created_at': str(c.created_at) if c.created_at else None} for c in caps]}
+
+@app.post('/assets/{asset_id}/captions/regenerate')
+def regenerate_caption(asset_id: int, force: bool = Body(False, embed=True), db_s: Session = Depends(get_db)):
+    # Enqueue a caption task; task handler enforces variant/word limits
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    t = Task(type='caption', priority=110, payload_json={'asset_id': asset_id, 'force': force})
+    db_s.add(t)
+    db_s.commit()
+    return {'enqueued': True, 'task_id': t.id}
+
+@app.patch('/captions/{caption_id}')
+def update_caption(caption_id: int, user_edited: bool | None = Body(None, embed=True), text: str | None = Body(None, embed=True), db_s: Session = Depends(get_db)):
+    from .db import Caption
+    cap = db_s.get(Caption, caption_id)
+    if not cap:
+        raise HTTPException(status_code=404, detail='Caption not found')
+    changed = False
+    if user_edited is not None:
+        cap.user_edited = bool(user_edited)
+        changed = True
+    if text is not None:
+        # enforce word limit similar to generation path
+        import os as _os
+        try:
+            word_limit = int(_os.getenv('CAPTION_WORD_LIMIT', '40') or '40')
+        except Exception:
+            word_limit = 40
+        new_text = text or ''
+        try:
+            words = new_text.split()
+            if word_limit > 0 and len(words) > word_limit:
+                new_text = ' '.join(words[:word_limit])
+        except Exception:
+            pass
+        cap.text = new_text
+        changed = True
+    if changed:
+        db_s.commit()
+    return {'id': cap.id, 'asset_id': cap.asset_id, 'text': cap.text, 'model': cap.model, 'user_edited': cap.user_edited}
+
+@app.delete('/captions/{caption_id}')
+def delete_caption(caption_id: int, db_s: Session = Depends(get_db)):
+    from .db import Caption
+    cap = db_s.get(Caption, caption_id)
+    if not cap:
+        raise HTTPException(status_code=404, detail='Caption not found')
+    db_s.delete(cap)
+    db_s.commit()
+    return {'deleted': True, 'id': caption_id}
+
+@app.post('/video-index/rebuild')
+def video_index_rebuild(db_s: Session = Depends(get_db)):
+    # Clear and reload from derived/video_embeddings
+    try:
+        if tasks_mod.VIDEO_INDEX_SINGLETON is None:
+            tasks_mod.VIDEO_INDEX_SINGLETON = tasks_mod.InMemoryVectorIndex(tasks_mod.EMBED_DIM)
+        tasks_mod.VIDEO_INDEX_SINGLETON.clear()
+        import numpy as np
+        from glob import glob
+        from pathlib import Path as _Path
+        ids = []; vecs = []
+        for fp in glob(str(_Path(settings.derived_path) / 'video_embeddings' / '*.npy')):
+            try:
+                aid = int(_Path(fp).stem)
+                vec = np.load(fp).astype('float32')
+                ids.append(aid); vecs.append(vec)
+            except Exception:
+                continue
+        if ids:
+            tasks_mod.VIDEO_INDEX_SINGLETON.add(ids, np.stack(vecs))
+        return {'loaded': len(ids)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Caption search (simple LIKE) ---
+@app.post('/search/captions')
+def search_captions(text: str = Body('', embed=True), k: int = Body(20, embed=True), media: str = Body('all', embed=True), db_s: Session = Depends(get_db)):
+    from .db import Caption
+    from sqlalchemy import func as _f
+    if not text:
+        raise HTTPException(status_code=400, detail='text required')
+    q = db_s.query(Asset).join(Caption, Caption.asset_id==Asset.id).filter(_f.lower(Caption.text).like(f"%{text.lower()}%"))
+    if media == 'image':
+        q = q.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
+    elif media == 'video':
+        q = q.filter(Asset.mime.startswith('video'))
+    items = q.order_by(Asset.id.desc()).limit(k).all()
+    return {'query': text, 'results': [{'asset_id': a.id, 'path': a.path, 'mime': a.mime} for a in items]}
+
+# --- Tag management ---
+@app.get('/assets/{asset_id}/tags')
+def get_asset_tags(asset_id: int, db_s: Session = Depends(get_db)):
+    from .db import Tag, AssetTag
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    rows = db_s.query(Tag).join(AssetTag, AssetTag.tag_id==Tag.id).filter(AssetTag.asset_id==asset_id).all()
+    return {'asset_id': asset_id, 'tags': [{'id': t.id, 'name': t.name, 'type': t.type} for t in rows]}
+
+@app.post('/assets/{asset_id}/tags')
+def add_asset_tags(asset_id: int, names: list[str] = Body(..., embed=True), tag_type: str | None = Body(None, embed=True), db_s: Session = Depends(get_db)):
+    from .db import Tag, AssetTag
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    added = []
+    for nm in names:
+        nm = nm.strip()
+        if not nm:
+            continue
+        t = db_s.query(Tag).filter(Tag.name==nm).first()
+        if not t:
+            t = Tag(name=nm, type=tag_type)
+            db_s.add(t)
+            db_s.flush()
+        exists = db_s.query(AssetTag).filter(AssetTag.asset_id==asset_id, AssetTag.tag_id==t.id).first()
+        if not exists:
+            at = AssetTag(asset_id=asset_id, tag_id=t.id)
+            db_s.add(at)
+            added.append(nm)
+    db_s.commit()
+    return {'asset_id': asset_id, 'added': added}
+
+@app.post('/search/tags')
+def search_by_tags(tags: list[str] = Body(..., embed=True), mode: str = Body('any', embed=True), media: str = Body('all', embed=True), k: int = Body(100, embed=True), db_s: Session = Depends(get_db)):
+    from sqlalchemy import func as _f
+    from .db import Tag, AssetTag
+    if not tags:
+        raise HTTPException(status_code=400, detail='tags required')
+    tag_rows = db_s.query(Tag).filter(Tag.name.in_(tags)).all()
+    if not tag_rows:
+        return {'query': tags, 'results': []}
+    tag_ids = [t.id for t in tag_rows]
+    q = db_s.query(AssetTag.asset_id, _f.count(AssetTag.tag_id).label('cnt')).filter(AssetTag.tag_id.in_(tag_ids)).group_by(AssetTag.asset_id)
+    if mode == 'all':
+        q = q.having(_f.count(AssetTag.tag_id) >= len(tag_ids))
+    q = q.limit(k)
+    asset_ids = [aid for (aid, _) in q.all()]
+    if not asset_ids:
+        return {'query': tags, 'results': []}
+    qa = db_s.query(Asset).filter(Asset.id.in_(asset_ids))
+    if media == 'image':
+        qa = qa.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
+    elif media == 'video':
+        qa = qa.filter(Asset.mime.startswith('video'))
+    assets = qa.all()
+    return {'query': tags, 'mode': mode, 'results': [{'asset_id': a.id, 'path': a.path, 'mime': a.mime} for a in assets]}
+
+# --- Smart search (hybrid): vector + caption + tags ---
+@app.post('/search/smart')
+def search_smart(text: str | None = Body(None, embed=True), tags: list[str] | None = Body(None, embed=True), media: str = Body('all', embed=True), k: int = Body(20, embed=True), db_s: Session = Depends(get_db)):
+    from .db import Caption, Tag, AssetTag
+    scores: dict[int, float] = {}
+    # Vector search across images/videos
+    if text:
+        try:
+            if media in ('all', 'image') and tasks_mod.INDEX_SINGLETON is not None:
+                qv = tasks_mod.EMBED_SERVICE.embed_text(text) if tasks_mod.EMBED_SERVICE else None
+                if qv is not None:
+                    for aid, sc in tasks_mod.INDEX_SINGLETON.search(qv, k=k*2):
+                        scores[aid] = max(scores.get(aid, 0.0), float(sc))
+            if media in ('all', 'video') and getattr(tasks_mod, 'VIDEO_INDEX_SINGLETON', None) is not None:
+                qv = tasks_mod.EMBED_SERVICE.embed_text(text) if tasks_mod.EMBED_SERVICE else None
+                if qv is not None:
+                    for aid, sc in tasks_mod.VIDEO_INDEX_SINGLETON.search(qv, k=k*2):
+                        scores[aid] = max(scores.get(aid, 0.0), float(sc))
+        except Exception:
+            pass
+    # Caption match boost
+    if text:
+        from sqlalchemy import func as _f
+        cq = db_s.query(Caption.asset_id).filter(_f.lower(Caption.text).like(f"%{text.lower()}%")).limit(1000).all()
+        for (aid,) in cq:
+            scores[aid] = scores.get(aid, 0.0) + 0.1
+    # Tag match boost
+    if tags:
+        tag_rows = db_s.query(Tag).filter(Tag.name.in_(tags)).all()
+        if tag_rows:
+            tag_ids = [t.id for t in tag_rows]
+            tq = db_s.query(AssetTag.asset_id).filter(AssetTag.tag_id.in_(tag_ids)).limit(2000).all()
+            for (aid,) in tq:
+                scores[aid] = scores.get(aid, 0.0) + 0.1
+    # Filter media type
+    if media in ('image', 'video'):
+        ids = list(scores.keys())
+        if ids:
+            m = db_s.query(Asset.id, Asset.mime).filter(Asset.id.in_(ids)).all()
+            for (aid, mm) in m:
+                is_vid = bool(mm and mm.startswith('video'))
+                if media == 'image' and is_vid:
+                    scores.pop(aid, None)
+                if media == 'video' and not is_vid:
+                    scores.pop(aid, None)
+    # Return top-k
+    top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:k]
+    if not top:
+        return {'query': {'text': text, 'tags': tags, 'media': media}, 'results': []}
+    aset = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([i for i,_ in top])).all()}
+    out = []
+    for aid, sc in top:
+        a = aset.get(aid)
+        out.append({'asset_id': aid, 'score': round(float(sc), 4), 'path': a.path if a else None, 'mime': a.mime if a else None})
+    return {'query': {'text': text, 'tags': tags, 'media': media}, 'results': out}
+
+@app.post('/search/video')
+def search_video(text: str = Body('', embed=True), k: int = Body(10, embed=True)):
+    if tasks_mod.VIDEO_INDEX_SINGLETON is None:
+        raise HTTPException(status_code=400, detail='Video index not initialized')
+    # Embed query text and search
+    try:
+        qvec = tasks_mod.EMBED_SERVICE.embed_text(text) if tasks_mod.EMBED_SERVICE else None
+        if qvec is None:
+            raise RuntimeError('Embedding service unavailable')
+        results = tasks_mod.VIDEO_INDEX_SINGLETON.search(qvec, k=k)
+        return {'query': text, 'results': [{'asset_id': aid, 'score': score} for aid, score in results]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/video-seg-index/rebuild')
+def video_segment_index_rebuild():
+    try:
+        if tasks_mod.VIDEO_SEG_INDEX_SINGLETON is None:
+            tasks_mod.VIDEO_SEG_INDEX_SINGLETON = tasks_mod.InMemoryVectorIndex(tasks_mod.EMBED_DIM)
+        tasks_mod.VIDEO_SEG_INDEX_SINGLETON.clear()
+        import numpy as np
+        from glob import glob
+        from pathlib import Path as _Path
+        ids = []; vecs = []
+        for fp in glob(str(_Path(settings.derived_path) / 'video_embeddings' / 'seg_*.npy')):
+            try:
+                sid = int(_Path(fp).stem.split('_',1)[1])
+                vec = np.load(fp).astype('float32')
+                ids.append(sid); vecs.append(vec)
+            except Exception:
+                continue
+        if ids:
+            tasks_mod.VIDEO_SEG_INDEX_SINGLETON.add(ids, np.stack(vecs))
+        return {'loaded': len(ids)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post('/search/video-segments')
+def search_video_segments(text: str = Body('', embed=True), k: int = Body(10, embed=True), db_s: Session = Depends(get_db)):
+    if tasks_mod.VIDEO_SEG_INDEX_SINGLETON is None:
+        raise HTTPException(status_code=400, detail='Video segment index not initialized')
+    try:
+        qvec = tasks_mod.EMBED_SERVICE.embed_text(text) if tasks_mod.EMBED_SERVICE else None
+        if qvec is None:
+            raise RuntimeError('Embedding service unavailable')
+        results = tasks_mod.VIDEO_SEG_INDEX_SINGLETON.search(qvec, k=k)
+        # Attach segment metadata
+        from .db import VideoSegment
+        out = []
+        for sid, score in results:
+            seg = db_s.get(VideoSegment, sid)
+            item = {'segment_id': sid, 'score': score}
+            if seg:
+                item.update({'asset_id': seg.asset_id, 'start_sec': seg.start_sec, 'end_sec': seg.end_sec})
+            out.append(item)
+        return {'query': text, 'results': out}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get('/videos/{asset_id}')
+def get_video_info(asset_id: int, db_s: Session = Depends(get_db)):
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    if not (a.mime or '').startswith('video'):
+        raise HTTPException(status_code=400, detail='Asset is not a video')
+    frames_dir = Path(DERIVED_PATH) / 'video_frames' / str(asset_id)
+    frames = []
+    try:
+        if frames_dir.exists():
+            for p in sorted(frames_dir.glob('frame_*.jpg')):
+                frames.append(p.name)
+            if (frames_dir / '_keyframes_stub.txt').exists():
+                frames.append('_keyframes_stub.txt')
+    except Exception:
+        pass
+    return {
+        'id': a.id,
+        'path': a.path,
+        'mime': a.mime,
+        'duration_sec': a.duration_sec,
+        'fps': a.fps,
+        'frames': frames,
+    }
+
+@app.get('/videos/{asset_id}/segments')
+def get_video_segments(asset_id: int, db_s: Session = Depends(get_db)):
+    from .db import VideoSegment
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+    segs = db_s.query(VideoSegment).filter(VideoSegment.asset_id==asset_id).order_by(VideoSegment.start_sec).all()
+    return {
+        'asset_id': asset_id,
+        'segments': [
+            {
+                'id': s.id,
+                'start_sec': s.start_sec,
+                'end_sec': s.end_sec,
+                'keyframe': s.keyframe_path,
+                'embedding': s.embedding_path,
+            } for s in segs
+        ]
+    }
 
 @app.get('/duplicates', response_model=schemas.DuplicatesResponse)
 def list_duplicates(min_group_size: int = Query(2, ge=2), mode: str = Query('all', description='sha256|phash|all'), page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db_s: Session = Depends(get_db)):
@@ -660,17 +1016,23 @@ def rebuild_vector_index(limit: int = Body(None), db_s: Session = Depends(get_db
     # clear and reload
     tasks_mod.INDEX_SINGLETON.clear()
     if isinstance(tasks_mod.INDEX_SINGLETON, FaissVectorIndex):
-        loaded = load_faiss_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
+        loaded = load_faiss_index_from_embeddings(deps.SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
         try:
             tasks_mod.INDEX_SINGLETON.save(settings.vector_index_path)
         except Exception:
             pass
     else:
-        loaded = load_index_from_embeddings(SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
+        loaded = load_index_from_embeddings(deps.SessionLocal, tasks_mod.INDEX_SINGLETON, limit=limit or settings.max_index_load)
     return {'api_version': schemas.API_VERSION, 'reloaded': loaded, 'dim': tasks_mod.EMBED_DIM, 'size': len(tasks_mod.INDEX_SINGLETON), 'backend': settings.vector_index_backend}
 # Routers
 from .routers import people as people_router
+from .routers import voice as voice_router
+from .routers import voice_photo as voice_photo_router
+from .routers import ui as ui_router
 app.include_router(people_router.router, prefix='')
+app.include_router(voice_router.router, prefix='')
+app.include_router(voice_photo_router.router, prefix='')
+app.include_router(ui_router.router, prefix='')
 
 # --- Albums: Time hierarchy (year -> month -> day)
 @app.get('/albums/time', response_model=schemas.TimeAlbumsResponse)
@@ -827,4 +1189,4 @@ if __name__ == "__main__":
     # Temporarily disable startup events for debugging
     import os
     os.environ['RUN_MODE'] = 'debug'
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8002, log_level="info")

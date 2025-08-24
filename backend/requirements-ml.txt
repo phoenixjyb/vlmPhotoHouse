@@ -9,11 +9,16 @@ sentence-transformers
 open_clip_torch
 torch
 torchvision
+facenet-pytorch
 faiss-cpu
 onnxruntime  # for LVFaceEmbeddingProvider (use onnxruntime-gpu if CUDA desired)
 onnx  # needed only to generate dummy/testing ONNX models (not required at runtime if you already have a model file)
 
 # Caption model dependencies
 transformers  # for LLaVA-NeXT, BLIP2
-pillow  # for image processing (PIL)
 qwen-vl-utils  # for Qwen2-VL model support
+
+# Optional video extras (install only if you need these features)
+# pyscenedetect  # scene/shot boundary detection
+# ffmpeg-python   # Pythonic ffmpeg wrapper (not required; we use subprocess by default)
+# faster-whisper  # transcription (if adding transcript pipeline)

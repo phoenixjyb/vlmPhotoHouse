@@ -44,6 +44,10 @@ def test_stub_caption_provider():
 ])
 def test_provider_selection(provider_name, expected_class):
     """Test that provider selection works correctly."""
+    import os
+    heavy_enabled = os.getenv('CAPTION_TEST_ENABLE_HEAVY','false').lower() in ('1','true','yes') or bool(os.getenv('CAPTION_EXTERNAL_DIR',''))
+    if provider_name != 'stub' and not heavy_enabled:
+        pytest.skip("Skipping heavy caption providers; enable with CAPTION_TEST_ENABLE_HEAVY=1 or set CAPTION_EXTERNAL_DIR")
     with patch('app.config.settings') as mock_settings:
         mock_settings.caption_provider = provider_name
         mock_settings.caption_device = 'cpu'

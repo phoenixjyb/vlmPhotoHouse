@@ -10,6 +10,8 @@ from PIL import Image
 import imagehash
 from datetime import datetime, timedelta
 from . import metrics as metrics_mod
+import logging
+logger = logging.getLogger(__name__)
 
 EMBED_DIM = 512  # default; may be updated after loading real model
 DERIVED_DIR = Path(os.getenv('DERIVED_PATH','./derived'))
@@ -23,10 +25,23 @@ THUMB_SIZES = [256, 1024]
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
 
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
+VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
+VIDEO_SEG_INDEX_SINGLETON: InMemoryVectorIndex | None = None
 EMBED_SERVICE: EmbeddingService | None = None
 
 class TaskExecutor:
-    def __init__(self, session_factory, settings):
+    def __init__(self, session_factory=None, settings=None):
+        # Allow tests to instantiate without wiring by pulling from app.main lazily
+        if session_factory is None or settings is None:
+            try:
+                from . import dependencies as _deps
+                from .config import get_settings as _gs
+                if session_factory is None:
+                    session_factory = _deps.SessionLocal
+                if settings is None:
+                    settings = _gs()
+            except Exception:
+                raise TypeError("TaskExecutor requires session_factory and settings when app deps unavailable")
         self.session_factory = session_factory
         self.settings = settings
         self._last_dim_backfill_scan = 0.0
@@ -37,7 +52,7 @@ class TaskExecutor:
         # New multi-worker control
         self._workers: list[threading.Thread] = []
         self._stop_event = threading.Event()
-        global INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
+        global INDEX_SINGLETON, VIDEO_INDEX_SINGLETON, VIDEO_SEG_INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
             EMBED_SERVICE = EmbeddingService(self.settings.embed_model_image, self.settings.embed_model_text, EMBED_DIM, getattr(self.settings,'embed_device','cpu'))
             if EMBED_SERVICE.dim != EMBED_DIM:
@@ -47,6 +62,11 @@ class TaskExecutor:
                 INDEX_SINGLETON = FaissVectorIndex(EMBED_DIM, getattr(self.settings,'vector_index_path',None))  # type: ignore
             else:
                 INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
+        if VIDEO_INDEX_SINGLETON is None:
+            # Video index: memory-only for MVP
+            VIDEO_INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
+        if VIDEO_SEG_INDEX_SINGLETON is None:
+            VIDEO_SEG_INDEX_SINGLETON = InMemoryVectorIndex(EMBED_DIM)
         # override cluster threshold if provided
         if getattr(self.settings, 'face_cluster_threshold', None):
             FACE_CLUSTER_DIST_THRESHOLD = self.settings.face_cluster_threshold
@@ -149,6 +169,16 @@ class TaskExecutor:
                     self._handle_dim_backfill(session, task)
                 elif task.type == 'phash':
                     self._handle_phash(session, task)
+                elif task.type == 'video_probe':
+                    self._handle_video_probe(session, task)
+                elif task.type == 'video_keyframes':
+                    self._handle_video_keyframes(session, task)
+                elif task.type == 'video_embed':
+                    self._handle_video_embed(session, task)
+                elif task.type == 'video_scene_detect':
+                    self._handle_video_scene_detect(session, task)
+                elif task.type == 'video_segment_embed':
+                    self._handle_video_segment_embed(session, task)
                 elif task.type == 'fail_transient':
                     # Simulated transient failure for tests
                     raise OSError('Simulated transient failure')
@@ -283,15 +313,19 @@ class TaskExecutor:
                 im.convert('RGB').save(out_path, 'JPEG', quality=85)
 
     def _handle_caption(self, session: Session, task: Task):
-        asset_id = task.payload_json['asset_id']
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        force: bool = bool(payload.get('force', False))
+        max_variants: int = int(os.getenv('CAPTION_MAX_VARIANTS', '3') or '3')
+        word_limit: int = int(os.getenv('CAPTION_WORD_LIMIT', '40') or '40')
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
-        
-        # Check if caption already exists
-        existing = session.get(Caption, asset_id)
-        if existing:
-            return existing
+        # Limit number of caption variants per asset
+        existing_caps = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
+        if existing_caps and not force and len(existing_caps) >= max_variants:
+            # Return the latest caption without creating a new one
+            return existing_caps[-1]
         
         try:
             # Use the caption service to generate real captions
@@ -321,6 +355,28 @@ class TaskExecutor:
                 text = ' '.join(tokens[:8])
             model_name = 'stub-fallback'
         
+        # Enforce word limit
+        try:
+            words = text.split()
+            if word_limit > 0 and len(words) > word_limit:
+                text = ' '.join(words[:word_limit])
+        except Exception:
+            pass
+        # If at capacity, replace the oldest non user_edited caption
+        if existing_caps and len(existing_caps) >= max_variants:
+            # try to replace oldest non-edited
+            to_replace = None
+            for c in existing_caps:
+                if not c.user_edited:
+                    to_replace = c
+                    break
+            if to_replace is None:
+                # All are user-edited; do not override
+                return existing_caps[-1]
+            to_replace.text = text
+            to_replace.model = model_name
+            session.commit()
+            return to_replace
         cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False)
         session.add(cap)
         session.commit()
@@ -670,6 +726,232 @@ class TaskExecutor:
                 ph = imagehash.phash(im)
             asset.perceptual_hash = ph.__str__()
             session.commit()
+        except Exception:
+            pass
+
+    # ---- Minimal Video Handlers (MVP stubs) ----
+    def _handle_video_probe(self, session: Session, task: Task):
+        # Ensure derived folders; try ffprobe to fetch duration/fps when available
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return
+        asset = session.get(Asset, asset_id)
+        if not asset:
+            return
+        # create derived dirs
+        (DERIVED_DIR / 'video_frames' / str(asset_id)).mkdir(parents=True, exist_ok=True)
+        (DERIVED_DIR / 'video_embeddings').mkdir(parents=True, exist_ok=True)
+        # Try to run ffprobe if present
+        try:
+            import subprocess, json as _json
+            cmd = ['ffprobe','-v','error','-print_format','json','-show_streams', asset.path]
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout:
+                info = _json.loads(result.stdout)
+                # Find video stream
+                streams = info.get('streams') or []
+                vstreams = [s for s in streams if s.get('codec_type')=='video']
+                if vstreams:
+                    vs = vstreams[0]
+                    # duration
+                    dur = None
+                    if 'duration' in vs:
+                        try:
+                            dur = float(vs['duration'])
+                        except Exception:
+                            dur = None
+                    if not dur and 'tags' in vs and 'DURATION' in vs['tags']:
+                        # parse HH:MM:SS.xx
+                        try:
+                            h, m, s = vs['tags']['DURATION'].split(':')
+                            dur = float(h)*3600 + float(m)*60 + float(s)
+                        except Exception:
+                            pass
+                    # fps
+                    fps = None
+                    r = vs.get('r_frame_rate') or vs.get('avg_frame_rate')
+                    if r and '/' in r:
+                        try:
+                            num, den = r.split('/')
+                            num = float(num); den = float(den) if float(den)!=0 else 1.0
+                            fps = num/den if den else None
+                        except Exception:
+                            pass
+                    if dur:
+                        asset.duration_sec = dur
+                    if fps:
+                        asset.fps = fps
+        except Exception:
+            pass
+        session.commit()
+
+    def _handle_video_keyframes(self, session: Session, task: Task):
+        # Attempt to extract spaced frames with ffmpeg when available; else stub
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return
+        src = None
+        with self.session_factory() as s2:
+            a = s2.get(Asset, asset_id)
+            if a:
+                src = a.path
+        out_dir = DERIVED_DIR / 'video_frames' / str(asset_id)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if not src or not os.path.exists(src):
+            return
+        interval = max(0.5, float(getattr(self.settings, 'video_keyframe_interval_sec', 2.0)))
+        # Use ffmpeg -vf fps=1/interval to sample roughly one frame per interval
+        try:
+            import subprocess
+            cmd = [
+                'ffmpeg','-hide_banner','-loglevel','error','-y',
+                '-i', src,
+                '-vf', f"fps=1/{interval}",
+                str(out_dir / 'frame_%05d.jpg')
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+        except Exception:
+            # fallback: marker file
+            try:
+                (out_dir / '_keyframes_stub.txt').write_text('keyframes not implemented (ffmpeg missing)')
+            except Exception:
+                pass
+
+    def _handle_video_embed(self, session: Session, task: Task):
+        # Compute pooled embedding over extracted frames if present; else zero-vector stub
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return
+        frames_dir = DERIVED_DIR / 'video_frames' / str(asset_id)
+        vecs = []
+        if frames_dir.exists():
+            try:
+                from PIL import Image as _Im
+                import glob
+                frame_files = sorted(glob.glob(str(frames_dir / 'frame_*.jpg')))[:32]
+                for fp in frame_files:
+                    try:
+                        with _Im.open(fp) as im:
+                            v = EMBED_SERVICE.embed_image(fp) if EMBED_SERVICE else None
+                            if v is None:
+                                continue
+                            vecs.append(v.astype('float32'))
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+        if vecs:
+            import numpy as _np
+            vec = _np.mean(_np.stack(vecs, axis=0), axis=0).astype('float32')
+        else:
+            vec = np.zeros((EMBED_DIM,), dtype='float32')
+        emb_path = DERIVED_DIR / 'video_embeddings' / f'{asset_id}.npy'
+        emb_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(emb_path, vec)
+        # Add to dedicated video index if available
+        try:
+            import app.metrics as m
+            m.embeddings_generated.inc()
+        except Exception:
+            pass
+        try:
+            if VIDEO_INDEX_SINGLETON is not None:
+                VIDEO_INDEX_SINGLETON.add([asset_id], vec.reshape(1,-1))
+        except Exception:
+            pass
+
+    def _handle_video_scene_detect(self, session: Session, task: Task):
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        if not asset_id:
+            return
+        asset = session.get(Asset, asset_id)
+        if not asset or not os.path.exists(asset.path):
+            return
+        min_len = float(getattr(self.settings, 'video_scene_min_sec', 1.0))
+        scenes: list[tuple[float,float]] = []
+        # Try pyscenedetect (optional dep)
+        try:
+            from scenedetect import detect, ContentDetector  # type: ignore
+            detected = detect(video_path=asset.path, detector=ContentDetector())
+            # detected is list of Scene objects with start/end timecodes
+            for sc in detected:
+                try:
+                    s = float(sc[0].get_seconds())
+                    e = float(sc[1].get_seconds())
+                    if e - s >= min_len:
+                        scenes.append((s,e))
+                except Exception:
+                    continue
+        except Exception:
+            # Fallback: split into fixed windows
+            dur = float(asset.duration_sec or 0)
+            if dur <= 0:
+                dur = 10.0
+            win = max(min_len, 3.0)
+            t = 0.0
+            while t < dur:
+                e = min(dur, t + win)
+                if e - t >= min_len:
+                    scenes.append((t,e))
+                t = e
+        # Store segments
+        from .db import VideoSegment
+        for s,e in scenes:
+            seg = VideoSegment(asset_id=asset_id, start_sec=s, end_sec=e)
+            session.add(seg)
+        session.commit()
+        # Enqueue per-segment embedding jobs
+        for seg in session.query(VideoSegment).filter_by(asset_id=asset_id).all():
+            session.add(Task(type='video_segment_embed', priority=95, payload_json={'segment_id': seg.id}))
+        session.commit()
+
+    def _handle_video_segment_embed(self, session: Session, task: Task):
+        payload = task.payload_json or {}
+        seg_id = payload.get('segment_id')
+        if not seg_id:
+            return
+        from .db import VideoSegment
+        seg = session.get(VideoSegment, seg_id)
+        if not seg:
+            return
+        # Extract a representative frame near segment midpoint for embedding
+        a = session.get(Asset, seg.asset_id)
+        if not a or not os.path.exists(a.path):
+            return
+        mid = max(0.0, (seg.start_sec + seg.end_sec) / 2.0)
+        out_dir = DERIVED_DIR / 'video_frames' / f"asset_{a.id}_segments"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        kf_path = out_dir / f"seg_{seg.id}_mid.jpg"
+        try:
+            import subprocess
+            # extract single frame at time 'mid'
+            cmd = ['ffmpeg','-hide_banner','-loglevel','error','-y','-ss', str(mid), '-i', a.path, '-frames:v','1', str(kf_path)]
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+            seg.keyframe_path = str(kf_path)
+        except Exception:
+            # If ffmpeg missing, skip image extraction
+            pass
+        # Embed representative image if available, else zero vector
+        vec = np.zeros((EMBED_DIM,), dtype='float32')
+        if seg.keyframe_path and os.path.exists(seg.keyframe_path):
+            try:
+                v = EMBED_SERVICE.embed_image(seg.keyframe_path) if EMBED_SERVICE else None
+                if v is not None:
+                    vec = v.astype('float32')
+            except Exception:
+                pass
+        emb_path = DERIVED_DIR / 'video_embeddings' / f'seg_{seg.id}.npy'
+        np.save(emb_path, vec)
+        seg.embedding_path = str(emb_path)
+        session.commit()
+        # Add to segment index
+        try:
+            if VIDEO_SEG_INDEX_SINGLETON is not None:
+                VIDEO_SEG_INDEX_SINGLETON.add([seg.id], vec.reshape(1,-1))
         except Exception:
             pass
 

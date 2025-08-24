@@ -14,15 +14,33 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    with op.batch_alter_table('tasks') as batch_op:
-        batch_op.add_column(sa.Column('started_at', sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column('finished_at', sa.DateTime(), nullable=True))
-        batch_op.create_index('ix_tasks_started_at', ['started_at'])
-        batch_op.create_index('ix_tasks_finished_at', ['finished_at'])
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_cols = {col['name'] for col in insp.get_columns('tasks')}
+    existing_indexes = {ix['name'] for ix in insp.get_indexes('tasks')}
+
+    if 'started_at' not in existing_cols:
+        op.add_column('tasks', sa.Column('started_at', sa.DateTime(), nullable=True))
+    if 'finished_at' not in existing_cols:
+        op.add_column('tasks', sa.Column('finished_at', sa.DateTime(), nullable=True))
+
+    if 'ix_tasks_started_at' not in existing_indexes:
+        op.create_index('ix_tasks_started_at', 'tasks', ['started_at'])
+    if 'ix_tasks_finished_at' not in existing_indexes:
+        op.create_index('ix_tasks_finished_at', 'tasks', ['finished_at'])
 
 def downgrade():
-    with op.batch_alter_table('tasks') as batch_op:
-        batch_op.drop_index('ix_tasks_started_at')
-        batch_op.drop_index('ix_tasks_finished_at')
-        batch_op.drop_column('started_at')
-        batch_op.drop_column('finished_at')
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_cols = {col['name'] for col in insp.get_columns('tasks')}
+    existing_indexes = {ix['name'] for ix in insp.get_indexes('tasks')}
+
+    if 'ix_tasks_started_at' in existing_indexes:
+        op.drop_index('ix_tasks_started_at', table_name='tasks')
+    if 'ix_tasks_finished_at' in existing_indexes:
+        op.drop_index('ix_tasks_finished_at', table_name='tasks')
+
+    if 'started_at' in existing_cols:
+        op.drop_column('tasks', 'started_at')
+    if 'finished_at' in existing_cols:
+        op.drop_column('tasks', 'finished_at')

@@ -50,7 +50,9 @@ def override_settings(temp_env_root, monkeypatch):
 def client():
     # Import app lazily after environment guard
     from app.main import app
-    return TestClient(app)
+    # Use context manager to ensure cleanup of connections/resources
+    with TestClient(app) as c:
+        yield c
 
 
 # Optional global skip: set SKIP_ALL_TESTS=true to skip the entire suite cleanly (exit code 0).

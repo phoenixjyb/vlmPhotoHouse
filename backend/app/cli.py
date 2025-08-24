@@ -38,6 +38,105 @@ def ingest_scan(paths: List[str] = typer.Argument(..., help="Directories to scan
         typer.echo(f"Ingest complete: {result}")
 
 
+@app.command("ingest-status")
+def ingest_status(
+    paths: List[str] = typer.Argument(..., help="Directories to summarize (progress by prefix)"),
+    scan_fs: bool = typer.Option(False, "--scan-fs", help="Also count files on disk (fast; only new files are hashed on ingest)"),
+    preview_limit: int = typer.Option(10, min=0, help="Show up to N sample files not yet ingested (filesystem preview)"),
+) -> None:
+    """Summarize ingestion/progress for one or more folders.
+
+    Reports counts for assets under each path prefix and how many are missing embeddings/captions.
+    """
+    from pathlib import Path as _Path
+    from sqlalchemy import func as _f
+    from .db import Asset, Embedding, Caption
+    settings = get_settings()
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        # Allowed extensions (mirror ingest)
+        allowed_ext = set(ingest_mod.SUPPORTED_IMAGE_EXT)
+        if getattr(settings, 'video_enabled', False):
+            try:
+                vids = [e.strip().lower() for e in settings.video_extensions.split(',') if e.strip()]
+                allowed_ext.update(vids)
+            except Exception:
+                pass
+        for root in paths:
+            prefix = str(_Path(root).resolve())
+            like = prefix + '%'
+            total_assets = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).scalar() or 0
+            # Missing image embedding
+            sub_emb = session.query(Embedding.asset_id).filter(Embedding.modality == 'image')
+            missing_embed = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).filter(~Asset.id.in_(sub_emb)).scalar() or 0
+            # Missing caption
+            sub_cap = session.query(Caption.asset_id)
+            missing_caption = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).filter(~Asset.id.in_(sub_cap)).scalar() or 0
+            fs_files = None
+            sample_new: list[str] = []
+            if scan_fs:
+                try:
+                    fs_files = 0
+                    for p in _Path(prefix).rglob('*'):
+                        if p.is_file() and p.suffix.lower() in allowed_ext:
+                            fs_files += 1
+                            if len(sample_new) < preview_limit:
+                                # Only show preview of not-yet-ingested candidates
+                                # Avoid hashing; rely on path uniqueness
+                                exists = session.query(Asset.id).filter(Asset.path == str(p.resolve())).first()
+                                if not exists:
+                                    sample_new.append(str(p.resolve()))
+                except Exception:
+                    pass
+            typer.echo(f"\n[{prefix}]")
+            typer.echo(f"  assets_in_db:       {total_assets}")
+            typer.echo(f"  missing_embedding:  {missing_embed}")
+            typer.echo(f"  missing_caption:    {missing_caption}")
+            if fs_files is not None:
+                to_ingest = max(0, fs_files - total_assets)
+                typer.echo(f"  files_on_disk:      {fs_files}")
+                typer.echo(f"  not_ingested(yet):  {to_ingest}")
+                try:
+                    pct = 0.0 if fs_files == 0 else (total_assets / fs_files) * 100.0
+                    typer.echo(f"  ingested_pct:       {pct:.1f}%")
+                except Exception:
+                    pass
+                if sample_new:
+                    typer.echo("  sample_new:")
+                    for s in sample_new:
+                        typer.echo(f"    - {s}")
+
+
+@app.command("ingest-watch")
+def ingest_watch(
+    paths: List[str] = typer.Argument(..., help="Directories to poll for new files"),
+    interval: float = typer.Option(30.0, help="Polling interval in seconds"),
+) -> None:
+    """Continuously poll and ingest new files.
+
+    Safe to run repeatedly; existing assets are skipped by path before hashing.
+    """
+    import time as _time
+    engine, SessionLocal = _session_factory()
+    db.Base.metadata.create_all(bind=engine)
+    typer.echo(f"Polling every {interval:.1f}s. Press Ctrl+C to stop.")
+    try:
+        cumulative = 0
+        while True:
+            start = _time.time()
+            with SessionLocal() as session:
+                result = ingest_mod.ingest_paths(session, paths)
+                cumulative += int(result.get('new_assets', 0))
+                typer.echo(
+                    f"[{_time.strftime('%H:%M:%S')}] new_assets={result['new_assets']} "
+                    f"skipped={result['skipped']} elapsed={result['elapsed_sec']}s total_ingested={cumulative}"
+                )
+            sleep_left = max(0.0, interval - (_time.time() - start))
+            _time.sleep(sleep_left)
+    except KeyboardInterrupt:
+        typer.echo("Stopped.")
+
+
 @app.command("list-dead")
 def list_dead(page: int = 1, page_size: int = 50) -> None:
     """List dead-letter tasks."""
@@ -330,6 +429,52 @@ def validate_caption() -> None:
         typer.secho(f"Caption validation failed: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
+
+@app.command("warmup")
+def warmup(
+    do_face: bool = typer.Option(True, help="Warm up face embedding provider"),
+    do_caption: bool = typer.Option(True, help="Warm up caption provider"),
+    repeats: int = typer.Option(1, min=1, max=3, help="How many dummy inferences to run per provider"),
+):
+    """Warm up configured providers (loads models and runs a tiny inference)."""
+    import time as _time
+    from PIL import Image as _Image
+    import numpy as _np
+    ok = True
+    if do_face:
+        try:
+            from .face_embedding_service import get_face_embedding_provider as _get_face
+            prov = _get_face()
+            img = _Image.new('RGB', (112,112), color=(128,128,128))
+            t0 = _time.time()
+            last_norm = 0.0
+            for _ in range(repeats):
+                vec = prov.embed_face(img)
+                last_norm = float(_np.linalg.norm(vec))
+            t1 = _time.time()
+            typer.secho(f"Face warmup OK: provider={prov.__class__.__name__} dim={vec.shape[0]} time={(t1-t0):.2f}s norm={last_norm:.3f}", fg=typer.colors.GREEN)
+        except Exception as e:
+            ok = False
+            typer.secho(f"Face warmup failed: {e}", fg=typer.colors.RED)
+    if do_caption:
+        try:
+            from .caption_service import get_caption_provider as _get_cap
+            prov = _get_cap()
+            img = _Image.new('RGB', (640, 360), color=(180, 200, 220))
+            t0 = _time.time()
+            last_cap = ''
+            for _ in range(repeats):
+                last_cap = prov.generate_caption(img)
+            t1 = _time.time()
+            preview = (last_cap or '').strip()
+            if len(preview) > 100:
+                preview = preview[:97] + '...'
+            typer.secho(f"Caption warmup OK: provider={prov.get_model_name()} time={(t1-t0):.2f}s caption='{preview}'", fg=typer.colors.GREEN)
+        except Exception as e:
+            ok = False
+            typer.secho(f"Caption warmup failed: {e}", fg=typer.colors.RED)
+    if not ok:
+        raise typer.Exit(1)
 
 if __name__ == '__main__':
     # Invoke the CLI after all command functions have been registered

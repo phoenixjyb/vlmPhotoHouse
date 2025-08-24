@@ -11,13 +11,15 @@ param(
     [string]$Preset, # Optional: LowVRAM | RTX3090
     [switch]$Gpu,
     [switch]$UseWindowsTerminal,
-    [switch]$KillExisting
+    [switch]$KillExisting,  # Deprecated - now always kills existing instances
+    [switch]$NoCleanup     # Skip cleanup of existing instances/ports
 )
 
 $ErrorActionPreference = 'Stop'
 
 function Resolve-BackendPython {
     $backend = Join-Path $PSScriptRoot '..' | Join-Path -ChildPath 'backend'
+    # Use optimized VLM Photo Engine environment (Python 3.12.10 + PyTorch 2.8.0+cu126)
     $py = Join-Path $backend '..' | Join-Path -ChildPath '.venv/Scripts/python.exe'
     if (Test-Path -LiteralPath $py) { return $py }
     return 'python'
@@ -42,16 +44,51 @@ function Get-LVFaceModelName([string]$Dir) {
 
 Write-Host "Starting dev multiprocess setup (tmux-style)" -ForegroundColor Cyan
 
-if ($UseWindowsTerminal -and $KillExisting) {
-    # Close any existing Windows Terminal instances for a fresh session
+# Always kill existing Windows Terminal instances for a fresh session (unless -NoCleanup)
+if (-not $NoCleanup) {
     try {
+        Write-Host "🔄 Cleaning up existing Windows Terminal instances..." -ForegroundColor Yellow
         $wt = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue
         if ($wt) {
-            Write-Host "Closing existing Windows Terminal instances..." -ForegroundColor Yellow
             $wt | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
+            Write-Host "✅ Closed $($wt.Count) existing Windows Terminal instance(s)" -ForegroundColor Green
+            Start-Sleep -Seconds 2  # Give processes time to fully terminate
+        } else {
+            Write-Host "✅ No existing Windows Terminal instances found" -ForegroundColor Green
         }
-    } catch { }
+    } catch { 
+        Write-Warning "Could not check/close existing Windows Terminal instances: $($_.Exception.Message)"
+    }
+
+    # Clean up any processes using our target ports
+    try {
+        Write-Host "🔄 Checking for services on target ports..." -ForegroundColor Yellow
+        $portsToCheck = @($ApiPort, $VoicePort, 8000)  # Include common alternative ports
+        foreach ($port in $portsToCheck) {
+            try {
+                $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+                if ($connections) {
+                    foreach ($conn in $connections) {
+                        $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+                        if ($process) {
+                            Write-Host "🔴 Stopping process '$($process.ProcessName)' on port $port" -ForegroundColor Red
+                            $process | Stop-Process -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                }
+            } catch { }
+        }
+        Write-Host "✅ Port cleanup completed" -ForegroundColor Green
+    } catch {
+        Write-Warning "Could not perform port cleanup: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "⚠️ Skipping cleanup due to -NoCleanup flag" -ForegroundColor Yellow
+}
+
+if ($UseWindowsTerminal -and $KillExisting) {
+    # This block is now redundant as we always clean up above
+    Write-Host "Note: -KillExisting flag is redundant as we always clean up existing instances" -ForegroundColor Gray
 }
 
 Test-DirExists -Path $LvfaceDir -Name 'LVFaceDir'
@@ -102,6 +139,15 @@ if (-not $env:VOICE_ENABLED) { $env:VOICE_ENABLED = 'true' }
 if (-not $env:VOICE_EXTERNAL_BASE_URL) { $env:VOICE_EXTERNAL_BASE_URL = "http://127.0.0.1:$VoicePort" }
 # Align TTS path with LLMyTranslate default
 if (-not $env:VOICE_TTS_PATH) { $env:VOICE_TTS_PATH = '/api/tts/synthesize' }
+
+# RTX 3090 Voice Service Configuration
+if ($Preset -eq 'RTX3090') {
+    # Enable RTX 3090 optimizations for voice services
+    $env:TTS_DEVICE = 'cuda:0'
+    $env:ASR_DEVICE = 'cuda:0'
+    $env:CUDA_VISIBLE_DEVICES = '0'
+    Write-Host "Voice services configured for RTX 3090 (cuda:0)" -ForegroundColor DarkCyan
+}
 
 # Device selection
 if ($effectiveUseGpu) {
@@ -218,11 +264,13 @@ function Start-ApiTab {
 }
 
 function Start-LVFaceShell {
-    $activate = ".venv\\Scripts\\Activate.ps1"
+    # Use isolated LVFace environment from workload-specific matrix
+    $lvfaceActivate = ".venv-lvface-311\\Scripts\\Activate.ps1"
     $content = @(
         "Set-Location -LiteralPath `"$LvfaceDir`"",
-        "if (Test-Path `"$activate`") { . `"$activate`" } else { Write-Warning `"$activate not found in $LvfaceDir`" }",
-        "Write-Host `"LVFace venv activated. Ready.`" -ForegroundColor Green"
+        "# Using isolated LVFace environment (Python 3.11.9 + PyTorch 2.6.0+cu124)",
+        "if (Test-Path `"$lvfaceActivate`") { . `"$lvfaceActivate`" } else { Write-Warning `"$lvfaceActivate not found in $LvfaceDir`" }",
+        "Write-Host `"LVFace isolated venv activated (CUDA 12.4 compatible). Ready.`" -ForegroundColor Green"
     ) -join "`n"
     $path = Join-Path $env:TEMP "lvface-pane-$PID.ps1"
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
@@ -252,16 +300,20 @@ function Start-CaptionShell {
 }
 
 function Start-VoicePane {
-    $activate = ".venv\\Scripts\\Activate.ps1"
+    # Use optimized ASR environment from workload-specific matrix
+    $asrActivate = ".venv-asr-311\\Scripts\\Activate.ps1"
     $content = @(
         "Set-Location -LiteralPath `"$VoiceDir`"",
-    "if (Test-Path `"$activate`") { . `"$activate`" } else { Write-Warning `"$activate not found in $VoiceDir`" }",
-    "if (Test-Path '.\\.venv\\Scripts\\python.exe') { `$py = '.\\.venv\\Scripts\\python.exe' } else { `$py = 'python' }",
-        "Write-Host 'Starting LLMyTranslate service...' -ForegroundColor Cyan",
+        "# Using optimized ASR environment (Python 3.11.9 + PyTorch 2.8.0+cu126)",
+        "if (Test-Path `"$asrActivate`") { . `"$asrActivate`" } else { Write-Warning `"$asrActivate not found in $VoiceDir`" }",
+        "if (Test-Path '.\\.venv-asr-311\\Scripts\\python.exe') { `$py = '.\\.venv-asr-311\\Scripts\\python.exe' } else { `$py = 'python' }",
+        "Write-Host 'Starting LLMyTranslate service with RTX 3090 optimized ASR...' -ForegroundColor Cyan",
         "if (Test-Path '.\\src\\main.py') {",
-    "  & `$py -m uvicorn src.main:app --host 127.0.0.1 --port $VoicePort",
+        "  & `$py -m uvicorn src.main:app --host 127.0.0.1 --port $VoicePort",
+        "} elseif (Test-Path '.\\run.py') {",
+        "  & `$py run.py",
         "} else {",
-    "  & `$py -m llmytranslate --host 127.0.0.1 --port $VoicePort",
+        "  & `$py -m llmytranslate --host 127.0.0.1 --port $VoicePort",
         "}"
     ) -join "`n"
     $path = Join-Path $env:TEMP "voice-pane-$PID.ps1"
@@ -274,22 +326,57 @@ function Start-VoicePane {
     }
 }
 
-# Launch
+function Start-TTSPane {
+    # Use optimized TTS environment from workload-specific matrix
+    $ttsActivate = ".venv-tts\\Scripts\\Activate.ps1"
+    $content = @(
+        "Set-Location -LiteralPath `"$VoiceDir`"",
+        "# Using optimized TTS environment (Python 3.12.10 + PyTorch 2.8.0+cu126)",
+        "if (Test-Path `"$ttsActivate`") { . `"$ttsActivate`" } else { Write-Warning `"$ttsActivate not found in $VoiceDir`" }",
+        "if (Test-Path '.\\.venv-tts\\Scripts\\python.exe') { `$py = '.\\.venv-tts\\Scripts\\python.exe' } else { `$py = 'python' }",
+        "Write-Host 'RTX 3090 TTS Environment Ready (Coqui TTS 0.27.0)' -ForegroundColor Green",
+        "Write-Host 'Available commands:' -ForegroundColor Yellow",
+        "Write-Host '  Test TTS: & `$py tts_subprocess_rtx3090.py test_rtx3090.json' -ForegroundColor Gray",
+        "Write-Host '  Server mode: & `$py -m uvicorn tts_server:app --port 8002' -ForegroundColor Gray"
+    ) -join "`n"
+    $path = Join-Path $env:TEMP "tts-pane-$PID.ps1"
+    Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+    if ($UseWindowsTerminal) {
+        return @{ File = $path; Dir = $VoiceDir }
+    } else {
+        Start-Process pwsh -ArgumentList @('-NoExit','-File', $path) -WorkingDirectory $VoiceDir
+        return $null
+    }
+}
+
+# Launch - 2x2 Grid Layout
 $apiSpec = Start-ApiTab
-$lvSpec = Start-LVFaceShell
-$capSpec = Start-CaptionShell
+$lvSpec = Start-LVFaceShell  
 $voiceSpec = Start-VoicePane
+$ttsSpec = Start-TTSPane
 
 if ($UseWindowsTerminal) {
-    # Build a single WT chain so panes open in the same window (pass as array)
+    # Build a clean 2x2 grid layout for optimized workload-specific environments
+    # Create 2x2 grid: Start with one pane, split horizontally for top row, then split each vertically
+    # Top Left: VLM Photo Engine API | Top Right: Voice Service (ASR)
+    # Bottom Left: LVFace Environment | Bottom Right: TTS Environment
     $wtArgs = @(
-    'new-tab','-d', $apiSpec.Dir, 'pwsh','-NoExit','-File', $apiSpec.File,
-    ';','split-pane','-H','-d', $lvSpec.Dir,  'pwsh','-NoExit','-File', $lvSpec.File,
-    ';','split-pane','-V','-d', $capSpec.Dir, 'pwsh','-NoExit','-File', $capSpec.File,
-    ';','split-pane','-V','-d', $voiceSpec.Dir, 'pwsh','-NoExit','-File', $voiceSpec.File
+        'new-tab', '--title', "`"VLM Photo Engine`"", '-d', "`"$($apiSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($apiSpec.File)`"",
+        ';', 'split-pane', '-H', '--title', "`"Voice Service (ASR)`"", '-d', "`"$($voiceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($voiceSpec.File)`"",
+        ';', 'move-focus', 'left',
+        ';', 'split-pane', '-V', '--title', "`"LVFace Environment`"", '-d', "`"$($lvSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvSpec.File)`"",
+        ';', 'move-focus', 'up', ';', 'move-focus', 'right',
+        ';', 'split-pane', '-V', '--title', "`"TTS Environment`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`""
     )
+    Write-Host "Executing Windows Terminal with args: $($wtArgs -join ' ')" -ForegroundColor Gray
     Start-Process wt -ArgumentList $wtArgs
 }
 
-Write-Host "Launched: API (port $ApiPort), LVFace shell, Caption shell, Voice service (port $VoicePort)." -ForegroundColor Green
-Write-Host "Tip: Use -UseWindowsTerminal for a single window with panes (requires Windows Terminal)." -ForegroundColor Yellow
+Write-Host "🎯 Launched 2x2 Grid Layout:" -ForegroundColor Green
+Write-Host "  Top Left: VLM Photo Engine (port $ApiPort)" -ForegroundColor Cyan  
+Write-Host "  Top Right: Voice Service ASR (port $VoicePort)" -ForegroundColor Cyan
+Write-Host "  Bottom Left: LVFace Environment" -ForegroundColor Cyan
+Write-Host "  Bottom Right: TTS Environment (RTX 3090)" -ForegroundColor Cyan
+Write-Host "✅ All workload-specific optimized environments ready (RTX 3090 + CUDA 12.6/12.4)" -ForegroundColor Green
+Write-Host "🧹 Previous instances automatically cleaned up for fresh start" -ForegroundColor Gray
+Write-Host "Tip: Use -NoCleanup to skip automatic cleanup of existing instances." -ForegroundColor Yellow

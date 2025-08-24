@@ -14,12 +14,20 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    with op.batch_alter_table('embeddings') as batch_op:
-        batch_op.add_column(sa.Column('device', sa.String(length=16), nullable=True))
-        batch_op.add_column(sa.Column('model_version', sa.String(length=64), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_cols = {col['name'] for col in insp.get_columns('embeddings')}
+    if 'device' not in existing_cols:
+        op.add_column('embeddings', sa.Column('device', sa.String(length=16), nullable=True))
+    if 'model_version' not in existing_cols:
+        op.add_column('embeddings', sa.Column('model_version', sa.String(length=64), nullable=True))
 
 
 def downgrade():
-    with op.batch_alter_table('embeddings') as batch_op:
-        batch_op.drop_column('device')
-        batch_op.drop_column('model_version')
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_cols = {col['name'] for col in insp.get_columns('embeddings')}
+    if 'device' in existing_cols:
+        op.drop_column('embeddings', 'device')
+    if 'model_version' in existing_cols:
+        op.drop_column('embeddings', 'model_version')

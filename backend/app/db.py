@@ -15,6 +15,8 @@ class Asset(Base):
     mime: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    duration_sec: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    fps: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     orientation: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     taken_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, index=True)
     camera_make: Mapped[Optional[str]] = mapped_column(String(64))
@@ -52,7 +54,8 @@ class Embedding(Base):
 
 class Caption(Base):
     __tablename__ = 'captions'
-    asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), index=True, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(String(64), nullable=False)
     user_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -87,6 +90,16 @@ class FaceDetection(Base):
     asset = relationship('Asset', back_populates='faces')
     person = relationship('Person', back_populates='faces')
 
+class VideoSegment(Base):
+    __tablename__ = 'video_segments'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), index=True, nullable=False)
+    start_sec: Mapped[float] = mapped_column(Float, nullable=False)
+    end_sec: Mapped[float] = mapped_column(Float, nullable=False)
+    keyframe_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    embedding_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+
 class Task(Base):
     __tablename__ = 'tasks'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -109,3 +122,19 @@ Index('idx_task_state_priority', Task.state, Task.priority, Task.scheduled_at)
 Index('idx_task_type_state', Task.type, Task.state)
 
 Index('idx_embeddings_asset_mod', Embedding.asset_id, Embedding.modality, unique=True)
+
+# --- Tags ---
+class Tag(Base):
+    __tablename__ = 'tags'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # e.g., date|location|person|scene|custom
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+
+class AssetTag(Base):
+    __tablename__ = 'asset_tags'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), index=True, nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id', ondelete='CASCADE'), index=True, nullable=False)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+    Index('idx_asset_tag_unique', asset_id, tag_id, unique=True)

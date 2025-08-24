@@ -5,7 +5,7 @@ from sqlalchemy import func
 from typing import List, Optional
 
 from ..db import Person, FaceDetection, Asset, Task
-from ..main import get_db, DERIVED_PATH  # reuse existing get_db and path constants
+from ..dependencies import get_db, DERIVED_PATH
 from .. import schemas
 
 router = APIRouter()
