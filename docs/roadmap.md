@@ -1,6 +1,13 @@
-# Project Roadmap — status as of 2025-08-23
+# Project Roadmap — status as of 2025-08-27
 
 Legend: [x] Done • [~] In progress/Partial • [ ] Planned
+
+## Latest Progress (Aug 27, 2025)
+- [x] **Drive E Integration Complete**: 8,926 files catalogued and ingested (6,569 images + 2,357 videos)
+- [x] **Video Processing Pipeline**: Multi-stage keyframe extraction with VLM captioning architecture
+- [x] **AI Automation System**: Complete orchestrator with 4 specialized processors
+- [~] **Video Keyframe Extraction**: 1/2,357 videos processed (pipeline active but slow)
+- [~] **AI Task Processing**: 18,421 tasks queued and ready for processing
 
 ## 1) Core correctness & robustness
 - [x] Alembic migrations baseline and fixes for SQLite (idempotent, circular-dependency-safe)
@@ -79,11 +86,21 @@ Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 - [x] **RTX 3090 + Quadro P2000 dual-GPU setup**: Validated Windows CUDA support, optimized device assignments (RTX 3090 for ML workloads, P2000 for display), RTX3090 preset with BLIP2 + LVFace
 - [x] **TTS end-to-end enablement**: Local Piper fallback when upstream TTS unavailable, browser speech synthesis backup, graceful degradation to JSON responses
 - [x] **ASR browser integration**: MediaRecorder microphone transcription demo, graceful error handling for voice endpoints
+- [x] **Drive E Full Integration**: 8,926 files catalogued, incremental processing system, comprehensive AI automation
+- [x] **Video Processing Architecture**: Multi-stage keyframe extraction → VLM captioning → scene detection pipeline
+- [x] **AI Orchestration System**: 4 specialized processors with task management and progress tracking
 
 ---
 
-## Next 2-week priorities (proposed)
-1) **Performance optimization with RTX 3090**: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
+## Next 2-week priorities (updated Aug 27, 2025)
+1) **Video Processing Acceleration**: Complete keyframe extraction for remaining 2,356 videos, optimize FFmpeg pipeline performance
+2) **AI Task Execution**: Process 18,421 pending AI tasks (captions, faces, embeddings) through orchestration system
+3) **Performance optimization with RTX 3090**: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
+4) **Drive E Content Intelligence**: Complete VLM captioning of all Drive E photos and videos for searchable content
+5) **System Monitoring**: Real-time progress tracking and performance metrics for large-scale processing
+
+## Next immediate priorities (original)
+1) Performance optimization with RTX 3090: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
 2) UI gallery and admin improvements: basic search/gallery grid, simple filters, surface health/config on `/ui/admin`
 3) Caption profiles: Fast (vitgpt2), Balanced (blip2), Quality (qwen2.5-vl/llava-next). Wire to external inference.py; batch job + inline editor
 4) API polish: search pagination/filters and basic response envelope
