@@ -1,0 +1,272 @@
+{
+  "E:\\01_INCOMING\\Jane\\doc": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\doc",
+    "last_processed": "2025-08-27T11:14:46.008572",
+    "file_count": 1,
+    "ingested_count": 0,
+    "skipped_count": 1,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane20240825\\Camera\\音视频裁剪大师": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane20240825\\Camera\\音视频裁剪大师",
+    "last_processed": "2025-08-27T11:50:15.069173",
+    "file_count": 1,
+    "ingested_count": 0,
+    "skipped_count": 1,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING": {
+    "directory_path": "E:\\01_INCOMING",
+    "last_processed": "2025-08-27T11:14:57.112994",
+    "file_count": 5,
+    "ingested_count": 0,
+    "skipped_count": 6569,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\childrenstales": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\childrenstales",
+    "last_processed": "2025-08-27T11:50:18.133063",
+    "file_count": 9,
+    "ingested_count": 5,
+    "skipped_count": 4,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-artistic-photos\\10X10七彩童年相册_10X10双面印_批量发片": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-artistic-photos\\10X10七彩童年相册_10X10双面印_批量发片",
+    "last_processed": "2025-08-27T10:05:43.771029",
+    "file_count": 17,
+    "ingested_count": 0,
+    "skipped_count": 17,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\小溪": {
+    "directory_path": "E:\\01_INCOMING\\小溪",
+    "last_processed": "2025-08-27T10:05:51.839552",
+    "file_count": 27,
+    "ingested_count": 0,
+    "skipped_count": 27,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-artistic-photos\\10X10七彩童年相册": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-artistic-photos\\10X10七彩童年相册",
+    "last_processed": "2025-08-27T10:05:55.014937",
+    "file_count": 30,
+    "ingested_count": 0,
+    "skipped_count": 30,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\长隆大马戏ChanglongCircus": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\长隆大马戏ChanglongCircus",
+    "last_processed": "2025-08-27T11:50:23.123383",
+    "file_count": 38,
+    "ingested_count": 29,
+    "skipped_count": 9,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\长隆大马戏ChanglongCircus": {
+    "directory_path": "E:\\01_INCOMING\\长隆大马戏ChanglongCircus",
+    "last_processed": "2025-08-27T11:50:39.254972",
+    "file_count": 38,
+    "ingested_count": 29,
+    "skipped_count": 9,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\sportsgame-eton": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\sportsgame-eton",
+    "last_processed": "2025-08-27T11:50:50.423566",
+    "file_count": 39,
+    "ingested_count": 15,
+    "skipped_count": 24,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\yjcc\\曹川婚纱照": {
+    "directory_path": "E:\\01_INCOMING\\yjcc\\曹川婚纱照",
+    "last_processed": "2025-08-27T10:06:12.330554",
+    "file_count": 42,
+    "ingested_count": 0,
+    "skipped_count": 42,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\Zoo-april2024": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\Zoo-april2024",
+    "last_processed": "2025-08-27T11:51:06.043715",
+    "file_count": 48,
+    "ingested_count": 12,
+    "skipped_count": 36,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\大兴动物园": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\大兴动物园",
+    "last_processed": "2025-08-27T12:50:55.779113",
+    "file_count": 72,
+    "ingested_count": 0,
+    "skipped_count": 72,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\大兴动物园": {
+    "directory_path": "E:\\01_INCOMING\\大兴动物园",
+    "last_processed": "2025-08-27T11:52:19.968346",
+    "file_count": 72,
+    "ingested_count": 61,
+    "skipped_count": 11,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\yjcc\\2014_10_28 wedding": {
+    "directory_path": "E:\\01_INCOMING\\yjcc\\2014_10_28 wedding",
+    "last_processed": "2025-08-27T11:52:35.384466",
+    "file_count": 80,
+    "ingested_count": 1,
+    "skipped_count": 79,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\print-batch1": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\print-batch1",
+    "last_processed": "2025-08-27T10:06:33.024749",
+    "file_count": 107,
+    "ingested_count": 0,
+    "skipped_count": 107,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\print-batch2-to-do": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\print-batch2-to-do",
+    "last_processed": "2025-08-27T10:06:36.222732",
+    "file_count": 149,
+    "ingested_count": 0,
+    "skipped_count": 149,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\wechatExport": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\wechatExport",
+    "last_processed": "2025-08-27T11:52:38.587978",
+    "file_count": 169,
+    "ingested_count": 47,
+    "skipped_count": 122,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\Aranya": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\Aranya",
+    "last_processed": "2025-08-27T11:52:49.277262",
+    "file_count": 174,
+    "ingested_count": 71,
+    "skipped_count": 103,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\Kindergarten": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\Kindergarten",
+    "last_processed": "2025-08-27T11:53:06.635135",
+    "file_count": 179,
+    "ingested_count": 83,
+    "skipped_count": 96,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\jane-kaola-campus2025": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\jane-kaola-campus2025",
+    "last_processed": "2025-08-27T10:06:54.206392",
+    "file_count": 230,
+    "ingested_count": 0,
+    "skipped_count": 230,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May\\guangzhou": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May\\guangzhou",
+    "last_processed": "2025-08-27T11:53:27.909197",
+    "file_count": 240,
+    "ingested_count": 29,
+    "skipped_count": 211,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-2024May": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-2024May",
+    "last_processed": "2025-08-27T11:53:44.091384",
+    "file_count": 267,
+    "ingested_count": 102,
+    "skipped_count": 964,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\cc20231107": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\cc20231107",
+    "last_processed": "2025-08-27T12:51:03.939475",
+    "file_count": 367,
+    "ingested_count": 0,
+    "skipped_count": 367,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\jane-s23-20241220\\Camera": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\jane-s23-20241220\\Camera",
+    "last_processed": "2025-08-27T11:56:03.933163",
+    "file_count": 371,
+    "ingested_count": 100,
+    "skipped_count": 271,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\2024JanSync": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\2024JanSync",
+    "last_processed": "2025-08-27T11:56:56.838694",
+    "file_count": 416,
+    "ingested_count": 135,
+    "skipped_count": 281,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane-20250315": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane-20250315",
+    "last_processed": "2025-08-27T11:57:44.143016",
+    "file_count": 658,
+    "ingested_count": 182,
+    "skipped_count": 476,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Janes23SyncTo20230909": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Janes23SyncTo20230909",
+    "last_processed": "2025-08-27T12:00:15.897120",
+    "file_count": 969,
+    "ingested_count": 211,
+    "skipped_count": 758,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane\\Jane20240825\\Camera": {
+    "directory_path": "E:\\01_INCOMING\\Jane\\Jane20240825\\Camera",
+    "last_processed": "2025-08-27T12:01:28.365532",
+    "file_count": 1775,
+    "ingested_count": 506,
+    "skipped_count": 1270,
+    "status": "completed",
+    "last_error": ""
+  },
+  "E:\\01_INCOMING\\Jane": {
+    "directory_path": "E:\\01_INCOMING\\Jane",
+    "last_processed": "2025-08-27T12:51:12.319401",
+    "file_count": 2336,
+    "ingested_count": 0,
+    "skipped_count": 8662,
+    "status": "completed",
+    "last_error": ""
+  }
+}

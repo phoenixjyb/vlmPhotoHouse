@@ -1,0 +1,13 @@
+{
+  "last_full_run": "2025-08-27T13:07:40.768396",
+  "last_ingestion": "2025-08-27T13:03:31.998265",
+  "last_caption_run": "2025-08-27T13:07:27.186473",
+  "last_ai_task_run": "2025-08-27T13:07:40.768396",
+  "total_runs": 16,
+  "pipeline_stats": {
+    "ingestion_success": true,
+    "caption_success": true,
+    "ai_tasks_success": true,
+    "total_time": 251.48041081428528
+  }
+}

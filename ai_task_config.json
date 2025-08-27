@@ -1,0 +1,32 @@
+{
+  "backend_url": "http://localhost:8000",
+  "state_file": "ai_task_state.json",
+  "log_file": "ai_task_manager.log",
+  "log_level": "INFO",
+  "max_retries": 3,
+  "batch_size": 50,
+  "task_priorities": {
+    "ingest": 10,
+    "thumb": 20,
+    "phash": 30,
+    "embed": 40,
+    "caption": 50,
+    "face": 60,
+    "video_probe": 70,
+    "video_keyframes": 80,
+    "video_embed": 90
+  },
+  "enabled_tasks": [
+    "ingest",
+    "thumb",
+    "phash",
+    "embed",
+    "caption",
+    "face"
+  ],
+  "processing_limits": {
+    "max_concurrent_tasks": 5,
+    "max_daily_tasks": 10000,
+    "memory_threshold_mb": 8000
+  }
+}

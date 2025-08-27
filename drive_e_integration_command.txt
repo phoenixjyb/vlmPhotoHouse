@@ -1,0 +1,9 @@
+# Drive E AI Integration Command
+
+# 1. Start backend server:
+cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 2. Run integration command:
+curl -X POST "http://localhost:8000/ingest/scan" \
+     -H "Content-Type: application/json" \
+     -d '{"paths": ["E:\\01_INCOMING\\Jane\\Jane-artistic-photos\\10X10\u4e03\u5f69\u7ae5\u5e74\u76f8\u518c", "E:\\01_INCOMING\\Jane\\cc20231107", "E:\\01_INCOMING\\Jane\\2024JanSync", "E:\\01_INCOMING\\\u5c0f\u6eaa", "E:\\01_INCOMING\\Jane\\Jane-2024May\\Aranya"]}'

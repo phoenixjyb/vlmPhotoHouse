@@ -1,0 +1,25 @@
+{
+  "session_id": "06210c4c-7388-49b7-9ffd-010661d17f1d",
+  "timestamp": "2025-08-27T00:39:49.429107",
+  "batch_stats": {
+    "total_files": 1,
+    "successful": 0,
+    "failed": 1,
+    "success_rate": 0.0,
+    "total_faces_detected": 0,
+    "files_with_captions": 0,
+    "total_processing_time": 0.0,
+    "average_processing_time": 0.0
+  },
+  "overall_stats": {
+    "total_files": 3,
+    "status_counts": {
+      "failed": 3
+    },
+    "active_sessions": 0
+  },
+  "failed_files": [
+    "E:\\01_INCOMING\\beach_sunset.jpg"
+  ],
+  "skipped_files": []
+}
