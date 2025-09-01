@@ -26,7 +26,9 @@ def try_load_qwen25vl():
         print("Attempting to load Qwen2.5-VL...", file=sys.stderr)
         
         model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        if torch.cuda.is_available():
+            torch.cuda.set_device(0)
         
         # Load processor first
         processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)

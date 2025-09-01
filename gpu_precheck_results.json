@@ -1,0 +1,117 @@
+{
+  "timestamp": "2025-09-01T18:48:49.506632",
+  "nvidia_smi_info": {
+    "success": true,
+    "gpus": [
+      {
+        "nvidia_index": 0,
+        "name": "Quadro P2000",
+        "memory_total_mb": 5120,
+        "memory_used_mb": 590,
+        "utilization_percent": 9
+      },
+      {
+        "nvidia_index": 1,
+        "name": "NVIDIA GeForce RTX 3090",
+        "memory_total_mb": 24576,
+        "memory_used_mb": 0,
+        "utilization_percent": 0
+      }
+    ],
+    "rtx3090_nvidia_index": 1,
+    "total_gpus": 2
+  },
+  "environment_results": {
+    "vlm_main": {
+      "cuda_0": {
+        "env_name": "Main VLM Environment",
+        "cuda_visible_devices": "0",
+        "success": true,
+        "pytorch_version": "2.8.0+cu126",
+        "cuda_available": true,
+        "device_count": 1,
+        "devices": [
+          {
+            "pytorch_index": 0,
+            "name": "NVIDIA GeForce RTX 3090",
+            "memory_gb": 24.0,
+            "memory_allocation_test": true
+          }
+        ],
+        "rtx3090_found": true,
+        "error": null
+      },
+      "cuda_1": {
+        "env_name": "Main VLM Environment",
+        "cuda_visible_devices": "1",
+        "success": false,
+        "pytorch_version": "2.8.0+cu126",
+        "cuda_available": true,
+        "device_count": 1,
+        "devices": [
+          {
+            "pytorch_index": 0,
+            "name": "Quadro P2000",
+            "memory_gb": 5.0,
+            "memory_allocation_test": true
+          }
+        ],
+        "rtx3090_found": false,
+        "error": null
+      }
+    },
+    "lvface": {
+      "cuda_0": {
+        "env_name": "LVFace Environment",
+        "success": false,
+        "error": "Execution error: [WinError 2] The system cannot find the file specified"
+      },
+      "cuda_1": {
+        "env_name": "LVFace Environment",
+        "success": false,
+        "error": "Execution error: [WinError 2] The system cannot find the file specified"
+      }
+    },
+    "blip2": {
+      "cuda_0": {
+        "env_name": "BLIP2 Caption Environment",
+        "cuda_visible_devices": "0",
+        "success": true,
+        "pytorch_version": "2.6.0+cu124",
+        "cuda_available": true,
+        "device_count": 1,
+        "devices": [
+          {
+            "pytorch_index": 0,
+            "name": "NVIDIA GeForce RTX 3090",
+            "memory_gb": 24.0,
+            "memory_allocation_test": true
+          }
+        ],
+        "rtx3090_found": true,
+        "error": null
+      },
+      "cuda_1": {
+        "env_name": "BLIP2 Caption Environment",
+        "cuda_visible_devices": "1",
+        "success": false,
+        "pytorch_version": "2.6.0+cu124",
+        "cuda_available": true,
+        "device_count": 1,
+        "devices": [
+          {
+            "pytorch_index": 0,
+            "name": "Quadro P2000",
+            "memory_gb": 5.0,
+            "memory_allocation_test": true
+          }
+        ],
+        "rtx3090_found": false,
+        "error": null
+      }
+    }
+  },
+  "optimal_cuda_visible_devices": "0",
+  "all_environments_success": false,
+  "success": true
+}

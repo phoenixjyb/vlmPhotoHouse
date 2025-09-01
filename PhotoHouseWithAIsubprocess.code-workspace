@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vlmCaptionModels"
+		},
+		{
+			"path": "../LVFace"
+		},
+		{
+			"path": "../../llmytranslate"
+		}
+	],
+	"settings": {}
+}

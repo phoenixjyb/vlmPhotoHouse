@@ -51,9 +51,17 @@ SessionLocal = deps.SessionLocal  # type: ignore
 executor = tasks_mod.TaskExecutor(deps.SessionLocal, settings)
 
 def task_worker_loop():
+    logger = logging.getLogger('app.worker')
+    logger.info("Task worker loop starting...")
     while True:
-        worked = executor.run_once()
-        time.sleep(settings.worker_poll_interval if not worked else 0.05)
+        try:
+            worked = executor.run_once()
+            if worked:
+                logger.debug("Task processed successfully")
+            time.sleep(settings.worker_poll_interval if not worked else 0.05)
+        except Exception as e:
+            logger.error(f"Task worker error: {e}", exc_info=True)
+            time.sleep(settings.worker_poll_interval)  # back off on error
 
 # --- Test-only helpers ---
 def reinit_executor_for_tests():

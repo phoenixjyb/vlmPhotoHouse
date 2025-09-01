@@ -19,7 +19,9 @@ class BLIP2Inference:
     def __init__(self, model_id: str = "Salesforce/blip2-opt-2.7b"):
         """Initialize BLIP2 model for inference."""
         self.model_id = model_id
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        if torch.cuda.is_available():
+            torch.cuda.set_device(0)
         self.model = None
         self.processor = None
         

@@ -36,7 +36,9 @@ def try_load_qwen25vl():
             print(f"❌ Local Qwen2.5-VL model not found at {model_path}", file=sys.stderr)
             return None
             
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+        if torch.cuda.is_available():
+            torch.cuda.set_device(0)
         
         # Load processor first
         processor = AutoProcessor.from_pretrained(str(model_path), trust_remote_code=True)

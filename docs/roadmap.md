@@ -6,6 +6,10 @@ Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 - [x] **Drive E Integration Complete**: 8,926 files catalogued and ingested (6,569 images + 2,357 videos)
 - [x] **Video Processing Pipeline**: Multi-stage keyframe extraction with VLM captioning architecture
 - [x] **AI Automation System**: Complete orchestrator with 4 specialized processors
+- [x] **RTX 3090 Multi-Service Optimization**: Unified launcher with 3x2 panel layout + interactive shell
+- [x] **Caption Models Integration**: BLIP2-OPT-2.7B + Qwen2.5-VL-3B with RTX 3090 acceleration
+- [x] **Voice Services Coordination**: ASR (Whisper) + TTS (Coqui) with GPU optimization
+- [x] **LVFace GPU Acceleration**: ONNX Runtime + CUDAExecutionProvider for 5-10x speedup
 - [~] **Video Keyframe Extraction**: 1/2,357 videos processed (pipeline active but slow)
 - [~] **AI Task Processing**: 18,421 tasks queued and ready for processing
 
@@ -55,6 +59,9 @@ Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 
 ## 10) Developer ergonomics
 - [x] Windows Terminal multi‑pane launcher with presets (+ LVFace/Caption/Voice panes)
+- [x] **RTX 3090 Unified Multi-Service Launcher**: 3x2 layout with 6 specialized monitoring panes
+- [x] **Interactive Command Shell**: PowerShell-based control center for triggering operations
+- [x] **Service Coordination**: Automated GPU assignment and environment management
 - [x] WSL tmux launcher and setup guide
 - [x] Quick-start guide for Windows launcher and unified ports
 - [ ] Makefile / pre-commit hooks (ruff, mypy, black)
@@ -89,15 +96,21 @@ Legend: [x] Done • [~] In progress/Partial • [ ] Planned
 - [x] **Drive E Full Integration**: 8,926 files catalogued, incremental processing system, comprehensive AI automation
 - [x] **Video Processing Architecture**: Multi-stage keyframe extraction → VLM captioning → scene detection pipeline
 - [x] **AI Orchestration System**: 4 specialized processors with task management and progress tracking
+- [x] **RTX 3090 Multi-Service Coordination**: Unified launcher with 6-pane monitoring + interactive command shell
+- [x] **Caption Models Portfolio**: BLIP2-OPT-2.7B + Qwen2.5-VL-3B with RTX 3090 GPU acceleration
+- [x] **Voice Services Integration**: ASR (Whisper) + TTS (Coqui) with coordinated RTX 3090 utilization
 
 ---
 
 ## Next 2-week priorities (updated Aug 27, 2025)
-1) **Video Processing Acceleration**: Complete keyframe extraction for remaining 2,356 videos, optimize FFmpeg pipeline performance
-2) **AI Task Execution**: Process 18,421 pending AI tasks (captions, faces, embeddings) through orchestration system
-3) **Performance optimization with RTX 3090**: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
-4) **Drive E Content Intelligence**: Complete VLM captioning of all Drive E photos and videos for searchable content
-5) **System Monitoring**: Real-time progress tracking and performance metrics for large-scale processing
+1) **RTX 3090 Multi-Service Optimization**: Complete integration testing of unified launcher with all 6 services
+2) **Video Processing Acceleration**: Complete keyframe extraction for remaining 2,356 videos, optimize FFmpeg pipeline performance
+3) **AI Task Execution**: Process 18,421 pending AI tasks (captions, faces, embeddings) through orchestration system
+4) **Caption Model Performance**: Benchmark BLIP2 vs Qwen2.5-VL on RTX 3090, optimize batch sizes and memory usage
+5) **Interactive Workflow Testing**: Validate ingestion → captioning → search pipeline through command shell
+6) **Voice Services Production**: Complete ASR + TTS integration testing with RTX 3090 acceleration
+7) **Drive E Content Intelligence**: Complete VLM captioning of all Drive E photos and videos for searchable content
+8) **System Monitoring**: Real-time progress tracking and performance metrics for large-scale processing
 
 ## Next immediate priorities (original)
 1) Performance optimization with RTX 3090: Batch size tuning for BLIP2/LVFace, video processing enablement, memory usage optimization
