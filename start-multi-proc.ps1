@@ -137,10 +137,12 @@ if ($env:CUDA_VISIBLE_DEVICES) {
 $env:TORCH_CUDA_ARCH_LIST = '8.6'  # RTX 3090 compute capability
 
 # VLM Photo Engine Backend Configuration
+# Face Processing Configuration  
 $env:FACE_EMBED_PROVIDER = 'lvface'
 $env:LVFACE_EXTERNAL_DIR = $LvfaceDir
 $env:LVFACE_MODEL_NAME = 'LVFace-B_Glint360K.onnx'
 $env:LVFACE_SERVICE_URL = 'http://localhost:8003'
+$env:SCRFD_SERVICE_URL = 'http://172.22.61.27:8003'  # WSL unified service
 $env:CAPTION_PROVIDER = 'blip2'
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'
@@ -243,17 +245,23 @@ function New-LvfacePane {
     param([int]$GpuIndex)
 
     $content = @(
-        "Write-Host '👤 LVFace Service (WSL) - RTX 3090 Face Recognition' -ForegroundColor Green",
-        "Write-Host 'ONNX Runtime + CUDA 12.4 | Running inside Ubuntu-22.04' -ForegroundColor Yellow",
+        "Write-Host '🤖 SCRFD + LVFace Unified Service (WSL) - RTX 3090 Face Analysis' -ForegroundColor Green",
+        "Write-Host 'SCRFD Detection + LVFace Recognition | ONNX Runtime + CUDA 12.4' -ForegroundColor Yellow",
+        "Write-Host 'Service URL: http://172.22.61.27:8003 (WSL Ubuntu-22.04)' -ForegroundColor Cyan",
         "",
-        "Write-Host '🚀 Launching LVFace service via WSL with CUDA 12.4...' -ForegroundColor Cyan",
-        # Use direct WSL path conversion and our updated start script
-        "wsl.exe -d Ubuntu-22.04 bash -c `"cd /mnt/h/wSpace/vlm-photo-engine/LVFace && export CUDA_VISIBLE_DEVICES=1 && ./.venv-cuda124-wsl/bin/python3 inference_onnx.py`""
+        "Write-Host '🚀 Launching unified SCRFD+LVFace service via WSL...' -ForegroundColor Cyan",
+        "Write-Host 'This service provides:' -ForegroundColor White",
+        "Write-Host '  • Face detection via SCRFD buffalo_l model' -ForegroundColor Gray",
+        "Write-Host '  • Face recognition via LVFace with 512D embeddings' -ForegroundColor Gray",
+        "Write-Host '  • GPU acceleration on RTX 3090' -ForegroundColor Gray",
+        "",
+        # Use the correct relative path from LVFace directory
+        "wsl.exe -d Ubuntu-22.04 -- bash -c 'cd /mnt/c/Users/yanbo/wSpace/vlm-photo-engine/LVFace && .venv-cuda124-wsl/bin/python unified_scrfd_service.py'"
     ) -join "`n"
 
-    $path = Join-Path $env:TEMP "lvface-pane-$PID.ps1"
+    $path = Join-Path $env:TEMP "unified-scrfd-pane-$PID.ps1"
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
-    return @{ File = $path; Dir = $LvfaceDir; Title = "LVFace (WSL CUDA 12.4)" }
+    return @{ File = $path; Dir = $LvfaceDir; Title = "SCRFD & LVFace" }
 }
 
 function New-AsrPane {
@@ -495,6 +503,41 @@ function New-InteractiveShellPane {
         "    }",
         "}",
         "",
+        "# Face Processing Commands",
+        "function Process-Faces([int]`$BatchSize = 50, [switch]`$Incremental) {",
+        "    Write-Host `"👤 Starting face detection and recognition processing...`" -ForegroundColor Cyan",
+        "    if (`$Incremental) {",
+        "        Write-Host `"🔄 Running incremental processing (unprocessed images only)`" -ForegroundColor Yellow",
+        "        & '.venv\\Scripts\\python.exe' enhanced_face_orchestrator_unified.py --incremental --batch-size `$BatchSize",
+        "    } else {",
+        "        Write-Host `"🔥 Running batch processing (limit: `$BatchSize images)`" -ForegroundColor Yellow",
+        "        & '.venv\\Scripts\\python.exe' enhanced_face_orchestrator_unified.py --batch-size `$BatchSize",
+        "    }",
+        "}",
+        "",
+        "function Test-Face-Service {",
+        "    Write-Host `"🤖 Testing SCRFD+LVFace service connectivity...`" -ForegroundColor Cyan",
+        "    try {",
+        "        `$result = Invoke-RestMethod -Uri 'http://172.22.61.27:8003/health' -TimeoutSec 5",
+        "        Write-Host `"✅ SCRFD+LVFace service is running`" -ForegroundColor Green",
+        "        Write-Host `"  Service: `$(`$result.service)`" -ForegroundColor Gray",
+        "        Write-Host `"  Version: `$(`$result.version)`" -ForegroundColor Gray",
+        "    } catch {",
+        "        Write-Host `"❌ SCRFD+LVFace service not available: `$(`$_.Exception.Message)`" -ForegroundColor Red",
+        "        Write-Host `"  Check if WSL service is running in the LVFace pane`" -ForegroundColor Yellow",
+        "    }",
+        "}",
+        "",
+        "function Check-Face-Status {",
+        "    Write-Host `"📊 Checking face processing status...`" -ForegroundColor Cyan",
+        "    & '.venv\\Scripts\\python.exe' verify_database_status.py",
+        "}",
+        "",
+        "function Verify-Face-Results([int]`$Count = 5) {",
+        "    Write-Host `"🔍 Verifying face detection results (showing `$Count samples)...`" -ForegroundColor Cyan",
+        "    & '.venv\\Scripts\\python.exe' detailed_verification.py --count `$Count",
+        "}",
+        "",
         "function Test-GPU-Models {",
         "    Write-Host '🚀 Testing Real AI Models on RTX 3090...' -ForegroundColor Yellow",
         "    Write-Host ''",
@@ -583,18 +626,33 @@ function New-InteractiveShellPane {
         "    Write-Host '  Search-Photos [query]  - Smart search photos (default: sunset)' -ForegroundColor Cyan",
         "    Write-Host '  Test-TTS [text]        - Test TTS synthesis' -ForegroundColor Cyan",
         "    Write-Host ''",
-        "    Write-Host '🚀 GPU Testing Commands:' -ForegroundColor Red",
+        "    Write-Host '� Face Processing Commands:' -ForegroundColor Magenta",
+        "    Write-Host '  Process-Faces [BatchSize] [Incremental] - Run face detection & recognition' -ForegroundColor Cyan",
+        "    Write-Host '    Examples:' -ForegroundColor Gray",
+        "    Write-Host '      Process-Faces 50        - Process 50 images' -ForegroundColor Gray", 
+        "    Write-Host '      Process-Faces -Incremental - Process only unprocessed images' -ForegroundColor Gray",
+        "    Write-Host '  Test-Face-Service      - Check SCRFD+LVFace service status' -ForegroundColor Cyan",
+        "    Write-Host '  Check-Face-Status      - Show database face processing statistics' -ForegroundColor Cyan",
+        "    Write-Host '  Verify-Face-Results [Count] - Visual verification of face detection' -ForegroundColor Cyan",
+        "    Write-Host ''",
+        "    Write-Host '�🚀 GPU Testing Commands:' -ForegroundColor Red",
         "    Write-Host '  Test-GPU-Models        - Test AI models on RTX 3090' -ForegroundColor Cyan",
         "    Write-Host '  Force-Load-Models      - Force load all models to GPU memory' -ForegroundColor Cyan",
         "    Write-Host ''",
         "    Write-Host '🌐 Direct API Access:' -ForegroundColor Yellow",
         "    Write-Host '  Main API: http://127.0.0.1:$ApiPort' -ForegroundColor Gray",
         "    Write-Host '  Voice API: http://127.0.0.1:$VoicePort' -ForegroundColor Gray",
+        "    Write-Host '  SCRFD+LVFace: http://172.22.61.27:8003' -ForegroundColor Gray",
         "    Write-Host '  Health: http://127.0.0.1:$ApiPort/health' -ForegroundColor Gray",
         "    Write-Host ''",
         "    Write-Host '📊 Caption Models Available:' -ForegroundColor Yellow",
         "    Write-Host '  • BLIP2-OPT-2.7B (fast, good quality)' -ForegroundColor Gray",
         "    Write-Host '  • Qwen2.5-VL-3B (slower, high quality)' -ForegroundColor Gray",
+        "    Write-Host ''",
+        "    Write-Host '👤 Face Processing Pipeline:' -ForegroundColor Yellow",
+        "    Write-Host '  • SCRFD buffalo_l model for face detection' -ForegroundColor Gray",
+        "    Write-Host '  • LVFace for 512D face embeddings' -ForegroundColor Gray",
+        "    Write-Host '  • Database tracking with face_processed status' -ForegroundColor Gray",
         "    Write-Host ''",
         "    Write-Host '⚡ RTX 3090 Commands:' -ForegroundColor Yellow",
         "    Write-Host '  nvidia-smi            - Check GPU status' -ForegroundColor Gray",
@@ -606,7 +664,10 @@ function New-InteractiveShellPane {
         "Show-Help",
         "",
         "Write-Host ''",
-        "Write-Host '🚀 Interactive shell ready! Try: Test-Services, Ingest-Photos, Generate-Captions' -ForegroundColor Green"
+        "Write-Host '🚀 Interactive shell ready! Available commands:' -ForegroundColor Green",
+        "Write-Host '  • Test-Services, Ingest-Photos, Generate-Captions' -ForegroundColor Cyan",
+        "Write-Host '  • Process-Faces, Test-Face-Service, Check-Face-Status' -ForegroundColor Magenta",
+        "Write-Host '  • Show-Help for complete command list' -ForegroundColor Yellow"
     ) -join "`n"
 
     $path = Join-Path $env:TEMP "interactive-shell-pane-$PID.ps1"

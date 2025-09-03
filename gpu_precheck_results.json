@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-09-01T18:48:49.506632",
+  "timestamp": "2025-09-03T09:48:48.932357",
   "nvidia_smi_info": {
     "success": true,
     "gpus": [
@@ -7,8 +7,8 @@
         "nvidia_index": 0,
         "name": "Quadro P2000",
         "memory_total_mb": 5120,
-        "memory_used_mb": 590,
-        "utilization_percent": 9
+        "memory_used_mb": 966,
+        "utilization_percent": 1
       },
       {
         "nvidia_index": 1,
