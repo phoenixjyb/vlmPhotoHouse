@@ -1,0 +1,21 @@
+{
+  "logs": "E:/VLM_DATA/logs",
+  "migration_date": "2025-09-03T10:58:06",
+  "vlm_data_root": "E:/VLM_DATA",
+  "databases": {
+    "metadata": "E:/VLM_DATA/databases/metadata.sqlite",
+    "app": "E:/VLM_DATA/databases/app.db",
+    "drive_e_processing": "E:/VLM_DATA/databases/drive_e_processing.db"
+  },
+  "derived": {
+    "captions": "E:/VLM_DATA/derived/captions",
+    "analytics": "E:/VLM_DATA/derived/analytics",
+    "thumbnails": "E:/VLM_DATA/derived/thumbnails"
+  },
+  "verification": "E:/VLM_DATA/verification",
+  "embeddings": {
+    "images": "E:/VLM_DATA/embeddings/images",
+    "faces": "E:/VLM_DATA/embeddings/faces"
+  },
+  "test_assets": "E:/VLM_DATA/test_assets"
+}

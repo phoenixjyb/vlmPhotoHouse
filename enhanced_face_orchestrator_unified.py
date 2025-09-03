@@ -35,7 +35,17 @@ class UnifiedFaceOrchestrator:
         # Create session with proxy bypass for Clash compatibility
         self.session = requests.Session()
         self.session.proxies = {'http': None, 'https': None}
-        self.db_path = "app.db"  # Use app.db which has the face_detections table
+        
+        # Load Drive E configuration
+        config_path = "config/drive_e_paths.json"
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            self.db_path = config["databases"]["app"]
+        else:
+            # Fallback to local database
+            self.db_path = "app.db"
+            
         self.processed_count = 0
         self.failed_count = 0
         self.start_time = None
@@ -387,6 +397,8 @@ def main():
                        help='Number of concurrent processing threads (default: 3)')
     parser.add_argument('--test-mode', action='store_true',
                        help='Enable test mode for debugging')
+    parser.add_argument('--incremental', action='store_true',
+                       help='Process only unprocessed images (default behavior)')
     
     args = parser.parse_args()
     

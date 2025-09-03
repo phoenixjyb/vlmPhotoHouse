@@ -33,7 +33,7 @@ Set-Location -LiteralPath $VlmPhotoHouseDir
 
 # Absolute paths for GPU precheck
 $PrecheckPy     = Join-Path $VlmPhotoHouseDir '.venv\Scripts\python.exe'
-$PrecheckScript = Join-Path $VlmPhotoHouseDir 'gpu_precheck_validation.py'
+$PrecheckScript = Join-Path $VlmPhotoHouseDir 'tools\gpu_precheck_validation.py'
 
 # 🔍 Dynamic RTX 3090 GPU Detection
 Write-Host ""
@@ -256,7 +256,7 @@ function New-LvfacePane {
         "Write-Host '  • GPU acceleration on RTX 3090' -ForegroundColor Gray",
         "",
         # Use the correct relative path from LVFace directory
-        "wsl.exe -d Ubuntu-22.04 -- bash -c 'cd /mnt/c/Users/yanbo/wSpace/vlm-photo-engine/LVFace && .venv-cuda124-wsl/bin/python unified_scrfd_service.py'"
+        "wsl.exe -d Ubuntu-22.04 -- bash -c 'cd /mnt/c/Users/yanbo/wSpace/vlm-photo-engine/LVFace && .venv-cuda124-wsl/bin/python src/unified_scrfd_service.py'"
     ) -join "`n"
 
     $path = Join-Path $env:TEMP "unified-scrfd-pane-$PID.ps1"
@@ -508,10 +508,10 @@ function New-InteractiveShellPane {
         "    Write-Host `"👤 Starting face detection and recognition processing...`" -ForegroundColor Cyan",
         "    if (`$Incremental) {",
         "        Write-Host `"🔄 Running incremental processing (unprocessed images only)`" -ForegroundColor Yellow",
-        "        & '.venv\\Scripts\\python.exe' enhanced_face_orchestrator_unified.py --incremental --batch-size `$BatchSize",
+        "        & '.venv\\Scripts\\python.exe' interactive_face_processor.py --process --batch-size `$BatchSize --incremental",
         "    } else {",
         "        Write-Host `"🔥 Running batch processing (limit: `$BatchSize images)`" -ForegroundColor Yellow",
-        "        & '.venv\\Scripts\\python.exe' enhanced_face_orchestrator_unified.py --batch-size `$BatchSize",
+        "        & '.venv\\Scripts\\python.exe' interactive_face_processor.py --process --batch-size `$BatchSize",
         "    }",
         "}",
         "",
@@ -679,9 +679,9 @@ function New-InteractiveShellPane {
 
 Write-Host ""
 if ($WithInteractiveShell) {
-    Write-Host "🏗️ Creating optimized 3x2 RTX 3090 layout + Interactive Shell (7 total panes)..." -ForegroundColor Green
+    Write-Host "🏗️ Creating optimized 2x3 RTX 3090 layout + Interactive Shell (6 panes + shell)..." -ForegroundColor Green
 } else {
-    Write-Host "🏗️ Creating optimized 3x2 RTX 3090 layout (6 panes)..." -ForegroundColor Green
+    Write-Host "🏗️ Creating optimized 2x3 RTX 3090 layout (6 panes)..." -ForegroundColor Green
 }
 
 # Create all pane specifications
@@ -698,28 +698,25 @@ if ($WithInteractiveShell) {
 
 if ($UseWindowsTerminal) {
     if ($WithInteractiveShell) {
-        # Launch 6-pane monitoring layout: 3 columns x 2 rows
-        # Step 1: Create top row (3 columns)
-        # Step 2: Split each column vertically to create bottom row
+        # Try a different approach: Create rows first, then columns
+        # This might give better equal distribution
         $wtArgs = @(
             'new-tab', '--title', "`"$($mainApiSpec.Title)`"", '-d', "`"$($mainApiSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($mainApiSpec.File)`"",
-            # Create second column (split right)
-            ';', 'split-pane', '-H', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
-            # Create third column (split right again)
-            ';', 'split-pane', '-H', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
-            # Now create bottom row by splitting each column vertically
-            # Go to first column and split down
-            ';', 'move-focus', 'left', ';', 'move-focus', 'left',
-            ';', 'split-pane', '-V', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
-            # Go to second column and split down
-            ';', 'move-focus', 'up', ';', 'move-focus', 'right',
-            ';', 'split-pane', '-V', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
-            # Go to third column and split down
-            ';', 'move-focus', 'up', ';', 'move-focus', 'right',
-            ';', 'split-pane', '-V', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
+            # First create the bottom row (split vertically 50/50)
+            ';', 'split-pane', '-V', '--size', '0.5', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
+            # Now split the top row into 3 columns
+            # Go back to top pane and split it horizontally
+            ';', 'move-focus', 'up',
+            ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
+            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
+            # Now split the bottom row into 3 columns to match
+            # Go to bottom left pane
+            ';', 'move-focus', 'down', ';', 'move-focus', 'left', ';', 'move-focus', 'left',
+            ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
+            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
         )
 
-        Write-Host "🖥️ Launching Windows Terminal with 3 columns x 2 rows layout..." -ForegroundColor Green
+        Write-Host "🖥️ Launching Windows Terminal with 2 rows x 3 columns equal layout..." -ForegroundColor Green
         Start-Process wt -ArgumentList $wtArgs
 
         # Wait a moment, then launch interactive shell in new tab
@@ -727,26 +724,24 @@ if ($UseWindowsTerminal) {
         Write-Host "🎮 Launching Interactive Command Shell in new tab..." -ForegroundColor Green
         Start-Process wt -ArgumentList @('new-tab', '--title', "`"$($interactiveSpec.Title)`"", '-d', "`"$($interactiveSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($interactiveSpec.File)`"")
     } else {
-        # Original 6-pane layout only (3 columns x 2 rows)
+        # Try rows-first approach for better equal distribution
         $wtArgs = @(
             'new-tab', '--title', "`"$($mainApiSpec.Title)`"", '-d', "`"$($mainApiSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($mainApiSpec.File)`"",
-            # Create second column (split right)
-            ';', 'split-pane', '-H', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
-            # Create third column (split right again)
-            ';', 'split-pane', '-H', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
-            # Now create bottom row by splitting each column vertically
-            # Go to first column and split down
-            ';', 'move-focus', 'left', ';', 'move-focus', 'left',
-            ';', 'split-pane', '-V', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
-            # Go to second column and split down
-            ';', 'move-focus', 'up', ';', 'move-focus', 'right',
-            ';', 'split-pane', '-V', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
-            # Go to third column and split down
-            ';', 'move-focus', 'up', ';', 'move-focus', 'right',
-            ';', 'split-pane', '-V', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
+            # First create the bottom row (split vertically 50/50)
+            ';', 'split-pane', '-V', '--size', '0.5', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
+            # Now split the top row into 3 columns
+            # Go back to top pane and split it horizontally
+            ';', 'move-focus', 'up',
+            ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
+            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
+            # Now split the bottom row into 3 columns to match
+            # Go to bottom left pane
+            ';', 'move-focus', 'down', ';', 'move-focus', 'left', ';', 'move-focus', 'left',
+            ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
+            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
         )
 
-        Write-Host "🖥️ Launching Windows Terminal with 3x2 RTX 3090 optimized layout..." -ForegroundColor Green
+        Write-Host "🖥️ Launching Windows Terminal with 2x3 RTX 3090 equal-spaced layout..." -ForegroundColor Green
         Start-Process wt -ArgumentList $wtArgs
     }
 
@@ -772,11 +767,16 @@ Write-Host ""
 Write-Host "🎯 VLM Photo Engine - RTX 3090 Multi-Service Coordination Launched!" -ForegroundColor Green
 Write-Host ""
 if ($WithInteractiveShell) {
-    Write-Host "📊 Monitoring Layout (3x2) + Interactive Shell:" -ForegroundColor Cyan
-    Write-Host "  Tab 1: 6-pane monitoring dashboard" -ForegroundColor Gray
+    Write-Host "📊 Monitoring Layout (2x3) + Interactive Shell:" -ForegroundColor Cyan
+    Write-Host "  Tab 1: 6-pane equal-spaced monitoring dashboard" -ForegroundColor Gray
     Write-Host "  Tab 2: Interactive command shell" -ForegroundColor Gray
 } else {
-    Write-Host "📊 3x2 Specialized Layout:" -ForegroundColor Cyan
+    Write-Host "📊 2x3 Equal-Spaced Layout:" -ForegroundColor Cyan
+    Write-Host "    ┌─────────────┬─────────────┬─────────────┐" -ForegroundColor Gray  
+    Write-Host "    │  Main API   │  Captions   │   LVFace    │" -ForegroundColor Gray
+    Write-Host "    ├─────────────┼─────────────┼─────────────┤" -ForegroundColor Gray
+    Write-Host "    │     ASR     │     TTS     │ GPU Monitor │" -ForegroundColor Gray
+    Write-Host "    └─────────────┴─────────────┴─────────────┘" -ForegroundColor Gray
 }
 Write-Host "  ┌─────────────┬─────────────┬─────────────┐" -ForegroundColor Gray
 Write-Host "  │ Main API    │ Caption     │ LVFace      │" -ForegroundColor Gray

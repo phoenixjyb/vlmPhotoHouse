@@ -4,6 +4,8 @@ Verify face processing status was added to database
 """
 
 import sqlite3
+import json
+import os
 
 def verify_database_changes():
     """Verify the face processing status columns were added and populated"""
@@ -12,7 +14,18 @@ def verify_database_changes():
     print("=" * 60)
     
     try:
-        conn = sqlite3.connect('app.db')
+        # Load Drive E configuration
+        config_path = "config/drive_e_paths.json"
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            db_path = config["databases"]["app"]
+        else:
+            # Fallback to local database
+            db_path = "app.db"
+            
+        print(f"📁 Using database: {db_path}")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # 1. Check if new columns exist
