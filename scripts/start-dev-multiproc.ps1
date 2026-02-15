@@ -46,19 +46,8 @@ Write-Host "Starting dev multiprocess setup (tmux-style)" -ForegroundColor Cyan
 
 # Always kill existing Windows Terminal instances for a fresh session (unless -NoCleanup)
 if (-not $NoCleanup) {
-    try {
-        Write-Host "🔄 Cleaning up existing Windows Terminal instances..." -ForegroundColor Yellow
-        $wt = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue
-        if ($wt) {
-            $wt | Stop-Process -Force -ErrorAction SilentlyContinue
-            Write-Host "✅ Closed $($wt.Count) existing Windows Terminal instance(s)" -ForegroundColor Green
-            Start-Sleep -Seconds 2  # Give processes time to fully terminate
-        } else {
-            Write-Host "✅ No existing Windows Terminal instances found" -ForegroundColor Green
-        }
-    } catch { 
-        Write-Warning "Could not check/close existing Windows Terminal instances: $($_.Exception.Message)"
-    }
+    # Do not kill Windows Terminal itself; that can terminate the caller session.
+    Write-Host "ℹ️ Skipping Windows Terminal shutdown during cleanup (safer session behavior)." -ForegroundColor DarkCyan
 
     # Clean up any processes using our target ports
     try {
