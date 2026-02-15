@@ -40,10 +40,12 @@ class Settings(BaseModel):
     lvface_model_path: str = Field(default=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'))
     lvface_external_dir: str = Field(default=os.getenv('LVFACE_EXTERNAL_DIR', ''))  # Path to external LVFace installation
     lvface_model_name: str = Field(default=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'))  # Model filename in external dir
-    caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|auto
+    lvface_service_url: str = Field(default=os.getenv('LVFACE_SERVICE_URL', ''))  # Optional LVFace HTTP service URL
+    caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|auto|http
     caption_device: str = Field(default=os.getenv('CAPTION_DEVICE', 'cpu'))  # cpu|cuda
     caption_model: str = Field(default=os.getenv('CAPTION_MODEL', 'auto'))  # model name override
     caption_external_dir: str = Field(default=os.getenv('CAPTION_EXTERNAL_DIR', ''))  # Path to external caption models installation
+    caption_service_url: str = Field(default=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8002'))  # HTTP caption service URL
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
     # Backoff configuration (supports legacy env var synonyms)

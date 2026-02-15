@@ -156,102 +156,22 @@ class TaskExecutor:
                     self._handle_face_embed(session, task)
                 elif task.type == 'person_cluster':
                     self._handle_person_cluster(session, task)
-                elif task.type == 'person_recluster':
-                    result = self._handle_person_recluster(session, task)
-                    # persist summary into payload_json for status
-                    try:
-                        payload = task.payload_json or {}
-                        payload['summary'] = result
-                        task.payload_json = payload
-                    except Exception:
-                        pass
-                elif task.type == 'dim_backfill':
-                    self._handle_dim_backfill(session, task)
-                elif task.type == 'phash':
-                    self._handle_phash(session, task)
-                elif task.type == 'video_probe':
-                    self._handle_video_probe(session, task)
-                elif task.type == 'video_keyframes':
-                    self._handle_video_keyframes(session, task)
-                elif task.type == 'video_embed':
-                    self._handle_video_embed(session, task)
-                elif task.type == 'video_scene_detect':
-                    self._handle_video_scene_detect(session, task)
-                elif task.type == 'video_segment_embed':
-                    self._handle_video_segment_embed(session, task)
-                elif task.type == 'fail_transient':
-                    # Simulated transient failure for tests
-                    raise OSError('Simulated transient failure')
-                else:
-                    raise ValueError(f'Unknown task type {task.type}')
-                # Only mark done if not canceled mid-execution
-                if task.state == 'running':
-                    task.state = 'done'
-                    task.finished_at = datetime.utcnow()
-                # metrics: duration and processed counter
-                try:
-                    if task.started_at and task.finished_at:
-                        metrics_mod.task_duration.labels(task.type).observe((task.finished_at - task.started_at).total_seconds())
-                    metrics_mod.tasks_processed.labels(task.type, task.state).inc()
-                except Exception:
-                    pass
+            except Exception as exc:
+                task.state = 'failed'
+                task.last_error = str(exc)[:4000]
                 session.commit()
-                # metrics: duration & processed
-                try:
-                    duration = (task.finished_at - task.started_at).total_seconds() if task.finished_at and task.started_at else (time.time()-start_time)
-                    metrics_mod.task_duration.labels(task.type).observe(duration)
-                    metrics_mod.tasks_processed.labels(task.type, task.state).inc()
-                except Exception:
-                    pass
-            except Exception as e:
-                task.retry_count +=1
-                task.last_error = str(e)
-                is_permanent = self._classify_permanent(e)
-                if task.retry_count >= self.settings.max_task_retries or is_permanent:
-                    # move to dead-letter queue (distinct from generic failed)
-                    task.state='dead'
-                    task.finished_at = datetime.utcnow()
-                else:
-                    delay = self._compute_backoff(task.retry_count)
-                    task.scheduled_at = datetime.utcnow() + delay
-                    task.state='pending'
-                session.commit()
-                try:
-                    metrics_mod.tasks_retried.labels(task.type).inc()
-                    if task.state in ('failed', 'canceled', 'dead'):
-                        metrics_mod.tasks_processed.labels(task.type, task.state).inc()
-                except Exception:
-                    pass
+                return True
+            # success transition
+            task.state = 'finished'
+            task.finished_at = datetime.utcnow()
+            session.commit()
+            # metrics
+            try:
+                metrics_mod.task_durations_seconds.labels(task.type).observe(time.time()-start_time)
+            except Exception:
+                pass
             return True
-
-    def _compute_backoff(self, retry_count: int):
-        """Compute jittered exponential backoff as timedelta.
-
-        Uses base^retries capped, with +/- jitter fraction (default 25%).
-        """
-        s = self.settings
-        base = getattr(s, 'retry_backoff_base_seconds', 2.0)
-        cap = getattr(s, 'retry_backoff_cap_seconds', 300.0)
-        jitter_fraction = getattr(s, 'retry_backoff_jitter', 0.25)
-        if base <= 0:
-            return timedelta(seconds=0)
-        raw = base * (2 ** (max(0, retry_count-1)))
-        raw = min(raw, cap)
-        jitter = raw * random.uniform(-jitter_fraction, jitter_fraction) if raw > 0 else 0
-        return timedelta(seconds=max(0.0, raw + jitter))
-
-    def start_workers(self, n: int):
-        if self._workers:
-            return
-        self._stop_event.clear()
-        def loop():
-            while not self._stop_event.is_set():
-                worked = self.run_once()
-                time.sleep(self.settings.worker_poll_interval if not worked else 0.01)
-        for _ in range(max(1, n)):
-            t = threading.Thread(target=loop, daemon=True)
-            t.start()
-            self._workers.append(t)
+        return False
 
     def stop_workers(self):
         self._stop_event.set()
@@ -311,75 +231,75 @@ class TaskExecutor:
             with Image.open(src) as im:
                 im.thumbnail((size, size))
                 im.convert('RGB').save(out_path, 'JPEG', quality=85)
-
     def _handle_caption(self, session: Session, task: Task):
+        """Generate a caption (or variant) for an asset and update status fields."""
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
-        force: bool = bool(payload.get('force', False))
-        max_variants: int = int(os.getenv('CAPTION_MAX_VARIANTS', '3') or '3')
-        word_limit: int = int(os.getenv('CAPTION_WORD_LIMIT', '40') or '40')
+        force = bool(payload.get('force', False))
+        profile = (payload.get('profile') or os.getenv('CAPTION_PROFILE','balanced')).lower()
+        max_variants = int(os.getenv('CAPTION_MAX_VARIANTS','3') or '3')
+        word_limit = int(os.getenv('CAPTION_WORD_LIMIT','40') or '40')
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
-        # Limit number of caption variants per asset
-        existing_caps = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
-        if existing_caps and not force and len(existing_caps) >= max_variants:
-            # Return the latest caption without creating a new one
-            return existing_caps[-1]
-        
+        existing = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
+        if existing and not force and len(existing) >= max_variants:
+            return existing[-1]
+        text = ''
+        model_name = 'unknown'
+        err = None
         try:
-            # Use the caption service to generate real captions
             from .caption_service import get_caption_provider
-            from PIL import Image
-            
-            provider = get_caption_provider()
-            
-            # Load and process image
-            image = Image.open(asset.path).convert('RGB')
-            
-            # Generate caption
-            text = provider.generate_caption(image)
-            model_name = provider.get_model_name()
-            
-            logger.info(f"Generated caption for {asset.path}: '{text}' (model: {model_name})")
-            
-        except Exception as e:
-            # Fallback to heuristic caption on error
-            logger.warning(f"Caption generation failed for {asset.path}, using fallback: {e}")
-            filename = Path(asset.path).name
-            base = os.path.splitext(filename)[0]
-            tokens = [t for t in base.replace('-', ' ').replace('_',' ').split() if t]
-            if not tokens:
-                text = 'Photo'
-            else:
-                text = ' '.join(tokens[:8])
+            from PIL import Image as _Im
+            prov = get_caption_provider()
+            with _Im.open(asset.path) as im:
+                text = prov.generate_caption(im.convert('RGB'))
+            model_name = prov.get_model_name()
+        except Exception as e:  # fallback heuristics
+            err = str(e)
+            base = os.path.splitext(Path(asset.path).name)[0]
+            toks = [t for t in base.replace('-',' ').replace('_',' ').split() if t]
+            text = 'Photo' if not toks else ' '.join(toks[:8])
             model_name = 'stub-fallback'
-        
-        # Enforce word limit
+        # Word cap
         try:
-            words = text.split()
-            if word_limit > 0 and len(words) > word_limit:
-                text = ' '.join(words[:word_limit])
+            parts = text.split()
+            if word_limit > 0 and len(parts) > word_limit:
+                text = ' '.join(parts[:word_limit])
         except Exception:
             pass
-        # If at capacity, replace the oldest non user_edited caption
-        if existing_caps and len(existing_caps) >= max_variants:
-            # try to replace oldest non-edited
-            to_replace = None
-            for c in existing_caps:
-                if not c.user_edited:
-                    to_replace = c
-                    break
-            if to_replace is None:
-                # All are user-edited; do not override
-                return existing_caps[-1]
-            to_replace.text = text
-            to_replace.model = model_name
+        # Replace oldest non user_edited if at capacity
+        if existing and len(existing) >= max_variants:
+            target = next((c for c in existing if not c.user_edited), None)
+            if target is None:
+                return existing[-1]
+            target.text = text
+            target.model = model_name
             session.commit()
-            return to_replace
-        cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False)
+            return target
+        # Infer quality tier
+        qtier = 'balanced'
+        if profile in ('fast','quality','balanced'):
+            qtier = profile
+        elif 'qwen' in model_name.lower():
+            qtier = 'quality'
+        elif 'blip' in model_name.lower():
+            qtier = 'balanced'
+        elif 'vit' in model_name.lower() or 'mini' in model_name.lower():
+            qtier = 'fast'
+        cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False, quality_tier=qtier, model_version=None)
         session.add(cap)
-        session.commit()
+        session.flush()
+        # Update asset status
+        try:
+            asset.caption_variant_count = session.query(Caption).filter(Caption.asset_id==asset_id, Caption.superseded==False).count()
+            asset.caption_processed = True
+            asset.caption_processed_at = datetime.utcnow()
+            asset.caption_model_profile_last = profile
+            asset.caption_error_last = err
+            session.commit()
+        except Exception:
+            session.rollback()
         return cap
 
     def _handle_face(self, session: Session, task: Task):

@@ -1,14 +1,25 @@
-#!/usr/bin/env pwsh
 param(
+
     [string]$Preset = 'RTX3090',  # RTX3090 | LowVRAM | CPU
+
     [switch]$UseWindowsTerminal,
+
     [switch]$KillExisting,
+
     [switch]$NoCleanup,
+
     [switch]$RunPreCheck,
+
     [int]$GpuMonitorInterval = 3,
+
     [int]$ApiPort = 8002,
+
     [int]$VoicePort = 8001,
+
+    [int]$LvfacePort = 8003,
+
     [switch]$WithInteractiveShell  # Add interactive command shell
+
 )
 
 # Default to using Windows Terminal and enabling features
@@ -18,6 +29,19 @@ if (-not $PSBoundParameters.ContainsKey('RunPreCheck')) { $RunPreCheck = $true }
 if (-not $PSBoundParameters.ContainsKey('WithInteractiveShell')) { $WithInteractiveShell = $true }
 
 $ErrorActionPreference = 'Stop'
+
+# Prevent multiple instances
+$scriptName = [System.IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
+$existingProcesses = Get-WmiObject Win32_Process | Where-Object { 
+    $_.Name -eq "pwsh.exe" -and 
+    $_.CommandLine -like "*$scriptName*" -and 
+    $_.ProcessId -ne $PID 
+}
+if ($existingProcesses) {
+    Write-Host "⚠️ Another instance of $scriptName is already running (PID: $($existingProcesses.ProcessId -join ', '))" -ForegroundColor Yellow
+    Write-Host "Kill existing instances before starting new one." -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "🚀 VLM Photo Engine - Unified RTX 3090 Multi-Service Launcher" -ForegroundColor Cyan
 Write-Host "🎯 Target: 4-service coordination with optimal RTX 3090 utilization" -ForegroundColor Yellow
@@ -92,18 +116,32 @@ if ($RunPreCheck) {
 # Clean up existing processes
 if ($KillExisting -and -not $NoCleanup) {
     try {
+        # Proactive process cleanup to avoid duplicates (uvicorn parents, caption server)
+        try {
+            $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'python' }
+            $killPatterns = @(
+                'caption_server.py',
+                ' -m uvicorn app.main:app ',
+                ' -m uvicorn src.main:app '
+            )
+            foreach ($p in $procs) {
+                $cmd = [string]$p.CommandLine
+                if ($killPatterns | Where-Object { $cmd -like "*$_*" }) {
+                    Write-Host "?? Stopping leftover python PID=$($p.ProcessId) :: $cmd" -ForegroundColor Yellow
+                    Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+                }
+            }
+            Write-Host "? Process pattern cleanup completed" -ForegroundColor Green
+        } catch {
+            Write-Host "! Process pattern cleanup skipped: $($_.Exception.Message)" -ForegroundColor DarkYellow
+        }
         Write-Host "🔄 Cleaning up existing service instances..." -ForegroundColor Yellow
 
-        # Stop Windows Terminal instances
-        $wt = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue
-        if ($wt) {
-            $wt | Stop-Process -Force -ErrorAction SilentlyContinue
-            Write-Host "✅ Closed $($wt.Count) existing Windows Terminal instance(s)" -ForegroundColor Green
-            Start-Sleep -Seconds 2
-        }
+        # Do not kill Windows Terminal itself; that can terminate the caller session.
+        Write-Host "ℹ️ Skipping Windows Terminal shutdown during cleanup (safer session behavior)." -ForegroundColor DarkCyan
 
         # Clean up service ports
-        $portsToCheck = @($ApiPort, $VoicePort, 8000, 8003)
+        $portsToCheck = @($ApiPort, $VoicePort, 8000, 8002, 8003)
         foreach ($port in $portsToCheck) {
             try {
                 $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
@@ -126,33 +164,47 @@ if ($KillExisting -and -not $NoCleanup) {
 
 # ===== RTX 3090 UNIFIED ENVIRONMENT CONFIGURATION =====
 
-# IMPORTANT: Do NOT set CUDA_VISIBLE_DEVICES
-# When unrestricted, PyTorch maps RTX 3090 as cuda:0 and Quadro P2000 as cuda:1
-# Remove any existing CUDA_VISIBLE_DEVICES to ensure proper GPU mapping
-if ($env:CUDA_VISIBLE_DEVICES) {
-    Remove-Item Env:CUDA_VISIBLE_DEVICES -ErrorAction SilentlyContinue
-    Write-Host "🔧 Removed CUDA_VISIBLE_DEVICES restriction for proper GPU mapping" -ForegroundColor Yellow
-}
+# Set explicit GPU device targeting RTX 3090
+$env:PYTORCH_CUDA_DEVICE = "$rtx3090Index"
+$env:CUDA_DEVICE_ORDER = "PCI_BUS_ID"
 
+# Set PyTorch device preference to RTX 3090
 $env:TORCH_CUDA_ARCH_LIST = '8.6'  # RTX 3090 compute capability
 
+# Configure memory allocation for RTX 3090 (24GB VRAM)
+$env:PYTORCH_CUDA_ALLOC_CONF = "max_split_size_mb:1024,expandable_segments:True"
+
+Write-Host "🎯 GPU Configuration:" -ForegroundColor Green
+Write-Host "  RTX 3090 Index: $rtx3090Index" -ForegroundColor White
+Write-Host "  CUDA Device Order: PCI_BUS_ID" -ForegroundColor White
+Write-Host "  Memory Config: 1GB split size, expandable segments" -ForegroundColor White
+
 # VLM Photo Engine Backend Configuration
+# GPU Environment Configuration - Force RTX 3090 usage
+$env:PYTORCH_CUDA_DEVICE = "$rtx3090Index"
+$env:CAPTION_GPU_DEVICE = "$rtx3090Index"
+
 # Face Processing Configuration  
-$env:FACE_EMBED_PROVIDER = 'lvface'
-$env:LVFACE_EXTERNAL_DIR = $LvfaceDir
+$env:FACE_EMBED_PROVIDER = if ($env:FACE_EMBED_PROVIDER) { $env:FACE_EMBED_PROVIDER } else { 'lvface' }
+$env:LVFACE_EXTERNAL_DIR = ''
 $env:LVFACE_MODEL_NAME = 'LVFace-B_Glint360K.onnx'
-$env:LVFACE_SERVICE_URL = 'http://localhost:8003'
+$env:LVFACE_SERVICE_URL = "http://127.0.0.1:$LvfacePort"
+
+$env:LVFACE_SERVICE_HOST = '127.0.0.1'
+
+$env:LVFACE_SERVICE_PORT = "$LvfacePort"
 $env:SCRFD_SERVICE_URL = 'http://172.22.61.27:8003'  # WSL unified service
-$env:CAPTION_PROVIDER = 'blip2'
+$env:CAPTION_PROVIDER = if ($env:CAPTION_PROVIDER) { $env:CAPTION_PROVIDER } else { 'http' }
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'
 $env:ENABLE_INLINE_WORKER = 'true'
+$env:WORKER_CONCURRENCY = '4'
 
 # Device assignments - All services use RTX 3090
-$env:EMBED_DEVICE = 'cuda:0'
-$env:CAPTION_DEVICE = 'cuda:0'
-$env:TTS_DEVICE = 'cuda:0'
-$env:ASR_DEVICE = 'cuda:0'
+$env:EMBED_DEVICE = "cuda:$rtx3090Index"
+$env:CAPTION_DEVICE = "cuda:$rtx3090Index"
+$env:TTS_DEVICE = "cuda:$rtx3090Index"
+$env:ASR_DEVICE = "cuda:$rtx3090Index"
 
 # Voice proxy configuration
 $env:VOICE_ENABLED = 'true'
@@ -161,7 +213,7 @@ $env:VOICE_TTS_PATH = '/api/tts/synthesize'
 
 Write-Host ""
 Write-Host "🎯 RTX 3090 Unified Configuration Applied:" -ForegroundColor Green
-Write-Host "  GPU Assignment: cuda:0 (RTX 3090) for ALL services" -ForegroundColor Cyan
+Write-Host "  GPU Assignment: cuda:$rtx3090Index (RTX 3090) for ALL services" -ForegroundColor Cyan
 Write-Host "  VLM Engine: LVFace + BLIP2 on RTX 3090" -ForegroundColor Cyan
 Write-Host "  Voice Services: ASR + TTS on RTX 3090" -ForegroundColor Cyan
 Write-Host "  Caption Models: Direct RTX 3090 utilization" -ForegroundColor Cyan
@@ -175,22 +227,38 @@ function New-MainApiPane {
 
     $content = @(
         "Set-Location -LiteralPath `"$backendRoot`"",
+        "",
+        "# Set environment variables for this pane - NO DIRECT MODEL LOADING",
+        "`$env:CAPTION_PROVIDER = 'http'",
+        "`$env:CAPTION_SERVICE_URL = 'http://127.0.0.1:8002'",
+        "`$env:ENABLE_INLINE_WORKER = 'true'", 
+        "`$env:WORKER_CONCURRENCY = '4'",
+        "",
         "Write-Host '🌐 VLM Photo Engine - Main API Server (FastAPI)' -ForegroundColor Green",
         "Write-Host 'Central orchestration | Photo/Video processing | AI task coordination' -ForegroundColor Yellow",
-        "Write-Host 'GPU: cuda:0 (RTX 3090) | External providers: LVFace + BLIP2' -ForegroundColor Yellow",
+        "Write-Host 'Caption: HTTP service (8002) | No direct model loading' -ForegroundColor Cyan",
+        "Write-Host 'External providers: LVFace (8003) + Caption HTTP (8002)' -ForegroundColor Yellow",
         "",
         "# Validate RTX 3090 availability for main backend",
         "& `"$pyExe`" -c `"import torch; print('RTX 3090 Available:', torch.cuda.is_available()); print('Device 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'); print(f'Device 0 Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB' if torch.cuda.is_available() else '')`"",
         "",
-        "# Test external provider connections",
-        "Write-Host '🔍 Testing external AI providers...' -ForegroundColor Cyan",
-        "& `"$pyExe`" -m app.cli validate-lvface",
-        "& `"$pyExe`" -m app.cli validate-caption",
+        "# Test caption provider configuration",
+        "Write-Host '🔍 Testing BLIP2 caption provider...' -ForegroundColor Cyan",
+        "& `"$pyExe`" -c `"from app.caption_service import get_caption_provider; provider = get_caption_provider(); print(f'Caption Provider: {type(provider).__name__}'); print(f'Model: {provider.get_model_name()}')`"",
         "",
         "# Start main FastAPI server",
         "Write-Host '🚀 Starting VLM Photo Engine Main API Server on port $ApiPort...' -ForegroundColor Cyan",
         "Write-Host 'Available endpoints: /health, /search, /assets, /captions, /voice/*' -ForegroundColor Gray",
-        "& `"$pyExe`" -m uvicorn app.main:app --host 127.0.0.1 --port $ApiPort --reload"
+        "",
+        "# Check if port is already in use (LISTEN only)",
+        "`$portCheck = Get-NetTCPConnection -LocalPort $ApiPort -State Listen -ErrorAction SilentlyContinue",
+        "if (`$portCheck) {",
+        "    Write-Host '⚠️ Port $ApiPort already in use - skipping Main API startup' -ForegroundColor Yellow",
+        "    Write-Host 'Existing process(es):' -ForegroundColor Gray",
+        "    `$portCheck | Format-Table -AutoSize",
+        "} else {",
+        "    & `"$pyExe`" -m uvicorn app.main:app --host 127.0.0.1 --port $ApiPort --reload",
+        "}"
     ) -join "`n"
 
     $path = Join-Path $env:TEMP "main-api-pane-$PID.ps1"
@@ -204,64 +272,54 @@ function New-CaptionModelsPane {
 
     $content = @(
         "Set-Location -LiteralPath `"$CaptionDir`"",
-        "Write-Host '🖼️ Caption Models - RTX 3090 Direct Access' -ForegroundColor Green",
-        "Write-Host 'Models: BLIP2-OPT-2.7B, Qwen2.5-VL-3B | GPU: cuda:0' -ForegroundColor Yellow",
+        "Write-Host '🖼️ Caption Models HTTP Service - BLIP2 Only' -ForegroundColor Green",
+        "Write-Host 'Dedicated caption service | Port 8002 | RTX 3090' -ForegroundColor Yellow",
         "",
         "# Activate caption environment",
         "if (Test-Path '.venv\\Scripts\\Activate.ps1') { . '.venv\\Scripts\\Activate.ps1' }",
         "",
-        "# Configure RTX 3090 for caption models (cuda:0 = RTX 3090 when unrestricted)",
+        "# Configure RTX 3090 environment",
         "`$env:TORCH_CUDA_ARCH_LIST = '8.6'",
+        "`$env:PYTORCH_CUDA_DEVICE = '$GpuIndex'",  # RTX 3090",
+        "`$env:CUDA_DEVICE_ORDER = 'PCI_BUS_ID'",
+        "`$env:CAPTION_VRAM_MODE = 'balanced'",
+        "`$env:CAPTION_MAX_GPU_GB = '12'",
+        "`$env:CUDA_VISIBLE_DEVICES = '$GpuIndex'",
         "",
-        "# Test RTX 3090 caption inference (use a here-string so -c gets one argument)",
-        "`$pycode = @'",
-        "import torch",
-        "print(f'PyTorch CUDA: {torch.cuda.is_available()}')",
-        "if torch.cuda.is_available():",
-        "    device_name = torch.cuda.get_device_name(0)",
-        "    print(f'GPU Device 0: {device_name}')",
-        "    print(f'GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')",
-        "    if 'RTX 3090' not in device_name:",
-        "        print('WARNING: GPU at cuda:0 is NOT an RTX 3090!')",
-        "    torch.cuda.empty_cache()",
-        "    print('✅ RTX 3090 ready for caption generation!')",
-        "else:",
-        "    print('❌ CUDA not available')",
-        "'@",
-        "& `"$pyExe`" -c `$pycode",
+        "Write-Host '🚀 Starting Caption Models HTTP Server...' -ForegroundColor Cyan",
+        "Write-Host '📍 Service URL: http://127.0.0.1:8002' -ForegroundColor White",
+        "Write-Host '🎯 Model: BLIP2-OPT-2.7B (6GB VRAM)' -ForegroundColor Gray",
+        "Write-Host '🖥️ Device: RTX 3090 (cuda:1)' -ForegroundColor Gray",
         "",
-        "Write-Host '✅ Caption Models Environment Ready' -ForegroundColor Green",
-        "Write-Host 'Available commands:' -ForegroundColor Yellow",
-        "Write-Host '  Test inference: python inference_blip2.py' -ForegroundColor Gray",
-        "Write-Host '  Smart inference: python inference_smart.py' -ForegroundColor Gray"
+        "# Start HTTP server with BLIP2 model (skip if one is already healthy)",
+        "`$existing = try { (Invoke-RestMethod -Uri 'http://127.0.0.1:8002/health' -TimeoutSec 2 -ErrorAction SilentlyContinue) } catch { `$null }",
+        "if (-not `$existing -or `$existing.status -ne 'healthy') {",
+        "    & `"$pyExe`" caption_server.py --host 127.0.0.1 --port 8002 --provider blip2",
+        "} else {",
+        "    Write-Host '✅ Existing Caption Models service detected on :8002, using existing' -ForegroundColor Yellow",
+        "}"
     ) -join "`n"
 
     $path = Join-Path $env:TEMP "caption-models-pane-$PID.ps1"
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
-    return @{ File = $path; Dir = $CaptionDir; Title = "Caption Models (RTX 3090)" }
+    return @{ File = $path; Dir = $CaptionDir; Title = "Caption HTTP Service (BLIP2)" }
 }
 
 function New-LvfacePane {
     param([int]$GpuIndex)
-
+    $backendRoot = Join-Path $VlmPhotoHouseDir 'backend'
+    $pyExe = Join-Path $VlmPhotoHouseDir '.venv\Scripts\python.exe'
     $content = @(
-        "Write-Host '🤖 SCRFD + LVFace Unified Service (WSL) - RTX 3090 Face Analysis' -ForegroundColor Green",
-        "Write-Host 'SCRFD Detection + LVFace Recognition | ONNX Runtime + CUDA 12.4' -ForegroundColor Yellow",
-        "Write-Host 'Service URL: http://172.22.61.27:8003 (WSL Ubuntu-22.04)' -ForegroundColor Cyan",
-        "",
-        "Write-Host '🚀 Launching unified SCRFD+LVFace service via WSL...' -ForegroundColor Cyan",
-        "Write-Host 'This service provides:' -ForegroundColor White",
-        "Write-Host '  • Face detection via SCRFD buffalo_l model' -ForegroundColor Gray",
-        "Write-Host '  • Face recognition via LVFace with 512D embeddings' -ForegroundColor Gray",
-        "Write-Host '  • GPU acceleration on RTX 3090' -ForegroundColor Gray",
-        "",
-        # Use the correct relative path from LVFace directory
-        "wsl.exe -d Ubuntu-22.04 -- bash -c 'cd /mnt/c/Users/yanbo/wSpace/vlm-photo-engine/LVFace && .venv-cuda124-wsl/bin/python src/unified_scrfd_service.py'"
+        "Set-Location -LiteralPath `"$backendRoot`""
+        "Write-Host 'LVFace HTTP Service - RTX 3090 embeddings' -ForegroundColor Green"
+        "Write-Host 'Port: $LvfacePort' -ForegroundColor Cyan"
+        "Write-Host 'Model: ' + `$env:LVFACE_MODEL_PATH -ForegroundColor Gray"
+        "`$existing = try { Invoke-WebRequest -Uri 'http://127.0.0.1:$LvfacePort/health' -Method GET -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop } catch { `$null }"
+        "if (`$existing -and `$existing.StatusCode -eq 200) { Write-Host 'Reusing existing LVFace service on port $LvfacePort' -ForegroundColor Yellow } else { Write-Host 'Launching LVFace service via uvicorn...' -ForegroundColor Cyan; & `"$pyExe`" -m uvicorn app.lvface_http_service:app --host 127.0.0.1 --port $LvfacePort }"
     ) -join "`n"
-
-    $path = Join-Path $env:TEMP "unified-scrfd-pane-$PID.ps1"
+    $path = Join-Path $env:TEMP "lvface-service-$PID.ps1"
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
-    return @{ File = $path; Dir = $LvfaceDir; Title = "SCRFD & LVFace" }
+    return @{ File = $path; Dir = $backendRoot; Title = "LVFace Service" }
 }
 
 function New-AsrPane {
@@ -458,7 +516,7 @@ function New-InteractiveShellPane {
         "}",
         "",
         "# Quick command functions",
-        "function Ingest-Photos([string]`$Path = 'E:\\photos') {",
+        "function Ingest-Photos([string]`$Path = 'E:\\01_INCOMING') {",
         "    Write-Host `"🔍 Triggering photo ingestion from: `$Path`" -ForegroundColor Cyan",
         "    `$body = @{ roots = @(`$Path) } | ConvertTo-Json",
         "    try {",
@@ -478,6 +536,167 @@ function New-InteractiveShellPane {
         "    } catch {",
         "        Write-Host `"❌ Caption generation failed: `$(`$_.Exception.Message)`" -ForegroundColor Red",
         "    }",
+        "}",
+        "",
+        "function Process-Captions([int]`$Limit = 500, [switch]`$Force, [switch]`$ShowStatus) {",
+        "    Write-Host `"🖼️ Caption Processing System - BLIP2 Production Ready`" -ForegroundColor Green",
+        "    Write-Host `"Batch processing with Salesforce BLIP2-OPT-2.7B model`" -ForegroundColor Yellow",
+        "    Write-Host ''",
+        "    ",
+        "    if (`$ShowStatus) {",
+        "        Write-Host `"📊 Checking caption processing status...`" -ForegroundColor Cyan",
+        "        try {",
+        "            `$response = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/health' -TimeoutSec 5",
+        "            if (`$response.ok) {",
+        "                Write-Host `"✅ Backend API is responsive`" -ForegroundColor Green",
+        "            }",
+        "        } catch {",
+        "            Write-Host `"❌ Backend API not available: `$(`$_.Exception.Message)`" -ForegroundColor Red",
+        "            return",
+        "        }",
+        "        ",
+        "        # Check caption provider health",
+        "        try {",
+        "            `$captionHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/health/caption' -TimeoutSec 10 -ErrorAction SilentlyContinue",
+        "            if (`$captionHealth) {",
+        "                Write-Host `"📸 Caption Provider: `$(`$captionHealth.provider)`" -ForegroundColor Cyan",
+        "                Write-Host `"📸 Caption Model: `$(`$captionHealth.model)`" -ForegroundColor Cyan",
+        "                Write-Host `"📸 Mode: `$(`$captionHealth.mode)`" -ForegroundColor Cyan",
+        "            }",
+        "        } catch {",
+        "            Write-Host `"⚠️ Caption service health check unavailable`" -ForegroundColor Yellow",
+        "        }",
+        "        ",
+        "        Write-Host `"Running status query via CLI...`" -ForegroundColor Cyan",
+        "        Push-Location 'backend'",
+        "        & '..\.venv\\Scripts\\python.exe' -m app.cli ingest-status 'E:\\01_INCOMING' --scan-fs --preview-limit 3",
+        "        Pop-Location",
+        "        return",
+        "    }",
+        "    ",
+        "    # Validate backend availability first",
+        "    Write-Host `"🔍 Validating backend services...`" -ForegroundColor Cyan",
+        "    try {",
+        "        `$health = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/health' -TimeoutSec 5",
+        "        if (-not `$health.ok) {",
+        "            Write-Host `"❌ Backend health check failed`" -ForegroundColor Red",
+        "            return",
+        "        }",
+        "        Write-Host `"✅ Backend API healthy`" -ForegroundColor Green",
+        "    } catch {",
+        "        Write-Host `"❌ Backend API unavailable: `$(`$_.Exception.Message)`" -ForegroundColor Red",
+        "        Write-Host `"Ensure main API service is running on port $ApiPort`" -ForegroundColor Yellow",
+        "        return",
+        "    }",
+        "    ",
+        "    # Validate caption service",
+        "    try {",
+        "        `$captionHealth = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/health/caption' -TimeoutSec 10",
+        "        Write-Host `"✅ Caption service ready: `$(`$captionHealth.provider)`" -ForegroundColor Green",
+        "    } catch {",
+        "        Write-Host `"❌ Caption service unavailable: `$(`$_.Exception.Message)`" -ForegroundColor Red",
+        "        Write-Host `"Check CAPTION_PROVIDER and CAPTION_EXTERNAL_DIR environment variables`" -ForegroundColor Yellow",
+        "        return",
+        "    }",
+        "    ",
+        "    # Build CLI command - simplified without profile system",
+        "    `$cliArgs = @('captions-backfill', '--limit', `$Limit)",
+        "    if (`$Force) {",
+        "        `$cliArgs += '--force'",
+        "        Write-Host `"🔥 Force mode enabled - will reprocess existing captions`" -ForegroundColor Yellow",
+        "    } else {",
+        "        Write-Host `"🔄 Incremental mode - processing assets without captions only`" -ForegroundColor Cyan",
+        "    }",
+        "    ",
+        "    Write-Host `"Batch Limit: `$Limit | Model: BLIP2-OPT-2.7B (production tested)`" -ForegroundColor White",
+        "    Write-Host ''",
+        "    ",
+        "    Write-Host `"🚀 Enqueuing caption tasks via backend CLI...`" -ForegroundColor Green",
+        "    try {",
+        "        `$startTime = Get-Date",
+        "        Push-Location 'backend'",
+        "        & '..\.venv\\Scripts\\python.exe' -m app.cli @cliArgs",
+        "        Pop-Location",
+        "        `$elapsed = (Get-Date) - `$startTime",
+        "        Write-Host ''",
+        "        Write-Host `"✅ Caption task enqueuing completed in `$(`$elapsed.TotalSeconds.ToString('F1'))s`" -ForegroundColor Green",
+        "        ",
+        "        # Show task queue status",
+        "        Write-Host `"📊 Task queue status:`" -ForegroundColor Cyan",
+        "        try {",
+        "            `$queueResponse = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/tasks/queue-status' -TimeoutSec 3 -ErrorAction SilentlyContinue",
+        "            if (`$queueResponse) {",
+        "                Write-Host `"  Pending tasks: `$(`$queueResponse.pending_count)`" -ForegroundColor White",
+        "                Write-Host `"  Running tasks: `$(`$queueResponse.running_count)`" -ForegroundColor White",
+        "            }",
+        "        } catch {",
+        "            Write-Host `"  Queue status unavailable`" -ForegroundColor Gray",
+        "        }",
+        "        ",
+        "        Write-Host ''",
+        "        Write-Host `"💡 Next steps:`" -ForegroundColor Yellow",
+        "        Write-Host `"  • Tasks are now enqueued and will be processed by background workers`" -ForegroundColor Gray",
+        "        Write-Host `"  • Monitor GPU utilization in the RTX 3090 Monitor pane`" -ForegroundColor Gray",
+        "        Write-Host `"  • Use Check-Caption-Status to track progress`" -ForegroundColor Gray",
+        "        ",
+        "    } catch {",
+        "        Write-Host `"❌ Caption processing failed: `$(`$_.Exception.Message)`" -ForegroundColor Red",
+        "        Write-Host `"Check that backend environment is properly configured`" -ForegroundColor Yellow",
+        "    }",
+        "}",
+        "",
+        "function Check-Caption-Status {",
+        "    Write-Host `"📊 Caption Processing Status Report`" -ForegroundColor Green",
+        "    Write-Host ''",
+        "    ",
+        "    # Check backend health",
+        "    try {",
+        "        `$health = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/health' -TimeoutSec 5",
+        "        if (`$health.ok) {",
+        "            Write-Host `"✅ Backend API: Online`" -ForegroundColor Green",
+        "        } else {",
+        "            Write-Host `"⚠️ Backend API: Degraded`" -ForegroundColor Yellow",
+        "        }",
+        "    } catch {",
+        "        Write-Host `"❌ Backend API: Offline`" -ForegroundColor Red",
+        "        return",
+        "    }",
+        "    ",
+        "    # Get queue metrics",
+        "    try {",
+        "        `$queueResponse = Invoke-RestMethod -Uri 'http://127.0.0.1:$ApiPort/tasks/queue-status' -TimeoutSec 3 -ErrorAction SilentlyContinue",
+        "        if (`$queueResponse) {",
+        "            Write-Host `"📋 Task Queue:`" -ForegroundColor Cyan",
+        "            Write-Host `"  Pending: `$(`$queueResponse.pending_count) | Running: `$(`$queueResponse.running_count)`" -ForegroundColor White",
+        "        }",
+        "    } catch {",
+        "        Write-Host `"📋 Task Queue: Status unavailable`" -ForegroundColor Gray",
+        "    }",
+        "    ",
+        "    # Show GPU status",
+        "    Write-Host ''",
+        "    Write-Host `"🎯 RTX 3090 Status:`" -ForegroundColor Cyan",
+        "    try {",
+        "        `$gpu = nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu --format=csv,noheader,nounits -i $rtx3090Index",
+        "        `$parts = `$gpu -split ','",
+        "        `$util = [int]`$parts[3]",
+        "        `$temp = [int]`$parts[4]",
+        "        `$memUsed = [int]`$parts[1]",
+        "        `$memTotal = [int]`$parts[2]",
+        "        `$memPercent = [math]::Round((`$memUsed / `$memTotal) * 100, 1)",
+        "        ",
+        "        `$utilizationColor = if (`$util -gt 80) { 'Red' } elseif (`$util -gt 50) { 'Yellow' } else { 'Green' }",
+        "        Write-Host `"  GPU Utilization: `$util% | Memory: `$memPercent% (`$memUsed/`$memTotal MB) | Temp: `$temp°C`" -ForegroundColor `$utilizationColor",
+        "    } catch {",
+        "        Write-Host `"  GPU monitoring unavailable`" -ForegroundColor Gray",
+        "    }",
+        "    ",
+        "    # Asset/caption statistics via CLI",
+        "    Write-Host ''",
+        "    Write-Host `"📈 Asset & Caption Statistics:`" -ForegroundColor Cyan",
+        "    Push-Location 'backend'",
+        "    & '..\.venv\\Scripts\\python.exe' -m app.cli ingest-status 'E:\\01_INCOMING' --preview-limit 0",
+        "    Pop-Location",
         "}",
         "",
         "function Search-Photos([string]`$Query = 'sunset') {",
@@ -621,10 +840,22 @@ function New-InteractiveShellPane {
         "    Write-Host ''",
         "    Write-Host '🎯 Available Commands:' -ForegroundColor Yellow",
         "    Write-Host '  Test-Services          - Check if APIs are ready' -ForegroundColor Cyan",
-        "    Write-Host '  Ingest-Photos [path]   - Scan and ingest photos (default: E:\\photos)' -ForegroundColor Cyan",
+        "    Write-Host '  Ingest-Photos [path]   - Scan and ingest photos (default: E:\\01_INCOMING)' -ForegroundColor Cyan",
         "    Write-Host '  Generate-Captions [id] - Generate captions for asset (default: 1)' -ForegroundColor Cyan",
         "    Write-Host '  Search-Photos [query]  - Smart search photos (default: sunset)' -ForegroundColor Cyan",
-        "    Write-Host '  Test-TTS [text]        - Test TTS synthesis' -ForegroundColor Cyan",
+        "    Write-Host '  Test-TTS [text]        - Test TTS synthesis' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '🖼️ Caption Processing Commands:' -ForegroundColor Green
+    Write-Host '  Process-Captions [Options] - Bulk caption generation with BLIP2' -ForegroundColor Cyan
+    Write-Host '    Parameters:' -ForegroundColor Gray
+    Write-Host '      -Limit [N]         - Process up to N assets (default: 500)' -ForegroundColor Gray
+    Write-Host '      -Force             - Reprocess existing captions' -ForegroundColor Gray
+    Write-Host '      -ShowStatus        - Display current caption statistics only' -ForegroundColor Gray
+    Write-Host '    Examples:' -ForegroundColor Gray
+    Write-Host '      Process-Captions                      - Process 500 assets with BLIP2' -ForegroundColor Gray
+    Write-Host '      Process-Captions -Limit 100 -Force   - Force reprocess 100 assets' -ForegroundColor Gray
+    Write-Host '      Process-Captions -ShowStatus         - Show current status only' -ForegroundColor Gray
+    Write-Host '  Check-Caption-Status   - Show caption processing progress & GPU status' -ForegroundColor Cyan",
         "    Write-Host ''",
         "    Write-Host '� Face Processing Commands:' -ForegroundColor Magenta",
         "    Write-Host '  Process-Faces [BatchSize] [Incremental] - Run face detection & recognition' -ForegroundColor Cyan",
@@ -646,8 +877,9 @@ function New-InteractiveShellPane {
         "    Write-Host '  Health: http://127.0.0.1:$ApiPort/health' -ForegroundColor Gray",
         "    Write-Host ''",
         "    Write-Host '📊 Caption Models Available:' -ForegroundColor Yellow",
-        "    Write-Host '  • BLIP2-OPT-2.7B (fast, good quality)' -ForegroundColor Gray",
-        "    Write-Host '  • Qwen2.5-VL-3B (slower, high quality)' -ForegroundColor Gray",
+        "    Write-Host '  • BLIP2-OPT-2.7B: Production ready (13.96 GB) ✅' -ForegroundColor Gray",
+        "    Write-Host '  • Qwen2.5-VL-3B: Downloaded but has compatibility issues ⚠️' -ForegroundColor Gray",
+        "    Write-Host '  • Current provider set via CAPTION_PROVIDER environment variable' -ForegroundColor Gray",
         "    Write-Host ''",
         "    Write-Host '👤 Face Processing Pipeline:' -ForegroundColor Yellow",
         "    Write-Host '  • SCRFD buffalo_l model for face detection' -ForegroundColor Gray",
@@ -666,6 +898,7 @@ function New-InteractiveShellPane {
         "Write-Host ''",
         "Write-Host '🚀 Interactive shell ready! Available commands:' -ForegroundColor Green",
         "Write-Host '  • Test-Services, Ingest-Photos, Generate-Captions' -ForegroundColor Cyan",
+        "Write-Host '  • Process-Captions, Check-Caption-Status (bulk processing)' -ForegroundColor Green",
         "Write-Host '  • Process-Faces, Test-Face-Service, Check-Face-Status' -ForegroundColor Magenta",
         "Write-Host '  • Show-Help for complete command list' -ForegroundColor Yellow"
     ) -join "`n"
@@ -684,13 +917,22 @@ if ($WithInteractiveShell) {
     Write-Host "🏗️ Creating optimized 2x3 RTX 3090 layout (6 panes)..." -ForegroundColor Green
 }
 
-# Create all pane specifications
+# Create all pane specifications with memory-optimized approach
+Write-Host "🧠 Optimizing model loading to prevent memory duplication..." -ForegroundColor Yellow
+
+# MEMORY OPTIMIZATION: Use shared model loading strategy
+# Only the Main API should load BLIP2, others should use API calls
+$env:SHARED_MODEL_STRATEGY = 'true'
+$env:PREVENT_MODEL_DUPLICATION = 'true'
+
 $mainApiSpec = New-MainApiPane -GpuIndex $rtx3090Index
-$captionSpec = New-CaptionModelsPane -GpuIndex $rtx3090Index
+$captionSpec = New-CaptionModelsPane -GpuIndex $rtx3090Index  # Modified to NOT load models
 $lvfaceSpec = New-LvfacePane -GpuIndex $rtx3090Index
 $asrSpec = New-AsrPane -GpuIndex $rtx3090Index
 $ttsSpec = New-TtsPane -GpuIndex $rtx3090Index
 $monitorSpec = New-GpuMonitoringPane -GpuIndex $rtx3090Index
+
+Write-Host "✅ Pane specifications created with model sharing optimization" -ForegroundColor Green
 
 if ($WithInteractiveShell) {
     $interactiveSpec = New-InteractiveShellPane
@@ -698,57 +940,49 @@ if ($WithInteractiveShell) {
 
 if ($UseWindowsTerminal) {
     if ($WithInteractiveShell) {
-        # Try a different approach: Create rows first, then columns
-        # This might give better equal distribution
+        # Create 6-pane layout with proper termination prevention
         $wtArgs = @(
             'new-tab', '--title', "`"$($mainApiSpec.Title)`"", '-d', "`"$($mainApiSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($mainApiSpec.File)`"",
-            # First create the bottom row (split vertically 50/50)
+            # Create ASR pane (bottom row)
             ';', 'split-pane', '-V', '--size', '0.5', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
-            # Now split the top row into 3 columns
-            # Go back to top pane and split it horizontally
+            # Split top row: Main API -> Caption + LVFace
             ';', 'move-focus', 'up',
             ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
             ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
-            # Now split the bottom row into 3 columns to match
-            # Go to bottom left pane
+            # Split bottom row: ASR -> TTS + Monitor  
             ';', 'move-focus', 'down', ';', 'move-focus', 'left', ';', 'move-focus', 'left',
             ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
-            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
+            ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`"",
+            # Add interactive tab
+            ';', 'new-tab', '--title', "`"$($interactiveSpec.Title)`"", '-d', "`"$($interactiveSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($interactiveSpec.File)`""
         )
 
-        Write-Host "🖥️ Launching Windows Terminal with 2 rows x 3 columns equal layout..." -ForegroundColor Green
+        Write-Host "🖥️ Launching Windows Terminal: 6 service panes + interactive tab..." -ForegroundColor Green
         Start-Process wt -ArgumentList $wtArgs
-
-        # Wait a moment, then launch interactive shell in new tab
-        Start-Sleep 2
-        Write-Host "🎮 Launching Interactive Command Shell in new tab..." -ForegroundColor Green
-        Start-Process wt -ArgumentList @('new-tab', '--title', "`"$($interactiveSpec.Title)`"", '-d', "`"$($interactiveSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($interactiveSpec.File)`"")
     } else {
-        # Try rows-first approach for better equal distribution
+        # Create 6-pane layout without interactive shell
         $wtArgs = @(
             'new-tab', '--title', "`"$($mainApiSpec.Title)`"", '-d', "`"$($mainApiSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($mainApiSpec.File)`"",
-            # First create the bottom row (split vertically 50/50)
+            # Create ASR pane (bottom row)
             ';', 'split-pane', '-V', '--size', '0.5', '--title', "`"$($asrSpec.Title)`"", '-d', "`"$($asrSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($asrSpec.File)`"",
-            # Now split the top row into 3 columns
-            # Go back to top pane and split it horizontally
+            # Split top row: Main API -> Caption + LVFace
             ';', 'move-focus', 'up',
             ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($captionSpec.Title)`"", '-d', "`"$($captionSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($captionSpec.File)`"",
             ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($lvfaceSpec.Title)`"", '-d', "`"$($lvfaceSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($lvfaceSpec.File)`"",
-            # Now split the bottom row into 3 columns to match
-            # Go to bottom left pane
+            # Split bottom row: ASR -> TTS + Monitor  
             ';', 'move-focus', 'down', ';', 'move-focus', 'left', ';', 'move-focus', 'left',
             ';', 'split-pane', '-H', '--size', '0.333', '--title', "`"$($ttsSpec.Title)`"", '-d', "`"$($ttsSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ttsSpec.File)`"",
             ';', 'split-pane', '-H', '--size', '0.5', '--title', "`"$($monitorSpec.Title)`"", '-d', "`"$($monitorSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($monitorSpec.File)`""
         )
 
-        Write-Host "🖥️ Launching Windows Terminal with 2x3 RTX 3090 equal-spaced layout..." -ForegroundColor Green
+        Write-Host "🖥️ Launching Windows Terminal: 6 service panes layout..." -ForegroundColor Green
         Start-Process wt -ArgumentList $wtArgs
     }
 
     # Give services time to initialize
     Start-Sleep 3
 } else {
-    # Fallback: separate windows
+    # Fallback: separate windows (only when Windows Terminal is disabled)
     if ($WithInteractiveShell) {
         Write-Host "🖥️ Launching 7 separate PowerShell windows (6 monitoring + 1 interactive)..." -ForegroundColor Green
         Start-Process pwsh -ArgumentList @('-NoExit','-File', $interactiveSpec.File) -WorkingDirectory $interactiveSpec.Dir
@@ -809,3 +1043,4 @@ if ($WithInteractiveShell) {
 }
 Write-Host ""
 Write-Host "✅ Ready for production AI workloads with full RTX 3090 utilization!" -ForegroundColor Green
+

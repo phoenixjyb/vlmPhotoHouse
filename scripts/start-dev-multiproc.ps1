@@ -116,8 +116,15 @@ if ($Preset) {
 
 # Environment for backend (using effective values)
 $env:FACE_EMBED_PROVIDER = $effectiveFace
-$env:LVFACE_EXTERNAL_DIR = $LvfaceDir
 $env:LVFACE_MODEL_NAME = Get-LVFaceModelName -Dir $LvfaceDir
+# Prefer external LVFace subprocess only when inference.py exists; otherwise use builtin ONNX path.
+$lvfaceInference = Join-Path $LvfaceDir 'inference.py'
+if (Test-Path -LiteralPath $lvfaceInference) {
+    $env:LVFACE_EXTERNAL_DIR = $LvfaceDir
+} else {
+    $env:LVFACE_EXTERNAL_DIR = ''
+    $env:LVFACE_MODEL_PATH = Join-Path $LvfaceDir ("models\" + $env:LVFACE_MODEL_NAME)
+}
 $env:CAPTION_PROVIDER = $effectiveCaption
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'

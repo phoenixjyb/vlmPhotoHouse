@@ -179,6 +179,50 @@ def ping() -> None:
     """Simple heartbeat to verify CLI wiring."""
     typer.echo("cli-ok")
 
+@app.command("captions-backfill")
+def captions_backfill(
+    profile: str = typer.Option('balanced', help="Caption profile hint (fast|balanced|quality) recorded only; current providers handled via env"),
+    max_variants: int = typer.Option(3, help="Desired variant target per asset (won't overwrite user_edited)"),
+    limit: int = typer.Option(500, help="Max assets to enqueue this run"),
+    force: bool = typer.Option(False, help="Force enqueue even if variants already at/above target (respects user_edited preservation)"),
+) -> None:
+    """Enqueue caption tasks for assets missing captions or below variant target.
+
+    This does NOT generate immediately; it schedules tasks respecting existing
+    user-edited captions and variant caps. Newly added status fields on assets
+    will be updated by task handler (future enhancement).
+    """
+    from .db import Asset, Caption, Task
+    engine, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id).order_by(Asset.id.asc())
+        enqueued = 0
+        scanned = 0
+        for (asset_id,) in q:
+            if enqueued >= limit:
+                break
+            scanned += 1
+            caps = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
+            user_edited_count = sum(1 for c in caps if c.user_edited)
+            
+            # Skip if we have enough variants AND not forcing
+            if not force and len(caps) >= max_variants:
+                continue
+                
+            # When forcing, skip only if there are user-edited captions (preserve user work)
+            if force and user_edited_count > 0:
+                continue
+                
+            # Avoid duplicate pending caption task
+            existing_task = session.query(Task).filter(Task.type=='caption', Task.state.in_(['pending','running']), Task.payload_json['asset_id'].as_integer()==asset_id).first()
+            if existing_task:
+                continue
+            payload = {'asset_id': asset_id, 'force': force, 'profile': profile}
+            session.add(Task(type='caption', priority=110, payload_json=payload))
+            enqueued += 1
+        session.commit()
+        typer.echo(f"scanned={scanned} enqueued={enqueued} limit={limit} target_variants={max_variants} profile={profile}")
+
 
 # (Defer CLI invocation to the very end of file after all commands are registered)
 import os, sys

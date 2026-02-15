@@ -1,6 +1,8 @@
 import hashlib
 import os
 import time
+import io
+import httpx
 from functools import lru_cache
 from typing import Protocol, Optional
 import numpy as np
@@ -145,6 +147,63 @@ class LVFaceEmbeddingProvider:
             vec /= n
         return vec
 
+
+class LVFaceHTTPProvider:
+    """HTTP-based LVFace embedding provider."""
+
+    def __init__(self, service_url: str, target_dim: int):
+        self.service_url = service_url.rstrip('/')
+        self.target_dim = target_dim
+        self.logger = logging.getLogger('app.lvface_http_provider')
+        try:
+            with httpx.Client(timeout=5.0, proxies={}) as client:
+                resp = client.get(f"{self.service_url}/health")
+                if resp.status_code == 200:
+                    info = resp.json()
+                    self.logger.info(
+                        "Connected to LVFace service %s (device=%s)",
+                        info.get('status', 'unknown'),
+                        info.get('device', 'unknown'))
+                else:
+                    self.logger.warning(
+                        "LVFace service health check failed: %s", resp.status_code)
+        except Exception as exc:
+            self.logger.warning("LVFace HTTP service not immediately available: %s", exc)
+
+    def embed_face(self, image: Image.Image) -> np.ndarray:
+        buffer = io.BytesIO()
+        image.convert('RGB').resize((112, 112)).save(buffer, format='PNG')
+        buffer.seek(0)
+        payload = buffer.getvalue()
+        try:
+            with httpx.Client(timeout=20.0, proxies={}) as client:
+                files = {'file': ('face.png', payload, 'image/png')}
+                response = client.post(f"{self.service_url}/embed", files=files)
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"LVFace HTTP error {response.status_code}: {response.text[:200]}")
+            data = response.json()
+            vector = data.get('embedding') or data.get('vector') or []
+            arr = np.array(vector, dtype=np.float32)
+            if arr.size == 0:
+                raise ValueError('Empty embedding returned from LVFace HTTP service')
+            if self.target_dim < arr.shape[0]:
+                arr = arr[:self.target_dim]
+            elif self.target_dim > arr.shape[0]:
+                need = self.target_dim - arr.shape[0]
+                digest = hashlib.sha256(arr.tobytes()).digest()
+                raw = (digest * (need // len(digest) + 1))[:need]
+                pad = np.frombuffer(raw, dtype=np.uint8).astype('float32')
+                pad = (pad - 127.5) / 128.0
+                arr = np.concatenate([arr, pad])
+            norm = np.linalg.norm(arr)
+            if norm > 0:
+                arr = arr / norm
+            return arr
+        except Exception as exc:
+            self.logger.error("LVFace HTTP embedding failure: %s", exc)
+            raise
+
 @lru_cache()
 def get_face_embedding_provider() -> FaceEmbeddingProvider:
     s = get_settings()
@@ -223,14 +282,16 @@ def _build_provider(provider: str, device_req: str, target_dim: int) -> FaceEmbe
     if provider == 'lvface':
         from .config import get_settings as _gs
         s = _gs()
-        
-        # Check if we should use subprocess (external LVFace)
-        lvface_external_dir = os.getenv('LVFACE_EXTERNAL_DIR')
+
+        lvface_service_url = os.getenv('LVFACE_SERVICE_URL') or getattr(s, 'lvface_service_url', '')
+        if lvface_service_url:
+            return LVFaceHTTPProvider(lvface_service_url, target_dim)
+
+        lvface_external_dir = os.getenv('LVFACE_EXTERNAL_DIR') or getattr(s, 'lvface_external_dir', '')
         if lvface_external_dir:
             from .lvface_subprocess import LVFaceSubprocessProvider
             model_name = os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx')
             return LVFaceSubprocessProvider(lvface_external_dir, model_name, target_dim)
-        else:
-            # Use built-in ONNX provider
-            return LVFaceEmbeddingProvider(s.lvface_model_path, 'cuda' if device_req=='cuda' else 'cpu', target_dim)
+
+        return LVFaceEmbeddingProvider(s.lvface_model_path, 'cuda' if device_req=='cuda' else 'cpu', target_dim)
     raise RuntimeError(f'Unknown provider {provider}')

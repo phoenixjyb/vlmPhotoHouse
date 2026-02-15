@@ -67,7 +67,16 @@ class CaptionSubprocessProvider:
                     "--model", self.model_name,
                     "--image", tmp_path
                 ]
+                
+                # Prepare environment variables - inherit current env and add caption-specific ones
+                env = os.environ.copy()
+                if "CAPTION_GPU_DEVICE" in os.environ:
+                    env["CAPTION_GPU_DEVICE"] = os.environ["CAPTION_GPU_DEVICE"]
+                
                 logger.debug(f"Running caption subprocess: {' '.join(cmd)} (in {self.caption_dir})")
+                if "CAPTION_GPU_DEVICE" in env:
+                    logger.debug(f"GPU device set to: {env['CAPTION_GPU_DEVICE']}")
+                    
                 result = subprocess.run(
                     cmd,
                     cwd=str(self.caption_dir),
@@ -75,7 +84,8 @@ class CaptionSubprocessProvider:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    timeout=600  # 10 minute timeout for model inference (includes loading)
+                    timeout=600,  # 10 minute timeout for model inference (includes loading)
+                    env=env  # Pass environment variables to subprocess
                 )
                 if result.returncode == 0:
                     break

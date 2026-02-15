@@ -6,12 +6,71 @@ from functools import lru_cache
 from typing import Protocol, Optional
 from PIL import Image
 import json
+import httpx
+import tempfile
 
 logger = logging.getLogger(__name__)
 
 class CaptionProvider(Protocol):
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str: ...
     def get_model_name(self) -> str: ...
+
+class HTTPCaptionProvider:
+    """HTTP-based caption provider that calls remote caption service."""
+    
+    def __init__(self, service_url: str = "http://127.0.0.1:8002"):
+        self.service_url = service_url.rstrip('/')
+        self.model_name = "http-caption-service"
+        
+        # Verify service is available
+        try:
+            # Configure httpx to bypass proxy for localhost
+            with httpx.Client(timeout=5.0, proxies={}) as client:
+                response = client.get(f"{self.service_url}/health")
+                if response.status_code == 200:
+                    health_data = response.json()
+                    logger.info(f"Connected to caption service: {health_data.get('status', 'unknown')}")
+                    if health_data.get('models_loaded'):
+                        self.model_name = f"http-{'-'.join(health_data['models_loaded'])}"
+                else:
+                    logger.warning(f"Caption service health check failed: {response.status_code}")
+        except httpx.RequestError as e:
+            logger.warning(f"Caption service not immediately available: {e}")
+    
+    def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str:
+        """Generate caption using remote HTTP service."""
+        try:
+            # Convert PIL image to bytes
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                image.save(tmp_file.name, format='PNG')
+                
+                # Send to caption service with proxy bypass
+                with httpx.Client(timeout=30.0, proxies={}) as client:
+                    with open(tmp_file.name, 'rb') as f:
+                        files = {'file': ('image.png', f, 'image/png')}
+                        response = client.post(f"{self.service_url}/caption", files=files)
+                
+                # Clean up temp file
+                os.unlink(tmp_file.name)
+            
+            if response.status_code == 200:
+                result = response.json()
+                caption = result.get('caption', 'Caption generation failed')
+                logger.debug(f"Generated caption: {caption[:100]}...")
+                return caption
+            else:
+                logger.error(f"Caption service error: {response.status_code} - {response.text}")
+                return "Caption service unavailable"
+                
+        except httpx.RequestError as e:
+            logger.error(f"Failed to connect to caption service: {e}")
+            return "Caption service connection failed"
+        except Exception as e:
+            logger.error(f"Caption generation error: {e}")
+            return "Caption generation error"
+    
+    def get_model_name(self) -> str:
+        return self.model_name
 
 class StubCaptionProvider:
     """Stub caption provider that generates heuristic captions."""
@@ -292,6 +351,13 @@ def get_caption_provider() -> CaptionProvider:
 def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     """Build a specific caption provider."""
     provider = provider.lower()
+    
+    # HTTP caption service provider
+    if provider == 'http':
+        from .config import get_settings
+        settings = get_settings()
+        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8002')
+        return HTTPCaptionProvider(service_url)
     
     # Check if we should use subprocess (external caption models)
     from .config import get_settings

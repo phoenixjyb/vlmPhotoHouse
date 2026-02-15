@@ -32,6 +32,12 @@ class Asset(Base):
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     imported_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     status: Mapped[str] = mapped_column(String(16), default='active', index=True)
+    # Caption processing status fields (added via migration 9b1e7d2a5c6f)
+    caption_processed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    caption_variant_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    caption_processed_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, nullable=True)
+    caption_error_last: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    caption_model_profile_last: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     embeddings = relationship('Embedding', back_populates='asset', cascade='all, delete-orphan')
     captions = relationship('Caption', back_populates='asset', cascade='all, delete-orphan')
@@ -61,6 +67,10 @@ class Caption(Base):
     user_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, onupdate=func.now())
+    # Variant metadata
+    quality_tier: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    model_version: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    superseded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     asset = relationship('Asset', back_populates='captions')
 
