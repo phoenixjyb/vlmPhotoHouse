@@ -54,7 +54,7 @@ try {
     if (Test-Path $pythonExe) {
         # Run comprehensive GPU validation
         Write-Host "  📊 Running GPU device mapping validation..." -ForegroundColor Gray
-        $gpuValidation = & $pythonExe ".\configure_gpu.py" --status 2>&1
+        $gpuValidation = & $pythonExe ".\tools\configure_gpu.py" --status 2>&1
         
         if ($LASTEXITCODE -ne 0) {
             Write-Host "❌ Python GPU validation failed!" -ForegroundColor Red

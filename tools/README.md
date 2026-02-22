@@ -10,6 +10,7 @@ This directory contains utility scripts, monitoring tools, and administrative ut
 - `monitor_video_progress.py` - Video processing progress tracking
 - `gpu_monitor_plot.py` - GPU usage visualization and plotting
 - `quick_gpu_check.py` - Quick GPU status checking
+- `test_caption_noproxy.ps1` - Localhost caption service health test without proxy
 - `quick_status.py` - Quick system status overview
 - `system_overview.py` - Comprehensive system status overview
 
@@ -18,6 +19,7 @@ This directory contains utility scripts, monitoring tools, and administrative ut
 - `update_face_schema.py` - Database schema update utilities
 - `import_assets.py` - Asset import and ingestion utilities
 - `fix_view.py` - Database view fixes and repairs
+- `analyze_databases.py` - Inspect database tables, sizes, and record counts
 
 ### Visualization & Analysis
 - `visualize_detection.py` - Face detection result visualization
@@ -27,6 +29,7 @@ This directory contains utility scripts, monitoring tools, and administrative ut
 
 ### System Administration
 - `gpu_precheck_validation.py` - GPU setup validation and checking
+- `configure_gpu.py` - Configure and validate RTX 3090 device mapping
 - `photo_ingestion_guide.py` - Photo ingestion workflow utilities
 - `photo_organization_strategy.py` - Photo organization tools
 - `reset_processing_dirs.py` - Processing directory cleanup
@@ -39,6 +42,9 @@ This directory contains utility scripts, monitoring tools, and administrative ut
 ```bash
 # Real-time GPU monitoring
 python tools/monitor_gpu_usage.py
+
+# Caption service health check (PowerShell)
+powershell -ExecutionPolicy Bypass -File tools/test_caption_noproxy.ps1
 
 # System status overview
 python tools/system_overview.py
@@ -57,6 +63,9 @@ python tools/update_face_schema.py
 
 # Import new assets
 python tools/import_assets.py
+
+# Analyze Drive E database inventory
+python tools/analyze_databases.py
 ```
 
 ### Visualization
@@ -72,6 +81,9 @@ python tools/gpu_monitor_plot.py
 ```bash
 # Validate GPU setup
 python tools/gpu_precheck_validation.py
+
+# Configure and display GPU device mapping
+python tools/configure_gpu.py --status
 
 # Reset processing directories
 python tools/reset_processing_dirs.py
