@@ -13,6 +13,7 @@ param(
     [int]$GpuMonitorInterval = 3,
 
     [int]$ApiPort = 8002,
+    [int]$CaptionPort = 8102,
 
     [int]$VoicePort = 8001,
 
@@ -141,7 +142,7 @@ if ($KillExisting -and -not $NoCleanup) {
         Write-Host "ℹ️ Skipping Windows Terminal shutdown during cleanup (safer session behavior)." -ForegroundColor DarkCyan
 
         # Clean up service ports
-        $portsToCheck = @($ApiPort, $VoicePort, 8000, 8002, 8003)
+        $portsToCheck = @($ApiPort, $CaptionPort, $VoicePort, $LvfacePort, 8000)
         foreach ($port in $portsToCheck) {
             try {
                 $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
@@ -195,6 +196,7 @@ $env:LVFACE_SERVICE_HOST = '127.0.0.1'
 $env:LVFACE_SERVICE_PORT = "$LvfacePort"
 $env:SCRFD_SERVICE_URL = 'http://172.22.61.27:8003'  # WSL unified service
 $env:CAPTION_PROVIDER = if ($env:CAPTION_PROVIDER) { $env:CAPTION_PROVIDER } else { 'http' }
+$env:CAPTION_SERVICE_URL = "http://127.0.0.1:$CaptionPort"
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'
 $env:ENABLE_INLINE_WORKER = 'true'
@@ -230,14 +232,14 @@ function New-MainApiPane {
         "",
         "# Set environment variables for this pane - NO DIRECT MODEL LOADING",
         "`$env:CAPTION_PROVIDER = 'http'",
-        "`$env:CAPTION_SERVICE_URL = 'http://127.0.0.1:8002'",
+        "`$env:CAPTION_SERVICE_URL = 'http://127.0.0.1:$CaptionPort'",
         "`$env:ENABLE_INLINE_WORKER = 'true'", 
         "`$env:WORKER_CONCURRENCY = '4'",
         "",
         "Write-Host '🌐 VLM Photo Engine - Main API Server (FastAPI)' -ForegroundColor Green",
         "Write-Host 'Central orchestration | Photo/Video processing | AI task coordination' -ForegroundColor Yellow",
-        "Write-Host 'Caption: HTTP service (8002) | No direct model loading' -ForegroundColor Cyan",
-        "Write-Host 'External providers: LVFace (8003) + Caption HTTP (8002)' -ForegroundColor Yellow",
+        "Write-Host 'Caption: HTTP service ($CaptionPort) | No direct model loading' -ForegroundColor Cyan",
+        "Write-Host 'External providers: LVFace ($LvfacePort) + Caption HTTP ($CaptionPort)' -ForegroundColor Yellow",
         "",
         "# Validate RTX 3090 availability for main backend",
         "& `"$pyExe`" -c `"import torch; print('RTX 3090 Available:', torch.cuda.is_available()); print('Device 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'); print(f'Device 0 Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB' if torch.cuda.is_available() else '')`"",
@@ -273,7 +275,7 @@ function New-CaptionModelsPane {
     $content = @(
         "Set-Location -LiteralPath `"$CaptionDir`"",
         "Write-Host '🖼️ Caption Models HTTP Service - BLIP2 Only' -ForegroundColor Green",
-        "Write-Host 'Dedicated caption service | Port 8002 | RTX 3090' -ForegroundColor Yellow",
+        "Write-Host 'Dedicated caption service | Port $CaptionPort | RTX 3090' -ForegroundColor Yellow",
         "",
         "# Activate caption environment",
         "if (Test-Path '.venv\\Scripts\\Activate.ps1') { . '.venv\\Scripts\\Activate.ps1' }",
@@ -287,16 +289,16 @@ function New-CaptionModelsPane {
         "`$env:CUDA_VISIBLE_DEVICES = '$GpuIndex'",
         "",
         "Write-Host '🚀 Starting Caption Models HTTP Server...' -ForegroundColor Cyan",
-        "Write-Host '📍 Service URL: http://127.0.0.1:8002' -ForegroundColor White",
+        "Write-Host '📍 Service URL: http://127.0.0.1:$CaptionPort' -ForegroundColor White",
         "Write-Host '🎯 Model: BLIP2-OPT-2.7B (6GB VRAM)' -ForegroundColor Gray",
         "Write-Host '🖥️ Device: RTX 3090 (cuda:1)' -ForegroundColor Gray",
         "",
         "# Start HTTP server with BLIP2 model (skip if one is already healthy)",
-        "`$existing = try { (Invoke-RestMethod -Uri 'http://127.0.0.1:8002/health' -TimeoutSec 2 -ErrorAction SilentlyContinue) } catch { `$null }",
+        "`$existing = try { (Invoke-RestMethod -Uri 'http://127.0.0.1:$CaptionPort/health' -TimeoutSec 2 -ErrorAction SilentlyContinue) } catch { `$null }",
         "if (-not `$existing -or `$existing.status -ne 'healthy') {",
-        "    & `"$pyExe`" caption_server.py --host 127.0.0.1 --port 8002 --provider blip2",
+        "    & `"$pyExe`" caption_server.py --host 127.0.0.1 --port $CaptionPort --provider blip2",
         "} else {",
-        "    Write-Host '✅ Existing Caption Models service detected on :8002, using existing' -ForegroundColor Yellow",
+        "    Write-Host '✅ Existing Caption Models service detected on :$CaptionPort, using existing' -ForegroundColor Yellow",
         "}"
     ) -join "`n"
 

@@ -13,6 +13,10 @@ from . import metrics as metrics_mod
 import logging
 logger = logging.getLogger(__name__)
 
+# Allow very large photos from camera roll exports; avoids PIL decompression-bomb guard
+# causing caption/face fallbacks on valid high-resolution images.
+Image.MAX_IMAGE_PIXELS = None
+
 EMBED_DIM = 512  # default; may be updated after loading real model
 DERIVED_DIR = Path(os.getenv('DERIVED_PATH','./derived'))
 ( DERIVED_DIR / 'embeddings').mkdir(parents=True, exist_ok=True)

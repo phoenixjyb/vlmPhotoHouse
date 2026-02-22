@@ -50,7 +50,7 @@ def ingest_status(
     """
     from pathlib import Path as _Path
     from sqlalchemy import func as _f
-    from .db import Asset, Embedding, Caption
+    from .db import Asset, Embedding, Caption, Task
     settings = get_settings()
     _, SessionLocal = _session_factory()
     with SessionLocal() as session:
@@ -66,9 +66,40 @@ def ingest_status(
             prefix = str(_Path(root).resolve())
             like = prefix + '%'
             total_assets = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).scalar() or 0
-            # Missing image embedding
-            sub_emb = session.query(Embedding.asset_id).filter(Embedding.modality == 'image')
-            missing_embed = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).filter(~Asset.id.in_(sub_emb)).scalar() or 0
+            # Missing embeddings:
+            # - image assets: missing modality='image' embedding row
+            # - video assets: missing completed video_embed task
+            sub_img_emb = session.query(Embedding.asset_id).filter(Embedding.modality == 'image')
+            missing_img_embed = (
+                session.query(_f.count(Asset.id))
+                .filter(Asset.path.like(like))
+                .filter(Asset.mime.like('image/%'))
+                .filter(~Asset.id.in_(sub_img_emb))
+                .scalar()
+                or 0
+            )
+            video_asset_ids = {
+                aid
+                for (aid,) in session.query(Asset.id)
+                .filter(Asset.path.like(like))
+                .filter(Asset.mime.like('video/%'))
+                .all()
+            }
+            done_video_embed_ids: set[int] = set()
+            if video_asset_ids:
+                rows = (
+                    session.query(Task.payload_json)
+                    .filter(Task.type == 'video_embed')
+                    .filter(Task.state.in_(['done', 'finished']))
+                    .all()
+                )
+                for (payload,) in rows:
+                    if isinstance(payload, dict):
+                        vid = payload.get('asset_id')
+                        if isinstance(vid, int) and vid in video_asset_ids:
+                            done_video_embed_ids.add(vid)
+            missing_video_embed = max(0, len(video_asset_ids) - len(done_video_embed_ids))
+            missing_embed = missing_img_embed + missing_video_embed
             # Missing caption
             sub_cap = session.query(Caption.asset_id)
             missing_caption = session.query(_f.count(Asset.id)).filter(Asset.path.like(like)).filter(~Asset.id.in_(sub_cap)).scalar() or 0
@@ -91,6 +122,8 @@ def ingest_status(
             typer.echo(f"\n[{prefix}]")
             typer.echo(f"  assets_in_db:       {total_assets}")
             typer.echo(f"  missing_embedding:  {missing_embed}")
+            typer.echo(f"  missing_img_embed:  {missing_img_embed}")
+            typer.echo(f"  missing_vid_embed:  {missing_video_embed}")
             typer.echo(f"  missing_caption:    {missing_caption}")
             if fs_files is not None:
                 to_ingest = max(0, fs_files - total_assets)

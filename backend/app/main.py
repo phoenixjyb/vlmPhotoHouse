@@ -63,48 +63,12 @@ def task_worker_loop():
             logger.error(f"Task worker error: {e}", exc_info=True)
             time.sleep(settings.worker_poll_interval)  # back off on error
 
-# --- Test-only helpers ---
-def reinit_executor_for_tests():
-    """Reinitialize settings and executor to pick up env overrides in tests.
+def _run_heavy_startup_tasks():
+    """Run expensive startup work after API boot.
 
-    Safe to call multiple times. Does not recreate the engine; assumes DATABASE_URL unchanged.
+    This keeps process startup responsive by allowing uvicorn to bind quickly
+    while indexes and re-embed scheduling continue in background.
     """
-    global settings, executor
-    try:
-        executor.stop_workers()
-    except Exception:
-        pass
-    settings = get_settings()
-    # Rebind dependencies to the current DATABASE_URL and ensure schema
-    ensure_db()
-    try:
-        db.Base.metadata.create_all(bind=deps.engine)
-    except Exception:
-        pass
-    executor = tasks_mod.TaskExecutor(deps.SessionLocal, settings)
-    return executor
-
-@app.on_event("startup")
-def on_startup():
-    # Simplified startup for testing
-    print("Starting server with basic initialization...")
-    init_db()  # Just create tables, skip Alembic for now
-    print("Database initialized.")
-    
-    # Enable task workers for caption processing
-    if settings.enable_inline_worker and settings.run_mode in ("api", "all"):
-        print("Starting task workers...")
-        # Backwards compatibility: if concurrency==1 use legacy single loop else multi-worker
-        if settings.worker_concurrency <= 1:
-            t = threading.Thread(target=task_worker_loop, daemon=True)
-            t.start()
-            print("Single task worker started.")
-        else:
-            executor.start_workers(settings.worker_concurrency)
-            print(f"Multi-worker executor started with {settings.worker_concurrency} workers.")
-    else:
-        print("Task workers disabled.")
-
     # Optionally load existing embeddings into index
     if settings.vector_index_autoload and tasks_mod.INDEX_SINGLETON is not None and not settings.vector_index_rebuild_on_demand_only:
         try:
@@ -171,7 +135,6 @@ def on_startup():
                     break
             if mismatch:
                 # enqueue embed tasks for assets lacking up-to-date embeddings up to limit
-                existing_asset_ids = session.query(Embedding.asset_id).filter(Embedding.modality=='image').subquery()
                 stale = session.query(Embedding.asset_id).filter(Embedding.model!=settings.embed_model_image).all()
                 stale_ids = {aid for (aid,) in stale}
                 assets = session.query(Asset.id).limit(settings.embed_reembed_startup_limit).all()
@@ -185,6 +148,54 @@ def on_startup():
                     logging.getLogger('app').info(f"Scheduled {scheduled} re-embed tasks due to model change")
     except Exception:
         logging.getLogger('app').warning('Re-embed scheduling failed', exc_info=True)
+
+# --- Test-only helpers ---
+def reinit_executor_for_tests():
+    """Reinitialize settings and executor to pick up env overrides in tests.
+
+    Safe to call multiple times. Does not recreate the engine; assumes DATABASE_URL unchanged.
+    """
+    global settings, executor
+    try:
+        executor.stop_workers()
+    except Exception:
+        pass
+    settings = get_settings()
+    # Rebind dependencies to the current DATABASE_URL and ensure schema
+    ensure_db()
+    try:
+        db.Base.metadata.create_all(bind=deps.engine)
+    except Exception:
+        pass
+    executor = tasks_mod.TaskExecutor(deps.SessionLocal, settings)
+    return executor
+
+@app.on_event("startup")
+def on_startup():
+    # Simplified startup for testing
+    print("Starting server with basic initialization...")
+    init_db()  # Just create tables, skip Alembic for now
+    print("Database initialized.")
+    
+    # Enable task workers for caption processing
+    if settings.enable_inline_worker and settings.run_mode in ("api", "all"):
+        print("Starting task workers...")
+        # Backwards compatibility: if concurrency==1 use legacy single loop else multi-worker
+        if settings.worker_concurrency <= 1:
+            t = threading.Thread(target=task_worker_loop, daemon=True)
+            t.start()
+            print("Single task worker started.")
+        else:
+            executor.start_workers(settings.worker_concurrency)
+            print(f"Multi-worker executor started with {settings.worker_concurrency} workers.")
+    else:
+        print("Task workers disabled.")
+    defer_heavy = os.getenv('DEFER_HEAVY_STARTUP', 'true').lower() in ('1', 'true', 'yes')
+    if defer_heavy:
+        threading.Thread(target=_run_heavy_startup_tasks, daemon=True, name='startup-heavy-init').start()
+        print("Deferred heavy startup tasks to background thread.")
+    else:
+        _run_heavy_startup_tasks()
 
 @app.middleware('http')
 async def request_logging_middleware(request: Request, call_next):

@@ -24,8 +24,8 @@ class HTTPCaptionProvider:
         
         # Verify service is available
         try:
-            # Configure httpx to bypass proxy for localhost
-            with httpx.Client(timeout=5.0, proxies={}) as client:
+            # Bypass environment proxy settings for localhost caption service.
+            with httpx.Client(timeout=5.0, trust_env=False) as client:
                 response = client.get(f"{self.service_url}/health")
                 if response.status_code == 200:
                     health_data = response.json()
@@ -39,19 +39,18 @@ class HTTPCaptionProvider:
     
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str:
         """Generate caption using remote HTTP service."""
+        tmp_path = None
         try:
-            # Convert PIL image to bytes
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
-                image.save(tmp_file.name, format='PNG')
-                
-                # Send to caption service with proxy bypass
-                with httpx.Client(timeout=30.0, proxies={}) as client:
-                    with open(tmp_file.name, 'rb') as f:
-                        files = {'file': ('image.png', f, 'image/png')}
-                        response = client.post(f"{self.service_url}/caption", files=files)
-                
-                # Clean up temp file
-                os.unlink(tmp_file.name)
+            # Windows keeps NamedTemporaryFile handle open in-context; create a path then close it first.
+            fd, tmp_path = tempfile.mkstemp(suffix='.png')
+            os.close(fd)
+            image.save(tmp_path, format='PNG')
+
+            # Send to caption service with proxy bypass
+            with httpx.Client(timeout=30.0, trust_env=False) as client:
+                with open(tmp_path, 'rb') as f:
+                    files = {'file': ('image.png', f, 'image/png')}
+                    response = client.post(f"{self.service_url}/caption", files=files)
             
             if response.status_code == 200:
                 result = response.json()
@@ -68,6 +67,12 @@ class HTTPCaptionProvider:
         except Exception as e:
             logger.error(f"Caption generation error: {e}")
             return "Caption generation error"
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
     
     def get_model_name(self) -> str:
         return self.model_name
