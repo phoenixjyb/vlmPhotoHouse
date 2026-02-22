@@ -40,12 +40,21 @@ def list_persons(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le
     return {'api_version': schemas.API_VERSION, 'page': page, 'page_size': page_size, 'total': total, 'persons': result}
 
 @router.get('/faces', response_model=schemas.FacesResponse)
-def list_faces(person_id: int | None = Query(None), unassigned: bool = Query(False), page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db_s: Session = Depends(get_db)):
+def list_faces(
+    person_id: int | None = Query(None),
+    asset_id: int | None = Query(None),
+    unassigned: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db_s: Session = Depends(get_db)
+):
     q = db_s.query(FaceDetection)
     if person_id is not None and unassigned:
         raise HTTPException(status_code=400, detail='Specify either person_id or unassigned, not both')
     if person_id is not None:
         q = q.filter(FaceDetection.person_id==person_id)
+    if asset_id is not None:
+        q = q.filter(FaceDetection.asset_id==asset_id)
     if unassigned:
         q = q.filter(FaceDetection.person_id==None)
     total = q.count()

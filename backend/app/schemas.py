@@ -18,6 +18,7 @@ class AssetBrief(BaseModel):
 class AssetDetail(BaseModel):
     id: int
     path: str
+    mime: Optional[str] = None
     hash_sha256: str
     perceptual_hash: Optional[str] = None
     width: Optional[int] = None

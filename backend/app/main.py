@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import os, threading, time
 import logging, uuid
 import math
+import mimetypes
 
 from . import db
 from .config import get_settings
@@ -435,6 +436,61 @@ def search(q: str = Query('', description='Query text (stub substring match on p
     total = base.count()
     items = base.order_by(Asset.id.desc()).offset((page-1)*page_size).limit(page_size).all()
     return {'api_version': schemas.API_VERSION, 'page': page, 'page_size': page_size, 'total': total, 'items': [{'id': a.id, 'path': a.path} for a in items]}
+
+@app.get('/assets/{asset_id}/media')
+def get_asset_media(asset_id: int, download: bool = Query(False), db_s: Session = Depends(get_db)):
+    """Serve original asset bytes for image/video preview in the web UI."""
+    asset = db_s.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail='asset not found')
+    apath = Path(asset.path)
+    if not apath.exists() or not apath.is_file():
+        raise HTTPException(status_code=404, detail='asset file not found on disk')
+
+    media_type = asset.mime or mimetypes.guess_type(str(apath))[0] or 'application/octet-stream'
+    if download:
+        return FileResponse(str(apath), media_type=media_type, filename=apath.name)
+    return FileResponse(str(apath), media_type=media_type)
+
+@app.get('/assets/{asset_id}/thumbnail')
+def get_asset_thumbnail(asset_id: int, size: int = Query(256, ge=64, le=1024), db_s: Session = Depends(get_db)):
+    """Return a thumbnail for an asset, generating it on demand when missing."""
+    asset = db_s.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail='asset not found')
+
+    derived_root = Path(settings.derived_path)
+    thumb_path = derived_root / 'thumbnails' / str(size) / f'{asset_id}.jpg'
+    if thumb_path.exists():
+        return FileResponse(str(thumb_path), media_type='image/jpeg')
+
+    source_path: Path | None = None
+    asset_path = Path(asset.path)
+    mime = asset.mime or ''
+
+    if mime.startswith('video'):
+        frames_dir = derived_root / 'video_frames' / str(asset_id)
+        if frames_dir.exists():
+            for frame in sorted(frames_dir.glob('*.jpg')):
+                source_path = frame
+                break
+    else:
+        source_path = asset_path
+
+    if source_path is None or (not source_path.exists()) or (not source_path.is_file()):
+        raise HTTPException(status_code=404, detail='thumbnail source not found')
+
+    try:
+        from PIL import Image
+        thumb_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source_path) as im:
+            rgb = im.convert('RGB')
+            rgb.thumbnail((size, size))
+            rgb.save(thumb_path, 'JPEG', quality=86)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'thumbnail generation failed: {e}')
+
+    return FileResponse(str(thumb_path), media_type='image/jpeg')
 
 # --- Captions management ---
 @app.get('/assets/{asset_id}/captions')
@@ -942,6 +998,7 @@ async def upload_asset(data: bytes = Body(..., description='Raw image bytes'), f
         'asset': {
             'id': asset.id,
             'path': asset.path,
+            'mime': getattr(asset, 'mime', None),
             'hash_sha256': asset.hash_sha256,
             'perceptual_hash': getattr(asset, 'perceptual_hash', None),
             'width': asset.width,
@@ -963,6 +1020,7 @@ def list_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=
         assets.append({
             'id': a.id,
             'path': a.path,
+            'mime': a.mime,
             'hash_sha256': a.hash_sha256,
             'perceptual_hash': getattr(a,'perceptual_hash', None),
             'width': a.width,
@@ -992,6 +1050,7 @@ async def upload_asset_multipart(file: UploadFile = File(...), db_s: Session = D
         'asset': {
             'id': asset.id,
             'path': asset.path,
+            'mime': getattr(asset, 'mime', None),
             'hash_sha256': asset.hash_sha256,
             'perceptual_hash': getattr(asset, 'perceptual_hash', None),
             'width': asset.width,
