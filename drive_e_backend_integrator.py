@@ -15,6 +15,7 @@ Features:
 """
 
 import json
+import os
 import requests
 import time
 import logging
@@ -44,17 +45,23 @@ class IngestionState:
 class DriveEBackendIntegrator:
     """Handles Drive E file integration with the backend."""
     
-    def __init__(self, backend_url: str = "http://localhost:8000"):
+    def __init__(self, backend_url: str = "http://localhost:8002"):
         self.backend_url = backend_url
-        self.drive_e_state_file = "simple_drive_e_state.json"
-        self.ingestion_state_file = "drive_e_ingestion_state.json"
+        self.data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+        self.state_dir = Path(os.getenv("VLM_STATE_DIR", str(self.data_root / "state")))
+        self.logs_dir = Path(os.getenv("VLM_LOG_DIR", str(self.data_root / "logs")))
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+
+        self.drive_e_state_file = self._resolve_state_file("simple_drive_e_state.json")
+        self.ingestion_state_file = self.state_dir / "drive_e_ingestion_state.json"
         
         # Setup logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('drive_e_integration.log'),
+                logging.FileHandler(self.logs_dir / 'drive_e_integration.log', encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )
@@ -63,6 +70,16 @@ class DriveEBackendIntegrator:
         # Load states
         self.drive_e_files = self.load_drive_e_state()
         self.ingestion_state = self.load_ingestion_state()
+
+    def _resolve_state_file(self, filename: str) -> Path:
+        """Prefer E: state dir; fall back to legacy repo-root file if it exists."""
+        preferred = self.state_dir / filename
+        legacy = Path(filename)
+        if preferred.exists():
+            return preferred
+        if legacy.exists():
+            return legacy
+        return preferred
     
     def normalize_path_for_api(self, path: str) -> str:
         """Normalize path for API calls with proper Unicode handling."""
@@ -107,7 +124,7 @@ class DriveEBackendIntegrator:
         try:
             with open(self.drive_e_state_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            self.logger.info(f"Loaded {len(data)} files from Drive E state")
+            self.logger.info(f"Loaded {len(data)} files from Drive E state: {self.drive_e_state_file}")
             return data
         except Exception as e:
             self.logger.error(f"Failed to load Drive E state: {e}")
@@ -116,7 +133,8 @@ class DriveEBackendIntegrator:
     def load_ingestion_state(self) -> Dict[str, IngestionState]:
         """Load existing ingestion state."""
         try:
-            with open(self.ingestion_state_file, 'r', encoding='utf-8') as f:
+            ingestion_file = self._resolve_state_file("drive_e_ingestion_state.json")
+            with open(ingestion_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
             # Convert to IngestionState objects
@@ -124,7 +142,7 @@ class DriveEBackendIntegrator:
             for path, state_data in data.items():
                 state[path] = IngestionState(**state_data)
             
-            self.logger.info(f"Loaded ingestion state for {len(state)} directories")
+            self.logger.info(f"Loaded ingestion state for {len(state)} directories: {ingestion_file}")
             return state
         except FileNotFoundError:
             return {}
@@ -141,7 +159,7 @@ class DriveEBackendIntegrator:
                 data[path] = asdict(state)
             
             # Atomic write with UTF-8 encoding
-            temp_file = f"{self.ingestion_state_file}.tmp"
+            temp_file = self.ingestion_state_file.with_suffix(f"{self.ingestion_state_file.suffix}.tmp")
             with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             
@@ -422,7 +440,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Drive E Backend Integration')
-    parser.add_argument('--backend-url', default='http://localhost:8000', help='Backend URL')
+    parser.add_argument('--backend-url', default='http://localhost:8002', help='Backend URL')
     parser.add_argument('--batch-size', type=int, default=10, help='Directories per batch')
     parser.add_argument('--max-dirs', type=int, help='Maximum directories to process')
     parser.add_argument('--status', action='store_true', help='Show status report only')

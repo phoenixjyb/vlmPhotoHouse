@@ -17,6 +17,7 @@ Features:
 """
 
 import json
+import os
 import time
 import logging
 import subprocess
@@ -30,16 +31,22 @@ import requests
 class AIOrchestrator:
     """Master orchestrator for AI processing pipeline."""
     
-    def __init__(self, backend_url: str = "http://localhost:8000"):
+    def __init__(self, backend_url: str = "http://localhost:8002"):
         self.backend_url = backend_url
-        self.state_file = "ai_orchestrator_state.json"
+        self.script_dir = Path(__file__).resolve().parent
+        self.data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+        self.state_dir = Path(os.getenv("VLM_STATE_DIR", str(self.data_root / "state")))
+        self.logs_dir = Path(os.getenv("VLM_LOG_DIR", str(self.data_root / "logs")))
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file = self.state_dir / "ai_orchestrator_state.json"
         
         # Setup logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('ai_orchestrator.log'),
+                logging.FileHandler(self.logs_dir / 'ai_orchestrator.log', encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )
@@ -47,9 +54,9 @@ class AIOrchestrator:
         
         # Component scripts
         self.scripts = {
-            'ingestion': 'drive_e_backend_integrator.py',
-            'captions': 'caption_processor.py',
-            'ai_tasks': 'ai_task_manager.py'
+            'ingestion': self.script_dir / 'drive_e_backend_integrator.py',
+            'captions': self.script_dir / 'caption_processor.py',
+            'ai_tasks': self.script_dir / 'ai_task_manager.py'
         }
         
         # Load orchestrator state
@@ -58,7 +65,7 @@ class AIOrchestrator:
     def load_orchestrator_state(self) -> Dict:
         """Load orchestrator state."""
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
             return {
@@ -76,8 +83,8 @@ class AIOrchestrator:
     def save_orchestrator_state(self):
         """Save orchestrator state."""
         try:
-            temp_file = f"{self.state_file}.tmp"
-            with open(temp_file, 'w') as f:
+            temp_file = self.state_file.with_suffix(f"{self.state_file.suffix}.tmp")
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(self.orchestrator_state, f, indent=2)
             Path(temp_file).replace(self.state_file)
         except Exception as e:
@@ -111,7 +118,7 @@ class AIOrchestrator:
             raise FileNotFoundError(f"Script not found: {script_path}")
         
         # Build command
-        cmd = [sys.executable, script_path]
+        cmd = [sys.executable, str(script_path)]
         if args:
             cmd.extend(args)
         
@@ -123,6 +130,7 @@ class AIOrchestrator:
                 cmd,
                 capture_output=True,
                 text=True,
+                cwd=self.script_dir,
                 timeout=3600  # 1 hour timeout
             )
             
@@ -370,7 +378,7 @@ class AIOrchestrator:
 def main():
     """Main execution function."""
     parser = argparse.ArgumentParser(description='VLM Photo Engine AI Orchestrator')
-    parser.add_argument('--backend-url', default='http://localhost:8000', help='Backend URL')
+    parser.add_argument('--backend-url', default='http://localhost:8002', help='Backend URL')
     parser.add_argument('--max-dirs', type=int, help='Maximum directories for ingestion')
     parser.add_argument('--max-caption-tasks', type=int, help='Maximum caption tasks')
     parser.add_argument('--max-ai-tasks', type=int, help='Maximum AI tasks')

@@ -8,16 +8,31 @@ so they can be reprocessed to complete video ingestion.
 """
 
 import json
+import os
 import sys
+from pathlib import Path
 
 # Ensure UTF-8 encoding
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
+
+def _state_file(name: str) -> Path:
+    data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+    state_dir = Path(os.getenv("VLM_STATE_DIR", str(data_root / "state")))
+    preferred = state_dir / name
+    legacy = Path(name)
+    if preferred.exists():
+        return preferred
+    if legacy.exists():
+        return legacy
+    return preferred
+
 def reset_processing_directories():
     try:
+        ingestion_file = _state_file('drive_e_ingestion_state.json')
         # Load current ingestion state
-        with open('drive_e_ingestion_state.json', 'r', encoding='utf-8') as f:
+        with open(ingestion_file, 'r', encoding='utf-8') as f:
             ingestion_state = json.load(f)
         print(f"Loaded ingestion state for {len(ingestion_state)} directories")
         
@@ -38,7 +53,8 @@ def reset_processing_directories():
                 print(f"Reset to pending: {directory}")
             
             # Save updated state
-            with open('drive_e_ingestion_state.json', 'w', encoding='utf-8') as f:
+            ingestion_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(ingestion_file, 'w', encoding='utf-8') as f:
                 json.dump(ingestion_state, f, indent=2, ensure_ascii=False)
             print(f"\nReset {len(processing_dirs)} directories to pending status")
         else:

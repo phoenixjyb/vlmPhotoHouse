@@ -7,6 +7,11 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+# Prefer runtime DATABASE_URL so migrations follow active Drive-E data root.
+runtime_db_url = os.getenv("DATABASE_URL")
+if runtime_db_url:
+    config.set_main_option("sqlalchemy.url", runtime_db_url.replace("%", "%%"))
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

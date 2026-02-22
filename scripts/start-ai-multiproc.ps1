@@ -37,16 +37,38 @@
 
 [CmdletBinding()]
 param(
-    [int]$ApiPort = 8000,
+    [int]$ApiPort = 8002,
     [switch]$NoCleanup,
     [bool]$UseWindowsTerminal = $true,
-    [switch]$SingleMode
+    [switch]$SingleMode,
+    [string]$DataRoot = 'E:\VLM_DATA',
+    [string]$OriginalsPath = 'E:\01_INCOMING'
 )
 
 # Environment and Path Resolution
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent $PSScriptRoot
 $backendRoot = Join-Path $workspaceRoot "backend"
+
+# Canonical runtime data paths on Drive E
+$env:VLM_DATA_ROOT = $DataRoot
+$env:DERIVED_PATH = Join-Path $DataRoot 'derived'
+$env:VECTOR_INDEX_PATH = Join-Path $env:DERIVED_PATH 'vector.index'
+$env:ORIGINALS_PATH = $OriginalsPath
+$env:VLM_STATE_DIR = Join-Path $DataRoot 'state'
+$env:VLM_LOG_DIR = Join-Path $DataRoot 'logs'
+$env:VLM_TMP_DIR = Join-Path $DataRoot 'tmp'
+New-Item -ItemType Directory -Path (Join-Path $DataRoot 'databases') -Force | Out-Null
+New-Item -ItemType Directory -Path $env:DERIVED_PATH -Force | Out-Null
+New-Item -ItemType Directory -Path $env:VLM_STATE_DIR -Force | Out-Null
+New-Item -ItemType Directory -Path $env:VLM_LOG_DIR -Force | Out-Null
+New-Item -ItemType Directory -Path $env:VLM_TMP_DIR -Force | Out-Null
+$env:TMP = $env:VLM_TMP_DIR
+$env:TEMP = $env:VLM_TMP_DIR
+if (-not $env:DATABASE_URL) {
+    $dbUriPath = ((Join-Path $DataRoot 'databases\metadata.sqlite') -replace '\\','/')
+    $env:DATABASE_URL = "sqlite:///$dbUriPath"
+}
 
 # Validate workspace structure
 if (!(Test-Path $backendRoot -PathType Container)) {

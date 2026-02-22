@@ -7,6 +7,7 @@ Handles incremental processing with state tracking and retry logic.
 """
 
 import json
+import os
 import requests
 import time
 import logging
@@ -33,9 +34,14 @@ class CaptionTask:
 class CaptionProcessor:
     """Handles AI caption generation tasks."""
     
-    def __init__(self, backend_url: str = "http://localhost:8000"):
+    def __init__(self, backend_url: str = "http://localhost:8002"):
         self.backend_url = backend_url
-        self.state_file = "caption_processing_state.json"
+        self.data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+        self.state_dir = Path(os.getenv("VLM_STATE_DIR", str(self.data_root / "state")))
+        self.logs_dir = Path(os.getenv("VLM_LOG_DIR", str(self.data_root / "logs")))
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file = self.state_dir / "caption_processing_state.json"
         self.max_retries = 3
         self.batch_size = 20
         
@@ -44,7 +50,7 @@ class CaptionProcessor:
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler('caption_processor.log'),
+                logging.FileHandler(self.logs_dir / 'caption_processor.log', encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )
@@ -57,7 +63,7 @@ class CaptionProcessor:
     def load_state(self) -> Dict[int, CaptionTask]:
         """Load existing task state."""
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
             # Convert to CaptionTask objects
@@ -82,8 +88,8 @@ class CaptionProcessor:
                 data[str(asset_id)] = asdict(task)
             
             # Atomic write
-            temp_file = f"{self.state_file}.tmp"
-            with open(temp_file, 'w') as f:
+            temp_file = self.state_file.with_suffix(f"{self.state_file.suffix}.tmp")
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
             
             Path(temp_file).replace(self.state_file)
@@ -383,7 +389,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='AI Caption Generation Processor')
-    parser.add_argument('--backend-url', default='http://localhost:8000', help='Backend URL')
+    parser.add_argument('--backend-url', default='http://localhost:8002', help='Backend URL')
     parser.add_argument('--max-tasks', type=int, help='Maximum tasks to process')
     parser.add_argument('--continuous', action='store_true', help='Run continuously')
     parser.add_argument('--interval', type=int, default=300, help='Interval between cycles (seconds)')

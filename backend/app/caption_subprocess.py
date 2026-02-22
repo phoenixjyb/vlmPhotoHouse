@@ -9,6 +9,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _caption_tmp_dir() -> str:
+    """Prefer Drive E temp for runtime artifacts, fallback to process temp."""
+    data_root = os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA")
+    tmp_dir = os.getenv("VLM_TMP_DIR", os.path.join(data_root, "tmp"))
+    try:
+        os.makedirs(tmp_dir, exist_ok=True)
+    except Exception:
+        return tempfile.gettempdir()
+    return tmp_dir
+
 class CaptionSubprocessProvider:
     """Caption provider that calls external caption models installation via subprocess.
     
@@ -44,7 +55,7 @@ class CaptionSubprocessProvider:
     def generate_caption(self, image: Image.Image) -> str:
         """Generate caption using external caption models subprocess."""
         # Create temporary image file
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False, dir=_caption_tmp_dir()) as tmp:
             tmp_path = tmp.name
             # Ensure RGB format
             image = image.convert('RGB')

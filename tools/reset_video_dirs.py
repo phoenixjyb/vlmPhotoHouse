@@ -8,6 +8,7 @@ ingestion status to 'pending' so they can be reprocessed with video support enab
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -15,13 +16,26 @@ from pathlib import Path
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
+
+def _state_file(name: str) -> Path:
+    data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+    state_dir = Path(os.getenv("VLM_STATE_DIR", str(data_root / "state")))
+    preferred = state_dir / name
+    legacy = Path(name)
+    if preferred.exists():
+        return preferred
+    if legacy.exists():
+        return legacy
+    return preferred
+
 def main():
     # Video extensions to look for
     video_extensions = {'.mp4', '.mov', '.mkv', '.avi', '.m4v', '.webm'}
     
     # Load the drive E state to see all files
     try:
-        with open('simple_drive_e_state.json', 'r', encoding='utf-8') as f:
+        drive_state_file = _state_file('simple_drive_e_state.json')
+        with open(drive_state_file, 'r', encoding='utf-8') as f:
             drive_e_data = json.load(f)
         print(f"Loaded {len(drive_e_data)} files from Drive E state")
     except Exception as e:
@@ -30,7 +44,8 @@ def main():
     
     # Load current ingestion state
     try:
-        with open('drive_e_ingestion_state.json', 'r', encoding='utf-8') as f:
+        ingestion_file = _state_file('drive_e_ingestion_state.json')
+        with open(ingestion_file, 'r', encoding='utf-8') as f:
             ingestion_state = json.load(f)
         print(f"Loaded ingestion state for {len(ingestion_state)} directories")
     except Exception as e:
@@ -69,7 +84,8 @@ def main():
     # Save updated ingestion state
     if reset_count > 0:
         try:
-            with open('drive_e_ingestion_state.json', 'w', encoding='utf-8') as f:
+            ingestion_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(ingestion_file, 'w', encoding='utf-8') as f:
                 json.dump(ingestion_state, f, indent=2, ensure_ascii=False)
             print("Saved updated ingestion state")
         except Exception as e:

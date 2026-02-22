@@ -11,6 +11,18 @@ import tempfile
 
 logger = logging.getLogger(__name__)
 
+
+def _caption_tmp_dir() -> str:
+    """Prefer Drive E temp for runtime artifacts, fallback to process temp."""
+    data_root = os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA")
+    tmp_dir = os.getenv("VLM_TMP_DIR", os.path.join(data_root, "tmp"))
+    try:
+        os.makedirs(tmp_dir, exist_ok=True)
+    except Exception:
+        # If creation fails, tempfile will fallback to default system temp.
+        return tempfile.gettempdir()
+    return tmp_dir
+
 class CaptionProvider(Protocol):
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str: ...
     def get_model_name(self) -> str: ...
@@ -42,7 +54,7 @@ class HTTPCaptionProvider:
         tmp_path = None
         try:
             # Windows keeps NamedTemporaryFile handle open in-context; create a path then close it first.
-            fd, tmp_path = tempfile.mkstemp(suffix='.png')
+            fd, tmp_path = tempfile.mkstemp(suffix='.png', dir=_caption_tmp_dir())
             os.close(fd)
             image.save(tmp_path, format='PNG')
 

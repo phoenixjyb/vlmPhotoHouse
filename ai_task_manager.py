@@ -18,6 +18,7 @@ Features:
 """
 
 import json
+import os
 import logging
 import time
 import argparse
@@ -64,9 +65,24 @@ class AITaskManager:
     """Main AI task management system."""
     
     def __init__(self, config_file: str = "ai_task_config.json"):
+        self.data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+        self.state_dir = Path(os.getenv("VLM_STATE_DIR", str(self.data_root / "state")))
+        self.logs_dir = Path(os.getenv("VLM_LOG_DIR", str(self.data_root / "logs")))
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+
         self.config = self.load_config(config_file)
-        self.state_file = self.config.get("state_file", "ai_task_state.json")
-        self.backend_url = self.config.get("backend_url", "http://localhost:8000")
+        self.state_file = self._resolve_runtime_file(
+            self.config.get("state_file", "ai_task_state.json"),
+            self.state_dir,
+            "ai_task_state.json",
+        )
+        self.log_file = self._resolve_runtime_file(
+            self.config.get("log_file", "ai_task_manager.log"),
+            self.logs_dir,
+            "ai_task_manager.log",
+        )
+        self.backend_url = self.config.get("backend_url", "http://localhost:8002")
         self.max_retries = self.config.get("max_retries", 3)
         self.batch_size = self.config.get("batch_size", 50)
         
@@ -78,16 +94,29 @@ class AITaskManager:
         
         self.logger.info(f"AI Task Manager initialized with {len(self.task_state)} existing tasks")
 
+    def _resolve_runtime_file(self, configured_path: str, preferred_dir: Path, fallback_name: str) -> Path:
+        """Resolve generated runtime files to E: by default with legacy fallback."""
+        raw = configured_path or fallback_name
+        p = Path(raw)
+        if p.is_absolute():
+            return p
+        preferred = preferred_dir / p.name
+        legacy = Path(raw)
+        if preferred.exists():
+            return preferred
+        if legacy.exists():
+            return legacy
+        return preferred
+
     def setup_logging(self):
         """Configure logging system."""
         log_level = self.config.get("log_level", "INFO")
-        log_file = self.config.get("log_file", "ai_task_manager.log")
         
         logging.basicConfig(
             level=getattr(logging, log_level),
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_file),
+                logging.FileHandler(self.log_file, encoding='utf-8'),
                 logging.StreamHandler()
             ]
         )
@@ -95,17 +124,25 @@ class AITaskManager:
 
     def load_config(self, config_file: str) -> Dict:
         """Load configuration from file."""
+        cfg_path = Path(config_file)
+        if not cfg_path.is_absolute():
+            preferred = self.state_dir / cfg_path.name
+            if preferred.exists():
+                cfg_path = preferred
+            else:
+                legacy = Path(config_file)
+                cfg_path = legacy if legacy.exists() else preferred
         try:
-            with open(config_file, 'r') as f:
+            with open(cfg_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
-            self.create_default_config(config_file)
-            return self.load_config(config_file)
+            self.create_default_config(str(cfg_path))
+            return self.load_config(str(cfg_path))
 
     def create_default_config(self, config_file: str):
         """Create default configuration file."""
         default_config = {
-            "backend_url": "http://localhost:8000",
+            "backend_url": "http://localhost:8002",
             "state_file": "ai_task_state.json",
             "log_file": "ai_task_manager.log",
             "log_level": "INFO",
@@ -132,15 +169,17 @@ class AITaskManager:
             }
         }
         
-        with open(config_file, 'w') as f:
+        cfg_path = Path(config_file)
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_path, 'w', encoding='utf-8') as f:
             json.dump(default_config, f, indent=2)
         
-        print(f"Created default config file: {config_file}")
+        print(f"Created default config file: {cfg_path}")
 
     def load_state(self) -> Dict[str, AITaskState]:
         """Load existing task state."""
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
             # Convert to AITaskState objects
@@ -164,8 +203,8 @@ class AITaskManager:
                 data[key] = asdict(task_state)
             
             # Atomic write
-            temp_file = f"{self.state_file}.tmp"
-            with open(temp_file, 'w') as f:
+            temp_file = self.state_file.with_suffix(f"{self.state_file.suffix}.tmp")
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
             
             Path(temp_file).replace(self.state_file)

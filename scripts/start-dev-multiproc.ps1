@@ -7,7 +7,9 @@ param(
     [int]$VoicePort = 8001,
     [string]$CaptionProvider = 'blip2',
     [string]$FaceProvider = 'lvface',
-    [string]$DbPath,
+    [string]$DbPath = 'E:\VLM_DATA\databases\metadata.sqlite',
+    [string]$DataRoot = 'E:\VLM_DATA',
+    [string]$OriginalsPath = 'E:\01_INCOMING',
     [string]$Preset, # Optional: LowVRAM | RTX3090
     [switch]$Gpu,
     [switch]$UseWindowsTerminal,
@@ -165,6 +167,18 @@ if ($effectiveUseGpu) {
 $backendRoot = Join-Path $PSScriptRoot '..' | Join-Path -ChildPath 'backend'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $pyExe = Resolve-BackendPython
+
+# Canonical runtime data paths on Drive E
+$env:VLM_DATA_ROOT = $DataRoot
+$env:DERIVED_PATH = Join-Path $DataRoot 'derived'
+$env:VECTOR_INDEX_PATH = Join-Path $env:DERIVED_PATH 'vector.index'
+$env:ORIGINALS_PATH = $OriginalsPath
+$env:VLM_TMP_DIR = Join-Path $DataRoot 'tmp'
+New-Item -ItemType Directory -Path (Join-Path $DataRoot 'databases') -Force | Out-Null
+New-Item -ItemType Directory -Path $env:DERIVED_PATH -Force | Out-Null
+New-Item -ItemType Directory -Path $env:VLM_TMP_DIR -Force | Out-Null
+$env:TMP = $env:VLM_TMP_DIR
+$env:TEMP = $env:VLM_TMP_DIR
 
 Write-Host "LVFace: $($env:LVFACE_EXTERNAL_DIR) (model: $($env:LVFACE_MODEL_NAME))" -ForegroundColor DarkCyan
 if ($Preset) {

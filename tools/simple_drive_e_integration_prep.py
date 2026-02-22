@@ -10,12 +10,26 @@ import os
 import sys
 from pathlib import Path
 
+DATA_ROOT = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+STATE_DIR = Path(os.getenv("VLM_STATE_DIR", str(DATA_ROOT / "state")))
+STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _state_file(name: str) -> Path:
+    preferred = STATE_DIR / name
+    legacy = Path(name)
+    if preferred.exists():
+        return preferred
+    if legacy.exists():
+        return legacy
+    return preferred
+
 def get_sample_drive_e_directories():
     """Get a small sample of Drive E directories to test integration."""
     
     # Load the state file
     try:
-        with open('simple_drive_e_state.json', 'r') as f:
+        with open(_state_file('simple_drive_e_state.json'), 'r', encoding='utf-8') as f:
             data = json.load(f)
         print(f"Loaded {len(data)} files from Drive E state")
     except Exception as e:
@@ -44,26 +58,27 @@ def create_integration_command(directories):
     # Create the curl command for manual execution
     dirs_json = json.dumps(directories)
     
-    command = f'''curl -X POST "http://localhost:8000/ingest/scan" \\
+    command = f'''curl -X POST "http://localhost:8002/ingest/scan" \\
      -H "Content-Type: application/json" \\
      -d '{{"paths": {dirs_json}}}'
 '''
     
     print("\nTo integrate these directories with the AI backend, run:")
     print("1. First ensure the backend is running:")
-    print("   cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000")
+    print("   cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8002")
     print("\n2. Then run this command:")
     print(command)
     
     # Also save to a file
-    with open('drive_e_integration_command.txt', 'w') as f:
+    command_file = _state_file('drive_e_integration_command.txt')
+    with open(command_file, 'w', encoding='utf-8') as f:
         f.write("# Drive E AI Integration Command\n\n")
         f.write("# 1. Start backend server:\n")
-        f.write("cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000\n\n")
+        f.write("cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8002\n\n")
         f.write("# 2. Run integration command:\n")
         f.write(command)
     
-    print(f"\nCommand also saved to: drive_e_integration_command.txt")
+    print(f"\nCommand also saved to: {command_file}")
 
 def main():
     """Main function."""

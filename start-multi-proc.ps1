@@ -14,6 +14,8 @@ param(
 
     [int]$ApiPort = 8002,
     [int]$CaptionPort = 8102,
+    [string]$DataRoot = 'E:\VLM_DATA',
+    [string]$OriginalsPath = 'E:\01_INCOMING',
 
     [int]$VoicePort = 8001,
 
@@ -52,6 +54,7 @@ $VlmPhotoHouseDir = $PSScriptRoot
 $LvfaceDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace'
 $CaptionDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\vlmCaptionModels'
 $VoiceDir = 'C:\Users\yanbo\wSpace\llmytranslate'
+$BackendDir = Join-Path $VlmPhotoHouseDir 'backend'
 
 # Ensure we run from the script's directory for any relative paths
 Set-Location -LiteralPath $VlmPhotoHouseDir
@@ -163,6 +166,97 @@ if ($KillExisting -and -not $NoCleanup) {
     }
 }
 
+# ===== DATA ROOT CONFIGURATION (Drive E) =====
+try {
+    Write-Host ""
+    Write-Host "💾 Configuring data root on Drive E..." -ForegroundColor Green
+
+    if (-not (Test-Path -LiteralPath $DataRoot)) {
+        New-Item -ItemType Directory -Path $DataRoot -Force | Out-Null
+    }
+    $dbDir = Join-Path $DataRoot 'databases'
+    $derivedDataDir = Join-Path $DataRoot 'derived'
+    $tmpDataDir = Join-Path $DataRoot 'tmp'
+    New-Item -ItemType Directory -Path $dbDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $derivedDataDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $tmpDataDir -Force | Out-Null
+
+    $databaseFile = Join-Path $dbDir 'metadata.sqlite'
+    $vectorIndexPath = Join-Path $derivedDataDir 'vector.index'
+    $dbUriPath = ($databaseFile -replace '\\','/')
+    if ($dbUriPath -match '^[A-Za-z]:') {
+        $databaseUrl = "sqlite:///$dbUriPath"
+    } else {
+        if ($dbUriPath.StartsWith('/')) { $databaseUrl = "sqlite://$dbUriPath" } else { $databaseUrl = "sqlite:///$dbUriPath" }
+    }
+
+    # Export canonical runtime paths
+    $env:VLM_DATA_ROOT = $DataRoot
+    $env:DATABASE_URL = $databaseUrl
+    $env:DERIVED_PATH = $derivedDataDir
+    $env:VECTOR_INDEX_PATH = $vectorIndexPath
+    $env:ORIGINALS_PATH = $OriginalsPath
+    $env:VLM_TMP_DIR = $tmpDataDir
+    $env:TMP = $tmpDataDir
+    $env:TEMP = $tmpDataDir
+
+    # Migrate DB from local backend if present
+    $localDb = Join-Path $BackendDir 'metadata.sqlite'
+    if (Test-Path -LiteralPath $localDb) {
+        $doMove = $true
+        if (Test-Path -LiteralPath $databaseFile) {
+            $src = Get-Item -LiteralPath $localDb
+            $dst = Get-Item -LiteralPath $databaseFile
+            if ($src.LastWriteTime -le $dst.LastWriteTime -and $src.Length -le $dst.Length) {
+                $doMove = $false
+            } else {
+                $backup = "$databaseFile.bak_" + (Get-Date -Format 'yyyyMMdd_HHmmss')
+                Copy-Item -LiteralPath $databaseFile -Destination $backup -Force
+                Write-Host "📦 Backed up existing E: DB to $backup" -ForegroundColor Yellow
+            }
+        }
+        if ($doMove) {
+            Write-Host "➡️ Moving DB to Drive E: $localDb -> $databaseFile" -ForegroundColor Cyan
+            Move-Item -LiteralPath $localDb -Destination $databaseFile -Force
+        } else {
+            Write-Host "ℹ️ Keeping newer/larger DB already on Drive E; removing stale local DB copy." -ForegroundColor DarkCyan
+            Remove-Item -LiteralPath $localDb -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Migrate derived directory from local backend and replace with junction
+    $localDerived = Join-Path $BackendDir 'derived'
+    if (Test-Path -LiteralPath $localDerived) {
+        $item = Get-Item -LiteralPath $localDerived -Force
+        $isReparse = ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+        if (-not $isReparse) {
+            Write-Host "➡️ Migrating derived artifacts to Drive E (this may take a while)..." -ForegroundColor Cyan
+            robocopy $localDerived $derivedDataDir /E /MOVE /R:1 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+            if ($LASTEXITCODE -gt 7) {
+                throw "robocopy failed with exit code $LASTEXITCODE"
+            }
+            if (Test-Path -LiteralPath $localDerived) {
+                Remove-Item -LiteralPath $localDerived -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            try {
+                cmd /c "mklink /J `"$localDerived`" `"$derivedDataDir`"" | Out-Null
+                Write-Host "🔗 Created junction: $localDerived -> $derivedDataDir" -ForegroundColor Green
+            } catch {
+                Write-Warning "Could not create derived junction. Runtime still uses DERIVED_PATH on E:. Error: $($_.Exception.Message)"
+            }
+        }
+    }
+
+    Write-Host "✅ Data root configured: $DataRoot" -ForegroundColor Green
+    Write-Host "   DATABASE_URL=$($env:DATABASE_URL)" -ForegroundColor Gray
+    Write-Host "   DERIVED_PATH=$($env:DERIVED_PATH)" -ForegroundColor Gray
+    Write-Host "   ORIGINALS_PATH=$($env:ORIGINALS_PATH)" -ForegroundColor Gray
+    Write-Host "   VLM_TMP_DIR=$($env:VLM_TMP_DIR)" -ForegroundColor Gray
+} catch {
+    Write-Host "❌ Data-root setup failed: $($_.Exception.Message)" -ForegroundColor Red
+    throw
+}
+
 # ===== RTX 3090 UNIFIED ENVIRONMENT CONFIGURATION =====
 
 # Set explicit GPU device targeting RTX 3090
@@ -231,6 +325,14 @@ function New-MainApiPane {
         "Set-Location -LiteralPath `"$backendRoot`"",
         "",
         "# Set environment variables for this pane - NO DIRECT MODEL LOADING",
+        "`$env:VLM_DATA_ROOT = '$DataRoot'",
+        "`$env:DATABASE_URL = '$databaseUrl'",
+        "`$env:DERIVED_PATH = '$derivedDataDir'",
+        "`$env:VECTOR_INDEX_PATH = '$vectorIndexPath'",
+        "`$env:ORIGINALS_PATH = '$OriginalsPath'",
+        "`$env:VLM_TMP_DIR = '$tmpDataDir'",
+        "`$env:TMP = '$tmpDataDir'",
+        "`$env:TEMP = '$tmpDataDir'",
         "`$env:CAPTION_PROVIDER = 'http'",
         "`$env:CAPTION_SERVICE_URL = 'http://127.0.0.1:$CaptionPort'",
         "`$env:ENABLE_INLINE_WORKER = 'true'", 
@@ -287,6 +389,9 @@ function New-CaptionModelsPane {
         "`$env:CAPTION_VRAM_MODE = 'balanced'",
         "`$env:CAPTION_MAX_GPU_GB = '12'",
         "`$env:CUDA_VISIBLE_DEVICES = '$GpuIndex'",
+        "`$env:VLM_TMP_DIR = '$tmpDataDir'",
+        "`$env:TMP = '$tmpDataDir'",
+        "`$env:TEMP = '$tmpDataDir'",
         "",
         "Write-Host '🚀 Starting Caption Models HTTP Server...' -ForegroundColor Cyan",
         "Write-Host '📍 Service URL: http://127.0.0.1:$CaptionPort' -ForegroundColor White",

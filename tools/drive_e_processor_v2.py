@@ -40,7 +40,14 @@ API_BASE_URL = "http://127.0.0.1:8002"
 VOICE_BASE_URL = "http://127.0.0.1:8001"
 MAX_WORKERS = 4
 BATCH_SIZE = 100
-CHECKPOINT_DB = "drive_e_processing.db"
+DATA_ROOT = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+STATE_DIR = Path(os.getenv("VLM_STATE_DIR", str(DATA_ROOT / "state")))
+LOG_DIR = Path(os.getenv("VLM_LOG_DIR", str(DATA_ROOT / "logs")))
+DB_DIR = DATA_ROOT / "databases"
+STATE_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+DB_DIR.mkdir(parents=True, exist_ok=True)
+CHECKPOINT_DB = str(DB_DIR / "drive_e_processing.db")
 
 # Supported file types
 SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.heic', '.webp', '.tiff', '.bmp', '.gif'}
@@ -52,7 +59,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('drive_e_processing.log'),
+        logging.FileHandler(LOG_DIR / 'drive_e_processing.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -764,7 +771,7 @@ def main():
                        help="Number of worker threads")
     parser.add_argument("--batch-size", "-b", type=int, default=BATCH_SIZE,
                        help="Batch size for processing")
-    parser.add_argument("--report-path", "-r", default="drive_e_processing_report.json",
+    parser.add_argument("--report-path", "-r", default=str(LOG_DIR / "drive_e_processing_report.json"),
                        help="Output path for processing report")
     parser.add_argument("--dry-run", action="store_true",
                        help="Discover files but don't process them")

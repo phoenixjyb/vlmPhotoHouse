@@ -34,7 +34,10 @@ SUPPORTED_EXTENSIONS = {
 class SimpleDriveEProcessor:
     def __init__(self, drive_root: str):
         self.drive_root = Path(drive_root)
-        self.state_file = Path("simple_drive_e_state.json")
+        data_root = Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+        state_dir = Path(os.getenv("VLM_STATE_DIR", str(data_root / "state")))
+        state_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file = state_dir / "simple_drive_e_state.json"
         self.processed_files = self.load_state()
         
     def load_state(self) -> Dict:

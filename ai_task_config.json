@@ -1,5 +1,5 @@
 {
-  "backend_url": "http://localhost:8000",
+  "backend_url": "http://localhost:8002",
   "state_file": "ai_task_state.json",
   "log_file": "ai_task_manager.log",
   "log_level": "INFO",
