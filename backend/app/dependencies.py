@@ -23,6 +23,14 @@ def _rebind_if_needed():
     global engine, SessionLocal, _BOUND_URL
     settings = get_settings()  # respects cache_clear from tests
     target_url = settings.database_url
+    # Ensure SQLite target directory exists (avoids "unable to open database file")
+    if str(target_url).startswith("sqlite:///"):
+        raw = str(target_url).replace("sqlite:///", "", 1)
+        if raw and raw != ":memory:":
+            db_path = raw.replace("/", os.sep)
+            db_dir = os.path.dirname(db_path)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
     if engine is None or SessionLocal is None or str(getattr(engine, 'url', '')) != str(target_url):
         try:
             # Dispose old engine if present
@@ -127,4 +135,4 @@ def get_db() -> Generator[Session, None, None]:
         yield session
 
 # Shared path constants
-DERIVED_PATH = os.getenv('DERIVED_PATH', './derived')
+DERIVED_PATH = os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_ROOT', r'E:\VLM_DATA'), 'derived'))

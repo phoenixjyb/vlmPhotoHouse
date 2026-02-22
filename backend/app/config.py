@@ -2,13 +2,34 @@ import os
 from pydantic import BaseModel, Field
 from functools import lru_cache
 
+def _default_data_root() -> str:
+    return os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA")
+
+def _default_originals_path() -> str:
+    return os.getenv("ORIGINALS_PATH", r"E:\01_INCOMING")
+
+def _default_derived_path() -> str:
+    return os.getenv("DERIVED_PATH", os.path.join(_default_data_root(), "derived"))
+
+def _default_vector_index_path() -> str:
+    return os.getenv("VECTOR_INDEX_PATH", os.path.join(_default_derived_path(), "vector.index"))
+
+def _default_database_url() -> str:
+    explicit = os.getenv("DATABASE_URL")
+    if explicit:
+        return explicit
+    db_path = os.path.join(_default_data_root(), "databases", "metadata.sqlite").replace("\\", "/")
+    if db_path.startswith("/"):
+        return f"sqlite://{db_path}"
+    return f"sqlite:///{db_path}"
+
 class Settings(BaseModel):
     deploy_profile: str = Field(default=os.getenv("DEPLOY_PROFILE", "P1"))  # P1,P2,P3,P4
     run_mode: str = Field(default=os.getenv("RUN_MODE", "api"))  # api|worker|all
-    database_url: str = Field(default=os.getenv("DATABASE_URL", "sqlite:///./metadata.sqlite"))
+    database_url: str = Field(default=_default_database_url())
     vector_backend: str = Field(default=os.getenv("VECTOR_BACKEND", "faiss"))  # faiss|qdrant (future)
-    originals_path: str = Field(default=os.getenv("ORIGINALS_PATH", "./originals"))
-    derived_path: str = Field(default=os.getenv("DERIVED_PATH", "./derived"))
+    originals_path: str = Field(default=_default_originals_path())
+    derived_path: str = Field(default=_default_derived_path())
     enable_inline_worker: bool = Field(default=os.getenv("ENABLE_INLINE_WORKER", "true").lower() == "true")
     worker_poll_interval: float = Field(default=float(os.getenv("WORKER_POLL_INTERVAL", "2.0")))
     max_task_batch: int = Field(default=int(os.getenv("WORKER_MAX_BATCH", "10")))
@@ -19,7 +40,7 @@ class Settings(BaseModel):
     request_log_body: bool = Field(default=os.getenv('REQUEST_LOG_BODY','false').lower()=='true')
     slow_request_ms: int = Field(default=int(os.getenv('SLOW_REQUEST_MS','1000')))
     vector_index_backend: str = Field(default=os.getenv('VECTOR_INDEX_BACKEND','memory'))  # memory|faiss (future)
-    vector_index_path: str = Field(default=os.getenv('VECTOR_INDEX_PATH', 'derived/vector.index'))
+    vector_index_path: str = Field(default=_default_vector_index_path())
     vector_index_autosave: bool = Field(default=os.getenv('VECTOR_INDEX_AUTOSAVE','true').lower()=='true')
     vector_index_save_interval: int = Field(default=int(os.getenv('VECTOR_INDEX_SAVE_INTERVAL','300')))  # seconds
     embed_model_image: str = Field(default=os.getenv('EMBED_MODEL_IMAGE','stub-clip'))
@@ -81,10 +102,10 @@ def get_settings() -> Settings:
     return Settings(
         deploy_profile=os.getenv("DEPLOY_PROFILE", "P1"),
         run_mode=os.getenv("RUN_MODE", "api"),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./metadata.sqlite"),
+        database_url=_default_database_url(),
         vector_backend=os.getenv("VECTOR_BACKEND", "faiss"),
-        originals_path=os.getenv("ORIGINALS_PATH", "./originals"),
-        derived_path=os.getenv("DERIVED_PATH", "./derived"),
+        originals_path=_default_originals_path(),
+        derived_path=_default_derived_path(),
         enable_inline_worker=os.getenv("ENABLE_INLINE_WORKER", "true").lower() == "true",
         worker_poll_interval=float(os.getenv("WORKER_POLL_INTERVAL", "2.0")),
         max_task_batch=int(os.getenv("WORKER_MAX_BATCH", "10")),
@@ -95,7 +116,7 @@ def get_settings() -> Settings:
         request_log_body=os.getenv('REQUEST_LOG_BODY','false').lower()=='true',
         slow_request_ms=int(os.getenv('SLOW_REQUEST_MS','1000')),
         vector_index_backend=os.getenv('VECTOR_INDEX_BACKEND','memory'),
-        vector_index_path=os.getenv('VECTOR_INDEX_PATH', 'derived/vector.index'),
+        vector_index_path=_default_vector_index_path(),
         vector_index_autosave=os.getenv('VECTOR_INDEX_AUTOSAVE','true').lower()=='true',
         vector_index_save_interval=int(os.getenv('VECTOR_INDEX_SAVE_INTERVAL','300')),
         embed_model_image=os.getenv('EMBED_MODEL_IMAGE','stub-clip'),

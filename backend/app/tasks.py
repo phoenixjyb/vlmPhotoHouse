@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 Image.MAX_IMAGE_PIXELS = None
 
 EMBED_DIM = 512  # default; may be updated after loading real model
-DERIVED_DIR = Path(os.getenv('DERIVED_PATH','./derived'))
+DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_ROOT', r'E:\VLM_DATA'), 'derived')))
 ( DERIVED_DIR / 'embeddings').mkdir(parents=True, exist_ok=True)
 ( DERIVED_DIR / 'thumbnails' / '256').mkdir(parents=True, exist_ok=True)
 ( DERIVED_DIR / 'thumbnails' / '1024').mkdir(parents=True, exist_ok=True)
