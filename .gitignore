@@ -52,3 +52,8 @@ assets/
 **/person_embeddings/
 **/derived/
 **/derived/**
+*_state.json
+drive_e_*_report.json
+drive_e_integration_command.txt
+start-multi-proc-backup-*.ps1
+temp_snippet.ps1
