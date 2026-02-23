@@ -10,6 +10,11 @@ UI_DIR = Path(__file__).resolve().parents[1] / "ui"
 INDEX_FILE = UI_DIR / "index.html"
 APP_FILE = UI_DIR / "app.js"
 STYLE_FILE = UI_DIR / "styles.css"
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def _ensure_ui_file(path: Path) -> Path:
@@ -17,20 +22,23 @@ def _ensure_ui_file(path: Path) -> Path:
         raise HTTPException(status_code=500, detail=f"UI asset missing: {path.name}")
     return path
 
+def _ui_file_response(path: Path, media_type: str) -> FileResponse:
+    return FileResponse(str(_ensure_ui_file(path)), media_type=media_type, headers=NO_CACHE_HEADERS)
+
 
 @router.get("/ui")
 async def ui_home():
-    return FileResponse(str(_ensure_ui_file(INDEX_FILE)), media_type="text/html")
+    return _ui_file_response(INDEX_FILE, "text/html")
 
 
 @router.get("/ui/app.js")
 async def ui_js():
-    return FileResponse(str(_ensure_ui_file(APP_FILE)), media_type="application/javascript")
+    return _ui_file_response(APP_FILE, "application/javascript")
 
 
 @router.get("/ui/styles.css")
 async def ui_css():
-    return FileResponse(str(_ensure_ui_file(STYLE_FILE)), media_type="text/css")
+    return _ui_file_response(STYLE_FILE, "text/css")
 
 
 @router.get("/ui/search")
