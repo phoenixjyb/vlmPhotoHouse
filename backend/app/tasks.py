@@ -10,6 +10,7 @@ from PIL import Image
 import imagehash
 from datetime import datetime, timedelta
 from . import metrics as metrics_mod
+from .gps_utils import probe_video_metadata
 import logging
 logger = logging.getLogger(__name__)
 
@@ -425,19 +426,21 @@ class TaskExecutor:
             m.face_embeddings_generated.inc()
         except Exception:
             pass
-        pending_cluster = session.query(Task).filter(Task.type=='person_cluster', Task.state=='pending').first()
-        if not pending_cluster:
-            unassigned_faces = session.query(FaceDetection).filter(FaceDetection.person_id==None, FaceDetection.embedding_path!=None).count()
-            if unassigned_faces >=5:
-                session.add(Task(type='person_cluster', priority=180, payload_json={}))
-                session.commit()
-        # Possibly schedule a full recluster occasionally when number of persons grows
-        persons_count = session.query(Person).count()
-        if persons_count and persons_count % 25 == 0:
-            existing_recluster = session.query(Task).filter(Task.type=='person_recluster', Task.state=='pending').first()
-            if not existing_recluster:
-                session.add(Task(type='person_recluster', priority=250, payload_json={}))
-                session.commit()
+        auto_cluster_enabled = os.getenv('FACE_AUTO_CLUSTER_ENABLED', 'false').lower() in ('1', 'true', 'yes')
+        if auto_cluster_enabled:
+            pending_cluster = session.query(Task).filter(Task.type=='person_cluster', Task.state=='pending').first()
+            if not pending_cluster:
+                unassigned_faces = session.query(FaceDetection).filter(FaceDetection.person_id==None, FaceDetection.embedding_path!=None).count()
+                if unassigned_faces >= 5:
+                    session.add(Task(type='person_cluster', priority=180, payload_json={}))
+                    session.commit()
+            # Possibly schedule a full recluster occasionally when number of persons grows
+            persons_count = session.query(Person).count()
+            if persons_count and persons_count % 25 == 0:
+                existing_recluster = session.query(Task).filter(Task.type=='person_recluster', Task.state=='pending').first()
+                if not existing_recluster:
+                    session.add(Task(type='person_recluster', priority=250, payload_json={}))
+                    session.commit()
         return str(emb_path)
 
     def _handle_person_cluster(self, session: Session, task: Task):
@@ -659,7 +662,7 @@ class TaskExecutor:
 
     # ---- Minimal Video Handlers (MVP stubs) ----
     def _handle_video_probe(self, session: Session, task: Task):
-        # Ensure derived folders; try ffprobe to fetch duration/fps when available
+        # Ensure derived folders; probe duration/fps/GPS when available.
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         if not asset_id:
@@ -670,46 +673,15 @@ class TaskExecutor:
         # create derived dirs
         (DERIVED_DIR / 'video_frames' / str(asset_id)).mkdir(parents=True, exist_ok=True)
         (DERIVED_DIR / 'video_embeddings').mkdir(parents=True, exist_ok=True)
-        # Try to run ffprobe if present
         try:
-            import subprocess, json as _json
-            cmd = ['ffprobe','-v','error','-print_format','json','-show_streams', asset.path]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
-            if result.returncode == 0 and result.stdout:
-                info = _json.loads(result.stdout)
-                # Find video stream
-                streams = info.get('streams') or []
-                vstreams = [s for s in streams if s.get('codec_type')=='video']
-                if vstreams:
-                    vs = vstreams[0]
-                    # duration
-                    dur = None
-                    if 'duration' in vs:
-                        try:
-                            dur = float(vs['duration'])
-                        except Exception:
-                            dur = None
-                    if not dur and 'tags' in vs and 'DURATION' in vs['tags']:
-                        # parse HH:MM:SS.xx
-                        try:
-                            h, m, s = vs['tags']['DURATION'].split(':')
-                            dur = float(h)*3600 + float(m)*60 + float(s)
-                        except Exception:
-                            pass
-                    # fps
-                    fps = None
-                    r = vs.get('r_frame_rate') or vs.get('avg_frame_rate')
-                    if r and '/' in r:
-                        try:
-                            num, den = r.split('/')
-                            num = float(num); den = float(den) if float(den)!=0 else 1.0
-                            fps = num/den if den else None
-                        except Exception:
-                            pass
-                    if dur:
-                        asset.duration_sec = dur
-                    if fps:
-                        asset.fps = fps
+            meta = probe_video_metadata(asset.path, timeout_sec=10)
+            if meta.get('duration_sec') is not None:
+                asset.duration_sec = float(meta['duration_sec'])
+            if meta.get('fps') is not None:
+                asset.fps = float(meta['fps'])
+            if meta.get('gps_lat') is not None and meta.get('gps_lon') is not None:
+                asset.gps_lat = float(meta['gps_lat'])
+                asset.gps_lon = float(meta['gps_lon'])
         except Exception:
             pass
         session.commit()

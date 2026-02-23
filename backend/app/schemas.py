@@ -25,17 +25,35 @@ class AssetDetail(BaseModel):
     height: Optional[int] = None
     file_size: Optional[int] = None
     taken_at: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lon: Optional[float] = None
     status: Optional[str] = None
 
 class AssetUploadResponse(APIBase):
     asset: AssetDetail
     tasks_enqueued: int
 
+class AssetDetailResponse(APIBase):
+    asset: AssetDetail
+
 class AssetsListResponse(APIBase):
     page: int
     page_size: int
     total: int
     assets: List[AssetDetail]
+
+class AssetGeoPoint(BaseModel):
+    id: int
+    path: str
+    mime: Optional[str] = None
+    gps_lat: float
+    gps_lon: float
+    taken_at: Optional[str] = None
+
+class AssetGeoResponse(APIBase):
+    total: int
+    returned: int
+    points: List[AssetGeoPoint]
 
 class SearchResponse(APIBase):
     page: int

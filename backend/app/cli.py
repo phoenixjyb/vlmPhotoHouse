@@ -170,6 +170,100 @@ def ingest_watch(
         typer.echo("Stopped.")
 
 
+@app.command("gps-backfill")
+def gps_backfill(
+    root: Optional[str] = typer.Option(None, help="Optional root path filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
+    force: bool = typer.Option(False, help="Recompute even when GPS already exists"),
+    include_images: bool = typer.Option(True, help="Process image assets"),
+    include_videos: bool = typer.Option(True, help="Process video assets"),
+    ffprobe_timeout: int = typer.Option(12, min=1, max=60, help="ffprobe timeout per video in seconds"),
+    commit_every: int = typer.Option(100, min=1, max=2000, help="Commit cadence"),
+) -> None:
+    """Backfill GPS latitude/longitude from image EXIF and video metadata tags."""
+    from pathlib import Path as _Path
+    from .db import Asset
+    from .gps_utils import read_image_gps, probe_video_metadata
+
+    settings = get_settings()
+    _, SessionLocal = _session_factory()
+
+    video_exts: set[str] = set()
+    try:
+        video_exts = {e.strip().lower() for e in settings.video_extensions.split(',') if e.strip()}
+    except Exception:
+        video_exts = {'.mp4', '.mov', '.mkv', '.avi', '.m4v', '.webm'}
+
+    with SessionLocal() as session:
+        q = session.query(Asset).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + '%'))
+        if not force:
+            q = q.filter((Asset.gps_lat == None) | (Asset.gps_lon == None))
+
+        scanned = 0
+        skipped_missing_file = 0
+        skipped_type = 0
+        updated = 0
+        image_updates = 0
+        video_updates = 0
+
+        for asset in q:
+            if limit and scanned >= limit:
+                break
+            scanned += 1
+
+            p = _Path(asset.path)
+            if not p.exists():
+                skipped_missing_file += 1
+                continue
+
+            mime = (asset.mime or '').lower()
+            ext = p.suffix.lower()
+            is_image = mime.startswith('image/') or ext in ingest_mod.SUPPORTED_IMAGE_EXT
+            is_video = mime.startswith('video/') or ext in video_exts
+
+            lat = lon = None
+            if is_image and include_images:
+                gps = read_image_gps(p)
+                if gps is not None:
+                    lat, lon = gps
+            elif is_video and include_videos:
+                meta = probe_video_metadata(p, timeout_sec=ffprobe_timeout)
+                if meta.get('gps_lat') is not None and meta.get('gps_lon') is not None:
+                    lat = float(meta['gps_lat'])
+                    lon = float(meta['gps_lon'])
+            else:
+                skipped_type += 1
+                continue
+
+            if lat is not None and lon is not None:
+                asset.gps_lat = lat
+                asset.gps_lon = lon
+                updated += 1
+                if is_image:
+                    image_updates += 1
+                elif is_video:
+                    video_updates += 1
+
+            if scanned % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} updated={updated} "
+                    f"(images={image_updates}, videos={video_updates}) "
+                    f"missing_file={skipped_missing_file}"
+                )
+
+        session.commit()
+        typer.echo("gps-backfill done")
+        typer.echo(
+            f"scanned={scanned} updated={updated} "
+            f"image_updates={image_updates} video_updates={video_updates} "
+            f"skipped_missing_file={skipped_missing_file} skipped_type={skipped_type}"
+        )
+
+
 @app.command("list-dead")
 def list_dead(page: int = 1, page_size: int = 50) -> None:
     """List dead-letter tasks."""

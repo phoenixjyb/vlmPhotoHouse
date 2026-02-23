@@ -3,6 +3,11 @@ const state = {
   selectedAsset: null,
   persons: [],
   namedPersons: [],
+  showUnnamedPeople: false,
+  geoMap: null,
+  geoLayer: null,
+  mapLoaded: false,
+  libraryViewItems: [],
   assetMap: new Map(),
 };
 
@@ -74,6 +79,9 @@ function setActiveTab(tab) {
 
 function renderAssetGrid(items, containerId) {
   const root = qs(containerId);
+  if (containerId === "library-grid") {
+    state.libraryViewItems = Array.isArray(items) ? items : [];
+  }
   items.forEach((asset) => state.assetMap.set(Number(asset.id), asset));
   root.innerHTML = items
     .map((asset) => {
@@ -201,12 +209,25 @@ async function runSearch() {
 }
 
 async function loadAssetInspector(assetId) {
-  const asset = state.assetMap.get(Number(assetId));
+  const id = Number(assetId);
+  let asset = state.assetMap.get(id);
   if (!asset) {
-    return;
+    try {
+      const detail = await api(`/assets/detail/${id}`);
+      asset = detail.asset || null;
+      if (asset) {
+        state.assetMap.set(id, asset);
+      }
+    } catch (e) {
+      showToast(`Asset #${id} not found`);
+      return;
+    }
   }
+  if (!asset) return;
   state.selectedAsset = asset;
-  renderAssetGrid(Array.from(state.assetMap.values()), "library-grid");
+  if (state.libraryViewItems.length) {
+    renderAssetGrid(state.libraryViewItems, "library-grid");
+  }
 
   qs("asset-empty").classList.add("hidden");
   qs("asset-inspector").classList.remove("hidden");
@@ -231,6 +252,93 @@ async function loadAssetInspector(assetId) {
     renderFaces(faces.faces || []);
   } catch (e) {
     showToast(`Inspector load failed: ${e.message}`);
+  }
+}
+
+function ensureGeoMap() {
+  if (state.geoMap) {
+    return true;
+  }
+  if (!window.L) {
+    qs("map-meta").textContent = "Map library failed to load.";
+    return false;
+  }
+  const mapRoot = qs("geo-map");
+  if (!mapRoot) {
+    return false;
+  }
+  state.geoMap = window.L.map(mapRoot, {
+    zoomControl: true,
+    preferCanvas: true,
+  }).setView([39.9042, 116.4074], 4);
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(state.geoMap);
+  state.geoLayer = window.L.layerGroup().addTo(state.geoMap);
+  return true;
+}
+
+function mapPopupHtml(point) {
+  const when = point.taken_at ? `<p class="small muted">${esc(point.taken_at)}</p>` : "";
+  const type = isVideoAsset(point) ? "video" : "image";
+  return `
+    <div>
+      <p><strong>#${point.id}</strong> <span class="small muted">(${type})</span></p>
+      ${when}
+      <p class="small muted" title="${esc(point.path)}">${esc(basename(point.path))}</p>
+      <button class="btn ghost" data-action="map-open-asset" data-asset-id="${point.id}">Open Asset</button>
+    </div>
+  `;
+}
+
+async function loadGeoMap() {
+  try {
+    if (!ensureGeoMap()) return;
+    const media = qs("map-media-filter").value || "all";
+    const limitVal = Number(qs("map-limit").value || "3000");
+    const limit = Number.isFinite(limitVal) ? Math.max(100, Math.min(20000, limitVal)) : 3000;
+    const data = await api(`/assets/geo?media=${encodeURIComponent(media)}&limit=${limit}`);
+    const points = data.points || [];
+    points.forEach((p) => state.assetMap.set(Number(p.id), p));
+
+    state.geoLayer.clearLayers();
+    const bounds = [];
+    for (const p of points) {
+      const lat = Number(p.gps_lat);
+      const lon = Number(p.gps_lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      const marker = window.L.circleMarker([lat, lon], {
+        radius: 5,
+        weight: 1,
+        color: "#0f8a66",
+        fillColor: "#18a878",
+        fillOpacity: 0.65,
+      });
+      marker.bindPopup(mapPopupHtml(p), { maxWidth: 280 });
+      marker.addTo(state.geoLayer);
+      bounds.push([lat, lon]);
+    }
+
+    const total = Number(data.total || points.length);
+    qs("map-meta").textContent = `Showing ${points.length} of ${total} geo-tagged assets (${media}).`;
+
+    if (bounds.length > 0) {
+      const leafletBounds = window.L.latLngBounds(bounds);
+      if (!state.mapLoaded) {
+        state.geoMap.fitBounds(leafletBounds.pad(0.1));
+      }
+      state.mapLoaded = true;
+    } else {
+      qs("map-meta").textContent = "No GPS points found for this filter.";
+      state.geoMap.setView([39.9042, 116.4074], 3);
+    }
+
+    window.setTimeout(() => {
+      if (state.geoMap) state.geoMap.invalidateSize();
+    }, 50);
+  } catch (e) {
+    showToast(`Map load failed: ${e.message}`);
   }
 }
 
@@ -314,8 +422,12 @@ function renderFaces(faces) {
 
 async function loadPeople() {
   try {
+    state.showUnnamedPeople = Boolean(qs("people-show-unnamed")?.checked);
+    const personsUrl = state.showUnnamedPeople
+      ? "/persons?page=1&page_size=240&include_faces=true&sort_by=face_count&order=desc"
+      : "/persons?page=1&page_size=240&include_faces=true&named_only=true&sort_by=face_count&order=desc";
     const [data, named] = await Promise.all([
-      api("/persons?page=1&page_size=240&include_faces=true&sort_by=face_count&order=desc"),
+      api(personsUrl),
       api("/persons?page=1&page_size=500&include_faces=false&named_only=true&sort_by=face_count&order=desc"),
     ]);
     state.persons = data.persons || [];
@@ -333,7 +445,12 @@ function renderPeopleList() {
     root.innerHTML = `<p class="muted">No persons yet.</p>`;
     return;
   }
-  root.innerHTML = state.persons
+  const hint = state.showUnnamedPeople
+    ? `<p class="small muted">Showing named people and unnamed clusters.</p>`
+    : `<p class="small muted">Showing named people only. Enable "Show unnamed clusters" if needed.</p>`;
+  root.innerHTML =
+    hint +
+    state.persons
     .map((p) => {
       const display = p.display_name || `Person ${p.id}`;
       const samples = (p.sample_faces || [])
@@ -522,11 +639,13 @@ function initEvents() {
       if (el.dataset.tab === "tasks") await loadTasks();
       if (el.dataset.tab === "admin") await refreshAdminPanels();
       if (el.dataset.tab === "people") await loadPeople();
+      if (el.dataset.tab === "map") await loadGeoMap();
     });
   });
 
   qs("btn-refresh-all").addEventListener("click", async () => {
     await Promise.all([refreshDashboard(), loadTasks(), loadPeople(), refreshAdminPanels()]);
+    if (state.activeTab === "map") await loadGeoMap();
     showToast("Refreshed");
   });
 
@@ -656,7 +775,19 @@ function initEvents() {
   });
 
   qs("btn-refresh-people").addEventListener("click", loadPeople);
+  qs("people-show-unnamed").addEventListener("change", loadPeople);
+  qs("btn-refresh-map").addEventListener("click", loadGeoMap);
+  qs("map-media-filter").addEventListener("change", loadGeoMap);
   qs("btn-refresh-tasks").addEventListener("click", loadTasks);
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action='map-open-asset']");
+    if (!btn) return;
+    const assetId = Number(btn.dataset.assetId);
+    if (!assetId) return;
+    setActiveTab("library");
+    await loadAssetInspector(assetId);
+  });
 
   qs("task-rows").addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action='cancel-task']");
@@ -715,7 +846,7 @@ async function bootstrap() {
   initEvents();
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab && ["library", "people", "tasks", "admin"].includes(tab)) {
+  if (tab && ["library", "people", "map", "tasks", "admin"].includes(tab)) {
     setActiveTab(tab);
   }
   const q = params.get("q");
@@ -723,6 +854,9 @@ async function bootstrap() {
     qs("search-query").value = q;
   }
   await Promise.all([refreshDashboard(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
+  if (state.activeTab === "map") {
+    await loadGeoMap();
+  }
   if (q) {
     await runSearch();
   }

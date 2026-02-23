@@ -1005,6 +1005,8 @@ async def upload_asset(data: bytes = Body(..., description='Raw image bytes'), f
             'height': asset.height,
             'file_size': getattr(asset, 'file_size', None),
             'taken_at': str(getattr(asset, 'taken_at', None)) if getattr(asset, 'taken_at', None) else None,
+            'gps_lat': getattr(asset, 'gps_lat', None),
+            'gps_lon': getattr(asset, 'gps_lon', None),
             'status': getattr(asset, 'status', None)
         },
         'tasks_enqueued': enqueued
@@ -1027,6 +1029,8 @@ def list_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=
             'height': a.height,
             'file_size': getattr(a,'file_size', None),
             'taken_at': str(getattr(a,'taken_at', None)) if getattr(a,'taken_at', None) else None,
+            'gps_lat': getattr(a, 'gps_lat', None),
+            'gps_lon': getattr(a, 'gps_lon', None),
             'status': getattr(a,'status', None)
         })
     return {
@@ -1035,6 +1039,62 @@ def list_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=
         'page_size': page_size,
         'total': total,
         'assets': assets
+    }
+
+@app.get('/assets/detail/{asset_id}', response_model=schemas.AssetDetailResponse)
+def get_asset_detail(asset_id: int, db_s: Session = Depends(get_db)):
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='asset not found')
+    return {
+        'api_version': schemas.API_VERSION,
+        'asset': {
+            'id': a.id,
+            'path': a.path,
+            'mime': a.mime,
+            'hash_sha256': a.hash_sha256,
+            'perceptual_hash': getattr(a, 'perceptual_hash', None),
+            'width': a.width,
+            'height': a.height,
+            'file_size': getattr(a, 'file_size', None),
+            'taken_at': str(getattr(a, 'taken_at', None)) if getattr(a, 'taken_at', None) else None,
+            'gps_lat': getattr(a, 'gps_lat', None),
+            'gps_lon': getattr(a, 'gps_lon', None),
+            'status': getattr(a, 'status', None),
+        },
+    }
+
+@app.get('/assets/geo', response_model=schemas.AssetGeoResponse)
+def list_geo_assets(
+    media: str = Query('all', description='all|image|video'),
+    limit: int = Query(3000, ge=1, le=20000),
+    db_s: Session = Depends(get_db),
+):
+    media_val = (media or 'all').lower()
+    if media_val not in ('all', 'image', 'video'):
+        raise HTTPException(status_code=400, detail='media must be one of all|image|video')
+    q = db_s.query(Asset).filter(Asset.gps_lat != None, Asset.gps_lon != None)
+    if media_val == 'image':
+        q = q.filter(Asset.mime.like('image/%'))
+    elif media_val == 'video':
+        q = q.filter(Asset.mime.like('video/%'))
+    total = q.count()
+    rows = q.order_by(Asset.id.desc()).limit(limit).all()
+    points = []
+    for a in rows:
+        points.append({
+            'id': a.id,
+            'path': a.path,
+            'mime': a.mime,
+            'gps_lat': float(a.gps_lat),
+            'gps_lon': float(a.gps_lon),
+            'taken_at': str(getattr(a, 'taken_at', None)) if getattr(a, 'taken_at', None) else None,
+        })
+    return {
+        'api_version': schemas.API_VERSION,
+        'total': total,
+        'returned': len(points),
+        'points': points,
     }
 
 @app.post('/assets/upload/multipart', response_model=schemas.AssetUploadResponse)
@@ -1057,6 +1117,8 @@ async def upload_asset_multipart(file: UploadFile = File(...), db_s: Session = D
             'height': asset.height,
             'file_size': getattr(asset, 'file_size', None),
             'taken_at': str(getattr(asset, 'taken_at', None)) if getattr(asset, 'taken_at', None) else None,
+            'gps_lat': getattr(asset, 'gps_lat', None),
+            'gps_lon': getattr(asset, 'gps_lon', None),
             'status': getattr(asset, 'status', None)
         },
         'tasks_enqueued': enqueued

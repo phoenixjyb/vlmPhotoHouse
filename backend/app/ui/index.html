@@ -4,7 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260223c" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260223e" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 </head>
 <body>
   <div class="bg-orb bg-orb-a"></div>
@@ -51,6 +57,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="library">Library</button>
       <button class="tab" data-tab="people">People</button>
+      <button class="tab" data-tab="map">Map</button>
       <button class="tab" data-tab="tasks">Tasks</button>
       <button class="tab" data-tab="admin">Admin</button>
     </nav>
@@ -140,6 +147,10 @@
           <div class="panel left-panel">
             <div class="controls">
               <h2>People</h2>
+              <label class="small muted" style="display:flex; align-items:center; gap:6px;">
+                <input id="people-show-unnamed" type="checkbox" />
+                Show unnamed clusters
+              </label>
               <button id="btn-refresh-people" class="btn ghost">Refresh</button>
             </div>
             <div id="people-list" class="people-list"></div>
@@ -151,6 +162,29 @@
             <h3>Unassigned Faces</h3>
             <div id="unassigned-faces" class="face-grid"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="tab-map" class="tab-panel">
+        <div class="panel">
+          <div class="controls">
+            <h2>Geo Map</h2>
+            <label>
+              Media
+              <select id="map-media-filter">
+                <option value="all">All</option>
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+              </select>
+            </label>
+            <label>
+              Points
+              <input id="map-limit" type="number" min="100" max="20000" step="100" value="3000" />
+            </label>
+            <button id="btn-refresh-map" class="btn ghost">Refresh Map</button>
+          </div>
+          <p id="map-meta" class="muted">Loading map data...</p>
+          <div id="geo-map" class="geo-map"></div>
         </div>
       </section>
 
@@ -212,6 +246,11 @@
   </div>
 
   <div id="toast" class="toast"></div>
-  <script src="/ui/app.js?v=20260223c" defer></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="/ui/app.js?v=20260223e" defer></script>
 </body>
 </html>

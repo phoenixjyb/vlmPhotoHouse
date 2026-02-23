@@ -447,6 +447,23 @@ textarea:focus {
   font-family: "Cascadia Mono", "Consolas", "Courier New", monospace;
 }
 
+.geo-map {
+  width: 100%;
+  min-height: 68vh;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #eef4f0 0%, #dae8e2 100%);
+}
+
+.leaflet-popup-content {
+  min-width: 190px;
+}
+
+.leaflet-popup-content .small {
+  margin: 0.2rem 0;
+}
+
 .toast {
   position: fixed;
   bottom: 14px;
@@ -500,5 +517,8 @@ textarea:focus {
   }
   .asset-grid {
     grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+  .geo-map {
+    min-height: 52vh;
   }
 }

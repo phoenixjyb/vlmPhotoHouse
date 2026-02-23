@@ -6,6 +6,7 @@ import exifread
 from sqlalchemy.orm import Session
 from .db import Asset, Task
 from .config import get_settings
+from .gps_utils import parse_exif_gps, probe_video_metadata
 from PIL import Image
 
 # Image extensions always supported
@@ -39,6 +40,10 @@ def read_exif(path: Path) -> dict:
         if dt: out['taken_at'] = dt
         out['camera_make'] = str(tags.get('Image Make','') )[:64]
         out['camera_model'] = str(tags.get('Image Model','') )[:64]
+        gps = parse_exif_gps(tags)
+        if gps is not None:
+            out['gps_lat'] = gps[0]
+            out['gps_lon'] = gps[1]
     except Exception:
         pass
     return out
@@ -80,8 +85,19 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
                     pass
                 mime = 'image/jpeg' if p.suffix.lower() in ('.jpg','.jpeg') else mimetypes.guess_type(p.name)[0]
             else:
-                # Video: we don't probe heavy metadata in ingest (MVP)
+                # Video: try lightweight metadata probe (duration/fps/GPS) at ingest time.
                 mime = mimetypes.guess_type(p.name)[0] or 'video/unknown'
+                try:
+                    meta = probe_video_metadata(p, timeout_sec=8)
+                    if meta.get('duration_sec') is not None:
+                        exif['duration_sec'] = float(meta['duration_sec'])
+                    if meta.get('fps') is not None:
+                        exif['fps'] = float(meta['fps'])
+                    if meta.get('gps_lat') is not None and meta.get('gps_lon') is not None:
+                        exif['gps_lat'] = float(meta['gps_lat'])
+                        exif['gps_lon'] = float(meta['gps_lon'])
+                except Exception:
+                    pass
             asset = Asset(path=rel, hash_sha256=sha, file_size=p.stat().st_size, width=width, height=height, mime=mime, **exif)
             session.add(asset)
             session.flush()
