@@ -267,24 +267,22 @@ function renderTags(tags) {
 
 function personOptions(currentId) {
   const base = [`<option value="">Assign to person...</option>`];
-  const merged = [];
-  const seen = new Set();
-  for (const p of state.namedPersons) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    merged.push(p);
-  }
-  for (const p of state.persons) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    merged.push(p);
+  const namedIds = new Set((state.namedPersons || []).map((p) => Number(p.id)));
+  const current = Number(currentId || 0);
+
+  // Keep visibility when a face is already attached to an unnamed cluster.
+  if (current > 0 && !namedIds.has(current)) {
+    base.push(`<option value="${current}" selected>Current: Person ${current}</option>`);
   }
 
-  for (const p of merged.slice(0, 300)) {
+  for (const p of state.namedPersons || []) {
     const name = p.display_name || `Person ${p.id}`;
-    const selected = Number(currentId) === Number(p.id) ? "selected" : "";
+    const selected = current > 0 && current === Number(p.id) ? "selected" : "";
     base.push(`<option value="${p.id}" ${selected}>${esc(name)}</option>`);
   }
+
+  base.push(`<option value="__NEW__">+ New Person</option>`);
+  base.push(`<option value="__DELETE__">Not Face (Delete detection)</option>`);
   return base.join("");
 }
 
@@ -476,9 +474,26 @@ async function handleCaptionActions(event) {
 
 async function assignFace(faceId, selectorId) {
   const select = qs(selectorId);
-  const personId = Number(select?.value || 0);
-  if (!personId) {
+  const selected = String(select?.value || "");
+  if (!selected) {
     showToast("Select a target person first");
+    return;
+  }
+
+  if (selected === "__NEW__") {
+    await createPersonFromFace(faceId);
+    return;
+  }
+
+  if (selected === "__DELETE__") {
+    if (!window.confirm(`Delete face #${faceId} as non-face detection?`)) return;
+    await deleteFace(faceId);
+    return;
+  }
+
+  const personId = Number(selected);
+  if (!personId) {
+    showToast("Invalid person selection");
     return;
   }
   await api(`/faces/${faceId}/assign`, {
