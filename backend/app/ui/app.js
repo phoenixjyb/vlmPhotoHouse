@@ -305,6 +305,7 @@ function renderFaces(faces) {
             <div class="controls">
               <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">Assign</button>
               <button class="btn ghost" data-action="create-person-face" data-face-id="${f.id}">New Person</button>
+              <button class="btn danger" data-action="delete-face" data-face-id="${f.id}">Not Face</button>
             </div>
           </div>
         </article>
@@ -388,6 +389,7 @@ async function loadUnassignedFaces() {
               <div class="controls">
                 <button class="btn ghost" data-action="assign-face-unassigned" data-face-id="${f.id}">Assign</button>
                 <button class="btn ghost" data-action="create-person-face" data-face-id="${f.id}">New Person</button>
+                <button class="btn danger" data-action="delete-face-unassigned" data-face-id="${f.id}">Not Face</button>
               </div>
             </div>
           </article>
@@ -492,6 +494,12 @@ async function createPersonFromFace(faceId) {
   });
 }
 
+async function deleteFace(faceId) {
+  await api(`/faces/${faceId}?prune_empty_person=true`, {
+    method: "DELETE",
+  });
+}
+
 function initEvents() {
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", async () => {
@@ -575,6 +583,9 @@ function initEvents() {
         await assignFace(faceId, `face-person-${faceId}`);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
+      } else if (btn.dataset.action === "delete-face") {
+        if (!window.confirm(`Delete face #${faceId} as non-face detection?`)) return;
+        await deleteFace(faceId);
       }
       await loadPeople();
       if (state.selectedAsset) {
@@ -618,6 +629,9 @@ function initEvents() {
         await assignFace(faceId, `face-person-unassigned-${faceId}`);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
+      } else if (btn.dataset.action === "delete-face-unassigned") {
+        if (!window.confirm(`Delete face #${faceId} as non-face detection?`)) return;
+        await deleteFace(faceId);
       }
       await loadPeople();
       showToast(`Face ${faceId} updated`);

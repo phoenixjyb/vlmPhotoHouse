@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
+from pathlib import Path
 
 from ..db import Person, FaceDetection, Asset, Task
 from ..dependencies import get_db
@@ -25,6 +26,22 @@ def _recompute_face_counts(db_s: Session, person_ids):
     persons = db_s.query(Person).filter(Person.id.in_(person_ids)).all()
     for p in persons:
         p.face_count = count_map.get(p.id, 0)  # type: ignore[attr-defined]
+
+def _remove_face_artifacts(face: FaceDetection):
+    # Remove generated crops for this face across any size buckets.
+    faces_root = DERIVED_PATH / 'faces'
+    if faces_root.exists():
+        for p in faces_root.glob(f"*/{face.id}.jpg"):
+            try:
+                p.unlink(missing_ok=True)
+            except Exception:
+                pass
+    # Remove persisted embedding if tracked.
+    if face.embedding_path:
+        try:
+            Path(face.embedding_path).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 @router.get('/persons', response_model=schemas.PersonsResponse)
 def list_persons(
@@ -120,6 +137,63 @@ def assign_face(face_id: int, person_id: int | None = Body(None), create_new: bo
     _recompute_face_counts(db_s, [person.id])
     db_s.commit()
     return {'face_id': face.id, 'person_id': person.id, 'new_person_created': created}
+
+@router.delete('/faces/{face_id}')
+def delete_face(face_id: int, prune_empty_person: bool = Query(True), db_s: Session = Depends(get_db)):
+    face = db_s.get(FaceDetection, face_id)
+    if not face:
+        raise HTTPException(status_code=404, detail='face not found')
+
+    pid = face.person_id
+    _remove_face_artifacts(face)
+    db_s.delete(face)
+    db_s.flush()
+
+    deleted_person_id = None
+    if pid is not None:
+        _recompute_face_counts(db_s, [pid])
+        if prune_empty_person:
+            p = db_s.get(Person, pid)
+            if p and p.face_count == 0 and (not p.display_name or not p.display_name.strip()):
+                deleted_person_id = p.id
+                db_s.delete(p)
+
+    db_s.commit()
+    return {'deleted_face_id': face_id, 'deleted_person_id': deleted_person_id}
+
+@router.post('/faces/delete')
+def delete_faces_bulk(
+    face_ids: List[int] = Body(...),
+    prune_empty_person: bool = Body(True),
+    db_s: Session = Depends(get_db)
+):
+    if not face_ids:
+        raise HTTPException(status_code=400, detail='face_ids required')
+
+    faces = db_s.query(FaceDetection).filter(FaceDetection.id.in_(face_ids)).all()
+    if not faces:
+        raise HTTPException(status_code=404, detail='no faces found')
+
+    person_ids = set()
+    for face in faces:
+        if face.person_id is not None:
+            person_ids.add(face.person_id)
+        _remove_face_artifacts(face)
+        db_s.delete(face)
+    db_s.flush()
+
+    deleted_person_ids = []
+    if person_ids:
+        _recompute_face_counts(db_s, list(person_ids))
+        if prune_empty_person:
+            for pid in person_ids:
+                p = db_s.get(Person, pid)
+                if p and p.face_count == 0 and (not p.display_name or not p.display_name.strip()):
+                    deleted_person_ids.append(p.id)
+                    db_s.delete(p)
+
+    db_s.commit()
+    return {'deleted_faces': len(faces), 'deleted_person_ids': deleted_person_ids}
 
 @router.post('/faces/assign')
 def assign_faces_bulk(person_id: int | None = Body(None), face_ids: List[int] = Body(...), create_new: bool = Body(False), db_s: Session = Depends(get_db)):
