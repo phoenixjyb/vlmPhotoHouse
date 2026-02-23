@@ -27,10 +27,25 @@ def _recompute_face_counts(db_s: Session, person_ids):
         p.face_count = count_map.get(p.id, 0)  # type: ignore[attr-defined]
 
 @router.get('/persons', response_model=schemas.PersonsResponse)
-def list_persons(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), include_faces: bool = Query(False), db_s: Session = Depends(get_db)):
-    q = db_s.query(Person)
-    total = q.count()
-    persons = q.order_by(Person.id.asc()).offset((page-1)*page_size).limit(page_size).all()
+def list_persons(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    include_faces: bool = Query(False),
+    sort_by: str = Query('id'),
+    order: str = Query('asc'),
+    named_only: bool = Query(False),
+    name_query: str | None = Query(None),
+    db_s: Session = Depends(get_db)
+):
+    base_q = db_s.query(Person)
+    if named_only:
+        base_q = base_q.filter(Person.display_name != None).filter(func.trim(Person.display_name) != '')
+    if name_query and name_query.strip():
+        base_q = base_q.filter(Person.display_name.ilike(f"%{name_query.strip()}%"))
+    total = base_q.count()
+    sort_key = Person.face_count if sort_by == 'face_count' else Person.id
+    sort_clause = sort_key.desc() if order == 'desc' else sort_key.asc()
+    persons = base_q.order_by(sort_clause, Person.id.asc()).offset((page-1)*page_size).limit(page_size).all()
     result = []
     for p in persons:
         item = {'id': p.id, 'display_name': p.display_name, 'face_count': p.face_count}

@@ -2,6 +2,7 @@ const state = {
   activeTab: "library",
   selectedAsset: null,
   persons: [],
+  namedPersons: [],
   assetMap: new Map(),
 };
 
@@ -266,7 +267,20 @@ function renderTags(tags) {
 
 function personOptions(currentId) {
   const base = [`<option value="">Assign to person...</option>`];
+  const merged = [];
+  const seen = new Set();
+  for (const p of state.namedPersons) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    merged.push(p);
+  }
   for (const p of state.persons) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    merged.push(p);
+  }
+
+  for (const p of merged.slice(0, 300)) {
     const name = p.display_name || `Person ${p.id}`;
     const selected = Number(currentId) === Number(p.id) ? "selected" : "";
     base.push(`<option value="${p.id}" ${selected}>${esc(name)}</option>`);
@@ -301,8 +315,12 @@ function renderFaces(faces) {
 
 async function loadPeople() {
   try {
-    const data = await api("/persons?page=1&page_size=200&include_faces=true");
+    const [data, named] = await Promise.all([
+      api("/persons?page=1&page_size=240&include_faces=true&sort_by=face_count&order=desc"),
+      api("/persons?page=1&page_size=500&include_faces=false&named_only=true&sort_by=face_count&order=desc"),
+    ]);
     state.persons = data.persons || [];
+    state.namedPersons = named.persons || [];
     renderPeopleList();
     await loadUnassignedFaces();
   } catch (e) {
