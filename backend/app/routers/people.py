@@ -43,6 +43,36 @@ def _remove_face_artifacts(face: FaceDetection):
         except Exception:
             pass
 
+def _enqueue_label_propagation(db_s: Session, person_ids: list[int]) -> int | None:
+    target_ids = sorted({int(pid) for pid in person_ids if pid is not None})
+    if not target_ids:
+        return None
+    existing = (
+        db_s.query(Task)
+        .filter(Task.type == 'person_label_propagate')
+        .filter(Task.state.in_(['pending', 'running']))
+        .order_by(Task.id.desc())
+        .first()
+    )
+    if existing and existing.state == 'pending':
+        payload = dict(existing.payload_json or {})
+        prev = payload.get('person_ids') or []
+        prev_ids = set()
+        for v in prev:
+            try:
+                prev_ids.add(int(v))
+            except Exception:
+                continue
+        payload['person_ids'] = sorted(prev_ids.union(target_ids))
+        existing.payload_json = payload
+        db_s.flush()
+        return int(existing.id)
+    # Keep this fairly high priority so manual corrections propagate quickly.
+    t = Task(type='person_label_propagate', priority=95, payload_json={'person_ids': target_ids})
+    db_s.add(t)
+    db_s.flush()
+    return int(t.id)
+
 @router.get('/persons', response_model=schemas.PersonsResponse)
 def list_persons(
     page: int = Query(1, ge=1),
@@ -152,8 +182,9 @@ def assign_face(face_id: int, person_id: int | None = Body(None), create_new: bo
     face.label_source = 'manual'  # type: ignore[attr-defined]
     face.label_score = None  # type: ignore[attr-defined]
     _recompute_face_counts(db_s, [person.id])
+    propagation_task_id = _enqueue_label_propagation(db_s, [int(person.id)])
     db_s.commit()
-    return {'face_id': face.id, 'person_id': person.id, 'new_person_created': created}
+    return {'face_id': face.id, 'person_id': person.id, 'new_person_created': created, 'propagation_task_id': propagation_task_id}
 
 @router.delete('/faces/{face_id}')
 def delete_face(face_id: int, prune_empty_person: bool = Query(True), db_s: Session = Depends(get_db)):
@@ -232,8 +263,9 @@ def assign_faces_bulk(person_id: int | None = Body(None), face_ids: List[int] = 
         f.label_source = 'manual'  # type: ignore[attr-defined]
         f.label_score = None  # type: ignore[attr-defined]
     _recompute_face_counts(db_s, [target_person_id])
+    propagation_task_id = _enqueue_label_propagation(db_s, [int(target_person_id)])
     db_s.commit()
-    return {'assigned': len(faces), 'person_id': target_person_id, 'new_person_created': created}
+    return {'assigned': len(faces), 'person_id': target_person_id, 'new_person_created': created, 'propagation_task_id': propagation_task_id}
 
 @router.post('/persons/{person_id}/name')
 def rename_person(person_id: int, display_name: str = Body(..., embed=True), db_s: Session = Depends(get_db)):
@@ -260,8 +292,9 @@ def merge_persons(target_id: int = Body(...), source_ids: List[int] = Body(...),
     for p in sources:
         db_s.delete(p)
     _recompute_face_counts(db_s, [target.id])
+    propagation_task_id = _enqueue_label_propagation(db_s, [int(target.id)])
     db_s.commit()
-    return {'target_id': target.id, 'merged_sources': [p.id for p in sources], 'moved_faces': len(faces), 'face_count': target.face_count}
+    return {'target_id': target.id, 'merged_sources': [p.id for p in sources], 'moved_faces': len(faces), 'face_count': target.face_count, 'propagation_task_id': propagation_task_id}
 
 @router.post('/persons/{person_id}/delete')
 def delete_person(person_id: int, db_s: Session = Depends(get_db)):

@@ -559,6 +559,110 @@ def ping() -> None:
     """Simple heartbeat to verify CLI wiring."""
     typer.echo("cli-ok")
 
+@app.command("captions-clean-stubs")
+def captions_clean_stubs(
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
+    enqueue_missing: bool = typer.Option(True, help="Enqueue caption regeneration when no non-stub caption remains"),
+    force_regen: bool = typer.Option(True, help="Enqueue caption tasks with force=true"),
+    profile: str = typer.Option('balanced', help="Caption profile hint for newly enqueued tasks"),
+    apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
+    commit_every: int = typer.Option(300, min=50, max=5000, help="Commit cadence"),
+) -> None:
+    """Remove non-edited stub captions and backfill missing real captions."""
+    from pathlib import Path as _Path
+    from .db import Asset, Caption, Task
+
+    def _is_stub_caption(c: Caption) -> bool:
+        if bool(c.user_edited):
+            return False
+        model = (c.model or '').strip().lower()
+        if model.startswith('stub'):
+            return True
+        if model in ('unknown',):
+            txt = (c.text or '').strip().lower()
+            if txt in ('photo', 'image'):
+                return True
+        return False
+
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id, Asset.path).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + '%'))
+
+        scanned = 0
+        removed_stub = 0
+        enqueued = 0
+        assets_with_stub = 0
+        assets_now_missing_real = 0
+        pending_skips = 0
+
+        for asset_id, _path in q:
+            if limit and scanned >= limit:
+                break
+            scanned += 1
+
+            caps = session.query(Caption).filter(Caption.asset_id == asset_id).order_by(Caption.created_at.asc()).all()
+            if not caps:
+                has_real = False
+                stub_caps = []
+            else:
+                stub_caps = [c for c in caps if _is_stub_caption(c)]
+                has_real = any((not _is_stub_caption(c)) for c in caps)
+
+            if stub_caps:
+                assets_with_stub += 1
+                if apply:
+                    for c in stub_caps:
+                        session.delete(c)
+                removed_stub += len(stub_caps)
+
+            # After deletion, there may be no caption left or only deleted stubs.
+            if (not has_real) and enqueue_missing:
+                assets_now_missing_real += 1
+                existing_task = (
+                    session.query(Task.id)
+                    .filter(Task.type == 'caption')
+                    .filter(Task.state.in_(['pending', 'running']))
+                    .filter(Task.payload_json['asset_id'].as_integer() == asset_id)
+                    .first()
+                )
+                if existing_task:
+                    pending_skips += 1
+                else:
+                    if apply:
+                        payload = {'asset_id': int(asset_id), 'force': bool(force_regen), 'profile': profile}
+                        session.add(Task(type='caption', priority=110, payload_json=payload))
+                    enqueued += 1
+
+            if apply and scanned % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} removed_stub={removed_stub} enqueued={enqueued} "
+                    f"assets_with_stub={assets_with_stub} missing_real={assets_now_missing_real}"
+                )
+
+        if apply:
+            # keep summary fields accurate for touched assets
+            # lightweight full recompute is acceptable for offline cleanup runs
+            for (aid,) in session.query(Asset.id).all():
+                cnt = session.query(func.count(Caption.id)).filter(Caption.asset_id == aid, Caption.superseded == False).scalar() or 0
+                a = session.get(Asset, int(aid))
+                if a is not None:
+                    a.caption_variant_count = int(cnt)
+                    a.caption_processed = bool(cnt > 0)
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"captions-clean-stubs ({mode})")
+        typer.echo(
+            f"scanned={scanned} assets_with_stub={assets_with_stub} removed_stub={removed_stub} "
+            f"assets_missing_real={assets_now_missing_real} enqueued={enqueued} pending_skips={pending_skips} "
+            f"root={root or '(all)'} limit={limit} force_regen={force_regen}"
+        )
+
 @app.command("captions-backfill")
 def captions_backfill(
     profile: str = typer.Option('balanced', help="Caption profile hint (fast|balanced|quality) recorded only; current providers handled via env"),

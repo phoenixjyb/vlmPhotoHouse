@@ -162,6 +162,8 @@ class TaskExecutor:
                     self._handle_face_embed(session, task)
                 elif task.type == 'person_cluster':
                     self._handle_person_cluster(session, task)
+                elif task.type == 'person_label_propagate':
+                    self._handle_person_label_propagate(session, task)
             except Exception as exc:
                 task.state = 'failed'
                 task.last_error = str(exc)[:4000]
@@ -265,6 +267,19 @@ class TaskExecutor:
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
+            allow_stub_fallback = os.getenv('CAPTION_ENABLE_STUB_FALLBACK', 'false').lower() in ('1', 'true', 'yes')
+            if not allow_stub_fallback:
+                try:
+                    asset.caption_variant_count = session.query(Caption).filter(Caption.asset_id==asset_id, Caption.superseded==False).count()
+                    asset.caption_processed = bool(asset.caption_variant_count > 0)
+                    asset.caption_processed_at = datetime.utcnow()
+                    asset.caption_model_profile_last = profile
+                    asset.caption_error_last = err
+                    session.commit()
+                except Exception:
+                    session.rollback()
+                # Do not generate stub captions by default; keep asset eligible for future backfill.
+                return None
             base = os.path.splitext(Path(asset.path).name)[0]
             toks = [t for t in base.replace('-',' ').replace('_',' ').split() if t]
             text = 'Photo' if not toks else ' '.join(toks[:8])
@@ -654,6 +669,156 @@ class TaskExecutor:
                 time.sleep(per_face_sleep)
         session.commit()
         return {'faces': len(face_objs), 'persons': len(persons), 'new_persons': new_persons}
+
+    def _handle_person_label_propagate(self, session: Session, task: Task):
+        """Propagate newly-manual labels to similar unassigned faces (DNN assignment).
+
+        This is a targeted auto-assign pass:
+        - references use only manual-labeled faces
+        - candidates are only unassigned faces
+        - assignment requires score + margin thresholds
+        - only target person_ids are assignable
+        """
+        payload = task.payload_json or {}
+        raw_ids = payload.get('person_ids') or []
+        target_person_ids: set[int] = set()
+        for v in raw_ids:
+            try:
+                target_person_ids.add(int(v))
+            except Exception:
+                continue
+        if not target_person_ids:
+            return {'assigned': 0, 'reason': 'no_target_person_ids'}
+
+        score_threshold = float(payload.get('score_threshold', os.getenv('PERSON_LABEL_PROPAGATE_SCORE_THRESHOLD', '0.82')))
+        margin = float(payload.get('margin', os.getenv('PERSON_LABEL_PROPAGATE_MARGIN', '0.015')))
+        min_ref_faces = int(payload.get('min_ref_faces', os.getenv('PERSON_LABEL_PROPAGATE_MIN_REF_FACES', '2')))
+        max_scan = int(payload.get('max_scan', os.getenv('PERSON_LABEL_PROPAGATE_MAX_SCAN', '0')))
+        commit_every = int(payload.get('commit_every', 200))
+
+        data_root = Path(os.getenv('VLM_DATA_ROOT', r'E:\VLM_DATA'))
+
+        def _resolve_emb_path(ep: str) -> Path:
+            p = Path(ep)
+            if p.is_absolute():
+                return p
+            ep_norm = ep.replace("\\", "/")
+            if ep_norm.lower().startswith("derived/"):
+                return data_root / ep_norm
+            return Path(ep)
+
+        # Build manual reference centroids for all persons (for competition/margin),
+        # while only allowing assignments to target persons.
+        ref_rows = (
+            session.query(FaceDetection.person_id, FaceDetection.embedding_path)
+            .filter(FaceDetection.person_id != None)
+            .filter(FaceDetection.embedding_path != None)
+            .filter(FaceDetection.label_source == 'manual')
+            .all()
+        )
+        by_person: dict[int, list[np.ndarray]] = {}
+        for pid, ep in ref_rows:
+            if pid is None or not ep:
+                continue
+            p = _resolve_emb_path(str(ep))
+            if not p.exists():
+                continue
+            try:
+                v = np.load(p).astype('float32')
+                n = float(np.linalg.norm(v))
+                if n > 0:
+                    v = v / n
+            except Exception:
+                continue
+            by_person.setdefault(int(pid), []).append(v)
+
+        centroids: dict[int, np.ndarray] = {}
+        for pid, vecs in by_person.items():
+            if len(vecs) < min_ref_faces:
+                continue
+            c = np.mean(np.stack(vecs), axis=0).astype('float32')
+            n = float(np.linalg.norm(c))
+            if n > 0:
+                c = c / n
+            centroids[pid] = c
+
+        target_with_ref = sorted(pid for pid in target_person_ids if pid in centroids)
+        if not target_with_ref:
+            return {'assigned': 0, 'reason': 'no_target_centroids', 'targets': sorted(target_person_ids)}
+
+        q = (
+            session.query(FaceDetection)
+            .filter(FaceDetection.person_id == None)
+            .filter(FaceDetection.embedding_path != None)
+            .order_by(FaceDetection.id.asc())
+        )
+        if max_scan > 0:
+            q = q.limit(max_scan)
+        candidates = q.all()
+
+        scanned = 0
+        assigned = 0
+        affected: set[int] = set()
+
+        for face in candidates:
+            scanned += 1
+            ep = face.embedding_path
+            if not ep:
+                continue
+            p = _resolve_emb_path(str(ep))
+            if not p.exists():
+                continue
+            try:
+                v = np.load(p).astype('float32')
+                n = float(np.linalg.norm(v))
+                if n > 0:
+                    v = v / n
+            except Exception:
+                continue
+
+            scores = sorted(
+                [(float(np.dot(v, c)), pid) for pid, c in centroids.items()],
+                reverse=True,
+            )
+            if not scores:
+                continue
+            best_score, best_pid = scores[0]
+            second_score = scores[1][0] if len(scores) > 1 else -1.0
+            gap = best_score - second_score
+
+            if best_pid not in target_person_ids:
+                continue
+            if best_score < score_threshold or gap < margin:
+                continue
+
+            face.person_id = int(best_pid)
+            face.label_source = 'dnn'  # type: ignore[attr-defined]
+            face.label_score = float(best_score)  # type: ignore[attr-defined]
+            assigned += 1
+            affected.add(int(best_pid))
+
+            if assigned % max(20, commit_every) == 0:
+                session.commit()
+
+        for pid in sorted(affected):
+            cnt = (
+                session.query(FaceDetection.id)
+                .filter(FaceDetection.person_id == pid)
+                .count()
+            )
+            p_obj = session.get(Person, pid)
+            if p_obj is not None:
+                p_obj.face_count = int(cnt)
+        session.commit()
+        return {
+            'assigned': assigned,
+            'scanned': scanned,
+            'targets': sorted(target_person_ids),
+            'targets_with_ref': target_with_ref,
+            'score_threshold': score_threshold,
+            'margin': margin,
+            'min_ref_faces': min_ref_faces,
+        }
 
     def _handle_dim_backfill(self, session: Session, task: Task):
         asset_id = task.payload_json.get('asset_id') if task.payload_json else None
