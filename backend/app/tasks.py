@@ -333,13 +333,17 @@ class TaskExecutor:
                 except Exception:
                     pass
             except Exception:
-                # Fallback: single centered box
-                from PIL import Image as _Im
-                with _Im.open(src) as im_det:
-                    w,h = im_det.size
+                # Do not inject fake face boxes by default; this pollutes face_detections.
+                # Optional legacy behavior can be enabled via FACE_DETECT_CENTER_FALLBACK=true.
                 dets = []
-                size = min(w,h)*0.4
-                dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size})())
+                if os.getenv('FACE_DETECT_CENTER_FALLBACK', 'false').lower() in ('1', 'true', 'yes'):
+                    from PIL import Image as _Im
+                    with _Im.open(src) as im_det:
+                        w,h = im_det.size
+                    size = min(w,h)*0.4
+                    dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size})())
+                else:
+                    logger.warning(f"Face detection failed for asset_id={asset.id}; skipping fallback box insertion", exc_info=True)
             for d in dets:
                 face = FaceDetection(asset_id=asset.id, bbox_x=float(d.x), bbox_y=float(d.y), bbox_w=float(d.w), bbox_h=float(d.h), embedding_path=None)
                 session.add(face)
