@@ -8,6 +8,7 @@ from .db import Asset, Task
 from .config import get_settings
 from .gps_utils import parse_exif_gps, probe_video_metadata
 from PIL import Image
+from .image_utils import safe_exif_transpose
 
 # Image extensions always supported
 SUPPORTED_IMAGE_EXT = {'.jpg','.jpeg','.png','.heic','.webp'}
@@ -80,7 +81,8 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
                 exif = read_exif(p)
                 try:
                     with Image.open(p) as im:
-                        width, height = im.size
+                        upright = safe_exif_transpose(im)
+                        width, height = upright.size
                 except Exception:
                     pass
                 mime = 'image/jpeg' if p.suffix.lower() in ('.jpg','.jpeg') else mimetypes.guess_type(p.name)[0]

@@ -77,6 +77,8 @@ class FaceOut(BaseModel):
     id: int
     asset_id: int
     person_id: Optional[int]
+    label_source: Optional[str] = None
+    label_score: Optional[float] = None
 
 class FacesResponse(APIBase):
     page: int

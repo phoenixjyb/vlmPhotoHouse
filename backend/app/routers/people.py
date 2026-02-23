@@ -92,7 +92,22 @@ def list_faces(
         q = q.filter(FaceDetection.person_id==None)
     total = q.count()
     faces = q.order_by(FaceDetection.id.asc()).offset((page-1)*page_size).limit(page_size).all()
-    return {'api_version': schemas.API_VERSION, 'page': page, 'page_size': page_size, 'total': total, 'faces': [ {'id': f.id, 'asset_id': f.asset_id, 'person_id': f.person_id} for f in faces]}
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'faces': [
+            {
+                'id': f.id,
+                'asset_id': f.asset_id,
+                'person_id': f.person_id,
+                'label_source': getattr(f, 'label_source', None),
+                'label_score': getattr(f, 'label_score', None),
+            }
+            for f in faces
+        ],
+    }
 
 @router.get('/faces/{face_id}')
 def get_face(face_id: int, db_s: Session = Depends(get_db)):
@@ -134,6 +149,8 @@ def assign_face(face_id: int, person_id: int | None = Body(None), create_new: bo
     if not person:
         raise HTTPException(status_code=404, detail='person not found')
     face.person_id = person.id  # type: ignore[attr-defined]
+    face.label_source = 'manual'  # type: ignore[attr-defined]
+    face.label_score = None  # type: ignore[attr-defined]
     _recompute_face_counts(db_s, [person.id])
     db_s.commit()
     return {'face_id': face.id, 'person_id': person.id, 'new_person_created': created}
@@ -212,6 +229,8 @@ def assign_faces_bulk(person_id: int | None = Body(None), face_ids: List[int] = 
         raise HTTPException(status_code=404, detail='no faces found')
     for f in faces:
         f.person_id = target_person_id  # type: ignore[attr-defined]
+        f.label_source = 'manual'  # type: ignore[attr-defined]
+        f.label_score = None  # type: ignore[attr-defined]
     _recompute_face_counts(db_s, [target_person_id])
     db_s.commit()
     return {'assigned': len(faces), 'person_id': target_person_id, 'new_person_created': created}
@@ -252,6 +271,8 @@ def delete_person(person_id: int, db_s: Session = Depends(get_db)):
     faces = db_s.query(FaceDetection).filter(FaceDetection.person_id==person.id).all()
     for f in faces:
         f.person_id = None  # type: ignore[attr-defined]
+        f.label_source = None  # type: ignore[attr-defined]
+        f.label_score = None  # type: ignore[attr-defined]
     db_s.delete(person)
     db_s.commit()
     return {'deleted_person_id': person_id, 'faces_reassigned': len(faces)}

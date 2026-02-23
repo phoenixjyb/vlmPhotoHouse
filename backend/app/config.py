@@ -60,6 +60,7 @@ class Settings(BaseModel):
     face_crop_margin: float = Field(default=float(os.getenv('FACE_CROP_MARGIN','0.0')))  # fraction of max(w,h) to expand each side
     lvface_model_path: str = Field(default=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'))
     lvface_external_dir: str = Field(default=os.getenv('LVFACE_EXTERNAL_DIR', ''))  # Path to external LVFace installation
+    lvface_python_exe: str = Field(default=os.getenv('LVFACE_PYTHON_EXE', ''))  # Optional dedicated python for external LVFace subprocess
     lvface_model_name: str = Field(default=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'))  # Model filename in external dir
     lvface_service_url: str = Field(default=os.getenv('LVFACE_SERVICE_URL', ''))  # Optional LVFace HTTP service URL
     caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|auto|http
@@ -136,6 +137,7 @@ def get_settings() -> Settings:
     face_crop_margin=float(os.getenv('FACE_CROP_MARGIN','0.0')),
         lvface_model_path=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'),
         lvface_external_dir=os.getenv('LVFACE_EXTERNAL_DIR', ''),
+        lvface_python_exe=os.getenv('LVFACE_PYTHON_EXE', ''),
         lvface_model_name=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'),
         caption_provider=os.getenv('CAPTION_PROVIDER', 'stub'),
         caption_device=os.getenv('CAPTION_DEVICE', 'cpu'),

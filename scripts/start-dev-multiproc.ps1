@@ -119,12 +119,23 @@ if ($Preset) {
 # Environment for backend (using effective values)
 $env:FACE_EMBED_PROVIDER = $effectiveFace
 $env:LVFACE_MODEL_NAME = Get-LVFaceModelName -Dir $LvfaceDir
-# Prefer external LVFace subprocess only when inference.py exists; otherwise use builtin ONNX path.
+# Prefer external LVFace subprocess when a supported script exists and a dedicated LVFace python is available.
 $lvfaceInference = Join-Path $LvfaceDir 'inference.py'
-if (Test-Path -LiteralPath $lvfaceInference) {
+$lvfaceInferenceOnnx = Join-Path $LvfaceDir 'src\inference_onnx.py'
+$lvfacePyCandidates = @(
+    (Join-Path $LvfaceDir '.venv-lvface-311\Scripts\python.exe'),
+    (Join-Path $LvfaceDir '.venv\Scripts\python.exe')
+)
+$lvfacePyExe = $null
+foreach ($cand in $lvfacePyCandidates) {
+    if (Test-Path -LiteralPath $cand) { $lvfacePyExe = $cand; break }
+}
+if ((Test-Path -LiteralPath $lvfaceInference -or Test-Path -LiteralPath $lvfaceInferenceOnnx) -and $lvfacePyExe) {
     $env:LVFACE_EXTERNAL_DIR = $LvfaceDir
+    $env:LVFACE_PYTHON_EXE = $lvfacePyExe
 } else {
     $env:LVFACE_EXTERNAL_DIR = ''
+    $env:LVFACE_PYTHON_EXE = ''
     $env:LVFACE_MODEL_PATH = Join-Path $LvfaceDir ("models\" + $env:LVFACE_MODEL_NAME)
 }
 $env:CAPTION_PROVIDER = $effectiveCaption
@@ -181,6 +192,7 @@ $env:TMP = $env:VLM_TMP_DIR
 $env:TEMP = $env:VLM_TMP_DIR
 
 Write-Host "LVFace: $($env:LVFACE_EXTERNAL_DIR) (model: $($env:LVFACE_MODEL_NAME))" -ForegroundColor DarkCyan
+if ($env:LVFACE_PYTHON_EXE) { Write-Host "LVFace Python: $($env:LVFACE_PYTHON_EXE)" -ForegroundColor DarkCyan }
 if ($Preset) {
     $gpuVal = if ($effectiveUseGpu) { 'on' } else { 'off' }
     Write-Host "Preset: $Preset applied (face=$effectiveFace, caption=$effectiveCaption, gpu=$gpuVal)" -ForegroundColor Gray

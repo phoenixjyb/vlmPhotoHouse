@@ -264,6 +264,259 @@ def gps_backfill(
         )
 
 
+@app.command("faces-redetect-enqueue")
+def faces_redetect_enqueue(
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max tasks to enqueue (0 = all matching assets)"),
+    only_without_faces: bool = typer.Option(False, help="Only enqueue assets currently with zero face detections"),
+    skip_if_pending: bool = typer.Option(True, help="Skip assets that already have pending/running face task"),
+    priority: int = typer.Option(118, min=1, max=1000, help="Task priority for enqueued face tasks"),
+    dedupe_iou: float = typer.Option(0.60, min=0.0, max=1.0, help="IoU threshold used by task to avoid duplicate boxes"),
+    commit_every: int = typer.Option(500, min=50, max=5000, help="Commit cadence"),
+) -> None:
+    """Enqueue force redetect face tasks for image assets.
+
+    Uses force_redetect + supplement_only mode so existing labeled faces are preserved,
+    and only newly discovered non-overlapping detections are added.
+    """
+    from pathlib import Path as _Path
+    from .db import Asset, FaceDetection, Task
+
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id, Asset.path).filter(Asset.mime.like('image/%')).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + '%'))
+
+        scanned = 0
+        enqueued = 0
+        skipped_has_faces = 0
+        skipped_pending = 0
+
+        for asset_id, _path in q:
+            if limit and enqueued >= limit:
+                break
+            scanned += 1
+
+            if only_without_faces:
+                has_face = session.query(FaceDetection.id).filter(FaceDetection.asset_id == asset_id).first()
+                if has_face:
+                    skipped_has_faces += 1
+                    continue
+
+            if skip_if_pending:
+                existing_task = (
+                    session.query(Task.id)
+                    .filter(Task.type == 'face')
+                    .filter(Task.state.in_(['pending', 'running']))
+                    .filter(Task.payload_json['asset_id'].as_integer() == asset_id)
+                    .first()
+                )
+                if existing_task:
+                    skipped_pending += 1
+                    continue
+
+            payload = {
+                'asset_id': int(asset_id),
+                'force_redetect': True,
+                'supplement_only': True,
+                'dedupe_iou': float(dedupe_iou),
+            }
+            session.add(Task(type='face', priority=priority, payload_json=payload))
+            enqueued += 1
+
+            if enqueued % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} enqueued={enqueued} "
+                    f"skipped_pending={skipped_pending} skipped_has_faces={skipped_has_faces}"
+                )
+
+        session.commit()
+        typer.echo("faces-redetect-enqueue done")
+        typer.echo(
+            f"scanned={scanned} enqueued={enqueued} "
+            f"skipped_pending={skipped_pending} skipped_has_faces={skipped_has_faces} "
+            f"limit={limit} root={root or '(all)'} only_without_faces={only_without_faces}"
+        )
+
+
+@app.command("faces-auto-assign")
+def faces_auto_assign(
+    score_threshold: float = typer.Option(0.95, min=0.0, max=1.0, help="Minimum cosine score to accept assignment"),
+    margin: float = typer.Option(0.01, min=0.0, max=1.0, help="Min gap between top-1 and top-2 score"),
+    min_ref_faces: int = typer.Option(10, min=2, help="Minimum labeled faces per person to build a centroid"),
+    assign_all: bool = typer.Option(False, help="Assign every evaluated unassigned face to top-1 candidate (ignores threshold/margin)"),
+    reference_manual_only: bool = typer.Option(True, help="Use only manually labeled faces as centroid reference"),
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter"),
+    limit: int = typer.Option(0, min=0, help="Max unassigned faces to evaluate (0 = all)"),
+    name: Optional[List[str]] = typer.Option(None, "--name", help="Restrict target people names (repeat option)"),
+    apply: bool = typer.Option(False, help="Persist assignments (default is dry-run)"),
+    commit_every: int = typer.Option(200, min=20, max=2000, help="Commit cadence when --apply is enabled"),
+) -> None:
+    """Auto-assign unassigned faces to named persons using embedding centroid matching."""
+    from pathlib import Path as _Path
+    import numpy as _np
+    from collections import defaultdict as _dd
+    from .db import Person, FaceDetection, Asset
+
+    _, SessionLocal = _session_factory()
+
+    data_root = _Path(os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA"))
+
+    def _resolve_emb_path(ep: str) -> _Path:
+        p = _Path(ep)
+        if p.is_absolute():
+            return p
+        ep_norm = ep.replace("\\", "/")
+        if ep_norm.lower().startswith("derived/"):
+            return data_root / ep_norm
+        return _Path(ep)
+
+    target_names = {n.strip().lower() for n in (name or []) if n and n.strip()}
+
+    with SessionLocal() as session:
+        # Build reference vectors from already-assigned named faces.
+        ref_q = (
+            session.query(Person.id, Person.display_name, FaceDetection.embedding_path)
+            .join(FaceDetection, FaceDetection.person_id == Person.id)
+            .filter(Person.display_name != None)
+            .filter(func.trim(Person.display_name) != "")
+            .filter(FaceDetection.embedding_path != None)
+        )
+        if reference_manual_only:
+            ref_q = ref_q.filter(FaceDetection.label_source == 'manual')
+        ref_rows = ref_q.all()
+
+        by_person: dict[tuple[int, str], list[_np.ndarray]] = _dd(list)
+        missing_ref_emb = 0
+        for pid, pname, ep in ref_rows:
+            if not ep:
+                continue
+            name_norm = (pname or "").strip()
+            if not name_norm:
+                continue
+            if target_names and name_norm.lower() not in target_names:
+                continue
+            p = _resolve_emb_path(str(ep))
+            if not p.exists():
+                missing_ref_emb += 1
+                continue
+            try:
+                v = _np.load(p).astype("float32")
+                n = float(_np.linalg.norm(v))
+                if n > 0:
+                    v = v / n
+                by_person[(int(pid), name_norm)].append(v)
+            except Exception:
+                continue
+
+        centroids: list[tuple[int, str, int, _np.ndarray]] = []
+        for (pid, pname), vecs in by_person.items():
+            if len(vecs) < min_ref_faces:
+                continue
+            c = _np.mean(_np.stack(vecs), axis=0).astype("float32")
+            n = float(_np.linalg.norm(c))
+            if n > 0:
+                c = c / n
+            centroids.append((pid, pname, len(vecs), c))
+
+        if not centroids:
+            typer.echo(
+                f"No eligible reference persons (min_ref_faces={min_ref_faces}, name_filter={sorted(target_names) if target_names else 'none'})"
+            )
+            return
+
+        # Query unassigned candidate faces
+        q = (
+            session.query(FaceDetection.id, FaceDetection.embedding_path, Asset.path)
+            .join(Asset, Asset.id == FaceDetection.asset_id)
+            .filter(FaceDetection.person_id == None)
+            .filter(FaceDetection.embedding_path != None)
+            .order_by(FaceDetection.id.asc())
+        )
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + "%"))
+        rows = q.all()
+        if limit and limit > 0:
+            rows = rows[:limit]
+
+        scanned = 0
+        matched = 0
+        missing_face_emb = 0
+        affected: set[int] = set()
+        per_person: dict[str, int] = _dd(int)
+        preview: list[tuple[int, int, str, float, float]] = []
+
+        for fid, ep, _asset_path in rows:
+            scanned += 1
+            p = _resolve_emb_path(str(ep))
+            if not p.exists():
+                missing_face_emb += 1
+                continue
+            try:
+                v = _np.load(p).astype("float32")
+                n = float(_np.linalg.norm(v))
+                if n > 0:
+                    v = v / n
+            except Exception:
+                continue
+            scores = sorted(
+                [(float(_np.dot(v, c)), pid, pname) for pid, pname, _nref, c in centroids],
+                reverse=True,
+            )
+            if not scores:
+                continue
+            best_score, best_pid, best_name = scores[0]
+            second_score = scores[1][0] if len(scores) > 1 else -1.0
+            gap = best_score - second_score
+            if not assign_all and (best_score < score_threshold or gap < margin):
+                continue
+            matched += 1
+            per_person[best_name] += 1
+            affected.add(int(best_pid))
+            if len(preview) < 25:
+                preview.append((int(fid), int(best_pid), best_name, float(best_score), float(gap)))
+            if apply:
+                face = session.get(FaceDetection, int(fid))
+                if face is not None and face.person_id is None:
+                    face.person_id = int(best_pid)
+                    face.label_source = 'dnn'
+                    face.label_score = float(best_score)
+                if matched % commit_every == 0:
+                    session.commit()
+
+        if apply:
+            # Recompute counts for touched persons
+            for pid in sorted(affected):
+                cnt = (
+                    session.query(func.count(FaceDetection.id))
+                    .filter(FaceDetection.person_id == pid)
+                    .scalar()
+                    or 0
+                )
+                p = session.get(Person, pid)
+                if p is not None:
+                    p.face_count = int(cnt)
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"faces-auto-assign ({mode})")
+        typer.echo(
+            f"scanned={scanned} matched={matched} missing_face_emb={missing_face_emb} missing_ref_emb={missing_ref_emb} "
+            f"score_threshold={score_threshold:.3f} margin={margin:.3f} min_ref_faces={min_ref_faces} "
+            f"assign_all={assign_all} reference_manual_only={reference_manual_only}"
+        )
+        typer.echo(f"reference_persons={[(pid, name, nref) for pid, name, nref, _ in centroids]}")
+        typer.echo(f"matched_per_person={dict(sorted(per_person.items()))}")
+        if preview:
+            typer.echo("preview (face_id -> person):")
+            for fid, pid, pname, s, g in preview:
+                typer.echo(f"  {fid} -> {pid} ({pname}) score={s:.4f} gap={g:.4f}")
+
+
 @app.command("list-dead")
 def list_dead(page: int = 1, page_size: int = 50) -> None:
     """List dead-letter tasks."""
@@ -495,6 +748,7 @@ def validate_lvface() -> None:
     s = get_settings()
     # Show config (avoid printing MODEL_PATH when external dir is used)
     typer.echo(f"LVFACE_EXTERNAL_DIR={s.lvface_external_dir or '(none)'}")
+    typer.echo(f"LVFACE_PYTHON_EXE={s.lvface_python_exe or os.getenv('LVFACE_PYTHON_EXE','') or '(auto)'}")
     if s.lvface_external_dir:
         typer.echo(f"LVFACE_MODEL_NAME={s.lvface_model_name}")
     else:

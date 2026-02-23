@@ -402,11 +402,18 @@ function renderFaces(faces) {
   }
   root.innerHTML = faces
     .map(
-      (f) => `
+      (f) => {
+        const source = String(f.label_source || "").trim();
+        const score = typeof f.label_score === "number" ? f.label_score.toFixed(3) : "";
+        const sourceLine = source
+          ? `<p class="small muted">label=${esc(source)}${score ? ` score=${score}` : ""}</p>`
+          : `<p class="small muted">label=(none)</p>`;
+        return `
         <article class="face-card">
           <img src="/faces/${f.id}/crop?size=256" alt="face ${f.id}" />
           <div class="face-body">
             <p class="small muted">Face #${f.id}</p>
+            ${sourceLine}
             <select id="face-person-${f.id}">${personOptions(f.person_id)}</select>
             <div class="controls">
               <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">Assign</button>
@@ -415,7 +422,8 @@ function renderFaces(faces) {
             </div>
           </div>
         </article>
-      `
+      `;
+      }
     )
     .join("");
 }

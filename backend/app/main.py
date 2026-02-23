@@ -26,6 +26,7 @@ from . import schemas
 from typing import Generator, List
 from .services import assets as asset_service
 from .paths import DERIVED_PATH
+from .image_utils import safe_exif_transpose
 try:
     from . import metrics as metrics_mod  # optional module; guard usage below
 except Exception:
@@ -302,6 +303,7 @@ def health(request: Request, db_s: Session = Depends(get_db)):
             'embed_dim': embed_dim,
             'lvface_model_path': settings.lvface_model_path if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'lvface_external_dir': settings.lvface_external_dir if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
+            'lvface_python_exe': settings.lvface_python_exe if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'lvface_model_name': settings.lvface_model_name if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'detect_provider': face_detect_provider,
             'device': face_device,
@@ -484,7 +486,8 @@ def get_asset_thumbnail(asset_id: int, size: int = Query(256, ge=64, le=1024), d
         from PIL import Image
         thumb_path.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(source_path) as im:
-            rgb = im.convert('RGB')
+            upright = safe_exif_transpose(im)
+            rgb = upright.convert('RGB')
             rgb.thumbnail((size, size))
             rgb.save(thumb_path, 'JPEG', quality=86)
     except Exception as e:
@@ -971,7 +974,8 @@ def _ingest_asset_from_bytes(data: bytes, filename: str, db_s: Session) -> tuple
     try:
         from PIL import Image
         with Image.open(out_path) as im:
-            width, height = im.size
+            upright = safe_exif_transpose(im)
+            width, height = upright.size
     except Exception:
         pass
     asset = Asset(path=str(out_path.resolve()), hash_sha256=sha, width=width, height=height, file_size=len(data))

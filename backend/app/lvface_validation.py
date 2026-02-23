@@ -38,13 +38,22 @@ def validate_lvface_config() -> List[str]:
         if not external_dir.exists():
             raise LVFaceValidationError(f"LVFace external directory not found: {external_dir}")
         
-        # Check for Python executable
-        python_exe = external_dir / ".venv" / "Scripts" / "python.exe"
-        if not python_exe.exists():
-            # Try Unix path
-            python_exe = external_dir / ".venv" / "bin" / "python"
-            if not python_exe.exists():
-                raise LVFaceValidationError(f"LVFace Python executable not found in {external_dir}/.venv/")
+        # Check for Python executable (explicit env override first, then common defaults)
+        python_candidates = []
+        if settings.lvface_python_exe:
+            python_candidates.append(Path(settings.lvface_python_exe))
+        python_candidates.extend([
+            external_dir / ".venv-lvface-311" / "Scripts" / "python.exe",
+            external_dir / ".venv" / "Scripts" / "python.exe",
+            external_dir / ".venv-lvface-311" / "bin" / "python",
+            external_dir / ".venv" / "bin" / "python",
+        ])
+        python_exe = next((p for p in python_candidates if p.exists()), None)
+        if python_exe is None:
+            raise LVFaceValidationError(
+                "LVFace Python executable not found. Checked: "
+                + ", ".join(str(p) for p in python_candidates)
+            )
         
         # Check for models directory
         models_dir = external_dir / "models"
@@ -58,8 +67,11 @@ def validate_lvface_config() -> List[str]:
         
         # Check for inference script
         inference_script = external_dir / "inference.py"
-        if not inference_script.exists():
-            raise LVFaceValidationError(f"LVFace inference.py not found: {inference_script}")
+        inference_script_alt = external_dir / "src" / "inference_onnx.py"
+        if not inference_script.exists() and not inference_script_alt.exists():
+            raise LVFaceValidationError(
+                f"LVFace inference script not found: {inference_script} or {inference_script_alt}"
+            )
         
         logger.info(f"✓ External LVFace setup validated: {external_dir}")
         logger.info(f"✓ Model: {model_path}")
@@ -120,8 +132,9 @@ def get_config_summary() -> dict:
         summary.update({
             "external_dir": str(external_dir),
             "model_name": settings.lvface_model_name,
+            "python_exe": settings.lvface_python_exe or "",
             "model_exists": model_path.exists(),
-            "inference_script_exists": (external_dir / "inference.py").exists()
+            "inference_script_exists": (external_dir / "inference.py").exists() or (external_dir / "src" / "inference_onnx.py").exists()
         })
     else:
         model_path = Path(settings.lvface_model_path)

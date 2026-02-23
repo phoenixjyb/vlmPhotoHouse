@@ -3,6 +3,7 @@ from typing import List, Tuple, Dict, Optional, Any
 from pathlib import Path
 import threading
 import logging
+from .image_utils import safe_exif_transpose
 
 logger = logging.getLogger("vector_index")
 
@@ -232,7 +233,8 @@ class EmbeddingService:
         if self._clip_model is not None and self._clip_preprocess is not None:
             try:
                 from PIL import Image  # local import
-                image = Image.open(path).convert('RGB')
+                with Image.open(path) as _im:
+                    image = safe_exif_transpose(_im).convert('RGB')
                 image_in = self._clip_preprocess(image).unsqueeze(0)
                 import torch  # type: ignore
                 with torch.no_grad():

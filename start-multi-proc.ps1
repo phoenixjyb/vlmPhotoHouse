@@ -281,9 +281,26 @@ $env:CAPTION_GPU_DEVICE = "$rtx3090Index"
 
 # Face Processing Configuration  
 $env:FACE_EMBED_PROVIDER = if ($env:FACE_EMBED_PROVIDER) { $env:FACE_EMBED_PROVIDER } else { 'lvface' }
-$env:LVFACE_EXTERNAL_DIR = ''
 $env:LVFACE_MODEL_NAME = 'LVFace-B_Glint360K.onnx'
-$env:LVFACE_SERVICE_URL = "http://127.0.0.1:$LvfacePort"
+$lvfacePyCandidates = @(
+    (Join-Path $LvfaceDir '.venv-lvface-311\Scripts\python.exe'),
+    (Join-Path $LvfaceDir '.venv\Scripts\python.exe')
+)
+$lvfacePyExe = $null
+foreach ($cand in $lvfacePyCandidates) {
+    if (Test-Path -LiteralPath $cand) { $lvfacePyExe = $cand; break }
+}
+if ($lvfacePyExe) {
+    # Prefer dedicated LVFace environment for embedding subprocess calls.
+    $env:LVFACE_EXTERNAL_DIR = $LvfaceDir
+    $env:LVFACE_PYTHON_EXE = $lvfacePyExe
+    $env:LVFACE_SERVICE_URL = ''
+} else {
+    # Fallback to HTTP service path only if dedicated LVFace python is unavailable.
+    $env:LVFACE_EXTERNAL_DIR = ''
+    $env:LVFACE_PYTHON_EXE = ''
+    $env:LVFACE_SERVICE_URL = "http://127.0.0.1:$LvfacePort"
+}
 
 $env:LVFACE_SERVICE_HOST = '127.0.0.1'
 
@@ -311,6 +328,9 @@ Write-Host ""
 Write-Host "🎯 RTX 3090 Unified Configuration Applied:" -ForegroundColor Green
 Write-Host "  GPU Assignment: cuda:$rtx3090Index (RTX 3090) for ALL services" -ForegroundColor Cyan
 Write-Host "  VLM Engine: LVFace + BLIP2 on RTX 3090" -ForegroundColor Cyan
+if ($env:LVFACE_PYTHON_EXE) {
+    Write-Host "  LVFace env: $($env:LVFACE_PYTHON_EXE)" -ForegroundColor Cyan
+}
 Write-Host "  Voice Services: ASR + TTS on RTX 3090" -ForegroundColor Cyan
 Write-Host "  Caption Models: Direct RTX 3090 utilization" -ForegroundColor Cyan
 

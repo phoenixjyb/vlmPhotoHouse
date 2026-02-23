@@ -5,6 +5,7 @@ from sqlalchemy import select, or_, text, update
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
 from .config import get_settings
+from .image_utils import safe_exif_transpose
 from pathlib import Path
 from PIL import Image
 import imagehash
@@ -234,6 +235,7 @@ class TaskExecutor:
             if out_path.exists():
                 continue
             with Image.open(src) as im:
+                im = safe_exif_transpose(im)
                 im.thumbnail((size, size))
                 im.convert('RGB').save(out_path, 'JPEG', quality=85)
     def _handle_caption(self, session: Session, task: Task):
@@ -258,7 +260,8 @@ class TaskExecutor:
             from PIL import Image as _Im
             prov = get_caption_provider()
             with _Im.open(asset.path) as im:
-                text = prov.generate_caption(im.convert('RGB'))
+                upright = safe_exif_transpose(im)
+                text = prov.generate_caption(upright.convert('RGB'))
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
@@ -310,6 +313,35 @@ class TaskExecutor:
     def _handle_face(self, session: Session, task: Task):
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
+        force_redetect = bool(payload.get('force_redetect', False))
+        supplement_only = bool(payload.get('supplement_only', True))
+        dedupe_iou = float(payload.get('dedupe_iou', 0.60) or 0.60)
+        if dedupe_iou < 0.0:
+            dedupe_iou = 0.0
+        if dedupe_iou > 1.0:
+            dedupe_iou = 1.0
+
+        def _iou(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+            ax1, ay1, aw, ah = a
+            bx1, by1, bw, bh = b
+            ax2 = ax1 + aw
+            ay2 = ay1 + ah
+            bx2 = bx1 + bw
+            by2 = by1 + bh
+            ix1 = max(ax1, bx1)
+            iy1 = max(ay1, by1)
+            ix2 = min(ax2, bx2)
+            iy2 = min(ay2, by2)
+            iw = max(0.0, ix2 - ix1)
+            ih = max(0.0, iy2 - iy1)
+            inter = iw * ih
+            if inter <= 0.0:
+                return 0.0
+            union = (aw * ah) + (bw * bh) - inter
+            if union <= 0.0:
+                return 0.0
+            return inter / union
+
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError(f'Asset {asset_id} not found for face task')
@@ -317,7 +349,7 @@ class TaskExecutor:
         if not src.exists():
             raise FileNotFoundError(src)
         faces = session.query(FaceDetection).filter(FaceDetection.asset_id==asset.id).all()
-        if not faces:
+        if force_redetect or not faces:
             # Run detection provider
             try:
                 from .face_detection_service import get_face_detection_provider
@@ -326,7 +358,8 @@ class TaskExecutor:
                 import time as _t
                 t0_det = _t.time()
                 with _Im.open(src) as im_det:
-                    dets = provider.detect(im_det.convert('RGB'))
+                    upright = safe_exif_transpose(im_det)
+                    dets = provider.detect(upright.convert('RGB'))
                 try:  # pragma: no cover
                     import app.metrics as m
                     prov_name = type(provider).__name__.replace('DetectionProvider','').lower()
@@ -340,19 +373,26 @@ class TaskExecutor:
                 if os.getenv('FACE_DETECT_CENTER_FALLBACK', 'false').lower() in ('1', 'true', 'yes'):
                     from PIL import Image as _Im
                     with _Im.open(src) as im_det:
-                        w,h = im_det.size
+                        w,h = safe_exif_transpose(im_det).size
                     size = min(w,h)*0.4
                     dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size})())
                 else:
                     logger.warning(f"Face detection failed for asset_id={asset.id}; skipping fallback box insertion", exc_info=True)
+            existing_boxes = [(float(f.bbox_x), float(f.bbox_y), float(f.bbox_w), float(f.bbox_h)) for f in faces]
             for d in dets:
-                face = FaceDetection(asset_id=asset.id, bbox_x=float(d.x), bbox_y=float(d.y), bbox_w=float(d.w), bbox_h=float(d.h), embedding_path=None)
+                cand = (float(d.x), float(d.y), float(d.w), float(d.h))
+                is_dup = any(_iou(cand, box) >= dedupe_iou for box in existing_boxes)
+                if is_dup and supplement_only:
+                    continue
+                face = FaceDetection(asset_id=asset.id, bbox_x=cand[0], bbox_y=cand[1], bbox_w=cand[2], bbox_h=cand[3], embedding_path=None)
                 session.add(face)
+                existing_boxes.append(cand)
             session.flush()
             faces = session.query(FaceDetection).filter(FaceDetection.asset_id==asset.id).all()
         # Generate / ensure crops
         out_dir = DERIVED_DIR / 'faces' / '256'
-        with Image.open(src) as im:
+        with Image.open(src) as im_raw:
+            im = safe_exif_transpose(im_raw)
             w, h = im.size
             for face in faces:
                 crop_path = out_dir / f"{face.id}.jpg"
@@ -499,6 +539,8 @@ class TaskExecutor:
                     person.embedding_path = str(emb_path)
                 person.face_count += 1
                 face.person_id = person.id
+                face.label_source = 'dnn'  # type: ignore[attr-defined]
+                face.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
                 assignments += 1
             else:
                 # create new person
@@ -510,6 +552,8 @@ class TaskExecutor:
                 person.embedding_path = str(emb_path)
                 person_centroids[person.id] = fvec
                 face.person_id = person.id
+                face.label_source = 'dnn'  # type: ignore[attr-defined]
+                face.label_score = 1.0  # type: ignore[attr-defined]
                 persons.append(person)
                 new_persons_created += 1
                 assignments += 1
@@ -579,6 +623,8 @@ class TaskExecutor:
             if best_pid is not None and best_dist <= FACE_CLUSTER_DIST_THRESHOLD:
                 # assign
                 f.person_id = best_pid
+                f.label_source = 'dnn'  # type: ignore[attr-defined]
+                f.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
                 p = next(p for p in persons if p.id == best_pid)
                 # update centroid
                 new_c = (person_centroids[best_pid]*p.face_count + vec) / (p.face_count+1)
@@ -596,6 +642,8 @@ class TaskExecutor:
                 p.embedding_path = str(emb_path)
                 person_centroids[p.id] = vec
                 f.person_id = p.id
+                f.label_source = 'dnn'  # type: ignore[attr-defined]
+                f.label_score = 1.0  # type: ignore[attr-defined]
                 persons.append(p)
                 new_persons +=1
             # update progress
@@ -621,7 +669,8 @@ class TaskExecutor:
             return
         try:
             with Image.open(p) as im:
-                w, h = im.size
+                upright = safe_exif_transpose(im)
+                w, h = upright.size
             asset.width = w
             asset.height = h
             session.commit()
@@ -654,7 +703,8 @@ class TaskExecutor:
             return
         try:
             with Image.open(p) as im:
-                ph = imagehash.phash(im)
+                upright = safe_exif_transpose(im)
+                ph = imagehash.phash(upright)
             asset.perceptual_hash = ph.__str__()
             session.commit()
         except Exception:

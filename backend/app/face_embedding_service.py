@@ -291,7 +291,8 @@ def _build_provider(provider: str, device_req: str, target_dim: int) -> FaceEmbe
         if lvface_external_dir:
             from .lvface_subprocess import LVFaceSubprocessProvider
             model_name = os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx')
-            return LVFaceSubprocessProvider(lvface_external_dir, model_name, target_dim)
+            python_exe = os.getenv('LVFACE_PYTHON_EXE', '').strip() or None
+            return LVFaceSubprocessProvider(lvface_external_dir, model_name, target_dim, python_exe=python_exe)
 
         return LVFaceEmbeddingProvider(s.lvface_model_path, 'cuda' if device_req=='cuda' else 'cpu', target_dim)
     raise RuntimeError(f'Unknown provider {provider}')

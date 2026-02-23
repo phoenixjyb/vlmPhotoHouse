@@ -95,6 +95,8 @@ class FaceDetection(Base):
     bbox_h: Mapped[float] = mapped_column(Float, nullable=False)
     person_id: Mapped[Optional[int]] = mapped_column(ForeignKey('persons.id', ondelete='SET NULL'), nullable=True, index=True)
     embedding_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    label_source: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)  # manual|dnn
+    label_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
 
     asset = relationship('Asset', back_populates='faces')
