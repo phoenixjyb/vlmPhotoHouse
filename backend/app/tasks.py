@@ -1,4 +1,6 @@
 import os, json, time, random, numpy as np
+import subprocess
+import tempfile
 import threading
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_, text, update
@@ -243,6 +245,62 @@ class TaskExecutor:
                 im = safe_exif_transpose(im)
                 im.thumbnail((size, size))
                 im.convert('RGB').save(out_path, 'JPEG', quality=85)
+
+    def _load_caption_image(self, asset: Asset) -> Image.Image:
+        """Load an image for captioning, including representative frame extraction for videos."""
+        from PIL import Image as _Im
+
+        path = str(asset.path)
+        mime = (asset.mime or '').lower()
+        is_video = mime.startswith('video/')
+        if not is_video:
+            ext = Path(path).suffix.lower()
+            is_video = ext in {'.mp4', '.mov', '.m4v', '.avi', '.mkv', '.webm', '.wmv'}
+
+        if not is_video:
+            with _Im.open(path) as im:
+                return safe_exif_transpose(im).convert('RGB')
+
+        # Video captioning path: extract a representative frame with ffmpeg.
+        tmp_dir = os.getenv('VLM_TMP_DIR') or tempfile.gettempdir()
+        os.makedirs(tmp_dir, exist_ok=True)
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False, dir=tmp_dir) as tmp:
+            frame_path = tmp.name
+
+        duration = float(asset.duration_sec or 0.0)
+        seek_candidates = []
+        if duration > 0.0:
+            seek_candidates.append(max(0.0, duration * 0.5))
+            seek_candidates.append(max(0.0, duration * 0.1))
+        seek_candidates.append(0.0)
+
+        extracted = False
+        last_err = None
+        try:
+            for seek in seek_candidates:
+                cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y']
+                if seek > 0.0:
+                    cmd += ['-ss', f"{seek:.3f}"]
+                cmd += ['-i', path, '-frames:v', '1', frame_path]
+                try:
+                    subprocess.run(cmd, check=True, timeout=90, capture_output=True)
+                    if os.path.exists(frame_path) and os.path.getsize(frame_path) > 0:
+                        extracted = True
+                        break
+                except Exception as e:
+                    last_err = e
+
+            if not extracted:
+                raise RuntimeError(f"Unable to extract video frame for captioning: {last_err}")
+
+            with _Im.open(frame_path) as im:
+                return safe_exif_transpose(im).convert('RGB')
+        finally:
+            try:
+                os.unlink(frame_path)
+            except OSError:
+                pass
+
     def _handle_caption(self, session: Session, task: Task):
         """Generate a caption (or variant) for an asset and update status fields."""
         payload = task.payload_json or {}
@@ -262,11 +320,9 @@ class TaskExecutor:
         err = None
         try:
             from .caption_service import get_caption_provider
-            from PIL import Image as _Im
             prov = get_caption_provider()
-            with _Im.open(asset.path) as im:
-                upright = safe_exif_transpose(im)
-                text = prov.generate_caption(upright.convert('RGB'))
+            caption_image = self._load_caption_image(asset)
+            text = prov.generate_caption(caption_image)
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
