@@ -6,7 +6,7 @@ This folder contains outdated documentation that has been superseded by newer ve
 
 ### Superseded Documentation
 - **[prd.md](./prd.md)** → Replaced by [prd-v02.md](../project/prd-v02.md)
-- **[architecture.md](./architecture.md)** → Replaced by [architecture-v2.md](../architecture/architecture-v2.md)
+- **[architecture.md](./architecture.md)** → Replaced by [SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md](../architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)
 - **[ops-and-maintenance.md](./ops-and-maintenance.md)** → Replaced by [operations.md](../operations/operations.md)
 - **[security-privacy.md](./security-privacy.md)** → Replaced by [security.md](../security/security.md)
 

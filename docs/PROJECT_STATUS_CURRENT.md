@@ -18,6 +18,7 @@ Architecture companion:
 - Face embed provider: `LVFaceSubprocessProvider` (GPU/CUDA path)
 - Face detect provider: `InsightFaceDetectionProvider`
 - Caption provider: `HTTPCaptionProvider` (`http://127.0.0.1:8102`)
+- Caption service default: `qwen3-vl` (`Qwen/Qwen3-VL-8B-Instruct`, 4-bit nf4)
 
 ## Entry Point
 Use `scripts/start-dev-multiproc.ps1` as the main local entry point.

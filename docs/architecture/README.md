@@ -8,7 +8,7 @@ This section contains the technical architecture documentation for the VLM Photo
 - **[System Architecture Snapshot (2026-02-24)](./SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** - Current as-running/as-coded architecture baseline
 
 ### Core Architecture
-- **[Architecture Overview](./architecture-v2.md)** - Main system design document
+- **[Architecture Snapshot](./SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** - Current system design document
 - **[Visual Architecture](./architecture-diagrams.md)** - Mermaid diagrams showing system flows
 - **[Data Model](./data-model.md)** - Database schema and relationships
 
@@ -50,7 +50,7 @@ The VLM Photo Engine uses a **dual environment architecture**:
 - Env-configurable base URL and paths; proxy bypasses system proxies
 
 ### External Models Environment (`vlmCaptionModels/.venv`)
-- AI model inference (BLIP2, Qwen2.5-VL)
+- AI model inference (Qwen3-VL default, Qwen2.5-VL compatibility, BLIP2 fallback)
 - Face recognition (LVFace, MTCNN)
 - 20.96 GB of local model storage
 - JSON IPC communication with backend
@@ -80,10 +80,10 @@ Photos → Scan → Hash → Metadata → Queue Tasks
 
 The system uses a **pluggable provider pattern** for AI models:
 
-- **Caption Providers**: BLIP2 (production), Qwen2.5-VL (development)
+- **Caption Providers**: Qwen3-VL (default), Qwen2.5-VL (compatibility), BLIP2 (fallback)
 - **Face Providers**: LVFace, MTCNN, Facenet, InsightFace
 - **Health Monitoring**: Each provider has dedicated health endpoints
-- **JSON IPC**: Subprocess communication for external model integration
+- **IPC + HTTP**: Both subprocess JSON IPC and local HTTP caption service are supported
 
 ---
 
@@ -91,7 +91,7 @@ The system uses a **pluggable provider pattern** for AI models:
 
 ### ✅ Completed
 - Dual environment setup
-- BLIP2 caption generation
+- Qwen3-VL caption generation over local HTTP
 - LVFace integration
 - Health monitoring framework
 - Multi-provider architecture

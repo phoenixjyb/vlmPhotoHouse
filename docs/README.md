@@ -26,7 +26,7 @@ Welcome to the VLM Photo Engine documentation! This local-first AI photo engine 
 |----------|---------|----------|
 | **[Current Architecture Snapshot](./architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** | Live/runtime and code-verified architecture baseline | Developers/Operators |
 | **[Product Requirements](./project/prd-v02.md)** | What we're building and why | All |
-| **[Architecture](./architecture/architecture-v2.md)** | System design and implementation | Developers |
+| **[Architecture](./architecture/README.md)** | System design and implementation | Developers |
 | **[Roadmap](./project/roadmap.md)** | Project progress and next steps | All |
 
 ### Implementation Guides
@@ -56,7 +56,7 @@ Welcome to the VLM Photo Engine documentation! This local-first AI photo engine 
 ## 🎯 Current System Status (August 2025)
 
 ### ✅ Production Ready
-- **Caption Generation**: BLIP2 model integrated and working
+- **Caption Generation**: Qwen3-VL integrated (local HTTP + subprocess paths)
 - **Person Recognition**: LVFace model with face detection
 - **Dual Environment**: Backend + External AI models architecture
 - **Health Monitoring**: Comprehensive system status validation

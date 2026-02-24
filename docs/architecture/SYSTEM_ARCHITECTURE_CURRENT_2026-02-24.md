@@ -13,6 +13,7 @@ This document reflects the current architecture from live runtime checks plus cu
 - Face embedding provider: `LVFaceSubprocessProvider` on `cuda`
 - Face detection provider: `InsightFaceDetectionProvider`
 - Caption provider: `HTTPCaptionProvider`
+- Caption service: `http://127.0.0.1:8102` (active provider `qwen3-vl`)
 
 Live data snapshot:
 - Assets: `12,336` (image/jpeg: `9,972`; video/mp4: `2,356`)
@@ -87,6 +88,15 @@ Provider layer:
 ### 5.2 Captioning
 
 - Default active mode is HTTP caption provider (`/caption` on caption service).
+- Current default model path is Qwen3 over HTTP:
+  - Caption service provider: `qwen3-vl`
+  - Model: `Qwen/Qwen3-VL-8B-Instruct` (4-bit `nf4`)
+- Provider routing behavior in backend (`backend/app/caption_service.py`):
+  - If `CAPTION_PROVIDER=http`: use `HTTPCaptionProvider` -> `CAPTION_SERVICE_URL`.
+  - Else if `CAPTION_EXTERNAL_DIR` is set: use subprocess provider via `backend/app/caption_subprocess.py`.
+  - Else: use built-in in-process provider classes.
+- Qwen aliases supported in routing: `qwen2.5-vl`, `qwen3-vl`, `qwen3`, `qwen`.
+- Caption task now supports videos by extracting a representative frame with `ffmpeg` before VLM caption generation (`backend/app/tasks.py`).
 - Captions stored in `captions` table with variant metadata:
   - `quality_tier`, `model_version`, `superseded`, `user_edited`.
 - Asset-level status fields maintained in `assets`:
@@ -158,7 +168,7 @@ Face detection providers:
 - `stub`, `mtcnn`, `insight/scrfd`, `auto`
 
 Caption providers:
-- `stub`, `http`, `blip2`, `llava`, `qwen2.5-vl`, `auto`
+- `stub`, `http`, `blip2`, `llava`, `qwen2.5-vl`, `qwen3-vl`, `qwen3`, `auto`
 - External subprocess path supported when `CAPTION_EXTERNAL_DIR` is set.
 
 Voice:
