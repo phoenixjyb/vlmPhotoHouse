@@ -389,7 +389,7 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
             CaptionSubprocessProvider
         )
         model_name = getattr(settings, 'caption_model', 'auto')
-        if provider in ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl'):
+        if provider in ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl', 'qwen3-vl', 'qwen3'):
             return Qwen2VLSubprocessProvider(caption_external_dir, model_name, device)
         elif provider in ('llava', 'llava_next', 'llava-next'):
             return LlavaNextSubprocessProvider(caption_external_dir, model_name, device)
@@ -405,8 +405,8 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     elif provider in ('llava', 'llava_next'):
         model_name = os.getenv('LLAVA_MODEL_NAME', 'llava-hf/llava-v1.6-mistral-7b-hf')
         return LlavaNextCaptionProvider(model_name, device)
-    elif provider in ('qwen2vl', 'qwen', 'qwen2.5-vl'):
-        model_name = os.getenv('QWEN2VL_MODEL_NAME', 'Qwen/Qwen2-VL-7B-Instruct')
+    elif provider in ('qwen2vl', 'qwen', 'qwen2.5-vl', 'qwen3-vl', 'qwen3'):
+        model_name = os.getenv('QWEN2VL_MODEL_NAME', 'Qwen/Qwen3-VL-8B-Instruct')
         return Qwen2VLCaptionProvider(model_name, device)
     elif provider == 'blip2':
         model_name = os.getenv('BLIP2_MODEL_NAME', 'Salesforce/blip2-opt-2.7b')

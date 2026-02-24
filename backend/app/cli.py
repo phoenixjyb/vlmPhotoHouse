@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import typer
 from typing import List, Optional
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, or_
 from sqlalchemy.orm import sessionmaker
 
 from . import db
 from .config import get_settings
 from . import ingest as ingest_mod
+from .face_assignment_audit import record_face_assignment_event
 
 app = typer.Typer(add_completion=False, help="VLM Photo Engine CLI (dev)")
 
@@ -349,6 +350,7 @@ def faces_auto_assign(
     min_ref_faces: int = typer.Option(10, min=2, help="Minimum labeled faces per person to build a centroid"),
     assign_all: bool = typer.Option(False, help="Assign every evaluated unassigned face to top-1 candidate (ignores threshold/margin)"),
     reference_manual_only: bool = typer.Option(True, help="Use only manually labeled faces as centroid reference"),
+    include_dnn_assigned: bool = typer.Option(False, help="Also re-evaluate currently DNN-labeled faces (manual labels are never touched)"),
     root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter"),
     limit: int = typer.Option(0, min=0, help="Max unassigned faces to evaluate (0 = all)"),
     name: Optional[List[str]] = typer.Option(None, "--name", help="Restrict target people names (repeat option)"),
@@ -428,14 +430,23 @@ def faces_auto_assign(
             )
             return
 
-        # Query unassigned candidate faces
+        # Query candidate faces
         q = (
-            session.query(FaceDetection.id, FaceDetection.embedding_path, Asset.path)
+            session.query(
+                FaceDetection.id,
+                FaceDetection.embedding_path,
+                Asset.path,
+                FaceDetection.person_id,
+                FaceDetection.label_source,
+            )
             .join(Asset, Asset.id == FaceDetection.asset_id)
-            .filter(FaceDetection.person_id == None)
             .filter(FaceDetection.embedding_path != None)
             .order_by(FaceDetection.id.asc())
         )
+        if include_dnn_assigned:
+            q = q.filter(or_(FaceDetection.person_id == None, FaceDetection.label_source == 'dnn'))
+        else:
+            q = q.filter(FaceDetection.person_id == None)
         if root:
             prefix = str(_Path(root).resolve())
             q = q.filter(Asset.path.like(prefix + "%"))
@@ -445,12 +456,13 @@ def faces_auto_assign(
 
         scanned = 0
         matched = 0
+        changed = 0
         missing_face_emb = 0
         affected: set[int] = set()
         per_person: dict[str, int] = _dd(int)
         preview: list[tuple[int, int, str, float, float]] = []
 
-        for fid, ep, _asset_path in rows:
+        for fid, ep, _asset_path, current_person_id, current_label_source in rows:
             scanned += 1
             p = _resolve_emb_path(str(ep))
             if not p.exists():
@@ -474,17 +486,41 @@ def faces_auto_assign(
             gap = best_score - second_score
             if not assign_all and (best_score < score_threshold or gap < margin):
                 continue
+            current_pid_int = int(current_person_id) if current_person_id is not None else None
+            new_pid_int = int(best_pid)
+            # For full-batch refresh mode, skip no-op candidates that would keep same DNN label.
+            if include_dnn_assigned and current_label_source == 'dnn' and current_pid_int == new_pid_int:
+                continue
             matched += 1
             per_person[best_name] += 1
-            affected.add(int(best_pid))
+            affected.add(new_pid_int)
+            if current_pid_int is not None:
+                affected.add(current_pid_int)
             if len(preview) < 25:
-                preview.append((int(fid), int(best_pid), best_name, float(best_score), float(gap)))
+                preview.append((int(fid), new_pid_int, best_name, float(best_score), float(gap)))
             if apply:
                 face = session.get(FaceDetection, int(fid))
-                if face is not None and face.person_id is None:
-                    face.person_id = int(best_pid)
+                if face is not None and (face.person_id is None or getattr(face, 'label_source', None) == 'dnn'):
+                    old_person_id = int(face.person_id) if face.person_id is not None else None
+                    old_label_source = getattr(face, 'label_source', None)
+                    old_label_score = getattr(face, 'label_score', None)
+                    face.person_id = new_pid_int
                     face.label_source = 'dnn'
                     face.label_score = float(best_score)
+                    if record_face_assignment_event(
+                        session,
+                        face=face,
+                        source='dnn',
+                        reason='cli.faces-auto-assign',
+                        actor='cli',
+                        old_person_id=old_person_id,
+                        new_person_id=new_pid_int,
+                        old_label_source=old_label_source,
+                        new_label_source='dnn',
+                        old_label_score=float(old_label_score) if old_label_score is not None else None,
+                        new_label_score=float(best_score),
+                    ):
+                        changed += 1
                 if matched % commit_every == 0:
                     session.commit()
 
@@ -507,9 +543,11 @@ def faces_auto_assign(
         mode = "APPLY" if apply else "DRY-RUN"
         typer.echo(f"faces-auto-assign ({mode})")
         typer.echo(
-            f"scanned={scanned} matched={matched} missing_face_emb={missing_face_emb} missing_ref_emb={missing_ref_emb} "
+            f"scanned={scanned} matched={matched} changed={changed if apply else 'n/a'} "
+            f"missing_face_emb={missing_face_emb} missing_ref_emb={missing_ref_emb} "
             f"score_threshold={score_threshold:.3f} margin={margin:.3f} min_ref_faces={min_ref_faces} "
-            f"assign_all={assign_all} reference_manual_only={reference_manual_only}"
+            f"assign_all={assign_all} reference_manual_only={reference_manual_only} "
+            f"include_dnn_assigned={include_dnn_assigned}"
         )
         typer.echo(f"reference_persons={[(pid, name, nref) for pid, name, nref, _ in centroids]}")
         typer.echo(f"matched_per_person={dict(sorted(per_person.items()))}")

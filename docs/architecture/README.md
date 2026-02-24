@@ -4,6 +4,9 @@ This section contains the technical architecture documentation for the VLM Photo
 
 ## 📋 Quick Reference
 
+### Current Snapshot (Use First)
+- **[System Architecture Snapshot (2026-02-24)](./SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** - Current as-running/as-coded architecture baseline
+
 ### Core Architecture
 - **[Architecture Overview](./architecture-v2.md)** - Main system design document
 - **[Visual Architecture](./architecture-diagrams.md)** - Mermaid diagrams showing system flows

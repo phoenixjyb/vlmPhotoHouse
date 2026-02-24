@@ -137,6 +137,12 @@ def ensure_db():
                 Base.metadata.tables['video_segments'].create(bind=engine)  # type: ignore
             except Exception:
                 pass
+        # Create face_assignment_events table if missing (SQLite/backward-compat DBs)
+        if not insp.has_table('face_assignment_events'):
+            try:
+                Base.metadata.tables['face_assignment_events'].create(bind=engine)  # type: ignore
+            except Exception:
+                pass
         _DB_READY = True
     except Exception as e:
         print(f"Database initialization error: {e}")

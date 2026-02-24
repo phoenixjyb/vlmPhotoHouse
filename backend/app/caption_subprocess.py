@@ -150,11 +150,11 @@ class CaptionSubprocessProvider:
 class Qwen2VLSubprocessProvider(CaptionSubprocessProvider):
     """Qwen2.5-VL specific subprocess provider."""
     
-    def __init__(self, caption_dir: str, model_name: str = "Qwen/Qwen2.5-VL-7B-Instruct", device: str | None = None):
+    def __init__(self, caption_dir: str, model_name: str = "Qwen/Qwen3-VL-8B-Instruct", device: str | None = None):
         super().__init__(caption_dir, "qwen2.5-vl", model_name, device)
         
     def get_model_name(self) -> str:
-        return f"qwen2.5-vl-external ({self.model_name})"
+        return f"qwen-vl-external ({self.model_name})"
 
 
 class LlavaNextSubprocessProvider(CaptionSubprocessProvider):

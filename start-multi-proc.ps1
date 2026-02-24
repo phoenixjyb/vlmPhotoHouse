@@ -310,6 +310,11 @@ $env:CAPTION_PROVIDER = if ($env:CAPTION_PROVIDER) { $env:CAPTION_PROVIDER } els
 $env:CAPTION_SERVICE_URL = "http://127.0.0.1:$CaptionPort"
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'
+$env:CAPTION_HTTP_PROVIDER = if ($env:CAPTION_HTTP_PROVIDER) { $env:CAPTION_HTTP_PROVIDER } else { 'qwen3-vl' }
+$env:CAPTION_HTTP_MODEL = if ($env:CAPTION_HTTP_MODEL) { $env:CAPTION_HTTP_MODEL } else { 'auto' }
+$env:QWEN2VL_MODEL_NAME = if ($env:QWEN2VL_MODEL_NAME) { $env:QWEN2VL_MODEL_NAME } else { 'Qwen/Qwen3-VL-8B-Instruct' }
+$env:QWEN2VL_LOAD_IN_4BIT = if ($env:QWEN2VL_LOAD_IN_4BIT) { $env:QWEN2VL_LOAD_IN_4BIT } else { 'true' }
+$env:QWEN2VL_4BIT_QUANT_TYPE = if ($env:QWEN2VL_4BIT_QUANT_TYPE) { $env:QWEN2VL_4BIT_QUANT_TYPE } else { 'nf4' }
 $env:ENABLE_INLINE_WORKER = 'true'
 $env:WORKER_CONCURRENCY = '4'
 
@@ -367,7 +372,7 @@ function New-MainApiPane {
         "& `"$pyExe`" -c `"import torch; print('RTX 3090 Available:', torch.cuda.is_available()); print('Device 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'); print(f'Device 0 Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB' if torch.cuda.is_available() else '')`"",
         "",
         "# Test caption provider configuration",
-        "Write-Host '🔍 Testing BLIP2 caption provider...' -ForegroundColor Cyan",
+        "Write-Host '🔍 Testing caption provider...' -ForegroundColor Cyan",
         "& `"$pyExe`" -c `"from app.caption_service import get_caption_provider; provider = get_caption_provider(); print(f'Caption Provider: {type(provider).__name__}'); print(f'Model: {provider.get_model_name()}')`"",
         "",
         "# Start main FastAPI server",
@@ -396,7 +401,7 @@ function New-CaptionModelsPane {
 
     $content = @(
         "Set-Location -LiteralPath `"$CaptionDir`"",
-        "Write-Host '🖼️ Caption Models HTTP Service - BLIP2 Only' -ForegroundColor Green",
+        "Write-Host '🖼️ Caption Models HTTP Service' -ForegroundColor Green",
         "Write-Host 'Dedicated caption service | Port $CaptionPort | RTX 3090' -ForegroundColor Yellow",
         "",
         "# Activate caption environment",
@@ -415,13 +420,13 @@ function New-CaptionModelsPane {
         "",
         "Write-Host '🚀 Starting Caption Models HTTP Server...' -ForegroundColor Cyan",
         "Write-Host '📍 Service URL: http://127.0.0.1:$CaptionPort' -ForegroundColor White",
-        "Write-Host '🎯 Model: BLIP2-OPT-2.7B (6GB VRAM)' -ForegroundColor Gray",
+        "Write-Host '🎯 Provider: $($env:CAPTION_HTTP_PROVIDER) | Model: $($env:CAPTION_HTTP_MODEL)' -ForegroundColor Gray",
         "Write-Host '🖥️ Device: RTX 3090 (cuda:1)' -ForegroundColor Gray",
         "",
-        "# Start HTTP server with BLIP2 model (skip if one is already healthy)",
+        "# Start HTTP server with selected provider (skip if one is already healthy)",
         "`$existing = try { (Invoke-RestMethod -Uri 'http://127.0.0.1:$CaptionPort/health' -TimeoutSec 2 -ErrorAction SilentlyContinue) } catch { `$null }",
         "if (-not `$existing -or `$existing.status -ne 'healthy') {",
-        "    & `"$pyExe`" caption_server.py --host 127.0.0.1 --port $CaptionPort --provider blip2",
+        "    & `"$pyExe`" caption_server.py --host 127.0.0.1 --port $CaptionPort --provider $($env:CAPTION_HTTP_PROVIDER) --model $($env:CAPTION_HTTP_MODEL)",
         "} else {",
         "    Write-Host '✅ Existing Caption Models service detected on :$CaptionPort, using existing' -ForegroundColor Yellow",
         "}"

@@ -102,6 +102,23 @@ class FaceDetection(Base):
     asset = relationship('Asset', back_populates='faces')
     person = relationship('Person', back_populates='faces')
 
+class FaceAssignmentEvent(Base):
+    __tablename__ = 'face_assignment_events'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    face_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    asset_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    old_person_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    new_person_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    old_label_source: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    new_label_source: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    old_label_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    new_label_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, index=True)  # manual|dnn|system
+    reason: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    actor: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now(), index=True)
+
 class VideoSegment(Base):
     __tablename__ = 'video_segments'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -132,6 +149,8 @@ class Task(Base):
 
 Index('idx_task_state_priority', Task.state, Task.priority, Task.scheduled_at)
 Index('idx_task_type_state', Task.type, Task.state)
+Index('idx_face_assignment_events_face_created', FaceAssignmentEvent.face_id, FaceAssignmentEvent.created_at)
+Index('idx_face_assignment_events_person_created', FaceAssignmentEvent.new_person_id, FaceAssignmentEvent.created_at)
 
 Index('idx_embeddings_asset_mod', Embedding.asset_id, Embedding.modality, unique=True)
 

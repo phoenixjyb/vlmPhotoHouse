@@ -24,6 +24,7 @@ Welcome to the VLM Photo Engine documentation! This local-first AI photo engine 
 ### Core Documentation
 | Document | Purpose | Audience |
 |----------|---------|----------|
+| **[Current Architecture Snapshot](./architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** | Live/runtime and code-verified architecture baseline | Developers/Operators |
 | **[Product Requirements](./project/prd-v02.md)** | What we're building and why | All |
 | **[Architecture](./architecture/architecture-v2.md)** | System design and implementation | Developers |
 | **[Roadmap](./project/roadmap.md)** | Project progress and next steps | All |

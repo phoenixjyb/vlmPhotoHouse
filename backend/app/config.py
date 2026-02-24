@@ -63,7 +63,7 @@ class Settings(BaseModel):
     lvface_python_exe: str = Field(default=os.getenv('LVFACE_PYTHON_EXE', ''))  # Optional dedicated python for external LVFace subprocess
     lvface_model_name: str = Field(default=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'))  # Model filename in external dir
     lvface_service_url: str = Field(default=os.getenv('LVFACE_SERVICE_URL', ''))  # Optional LVFace HTTP service URL
-    caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|auto|http
+    caption_provider: str = Field(default=os.getenv('CAPTION_PROVIDER', 'stub'))  # stub|blip2|llava|qwen2.5-vl|qwen3-vl|auto|http
     caption_device: str = Field(default=os.getenv('CAPTION_DEVICE', 'cpu'))  # cpu|cuda
     caption_model: str = Field(default=os.getenv('CAPTION_MODEL', 'auto'))  # model name override
     caption_external_dir: str = Field(default=os.getenv('CAPTION_EXTERNAL_DIR', ''))  # Path to external caption models installation

@@ -5,6 +5,9 @@ Last Updated: 2026-02-24
 ## Scope
 This document is the operational handoff for any new agent joining this repository. It reflects the current production-like local setup on Windows with data rooted on Drive E.
 
+Architecture companion:
+- `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
+
 ## Current Ground Truth
 - Repository: `vlmPhotoHouse` (branch `master`)
 - API: `http://127.0.0.1:8002`
@@ -82,9 +85,19 @@ Run targeted auto-assign for selected names:
 .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --name jane --name jane_newborn --name yanbo --name chuan --apply --limit 0
 ```
 
+Run full-batch refresh using latest manual labels (re-evaluate unassigned + existing DNN labels):
+```powershell
+.\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --include-dnn-assigned --apply --limit 0
+```
+
 Health check:
 ```powershell
 Invoke-RestMethod -Uri http://127.0.0.1:8002/health
+```
+
+Inspect face assignment audit history:
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8002/faces/assignment-history?page=1&page_size=50"
 ```
 
 ## Next Priorities

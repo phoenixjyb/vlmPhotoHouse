@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, Body, Query, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import List, Optional
 from pathlib import Path
 
-from ..db import Person, FaceDetection, Asset, Task
+from ..db import Person, FaceDetection, Asset, Task, FaceAssignmentEvent
 from ..dependencies import get_db
 from ..paths import DERIVED_PATH
+from ..face_assignment_audit import record_face_assignment_event
 from .. import schemas
 
 router = APIRouter()
@@ -141,6 +142,75 @@ def list_faces(
         ],
     }
 
+@router.get('/faces/assignment-history', response_model=schemas.FaceAssignmentHistoryResponse)
+def list_face_assignment_history(
+    face_id: int | None = Query(None),
+    person_id: int | None = Query(None),
+    source: str | None = Query(None),
+    reason: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    db_s: Session = Depends(get_db),
+):
+    q = db_s.query(FaceAssignmentEvent)
+    if face_id is not None:
+        q = q.filter(FaceAssignmentEvent.face_id == face_id)
+    if person_id is not None:
+        q = q.filter(
+            or_(
+                FaceAssignmentEvent.old_person_id == person_id,
+                FaceAssignmentEvent.new_person_id == person_id,
+            )
+        )
+    if source and source.strip():
+        q = q.filter(FaceAssignmentEvent.source == source.strip())
+    if reason and reason.strip():
+        q = q.filter(FaceAssignmentEvent.reason == reason.strip())
+    total = q.count()
+    events = (
+        q.order_by(FaceAssignmentEvent.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    person_ids = {
+        int(pid)
+        for e in events
+        for pid in [e.old_person_id, e.new_person_id]
+        if pid is not None
+    }
+    name_map = {}
+    if person_ids:
+        rows = db_s.query(Person.id, Person.display_name).filter(Person.id.in_(person_ids)).all()
+        name_map = {int(pid): pname for pid, pname in rows}
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'events': [
+            {
+                'id': e.id,
+                'face_id': e.face_id,
+                'asset_id': e.asset_id,
+                'old_person_id': e.old_person_id,
+                'new_person_id': e.new_person_id,
+                'old_person_name': name_map.get(int(e.old_person_id)) if e.old_person_id is not None else None,
+                'new_person_name': name_map.get(int(e.new_person_id)) if e.new_person_id is not None else None,
+                'old_label_source': e.old_label_source,
+                'new_label_source': e.new_label_source,
+                'old_label_score': e.old_label_score,
+                'new_label_score': e.new_label_score,
+                'source': e.source,
+                'reason': e.reason,
+                'task_id': e.task_id,
+                'actor': e.actor,
+                'created_at': str(e.created_at) if e.created_at else None,
+            }
+            for e in events
+        ],
+    }
+
 @router.get('/faces/{face_id}')
 def get_face(face_id: int, db_s: Session = Depends(get_db)):
     face = db_s.get(FaceDetection, face_id)
@@ -180,9 +250,25 @@ def assign_face(face_id: int, person_id: int | None = Body(None), create_new: bo
     person = db_s.get(Person, target_person_id)
     if not person:
         raise HTTPException(status_code=404, detail='person not found')
+    old_person_id = int(face.person_id) if face.person_id is not None else None
+    old_label_source = getattr(face, 'label_source', None)
+    old_label_score = getattr(face, 'label_score', None)
     face.person_id = person.id  # type: ignore[attr-defined]
     face.label_source = 'manual'  # type: ignore[attr-defined]
     face.label_score = None  # type: ignore[attr-defined]
+    record_face_assignment_event(
+        db_s,
+        face=face,
+        source='manual',
+        reason='api.assign_face',
+        actor='api',
+        old_person_id=old_person_id,
+        new_person_id=int(person.id),
+        old_label_source=old_label_source,
+        new_label_source='manual',
+        old_label_score=float(old_label_score) if old_label_score is not None else None,
+        new_label_score=None,
+    )
     _recompute_face_counts(db_s, [person.id])
     propagation_task_id = _enqueue_label_propagation(db_s, [int(person.id)])
     db_s.commit()
@@ -195,6 +281,21 @@ def delete_face(face_id: int, prune_empty_person: bool = Query(True), db_s: Sess
         raise HTTPException(status_code=404, detail='face not found')
 
     pid = face.person_id
+    old_label_source = getattr(face, 'label_source', None)
+    old_label_score = getattr(face, 'label_score', None)
+    record_face_assignment_event(
+        db_s,
+        face=face,
+        source='system',
+        reason='api.delete_face',
+        actor='api',
+        old_person_id=int(pid) if pid is not None else None,
+        new_person_id=None,
+        old_label_source=old_label_source,
+        new_label_source=None,
+        old_label_score=float(old_label_score) if old_label_score is not None else None,
+        new_label_score=None,
+    )
     _remove_face_artifacts(face)
     db_s.delete(face)
     db_s.flush()
@@ -228,6 +329,21 @@ def delete_faces_bulk(
     for face in faces:
         if face.person_id is not None:
             person_ids.add(face.person_id)
+        old_label_source = getattr(face, 'label_source', None)
+        old_label_score = getattr(face, 'label_score', None)
+        record_face_assignment_event(
+            db_s,
+            face=face,
+            source='system',
+            reason='api.delete_faces_bulk',
+            actor='api',
+            old_person_id=int(face.person_id) if face.person_id is not None else None,
+            new_person_id=None,
+            old_label_source=old_label_source,
+            new_label_source=None,
+            old_label_score=float(old_label_score) if old_label_score is not None else None,
+            new_label_score=None,
+        )
         _remove_face_artifacts(face)
         db_s.delete(face)
     db_s.flush()
@@ -261,9 +377,25 @@ def assign_faces_bulk(person_id: int | None = Body(None), face_ids: List[int] = 
     if not faces:
         raise HTTPException(status_code=404, detail='no faces found')
     for f in faces:
+        old_person_id = int(f.person_id) if f.person_id is not None else None
+        old_label_source = getattr(f, 'label_source', None)
+        old_label_score = getattr(f, 'label_score', None)
         f.person_id = target_person_id  # type: ignore[attr-defined]
         f.label_source = 'manual'  # type: ignore[attr-defined]
         f.label_score = None  # type: ignore[attr-defined]
+        record_face_assignment_event(
+            db_s,
+            face=f,
+            source='manual',
+            reason='api.assign_faces_bulk',
+            actor='api',
+            old_person_id=old_person_id,
+            new_person_id=int(target_person_id),
+            old_label_source=old_label_source,
+            new_label_source='manual',
+            old_label_score=float(old_label_score) if old_label_score is not None else None,
+            new_label_score=None,
+        )
     _recompute_face_counts(db_s, [target_person_id])
     propagation_task_id = _enqueue_label_propagation(db_s, [int(target_person_id)])
     db_s.commit()
@@ -289,11 +421,30 @@ def merge_persons(target_id: int = Body(...), source_ids: List[int] = Body(...),
     if not sources:
         raise HTTPException(status_code=404, detail='no source persons found')
     faces = db_s.query(FaceDetection).filter(FaceDetection.person_id.in_([p.id for p in sources])).all()
+    touched_person_ids = {int(target.id)}
     for f in faces:
+        old_person_id = int(f.person_id) if f.person_id is not None else None
+        old_label_source = getattr(f, 'label_source', None)
+        old_label_score = getattr(f, 'label_score', None)
         f.person_id = target.id  # type: ignore[attr-defined]
+        if old_person_id is not None:
+            touched_person_ids.add(old_person_id)
+        record_face_assignment_event(
+            db_s,
+            face=f,
+            source='system',
+            reason='api.merge_persons',
+            actor='api',
+            old_person_id=old_person_id,
+            new_person_id=int(target.id),
+            old_label_source=old_label_source,
+            new_label_source=getattr(f, 'label_source', None),
+            old_label_score=float(old_label_score) if old_label_score is not None else None,
+            new_label_score=float(getattr(f, 'label_score')) if getattr(f, 'label_score', None) is not None else None,
+        )
     for p in sources:
         db_s.delete(p)
-    _recompute_face_counts(db_s, [target.id])
+    _recompute_face_counts(db_s, list(touched_person_ids))
     propagation_task_id = _enqueue_label_propagation(db_s, [int(target.id)])
     db_s.commit()
     return {'target_id': target.id, 'merged_sources': [p.id for p in sources], 'moved_faces': len(faces), 'face_count': target.face_count, 'propagation_task_id': propagation_task_id}
@@ -305,9 +456,25 @@ def delete_person(person_id: int, db_s: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail='person not found')
     faces = db_s.query(FaceDetection).filter(FaceDetection.person_id==person.id).all()
     for f in faces:
+        old_person_id = int(f.person_id) if f.person_id is not None else None
+        old_label_source = getattr(f, 'label_source', None)
+        old_label_score = getattr(f, 'label_score', None)
         f.person_id = None  # type: ignore[attr-defined]
         f.label_source = None  # type: ignore[attr-defined]
         f.label_score = None  # type: ignore[attr-defined]
+        record_face_assignment_event(
+            db_s,
+            face=f,
+            source='system',
+            reason='api.delete_person',
+            actor='api',
+            old_person_id=old_person_id,
+            new_person_id=None,
+            old_label_source=old_label_source,
+            new_label_source=None,
+            old_label_score=float(old_label_score) if old_label_score is not None else None,
+            new_label_score=None,
+        )
     db_s.delete(person)
     db_s.commit()
     return {'deleted_person_id': person_id, 'faces_reassigned': len(faces)}

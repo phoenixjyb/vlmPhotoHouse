@@ -5,7 +5,7 @@ param(
     [string]$LvfaceModelName = '',
     [int]$ApiPort = 8002,
     [int]$VoicePort = 8001,
-    [string]$CaptionProvider = 'blip2',
+    [string]$CaptionProvider = 'qwen3-vl',
     [string]$FaceProvider = 'lvface',
     [string]$DbPath = 'E:\VLM_DATA\databases\metadata.sqlite',
     [string]$DataRoot = 'E:\VLM_DATA',
@@ -103,7 +103,7 @@ if ($Preset) {
         }
         'rtx3090' {
             $effectiveFace = 'lvface'
-            $effectiveCaption = 'blip2'
+            $effectiveCaption = 'qwen3-vl'
             $effectiveUseGpu = $true
         }
         default {
@@ -141,6 +141,9 @@ if ((Test-Path -LiteralPath $lvfaceInference -or Test-Path -LiteralPath $lvfaceI
 $env:CAPTION_PROVIDER = $effectiveCaption
 $env:CAPTION_EXTERNAL_DIR = $CaptionDir
 $env:CAPTION_MODEL = 'auto'
+$env:QWEN2VL_MODEL_NAME = if ($env:QWEN2VL_MODEL_NAME) { $env:QWEN2VL_MODEL_NAME } else { 'Qwen/Qwen3-VL-8B-Instruct' }
+$env:QWEN2VL_LOAD_IN_4BIT = if ($env:QWEN2VL_LOAD_IN_4BIT) { $env:QWEN2VL_LOAD_IN_4BIT } else { 'true' }
+$env:QWEN2VL_4BIT_QUANT_TYPE = if ($env:QWEN2VL_4BIT_QUANT_TYPE) { $env:QWEN2VL_4BIT_QUANT_TYPE } else { 'nf4' }
 $env:ENABLE_INLINE_WORKER = 'true'
 
 # Voice proxy defaults (only set if not already present)
@@ -185,9 +188,11 @@ $env:DERIVED_PATH = Join-Path $DataRoot 'derived'
 $env:VECTOR_INDEX_PATH = Join-Path $env:DERIVED_PATH 'vector.index'
 $env:ORIGINALS_PATH = $OriginalsPath
 $env:VLM_TMP_DIR = Join-Path $DataRoot 'tmp'
+$env:HF_HOME = Join-Path $DataRoot 'hf_home'
 New-Item -ItemType Directory -Path (Join-Path $DataRoot 'databases') -Force | Out-Null
 New-Item -ItemType Directory -Path $env:DERIVED_PATH -Force | Out-Null
 New-Item -ItemType Directory -Path $env:VLM_TMP_DIR -Force | Out-Null
+New-Item -ItemType Directory -Path $env:HF_HOME -Force | Out-Null
 $env:TMP = $env:VLM_TMP_DIR
 $env:TEMP = $env:VLM_TMP_DIR
 

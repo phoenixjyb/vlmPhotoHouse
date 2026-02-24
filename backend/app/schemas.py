@@ -86,6 +86,30 @@ class FacesResponse(APIBase):
     total: int
     faces: List[FaceOut]
 
+class FaceAssignmentEventOut(BaseModel):
+    id: int
+    face_id: Optional[int] = None
+    asset_id: Optional[int] = None
+    old_person_id: Optional[int] = None
+    new_person_id: Optional[int] = None
+    old_person_name: Optional[str] = None
+    new_person_name: Optional[str] = None
+    old_label_source: Optional[str] = None
+    new_label_source: Optional[str] = None
+    old_label_score: Optional[float] = None
+    new_label_score: Optional[float] = None
+    source: str
+    reason: Optional[str] = None
+    task_id: Optional[int] = None
+    actor: Optional[str] = None
+    created_at: Optional[str] = None
+
+class FaceAssignmentHistoryResponse(APIBase):
+    page: int
+    page_size: int
+    total: int
+    events: List[FaceAssignmentEventOut]
+
 class TaskOut(BaseModel):
     id: int
     type: str

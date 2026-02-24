@@ -6,6 +6,7 @@ from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
 from .config import get_settings
 from .image_utils import safe_exif_transpose
+from .face_assignment_audit import record_face_assignment_event
 from pathlib import Path
 from PIL import Image
 import imagehash
@@ -555,9 +556,26 @@ class TaskExecutor:
                     np.save(emb_path, new_centroid.astype('float32'))
                     person.embedding_path = str(emb_path)
                 person.face_count += 1
+                old_person_id = int(face.person_id) if face.person_id is not None else None
+                old_label_source = getattr(face, 'label_source', None)
+                old_label_score = getattr(face, 'label_score', None)
                 face.person_id = person.id
                 face.label_source = 'dnn'  # type: ignore[attr-defined]
                 face.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
+                record_face_assignment_event(
+                    session,
+                    face=face,
+                    source='dnn',
+                    reason='worker.person_cluster',
+                    actor='worker',
+                    task_id=int(task.id),
+                    old_person_id=old_person_id,
+                    new_person_id=int(person.id),
+                    old_label_source=old_label_source,
+                    new_label_source='dnn',
+                    old_label_score=float(old_label_score) if old_label_score is not None else None,
+                    new_label_score=float(1.0 - best_dist),
+                )
                 assignments += 1
             else:
                 # create new person
@@ -568,9 +586,26 @@ class TaskExecutor:
                 np.save(emb_path, fvec.astype('float32'))
                 person.embedding_path = str(emb_path)
                 person_centroids[person.id] = fvec
+                old_person_id = int(face.person_id) if face.person_id is not None else None
+                old_label_source = getattr(face, 'label_source', None)
+                old_label_score = getattr(face, 'label_score', None)
                 face.person_id = person.id
                 face.label_source = 'dnn'  # type: ignore[attr-defined]
                 face.label_score = 1.0  # type: ignore[attr-defined]
+                record_face_assignment_event(
+                    session,
+                    face=face,
+                    source='dnn',
+                    reason='worker.person_cluster_new',
+                    actor='worker',
+                    task_id=int(task.id),
+                    old_person_id=old_person_id,
+                    new_person_id=int(person.id),
+                    old_label_source=old_label_source,
+                    new_label_source='dnn',
+                    old_label_score=float(old_label_score) if old_label_score is not None else None,
+                    new_label_score=1.0,
+                )
                 persons.append(person)
                 new_persons_created += 1
                 assignments += 1
@@ -639,9 +674,26 @@ class TaskExecutor:
                     best_pid = pid
             if best_pid is not None and best_dist <= FACE_CLUSTER_DIST_THRESHOLD:
                 # assign
+                old_person_id = int(f.person_id) if f.person_id is not None else None
+                old_label_source = getattr(f, 'label_source', None)
+                old_label_score = getattr(f, 'label_score', None)
                 f.person_id = best_pid
                 f.label_source = 'dnn'  # type: ignore[attr-defined]
                 f.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
+                record_face_assignment_event(
+                    session,
+                    face=f,
+                    source='dnn',
+                    reason='worker.person_recluster',
+                    actor='worker',
+                    task_id=int(task.id),
+                    old_person_id=old_person_id,
+                    new_person_id=int(best_pid),
+                    old_label_source=old_label_source,
+                    new_label_source='dnn',
+                    old_label_score=float(old_label_score) if old_label_score is not None else None,
+                    new_label_score=float(1.0 - best_dist),
+                )
                 p = next(p for p in persons if p.id == best_pid)
                 # update centroid
                 new_c = (person_centroids[best_pid]*p.face_count + vec) / (p.face_count+1)
@@ -658,9 +710,26 @@ class TaskExecutor:
                 np.save(emb_path, vec.astype('float32'))
                 p.embedding_path = str(emb_path)
                 person_centroids[p.id] = vec
+                old_person_id = int(f.person_id) if f.person_id is not None else None
+                old_label_source = getattr(f, 'label_source', None)
+                old_label_score = getattr(f, 'label_score', None)
                 f.person_id = p.id
                 f.label_source = 'dnn'  # type: ignore[attr-defined]
                 f.label_score = 1.0  # type: ignore[attr-defined]
+                record_face_assignment_event(
+                    session,
+                    face=f,
+                    source='dnn',
+                    reason='worker.person_recluster_new',
+                    actor='worker',
+                    task_id=int(task.id),
+                    old_person_id=old_person_id,
+                    new_person_id=int(p.id),
+                    old_label_source=old_label_source,
+                    new_label_source='dnn',
+                    old_label_score=float(old_label_score) if old_label_score is not None else None,
+                    new_label_score=1.0,
+                )
                 persons.append(p)
                 new_persons +=1
             # update progress
@@ -793,9 +862,26 @@ class TaskExecutor:
             if best_score < score_threshold or gap < margin:
                 continue
 
+            old_person_id = int(face.person_id) if face.person_id is not None else None
+            old_label_source = getattr(face, 'label_source', None)
+            old_label_score = getattr(face, 'label_score', None)
             face.person_id = int(best_pid)
             face.label_source = 'dnn'  # type: ignore[attr-defined]
             face.label_score = float(best_score)  # type: ignore[attr-defined]
+            record_face_assignment_event(
+                session,
+                face=face,
+                source='dnn',
+                reason='worker.person_label_propagate',
+                actor='worker',
+                task_id=int(task.id),
+                old_person_id=old_person_id,
+                new_person_id=int(best_pid),
+                old_label_source=old_label_source,
+                new_label_source='dnn',
+                old_label_score=float(old_label_score) if old_label_score is not None else None,
+                new_label_score=float(best_score),
+            )
             assigned += 1
             affected.add(int(best_pid))
 
