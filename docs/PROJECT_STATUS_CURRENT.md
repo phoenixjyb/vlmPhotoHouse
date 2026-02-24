@@ -1,139 +1,102 @@
 # VLM Photo Engine - Current Project Status
 
-*Last Updated: 2025-01-27 01:08:00*
+Last Updated: 2026-02-24
 
-## 🚀 Active Development - Drive E Bulk Processing
+## Scope
+This document is the operational handoff for any new agent joining this repository. It reflects the current production-like local setup on Windows with data rooted on Drive E.
 
-### Current Task: Drive E Photo/Video Ingestion
-**Status**: ⚡ **ACTIVELY RUNNING** - Background Processing in Progress
+## Current Ground Truth
+- Repository: `vlmPhotoHouse` (branch `master`)
+- API: `http://127.0.0.1:8002`
+- UI: `http://127.0.0.1:8002/ui`
+- Data root: `E:\VLM_DATA`
+- Originals root: `E:\01_INCOMING`
+- Database: `sqlite:///E:/VLM_DATA/databases/metadata.sqlite`
+- Face embed provider: `LVFaceSubprocessProvider` (GPU/CUDA path)
+- Face detect provider: `InsightFaceDetectionProvider`
+- Caption provider: `HTTPCaptionProvider` (`http://127.0.0.1:8102`)
 
-#### Progress Overview
-- **Discovery**: 7,891 total files identified on Drive E
-- **Processed**: 3,322+ files catalogued (42% complete)
-- **Processing Rate**: ~80-120 files/minute
-- **Estimated Completion**: ~1-2 hours remaining
-- **Data Quality**: All files verified with SHA256 hashes
+## Entry Point
+Use `scripts/start-dev-multiproc.ps1` as the main local entry point.
 
-#### Technical Implementation
-- **Script**: `simple_drive_e_processor.py` (standalone processor)
-- **State Management**: `simple_drive_e_state.json` (incremental tracking)
-- **Documentation**: Comprehensive guides created
-  - [Drive E Processing Guide](../DRIVE_E_PROCESSING_GUIDE.md)
-  - [Drive E Quick Reference](../DRIVE_E_QUICK_REFERENCE.md)
-  - [Drive E Integration Overview](../DRIVE_E_INTEGRATION_OVERVIEW.md)
-
-## 📊 System Architecture Status
-
-### ✅ Completed Components
-1. **Backend API Infrastructure**
-   - FastAPI server with comprehensive ML/AI capabilities
-   - Vector search with FAISS/ChromaDB integration
-   - Face recognition pipeline (LVFace integration)
-   - Caption generation (Qwen2.5-VL model support)
-
-2. **Database Schema**
-   - Photo metadata storage
-   - Face embeddings and person relationships
-   - Vector embeddings for semantic search
-   - Incremental processing state tracking
-
-3. **Processing Pipelines**
-   - Image/video metadata extraction
-   - Face detection and embedding generation
-   - Caption generation workflow
-   - Thumbnail and frame extraction
-
-### 🔄 In Progress
-1. **Drive E Bulk Ingestion** (Current Focus)
-   - Large-scale file discovery and cataloguing
-   - Incremental processing with change detection
-   - Integration preparation for AI processing pipeline
-
-2. **Documentation Integration**
-   - Project documentation ecosystem alignment
-   - Integration guides for bulk processing workflows
-   - Operational procedures documentation
-
-### 📋 Pending Tasks
-1. **Backend API Integration**
-   - Connect Drive E processor to backend API
-   - Bulk import processed files into main database
-   - Enable AI processing for discovered files
-
-2. **Web Interface**
-   - Photo/video browsing interface
-   - Search and filtering capabilities
-   - Person-based photo organization
-
-3. **Performance Optimization**
-   - GPU acceleration for AI models
-   - Batch processing optimization
-   - Caching strategies
-
-## 🛠 Development Environment
-
-### System Specs
-- **Python**: 3.12.10 (virtual environment)
-- **Platform**: Windows with junction link setup
-- **Storage**: Drive E (7,891 files) → Processing → VLM Database
-- **ML Stack**: PyTorch, Transformers, FAISS, ChromaDB
-
-### Path Configuration
-- **Workspace**: `C:\Users\yanbo\wSpace\vlm-photo-engine\vlmPhotoHouse`
-- **Junction Link**: `H:\wSpace` ↔ `C:\Users\yanbo\wSpace`
-- **Drive E Source**: `E:\01_INCOMING\` (bulk photo/video storage)
-
-## 📈 Progress Metrics
-
-### Processing Statistics
-```
-Total Files Discovered: 7,891
-Files Processed: 3,322+ (42% complete)
-Average File Size: ~50-150MB (videos), ~3-8MB (photos)
-Processing Duration: ~2 hours active
-Error Rate: 0% (no failed files)
+Recommended launch (from repo root):
+```powershell
+.\scripts\start-dev-multiproc.ps1 -UseWindowsTerminal -KillExisting
 ```
 
-### File Type Distribution
-- **Videos**: MP4 files (majority of large files)
-- **Photos**: JPG/JPEG files (majority count)
-- **Organized Structure**: Year/month/event folder hierarchy
+## Current People Taxonomy
+Named persons currently include:
+- `jane`
+- `jane_newborn`
+- `yanbo` (renamed from `yb`)
+- `chuan` (renamed from `cc`)
+- `meiying`
+- `zhiqiang`
+- `yixia`
+- `guansuo`
+- `yang`
+- `james`
 
-## 🔗 Integration Status
+Important split:
+- `jane` and `jane_newborn` are intentionally separate IDs.
+- Newborn propagation has been run with strict competition against other named persons.
 
-### Documentation Ecosystem
-- **Architecture**: Aligned with `architecture-v2.md`
-- **Roadmap**: Bulk processing phase documented in `roadmap.md`
-- **Project Relations**: Drive E processing integrated into `PROJECT_RELATIONSHIPS.md`
+## Snapshot (2026-02-24)
+Counts are moving as manual tags continue, but recent verified baseline is:
+- Faces total: ~16k
+- Faces assigned: ~7.7k
+- Faces unassigned: ~8.3k
+- Queue: pending 0 / running 0 at rest
 
-### Code Integration
-- **Standalone Phase**: Current Drive E processor operates independently
-- **Future Integration**: Ready for backend API connection once processing completes
-- **State Preservation**: JSON state file enables seamless continuation
+## What Was Fixed Recently
+1. Face count drift:
+- Root cause: `autoflush=False` sessions caused recompute queries to run before pending assignment writes were flushed.
+- Fix: explicit `flush()` before count recomputation in:
+  - `backend/app/routers/people.py`
+  - `backend/app/cli.py`
+  - `backend/app/tasks.py`
 
-## 🎯 Next Steps
+2. `dim_backfill` queue churn and dispatch gaps:
+- Added `dim_backfill` task handling branch to executor.
+- Added guard to avoid unbounded duplicate `dim_backfill` enqueue bursts.
 
-### Immediate (Next 2-4 hours)
-1. Monitor Drive E processing completion
-2. Validate final processing statistics
-3. Prepare backend API integration
+3. Manual-label propagation behavior:
+- Manual assignments enqueue `person_label_propagate` tasks.
+- Propagation uses manual references and writes `label_source='dnn'`, preserving provenance.
 
-### Short Term (Next 1-2 days)
-1. Connect processed files to main VLM database
-2. Enable AI processing for bulk imported files
-3. Update project roadmap with completion status
+## Operational Commands
+From `backend` directory:
 
-### Medium Term (Next 1-2 weeks)
-1. Implement web interface for processed photos
-2. Enable person-based search across full dataset
-3. Performance optimization for large dataset operations
+Check ingestion summary:
+```powershell
+.\.venv\Scripts\python.exe -m app.cli ingest-status E:\01_INCOMING
+```
 
----
+Run conservative full auto-assign:
+```powershell
+.\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --apply --limit 0
+```
 
-## 📞 Current Session Context
+Run targeted auto-assign for selected names:
+```powershell
+.\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --name jane --name jane_newborn --name yanbo --name chuan --apply --limit 0
+```
 
-**Active Terminal**: Background processor running (`simple_drive_e_processor.py`)
-**Documentation**: Complete and integrated
-**Next Action**: Monitor processing completion and prepare API integration
+Health check:
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8002/health
+```
 
-*This status document is automatically updated as development progresses.*
+## Next Priorities
+1. Continue manual corrections on hard cases (baby vs kid phases, side profiles, low-light faces).
+2. Run targeted propagation immediately after each manual batch.
+3. Periodically run conservative full auto-assign and verify precision via UI spot checks.
+4. Keep person naming clean (avoid unnamed clusters for known people).
+5. Keep all data artifacts on Drive E; do not migrate working data back to Drive C.
+
+## Notes for New Agents
+- Prefer working through API and CLI, not direct DB mutation, unless repair work is required.
+- If UI counts look stale, verify `persons.face_count` against `face_detections` counts.
+- If queue backlog appears stuck, inspect stale `running` tasks and provider health before bulk requeue.
+- Do not commit local artifacts like `.coverage`, `coverage.xml`, or personal workspace files.
+

@@ -490,6 +490,8 @@ def faces_auto_assign(
 
         if apply:
             # Recompute counts for touched persons
+            # SessionLocal uses autoflush=False; flush person_id updates before counting.
+            session.flush()
             for pid in sorted(affected):
                 cnt = (
                     session.query(func.count(FaceDetection.id))

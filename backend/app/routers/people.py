@@ -17,6 +17,8 @@ router = APIRouter()
 def _recompute_face_counts(db_s: Session, person_ids):
     if not person_ids:
         return
+    # SessionLocal uses autoflush=False; flush pending person_id changes before counting.
+    db_s.flush()
     counts = (
         db_s.query(FaceDetection.person_id, func.count(FaceDetection.id))
         .filter(FaceDetection.person_id.in_(person_ids))

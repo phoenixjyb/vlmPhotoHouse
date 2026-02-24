@@ -35,6 +35,10 @@ Get-ChildItem E:\VLM_DATA -Recurse | Measure-Object | Select-Object Count
 ## Deployment (Hybrid Workstation)
 See `docs/deployment.md` for Docker Compose on Windows + WSL2 with NVIDIA GPUs.
 
+## Agent Handoff
+For the current operational state and next actions, start with:
+- `docs/PROJECT_STATUS_CURRENT.md`
+
 ## Hardware Requirements
 
 ### Production Configuration ✅ (Validated)

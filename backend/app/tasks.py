@@ -164,6 +164,8 @@ class TaskExecutor:
                     self._handle_person_cluster(session, task)
                 elif task.type == 'person_label_propagate':
                     self._handle_person_label_propagate(session, task)
+                elif task.type == 'dim_backfill':
+                    self._handle_dim_backfill(session, task)
             except Exception as exc:
                 task.state = 'failed'
                 task.last_error = str(exc)[:4000]
@@ -800,6 +802,8 @@ class TaskExecutor:
             if assigned % max(20, commit_every) == 0:
                 session.commit()
 
+        # SessionLocal uses autoflush=False; flush person_id updates before counting.
+        session.flush()
         for pid in sorted(affected):
             cnt = (
                 session.query(FaceDetection.id)
@@ -847,6 +851,13 @@ class TaskExecutor:
         if now - self._last_dim_backfill_scan < self._dim_backfill_interval:
             return
         self._last_dim_backfill_scan = now
+        # Keep only a single batch in flight to avoid unbounded duplicate queue growth.
+        existing = session.query(Task.id).filter(
+            Task.type == 'dim_backfill',
+            Task.state.in_(['pending', 'running'])
+        ).first()
+        if existing:
+            return
         # find assets missing dimensions
         missing = session.query(Asset.id).filter(or_(Asset.width==None, Asset.height==None)).limit(50).all()
         if not missing:
