@@ -748,6 +748,89 @@ def captions_backfill(
         typer.echo(f"scanned={scanned} enqueued={enqueued} limit={limit} target_variants={max_variants} profile={profile}")
 
 
+@app.command("captions-prune-model")
+def captions_prune_model(
+    model_contains: str = typer.Option("blip2", help="Case-insensitive substring match against captions.model"),
+    keep_user_edited: bool = typer.Option(True, "--keep-user-edited/--include-user-edited", help="Preserve user-edited captions"),
+    require_replacement: bool = typer.Option(True, "--require-replacement/--allow-empty-after-delete", help="Delete only when asset has at least one non-matching caption"),
+    apply: bool = typer.Option(True, "--apply/--dry-run", help="Apply deletion (or dry-run)"),
+    commit_every: int = typer.Option(500, min=50, max=5000, help="Commit cadence"),
+) -> None:
+    """Delete caption variants by model name pattern (e.g. remove all BLIP2 outputs)."""
+    from .db import Asset, Caption
+
+    needle = (model_contains or "").strip().lower()
+    if not needle:
+        typer.echo("model_contains cannot be empty", err=True)
+        raise typer.Exit(2)
+
+    like_pattern = f"%{needle}%"
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Caption.id).filter(func.lower(Caption.model).like(like_pattern))
+        if keep_user_edited:
+            q = q.filter(Caption.user_edited == False)  # noqa: E712
+        candidate_ids = [int(cid) for (cid,) in q.all()]
+
+        scanned = 0
+        deleted = 0
+        skipped_missing_replacement = 0
+        touched_assets: set[int] = set()
+
+        for cap_id in candidate_ids:
+            scanned += 1
+            cap = session.get(Caption, cap_id)
+            if cap is None:
+                continue
+
+            if require_replacement:
+                replacement = (
+                    session.query(Caption.id)
+                    .filter(Caption.asset_id == cap.asset_id)
+                    .filter(Caption.id != cap.id)
+                    .filter(~func.lower(Caption.model).like(like_pattern))
+                    .first()
+                )
+                if replacement is None:
+                    skipped_missing_replacement += 1
+                    continue
+
+            touched_assets.add(int(cap.asset_id))
+            if apply:
+                session.delete(cap)
+            deleted += 1
+
+            if apply and deleted % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} deleted={deleted} "
+                    f"skipped_missing_replacement={skipped_missing_replacement}"
+                )
+
+        if apply:
+            # Recompute caption status fields for touched assets.
+            for aid in touched_assets:
+                cnt = (
+                    session.query(func.count(Caption.id))
+                    .filter(Caption.asset_id == aid, Caption.superseded == False)  # noqa: E712
+                    .scalar()
+                    or 0
+                )
+                asset = session.get(Asset, aid)
+                if asset is not None:
+                    asset.caption_variant_count = int(cnt)
+                    asset.caption_processed = bool(cnt > 0)
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"captions-prune-model ({mode})")
+        typer.echo(
+            f"model_contains='{needle}' scanned={scanned} deleted={deleted} "
+            f"skipped_missing_replacement={skipped_missing_replacement} "
+            f"keep_user_edited={keep_user_edited} require_replacement={require_replacement}"
+        )
+
+
 # (Defer CLI invocation to the very end of file after all commands are registered)
 import os, sys
 import typer
