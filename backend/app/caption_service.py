@@ -391,6 +391,7 @@ def get_caption_provider() -> CaptionProvider:
 def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     """Build a specific caption provider."""
     provider = provider.lower()
+    qwen_aliases = ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl', 'qwen3-vl', 'qwen3')
     
     # HTTP caption service provider
     if provider == 'http':
@@ -398,6 +399,16 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
         settings = get_settings()
         service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
         return HTTPCaptionProvider(service_url)
+    
+    # Route Qwen providers through the local caption HTTP service when configured.
+    # This keeps model execution in caption_server.py (qwen3-vl on GPU) instead of
+    # in-process/subprocess backend fallback paths.
+    if provider in qwen_aliases:
+        from .config import get_settings
+        settings = get_settings()
+        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
+        if service_url:
+            return HTTPCaptionProvider(service_url)
     
     # Check if we should use subprocess (external caption models)
     from .config import get_settings
@@ -412,7 +423,7 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
             CaptionSubprocessProvider
         )
         model_name = getattr(settings, 'caption_model', 'auto')
-        if provider in ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl', 'qwen3-vl', 'qwen3'):
+        if provider in qwen_aliases:
             return Qwen2VLSubprocessProvider(caption_external_dir, model_name, device)
         elif provider in ('llava', 'llava_next', 'llava-next'):
             return LlavaNextSubprocessProvider(caption_external_dir, model_name, device)
@@ -428,7 +439,7 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     elif provider in ('llava', 'llava_next'):
         model_name = os.getenv('LLAVA_MODEL_NAME', 'llava-hf/llava-v1.6-mistral-7b-hf')
         return LlavaNextCaptionProvider(model_name, device)
-    elif provider in ('qwen2vl', 'qwen', 'qwen2.5-vl', 'qwen3-vl', 'qwen3'):
+    elif provider in qwen_aliases:
         model_name = os.getenv('QWEN2VL_MODEL_NAME', 'Qwen/Qwen3-VL-8B-Instruct')
         return Qwen2VLCaptionProvider(model_name, device)
     elif provider == 'blip2':

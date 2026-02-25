@@ -131,7 +131,7 @@ $lvfacePyExe = $null
 foreach ($cand in $lvfacePyCandidates) {
     if (Test-Path -LiteralPath $cand) { $lvfacePyExe = $cand; break }
 }
-if ((Test-Path -LiteralPath $lvfaceInference -or Test-Path -LiteralPath $lvfaceInferenceOnnx) -and $lvfacePyExe) {
+if (((Test-Path -LiteralPath $lvfaceInference) -or (Test-Path -LiteralPath $lvfaceInferenceOnnx)) -and $lvfacePyExe) {
     $env:LVFACE_EXTERNAL_DIR = $LvfaceDir
     $env:LVFACE_PYTHON_EXE = $lvfacePyExe
 } else {
