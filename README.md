@@ -153,12 +153,13 @@ Providers:
 | Embedding | Insight (ArcFace) | `insight` | `insightface`, `onnxruntime` | Optional advanced model (kept as fallback) |
 | Detection | Stub (random boxes) | `stub` | none | Non-deterministic; for quick UI smoke |
 | Detection | MTCNN (facenet-pytorch) | `mtcnn` | `facenet-pytorch`, `torch`, `torchvision` | Multi-face detection |
+| Detection | InsightFace/SCRFD | `insight` or `scrfd` | `insightface`, `onnxruntime` | Recommended default for production |
 
 Key Environment Variables:
 
 ```
 FACE_EMBED_PROVIDER=stub|facenet|lvface|insight|auto
-FACE_DETECT_PROVIDER=stub|mtcnn|auto
+FACE_DETECT_PROVIDER=scrfd|insight|mtcnn|stub|auto
 EMBED_DEVICE=cpu|cuda
 LVFACE_MODEL_PATH=./models/lvface.onnx  # path to ONNX file when using lvface
 FORCE_REAL_FACE_PROVIDER=1  # allow real providers during tests (default tests force stub)
@@ -180,7 +181,7 @@ Example (Facenet GPU run):
 
 ```
 pip install facenet-pytorch torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
-export FACE_EMBED_PROVIDER=facenet EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=mtcnn
+export FACE_EMBED_PROVIDER=facenet EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=scrfd
 python -m backend.app.cli embed-dataset  # example future CLI
 ```
 
@@ -188,6 +189,8 @@ Example (LVFace ONNX):
 
 ```
 pip install onnxruntime-gpu  # or onnxruntime for CPU
-export FACE_EMBED_PROVIDER=lvface LVFACE_MODEL_PATH=/models/lvface.onnx EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=mtcnn
+export FACE_EMBED_PROVIDER=lvface LVFACE_MODEL_PATH=/models/lvface.onnx EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=scrfd
 ```
+
+Default now uses `FACE_DETECT_PROVIDER=scrfd` (InsightFace path) unless overridden.
 

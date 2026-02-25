@@ -62,7 +62,7 @@ pip install -r backend/requirements-ml.txt
 $env:VOICE_ENABLED="true"
 $env:VOICE_EXTERNAL_BASE_URL="http://127.0.0.1:8001"
 $env:FACE_EMBED_PROVIDER="facenet"  # or lvface, insight, auto
-$env:FACE_DETECT_PROVIDER="mtcnn"
+$env:FACE_DETECT_PROVIDER="scrfd"
 $env:EMBED_DEVICE="cuda"
 ```
 

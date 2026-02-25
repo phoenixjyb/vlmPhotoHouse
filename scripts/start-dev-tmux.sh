@@ -83,6 +83,7 @@ fi
 
 # Backend env
 export FACE_EMBED_PROVIDER="$FACE_PROVIDER"
+export FACE_DETECT_PROVIDER="${FACE_DETECT_PROVIDER:-scrfd}"
 export LVFACE_EXTERNAL_DIR="$LVFACE_DIR"
 export LVFACE_MODEL_NAME="$LVFACE_MODEL_NAME"
 export CAPTION_PROVIDER="$CAPTION_PROVIDER"
@@ -98,7 +99,7 @@ if [[ ! -x "$PY" ]]; then
   PY="python3"
 fi
 
-echo "Preset: ${PRESET:-none} | face=$FACE_EMBED_PROVIDER | caption=$CAPTION_PROVIDER | gpu=$([[ $GPU -eq 1 ]] && echo on || echo off)"
+echo "Preset: ${PRESET:-none} | face=$FACE_EMBED_PROVIDER | detect=$FACE_DETECT_PROVIDER | caption=$CAPTION_PROVIDER | gpu=$([[ $GPU -eq 1 ]] && echo on || echo off)"
 echo "LVFace: $LVFACE_EXTERNAL_DIR (model: $LVFACE_MODEL_NAME)"
 echo "Caption: $CAPTION_EXTERNAL_DIR"
 echo "Backend Python: $PY"

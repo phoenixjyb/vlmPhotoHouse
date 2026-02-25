@@ -324,7 +324,7 @@ Person search relies on face detection being configured:
 curl "http://localhost:8000/health"
 
 # Configure face detection provider
-export FACE_DETECT_PROVIDER=mtcnn
+export FACE_DETECT_PROVIDER=scrfd
 ```
 
 ### Face Embeddings

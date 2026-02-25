@@ -56,7 +56,7 @@ class Settings(BaseModel):
     face_embed_provider: str = Field(default=os.getenv('FACE_EMBED_PROVIDER', 'stub'))  # stub|facenet|insight
     face_embed_model: str = Field(default=os.getenv('FACE_EMBED_MODEL', 'stub-v1'))
     face_embed_dim: int = Field(default=int(os.getenv('FACE_EMBED_DIM', '128')))
-    face_detect_provider: str = Field(default=os.getenv('FACE_DETECT_PROVIDER','stub'))  # stub|mtcnn|auto
+    face_detect_provider: str = Field(default=os.getenv('FACE_DETECT_PROVIDER','scrfd'))  # stub|mtcnn|insight|scrfd|auto
     face_crop_margin: float = Field(default=float(os.getenv('FACE_CROP_MARGIN','0.0')))  # fraction of max(w,h) to expand each side
     lvface_model_path: str = Field(default=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'))
     lvface_external_dir: str = Field(default=os.getenv('LVFACE_EXTERNAL_DIR', ''))  # Path to external LVFace installation
@@ -133,7 +133,7 @@ def get_settings() -> Settings:
     face_embed_provider=os.getenv('FACE_EMBED_PROVIDER','stub'),
     face_embed_model=os.getenv('FACE_EMBED_MODEL','stub-v1'),
     face_embed_dim=int(os.getenv('FACE_EMBED_DIM','128')),
-    face_detect_provider=os.getenv('FACE_DETECT_PROVIDER','stub'),
+    face_detect_provider=os.getenv('FACE_DETECT_PROVIDER','scrfd'),
     face_crop_margin=float(os.getenv('FACE_CROP_MARGIN','0.0')),
         lvface_model_path=os.getenv('LVFACE_MODEL_PATH', 'models/lvface.onnx'),
         lvface_external_dir=os.getenv('LVFACE_EXTERNAL_DIR', ''),

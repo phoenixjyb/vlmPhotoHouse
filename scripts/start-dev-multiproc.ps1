@@ -118,6 +118,7 @@ if ($Preset) {
 
 # Environment for backend (using effective values)
 $env:FACE_EMBED_PROVIDER = $effectiveFace
+$env:FACE_DETECT_PROVIDER = if ($env:FACE_DETECT_PROVIDER) { $env:FACE_DETECT_PROVIDER } else { 'scrfd' }
 $env:LVFACE_MODEL_NAME = Get-LVFaceModelName -Dir $LvfaceDir
 # Prefer external LVFace subprocess when a supported script exists and a dedicated LVFace python is available.
 $lvfaceInference = Join-Path $LvfaceDir 'inference.py'
@@ -203,6 +204,7 @@ if ($Preset) {
     Write-Host "Preset: $Preset applied (face=$effectiveFace, caption=$effectiveCaption, gpu=$gpuVal)" -ForegroundColor Gray
 }
 Write-Host "Face provider: $($env:FACE_EMBED_PROVIDER) device=$($env:EMBED_DEVICE)" -ForegroundColor DarkCyan
+Write-Host "Face detector: $($env:FACE_DETECT_PROVIDER)" -ForegroundColor DarkCyan
 Write-Host "Caption: $($env:CAPTION_EXTERNAL_DIR) (provider: $($env:CAPTION_PROVIDER)) device=$($env:CAPTION_DEVICE)" -ForegroundColor DarkCyan
 Write-Host "Backend Python: $pyExe" -ForegroundColor DarkCyan
 

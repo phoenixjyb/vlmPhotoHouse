@@ -281,6 +281,7 @@ $env:CAPTION_GPU_DEVICE = "$rtx3090Index"
 
 # Face Processing Configuration  
 $env:FACE_EMBED_PROVIDER = if ($env:FACE_EMBED_PROVIDER) { $env:FACE_EMBED_PROVIDER } else { 'lvface' }
+$env:FACE_DETECT_PROVIDER = if ($env:FACE_DETECT_PROVIDER) { $env:FACE_DETECT_PROVIDER } else { 'scrfd' }
 $env:LVFACE_MODEL_NAME = 'LVFace-B_Glint360K.onnx'
 $lvfacePyCandidates = @(
     (Join-Path $LvfaceDir '.venv-lvface-311\Scripts\python.exe'),
@@ -360,6 +361,7 @@ function New-MainApiPane {
         "`$env:TEMP = '$tmpDataDir'",
         "`$env:CAPTION_PROVIDER = 'http'",
         "`$env:CAPTION_SERVICE_URL = 'http://127.0.0.1:$CaptionPort'",
+        "`$env:FACE_DETECT_PROVIDER = 'scrfd'",
         "`$env:ENABLE_INLINE_WORKER = 'true'", 
         "`$env:WORKER_CONCURRENCY = '4'",
         "",

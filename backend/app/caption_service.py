@@ -57,28 +57,51 @@ class HTTPCaptionProvider:
             fd, tmp_path = tempfile.mkstemp(suffix='.png', dir=_caption_tmp_dir())
             os.close(fd)
             image.save(tmp_path, format='PNG')
+            max_retries = max(1, int(os.getenv("CAPTION_HTTP_RETRIES", "2") or "2"))
+            retry_delay = float(os.getenv("CAPTION_HTTP_RETRY_DELAY_SEC", "1.0") or "1.0")
+            last_err: Exception | None = None
 
-            # Send to caption service with proxy bypass
-            with httpx.Client(timeout=30.0, trust_env=False) as client:
-                with open(tmp_path, 'rb') as f:
-                    files = {'file': ('image.png', f, 'image/png')}
-                    response = client.post(f"{self.service_url}/caption", files=files)
-            
-            if response.status_code == 200:
-                result = response.json()
-                caption = result.get('caption', 'Caption generation failed')
-                logger.debug(f"Generated caption: {caption[:100]}...")
-                return caption
-            else:
-                logger.error(f"Caption service error: {response.status_code} - {response.text}")
-                return "Caption service unavailable"
+            for attempt in range(1, max_retries + 1):
+                # Send to caption service with proxy bypass
+                with httpx.Client(timeout=30.0, trust_env=False) as client:
+                    with open(tmp_path, 'rb') as f:
+                        files = {'file': ('image.png', f, 'image/png')}
+                        response = client.post(f"{self.service_url}/caption", files=files)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    caption = result.get('caption', '').strip()
+                    if caption:
+                        logger.debug(f"Generated caption: {caption[:100]}...")
+                        return caption
+                    raise RuntimeError("Caption service returned empty caption")
+
+                detail = response.text
+                is_server_error = response.status_code >= 500
+                is_oom = ("out of memory" in detail.lower()) or ("cuda out of memory" in detail.lower())
+                err = RuntimeError(f"Caption service error: {response.status_code} - {detail}")
+                last_err = err
+
+                if is_server_error and attempt < max_retries:
+                    logger.warning(
+                        "Caption service transient error on attempt %s/%s (oom=%s), retrying in %.1fs",
+                        attempt, max_retries, is_oom, retry_delay
+                    )
+                    time.sleep(retry_delay)
+                    continue
+
+                raise err
+
+            if last_err:
+                raise last_err
+            raise RuntimeError("Caption service failed without explicit error")
                 
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to caption service: {e}")
-            return "Caption service connection failed"
+            raise RuntimeError(f"Caption service connection failed: {e}") from e
         except Exception as e:
             logger.error(f"Caption generation error: {e}")
-            return "Caption generation error"
+            raise
         finally:
             if tmp_path:
                 try:
