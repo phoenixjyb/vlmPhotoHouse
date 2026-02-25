@@ -371,6 +371,33 @@ class TaskExecutor:
         cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False, quality_tier=qtier, model_version=None)
         session.add(cap)
         session.flush()
+        # Optionally derive lightweight keyword tags from generated caption text.
+        auto_tag_enabled = os.getenv('CAPTION_AUTO_TAG_ENABLE', 'true').lower() in ('1', 'true', 'yes')
+        if auto_tag_enabled and text:
+            try:
+                from .tagging import extract_caption_tag_candidates, upsert_asset_tags
+
+                max_auto_tags = int(os.getenv('CAPTION_AUTO_TAG_MAX_TAGS', '8') or '8')
+                auto_tag_type = os.getenv('CAPTION_AUTO_TAG_TYPE', 'caption-auto') or 'caption-auto'
+                candidates = extract_caption_tag_candidates(text, max_tags=max(1, max_auto_tags))
+                if candidates:
+                    tag_names = [str(c.get('name') or '').strip() for c in candidates]
+                    tag_names = [x for x in tag_names if x]
+                    if tag_names:
+                        name_types = {
+                            str(c.get('name') or '').strip(): str(c.get('type') or auto_tag_type).strip()
+                            for c in candidates
+                            if str(c.get('name') or '').strip()
+                        }
+                        upsert_asset_tags(
+                            session,
+                            asset_id=asset_id,
+                            names=tag_names,
+                            tag_type=auto_tag_type,
+                            name_types=name_types,
+                        )
+            except Exception:
+                logger.warning("Auto-tag derivation failed for asset_id=%s", asset_id, exc_info=True)
         # Update asset status
         try:
             asset.caption_variant_count = session.query(Caption).filter(Caption.asset_id==asset_id, Caption.superseded==False).count()

@@ -5,6 +5,7 @@ Local-first photo/video intelligence system with:
 - metadata + GPS extraction
 - face detection + face embeddings + person assignment
 - multimodal captions (Qwen3-VL via local HTTP caption service)
+- caption-derived canonical tagging (`<=8` content tags) with per-asset auto-tag block support
 - bilingual web UI
 - SQLite-backed search and task orchestration
 
@@ -88,6 +89,18 @@ Remove stub captions and enqueue real caption regeneration:
 ```powershell
 & $py -m app.cli captions-clean-stubs --root E:\01_INCOMING --apply
 & $py -m app.cli captions-backfill --profile balanced --max-variants 1 --limit 0
+& $py -m app.cli captions-tags-backfill --root E:\01_INCOMING --max-tags 8 --apply
+```
+
+Tagging notes:
+- `captions-tags-backfill` and caption auto-tagging now map caption phrases to canonical tags with deterministic quotas (`<=8`).
+- Removing a tag from the asset inspector blocks auto re-add for that asset.
+- Manually adding the same tag again clears the block.
+
+Remove a tag and block auto re-add (example):
+
+```powershell
+Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8002/assets/123/tags" -ContentType "application/json" -Body '{"tag_ids":[45],"block_auto":true}'
 ```
 
 Re-caption a single asset immediately (example `asset_id=123`):

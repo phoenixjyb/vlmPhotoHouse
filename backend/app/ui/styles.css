@@ -408,8 +408,25 @@ textarea:focus {
   background: #edf8f2;
   color: #215a48;
   border-radius: 999px;
-  padding: 0.16rem 0.6rem;
+  padding: 0.12rem 0.35rem 0.12rem 0.6rem;
   font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tag-chip-remove {
+  border: none;
+  background: transparent;
+  color: #2f6d58;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+}
+
+.tag-chip-remove:hover {
+  color: #a62626;
 }
 
 .face-grid {

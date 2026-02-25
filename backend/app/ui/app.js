@@ -190,6 +190,8 @@ const I18N = {
     regenerate_failed: "Regenerate failed: {error}",
     no_tag_entered: "No tag entered",
     tags_updated: "Tags updated",
+    remove_tag: "Remove tag",
+    tag_removed: "Tag removed",
     tag_update_failed: "Tag update failed: {error}",
     face_updated: "Face {id} updated",
     face_assignment_failed: "Face assignment failed: {error}",
@@ -362,6 +364,8 @@ const I18N = {
     regenerate_failed: "重生成失败: {error}",
     no_tag_entered: "未输入标签",
     tags_updated: "标签已更新",
+    remove_tag: "移除标签",
+    tag_removed: "标签已移除",
     tag_update_failed: "标签更新失败: {error}",
     face_updated: "人脸 {id} 已更新",
     face_assignment_failed: "人脸分配失败: {error}",
@@ -1120,7 +1124,18 @@ function renderTags(tags) {
     root.innerHTML = `<span class="muted">${esc(t("no_tags"))}</span>`;
     return;
   }
-  root.innerHTML = tags.map((t) => `<span class="tag-chip">${esc(t.name)}</span>`).join("");
+  root.innerHTML = tags
+    .map(
+      (tag) => `
+        <span class="tag-chip">
+          <span>${esc(tag.name)}</span>
+          <button class="tag-chip-remove" type="button" data-action="remove-tag" data-tag-id="${Number(tag.id) || 0}" title="${esc(
+            t("remove_tag")
+          )}" aria-label="${esc(t("remove_tag"))}">&times;</button>
+        </span>
+      `
+    )
+    .join("");
 }
 
 function personOptions(currentId) {
@@ -1640,6 +1655,23 @@ function initEvents() {
       showToast(t("tags_updated"));
     } catch (e) {
       showToast(t("tag_update_failed", { error: e.message }));
+    }
+  });
+
+  qs("tag-list").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action='remove-tag']");
+    if (!btn || !state.selectedAsset) return;
+    const tagId = Number(btn.dataset.tagId);
+    if (!tagId) return;
+    try {
+      await api(`/assets/${state.selectedAsset.id}/tags`, {
+        method: "DELETE",
+        body: JSON.stringify({ tag_ids: [tagId], block_auto: true }),
+      });
+      await loadAssetInspector(state.selectedAsset.id);
+      showToast(t("tag_removed"));
+    } catch (err) {
+      showToast(t("tag_update_failed", { error: err.message }));
     }
   });
 

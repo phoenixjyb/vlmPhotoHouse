@@ -9,7 +9,7 @@ This guide is intentionally short for now and points to the current production U
 
 ## Main Tabs
 
-- `Library`: browse assets, open inspector, read/edit captions.
+- `Library`: browse assets, open inspector, read/edit captions, and add/remove tags.
 - `People`: review faces, assign identities, run person cleanup workflows.
 - `Map`: view geo-tagged assets.
 - `Tasks`: monitor queue and system usage (CPU/RAM/GPU).
@@ -57,6 +57,29 @@ Clean stub captions, then backfill:
 ```powershell
 & $py -m app.cli captions-clean-stubs --root E:\01_INCOMING --apply
 & $py -m app.cli captions-backfill --profile balanced --max-variants 1 --limit 0
+& $py -m app.cli captions-tags-backfill --root E:\01_INCOMING --max-tags 8 --apply
+```
+
+Tag extraction is canonical and capped (`<=8`), and removed auto tags can be blocked per asset.
+
+### 2.1) Manual tag remove/block (API)
+
+View current tags for asset 123:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8002/assets/123/tags"
+```
+
+Remove tag ID 45 from asset 123 and block auto re-add:
+
+```powershell
+Invoke-RestMethod -Method Delete -Uri "http://127.0.0.1:8002/assets/123/tags" -ContentType "application/json" -Body '{"tag_ids":[45],"block_auto":true}'
+```
+
+Manual add clears the block for that tag:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8002/assets/123/tags" -ContentType "application/json" -Body '{"names":["indoor play area"]}'
 ```
 
 ### 3) Pause or resume Chinese translation

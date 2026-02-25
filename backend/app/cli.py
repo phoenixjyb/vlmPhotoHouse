@@ -748,6 +748,128 @@ def captions_backfill(
         typer.echo(f"scanned={scanned} enqueued={enqueued} limit={limit} target_variants={max_variants} profile={profile}")
 
 
+@app.command("captions-tags-backfill")
+def captions_tags_backfill(
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
+    max_tags: int = typer.Option(8, min=1, max=32, help="Max derived tags per asset"),
+    source_model_contains: Optional[str] = typer.Option(None, help="Optional caption model substring filter"),
+    tag_type: str = typer.Option("caption-auto", help="Type label used for newly-created tags"),
+    apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
+    commit_every: int = typer.Option(200, min=20, max=5000, help="Commit cadence"),
+) -> None:
+    """Derive tags from captions and upsert them into asset_tags."""
+    from pathlib import Path as _Path
+    from .db import Asset, Caption
+    from .tagging import extract_caption_tag_candidates, upsert_asset_tags
+
+    src_filter = (source_model_contains or "").strip().lower()
+    bad_texts = {
+        "caption service unavailable",
+        "caption service connection failed",
+        "caption generation error",
+        "caption generation failed",
+    }
+
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id, Asset.path).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + "%"))
+
+        scanned = 0
+        matched_caption = 0
+        no_caption = 0
+        no_tags = 0
+        assets_updated = 0
+        links_added = 0
+
+        for asset_id, _path in q:
+            if limit and scanned >= limit:
+                break
+            scanned += 1
+
+            caps = (
+                session.query(Caption)
+                .filter(Caption.asset_id == asset_id)
+                .order_by(Caption.user_edited.desc(), Caption.created_at.desc(), Caption.id.desc())
+                .all()
+            )
+            if not caps:
+                no_caption += 1
+                continue
+
+            source_cap = None
+            for c in caps:
+                txt = (c.text or "").strip()
+                mdl = (c.model or "").strip().lower()
+                if not txt:
+                    continue
+                if txt.lower() in bad_texts:
+                    continue
+                if "stub" in mdl:
+                    continue
+                if src_filter and src_filter not in mdl:
+                    continue
+                source_cap = c
+                break
+
+            if source_cap is None:
+                no_caption += 1
+                continue
+
+            matched_caption += 1
+            derived_candidates = extract_caption_tag_candidates(source_cap.text or "", max_tags=max_tags)
+            if not derived_candidates:
+                no_tags += 1
+                continue
+
+            derived = [str(x.get("name") or "").strip() for x in derived_candidates]
+            derived = [x for x in derived if x]
+            if not derived:
+                no_tags += 1
+                continue
+            name_types = {
+                str(x.get("name") or "").strip(): str(x.get("type") or tag_type).strip()
+                for x in derived_candidates
+                if str(x.get("name") or "").strip()
+            }
+            if apply:
+                added = upsert_asset_tags(
+                    session,
+                    asset_id=int(asset_id),
+                    names=derived,
+                    tag_type=tag_type,
+                    name_types=name_types,
+                )
+                if added:
+                    assets_updated += 1
+                    links_added += len(added)
+            else:
+                assets_updated += 1
+                links_added += len(derived)
+
+            if apply and scanned % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} matched_caption={matched_caption} "
+                    f"assets_updated={assets_updated} links_added={links_added}"
+                )
+
+        if apply:
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"captions-tags-backfill ({mode})")
+        typer.echo(
+            f"scanned={scanned} matched_caption={matched_caption} no_caption={no_caption} "
+            f"no_tags={no_tags} assets_updated={assets_updated} links_added={links_added} "
+            f"max_tags={max_tags} tag_type={tag_type} "
+            f"source_model_contains={source_model_contains or '(any)'} root={root or '(all)'} limit={limit}"
+        )
+
+
 @app.command("captions-backfill-zh")
 def captions_backfill_zh(
     root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),

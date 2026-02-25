@@ -671,20 +671,26 @@ def get_asset_tags(asset_id: int, db_s: Session = Depends(get_db)):
 
 @app.post('/assets/{asset_id}/tags')
 def add_asset_tags(asset_id: int, names: list[str] = Body(..., embed=True), tag_type: str | None = Body(None, embed=True), db_s: Session = Depends(get_db)):
-    from .db import Tag, AssetTag
+    from .db import Tag, AssetTag, AssetTagBlock
     a = db_s.get(Asset, asset_id)
     if not a:
         raise HTTPException(status_code=404, detail='Asset not found')
     added = []
+    effective_type = (str(tag_type or 'manual').strip() or None)
     for nm in names:
         nm = nm.strip()
         if not nm:
             continue
         t = db_s.query(Tag).filter(Tag.name==nm).first()
         if not t:
-            t = Tag(name=nm, type=tag_type)
+            t = Tag(name=nm, type=effective_type)
             db_s.add(t)
             db_s.flush()
+        elif (not t.type) and effective_type:
+            t.type = effective_type
+        blocked = db_s.query(AssetTagBlock).filter(AssetTagBlock.asset_id==asset_id, AssetTagBlock.tag_id==t.id).first()
+        if blocked is not None:
+            db_s.delete(blocked)
         exists = db_s.query(AssetTag).filter(AssetTag.asset_id==asset_id, AssetTag.tag_id==t.id).first()
         if not exists:
             at = AssetTag(asset_id=asset_id, tag_id=t.id)
@@ -692,6 +698,49 @@ def add_asset_tags(asset_id: int, names: list[str] = Body(..., embed=True), tag_
             added.append(nm)
     db_s.commit()
     return {'asset_id': asset_id, 'added': added}
+
+@app.delete('/assets/{asset_id}/tags')
+def remove_asset_tags(
+    asset_id: int,
+    tag_ids: list[int] = Body(..., embed=True),
+    block_auto: bool = Body(True, embed=True),
+    db_s: Session = Depends(get_db),
+):
+    from .db import Tag, AssetTag, AssetTagBlock
+
+    a = db_s.get(Asset, asset_id)
+    if not a:
+        raise HTTPException(status_code=404, detail='Asset not found')
+
+    clean_ids: list[int] = []
+    for raw in (tag_ids or []):
+        try:
+            tid = int(raw)
+        except Exception:
+            continue
+        if tid > 0:
+            clean_ids.append(tid)
+    if not clean_ids:
+        return {'asset_id': asset_id, 'removed': [], 'blocked_tag_ids': []}
+
+    removed: list[dict[str, object]] = []
+    blocked_tag_ids: list[int] = []
+    rows = db_s.query(Tag).filter(Tag.id.in_(clean_ids)).all()
+    for t in rows:
+        rel = db_s.query(AssetTag).filter(AssetTag.asset_id==asset_id, AssetTag.tag_id==t.id).first()
+        if rel is not None:
+            db_s.delete(rel)
+            removed.append({'id': t.id, 'name': t.name})
+        if block_auto:
+            blocked = db_s.query(AssetTagBlock).filter(
+                AssetTagBlock.asset_id==asset_id,
+                AssetTagBlock.tag_id==t.id,
+            ).first()
+            if blocked is None:
+                db_s.add(AssetTagBlock(asset_id=asset_id, tag_id=t.id))
+            blocked_tag_ids.append(int(t.id))
+    db_s.commit()
+    return {'asset_id': asset_id, 'removed': removed, 'blocked_tag_ids': blocked_tag_ids}
 
 @app.post('/search/tags')
 def search_by_tags(tags: list[str] = Body(..., embed=True), mode: str = Body('any', embed=True), media: str = Body('all', embed=True), k: int = Body(100, embed=True), db_s: Session = Depends(get_db)):

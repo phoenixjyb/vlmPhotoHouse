@@ -143,6 +143,12 @@ def ensure_db():
                 Base.metadata.tables['face_assignment_events'].create(bind=engine)  # type: ignore
             except Exception:
                 pass
+        # Create asset_tag_blocks table if missing (SQLite/backward-compat DBs)
+        if not insp.has_table('asset_tag_blocks'):
+            try:
+                Base.metadata.tables['asset_tag_blocks'].create(bind=engine)  # type: ignore
+            except Exception:
+                pass
         _DB_READY = True
     except Exception as e:
         print(f"Database initialization error: {e}")

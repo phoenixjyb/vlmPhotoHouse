@@ -103,6 +103,13 @@ Provider layer:
   - `quality_tier`, `model_version`, `superseded`, `user_edited`.
 - Asset-level status fields maintained in `assets`:
   - `caption_processed`, `caption_variant_count`, `caption_processed_at`, `caption_error_last`.
+- Caption-derived tagging now uses deterministic bilingual canonical mapping in `backend/app/tagging.py` with quota-based selection (`<=8`) and keyword fallback.
+- Auto-tag entry points:
+  - caption generation path in `backend/app/tasks.py`
+  - batch backfill command `captions-tags-backfill` in `backend/app/cli.py`
+- Per-asset auto-tag suppression is supported:
+  - `DELETE /assets/{asset_id}/tags` can remove tags and block re-add for auto-tagging.
+  - Blocked tag IDs are persisted in `asset_tag_blocks`; manual add unblocks.
 
 ### 5.3 Face Pipeline
 
@@ -143,7 +150,8 @@ Provider layer:
 - `persons`: person identities and cached `face_count`.
 - `tasks`: async queue with state/retry/progress fields.
 - `video_segments`: scene/time segments and segment embeddings.
-- `tags`, `asset_tags`: lightweight tagging.
+- `tags`, `asset_tags`: tagging catalog and asset links.
+- `asset_tag_blocks`: per-asset blocked auto tags (prevents removed auto tags from coming back).
 - `face_assignment_events`: assignment audit history (manual/dnn/system).
 
 ## 7) UI Architecture
@@ -155,7 +163,7 @@ UI is server-hosted static frontend:
 - Route: `/ui`
 
 Main tabs:
-- Library: search + asset inspector (media, captions, tags, per-asset faces).
+- Library: search + asset inspector (media, captions, tags with remove/block flow, per-asset faces).
 - People: named/unnamed persons, person assets, unassigned face queue.
 - Map: GPS visualization via Leaflet (`/assets/geo`).
 - Tasks: queue monitor + cancel action.

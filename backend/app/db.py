@@ -169,3 +169,11 @@ class AssetTag(Base):
     tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id', ondelete='CASCADE'), index=True, nullable=False)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     Index('idx_asset_tag_unique', asset_id, tag_id, unique=True)
+
+class AssetTagBlock(Base):
+    __tablename__ = 'asset_tag_blocks'
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), index=True, nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id', ondelete='CASCADE'), index=True, nullable=False)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+    Index('idx_asset_tag_block_unique', asset_id, tag_id, unique=True)
