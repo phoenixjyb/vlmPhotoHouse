@@ -280,6 +280,10 @@ textarea:focus {
   margin-bottom: 0.55rem;
 }
 
+.pager-input {
+  width: 86px;
+}
+
 .asset-card {
   border: 1px solid var(--line);
   border-radius: 10px;

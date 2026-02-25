@@ -202,6 +202,8 @@ const I18N = {
     no_asset_selected: "Select an asset first",
     prev_page: "Prev",
     next_page: "Next",
+    jump_page: "Go",
+    page_input_ph: "Page",
     pager_status: "Page {page}/{pages} | showing {shown}/{total}",
   },
   zh: {
@@ -372,6 +374,8 @@ const I18N = {
     no_asset_selected: "请先选择一个资源",
     prev_page: "上一页",
     next_page: "下一页",
+    jump_page: "跳转",
+    page_input_ph: "页码",
     pager_status: "第 {page}/{pages} 页 | 当前显示 {shown}/{total}",
   },
 };
@@ -409,11 +413,22 @@ function isLibraryPaged() {
   return ["latest", "path", "person"].includes(String(state.libraryPager.kind || ""));
 }
 
+function parsePageInputValue(rawValue, pages) {
+  const n = Number(rawValue);
+  if (!Number.isFinite(n)) return null;
+  const p = Math.floor(n);
+  if (p < 1) return 1;
+  if (p > pages) return pages;
+  return p;
+}
+
 function updateLibraryPagerUi() {
   const prev = qs("btn-library-prev");
   const next = qs("btn-library-next");
+  const jumpBtn = qs("btn-library-jump");
+  const jumpInput = qs("library-page-input");
   const meta = qs("library-page-meta");
-  if (!prev || !next || !meta) return;
+  if (!prev || !next || !meta || !jumpBtn || !jumpInput) return;
 
   const pager = state.libraryPager || {};
   const page = Math.max(1, Number(pager.page) || 1);
@@ -425,10 +440,17 @@ function updateLibraryPagerUi() {
   if (!isLibraryPaged()) {
     prev.disabled = true;
     next.disabled = true;
+    jumpBtn.disabled = true;
+    jumpInput.disabled = true;
   } else {
     prev.disabled = page <= 1;
     next.disabled = page >= pages || shown <= 0;
+    jumpBtn.disabled = shown <= 0 || pages <= 1;
+    jumpInput.disabled = shown <= 0 || pages <= 1;
   }
+  jumpInput.min = "1";
+  jumpInput.max = String(pages);
+  jumpInput.value = String(page);
   meta.textContent = t("pager_status", {
     page,
     pages,
@@ -440,17 +462,25 @@ function updateLibraryPagerUi() {
 function updatePersonAssetsPagerUi() {
   const prev = qs("btn-person-assets-prev");
   const next = qs("btn-person-assets-next");
+  const jumpBtn = qs("btn-person-assets-jump");
+  const jumpInput = qs("person-assets-page-input");
   const meta = qs("person-assets-page-meta");
-  if (!prev || !next || !meta) return;
+  if (!prev || !next || !meta || !jumpBtn || !jumpInput) return;
 
   const pager = state.personAssetsPager || {};
   const page = Math.max(1, Number(pager.page) || 1);
   const pages = pageCount(pager.total, pager.pageSize);
   const shown = Number(pager.shown) || 0;
   const total = Number(pager.total) || 0;
+  const active = Boolean(pager.personId);
 
-  prev.disabled = page <= 1 || !pager.personId;
-  next.disabled = page >= pages || shown <= 0 || !pager.personId;
+  prev.disabled = page <= 1 || !active;
+  next.disabled = page >= pages || shown <= 0 || !active;
+  jumpBtn.disabled = !active || shown <= 0 || pages <= 1;
+  jumpInput.disabled = !active || shown <= 0 || pages <= 1;
+  jumpInput.min = "1";
+  jumpInput.max = String(pages);
+  jumpInput.value = String(page);
   meta.textContent = t("pager_status", { page, pages, shown, total });
 }
 
@@ -837,6 +867,24 @@ async function runLibraryPage(delta) {
   await runSearch(target, true);
 }
 
+async function runLibraryJump() {
+  if (!isLibraryPaged()) return;
+  const pages = pageCount(state.libraryPager.total, state.libraryPager.pageSize);
+  const input = qs("library-page-input");
+  const target = parsePageInputValue(input?.value, pages);
+  if (!target) return;
+
+  const current = Math.max(1, Number(state.libraryPager.page) || 1);
+  if (target === current) return;
+
+  const kind = String(state.libraryPager.kind || "latest");
+  if (kind === "latest") {
+    await loadLibraryLatest(target);
+    return;
+  }
+  await runSearch(target, true);
+}
+
 function closeAssetInspector() {
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
@@ -1196,6 +1244,19 @@ async function runPersonAssetsPage(delta) {
   await loadPersonAssets(personId, target);
 }
 
+async function runPersonAssetsJump() {
+  const personId = Number(state.personAssetsPager.personId) || 0;
+  if (!personId) return;
+  const pages = pageCount(state.personAssetsPager.total, state.personAssetsPager.pageSize);
+  const input = qs("person-assets-page-input");
+  const target = parsePageInputValue(input?.value, pages);
+  if (!target) return;
+
+  const current = Math.max(1, Number(state.personAssetsPager.page) || 1);
+  if (target === current) return;
+  await loadPersonAssets(personId, target);
+}
+
 async function loadUnassignedFaces() {
   try {
     const data = await api("/faces?unassigned=true&page=1&page_size=120");
@@ -1428,6 +1489,10 @@ function initEvents() {
   qs("btn-library-load").addEventListener("click", () => loadLibraryLatest(1));
   qs("btn-library-prev").addEventListener("click", () => runLibraryPage(-1));
   qs("btn-library-next").addEventListener("click", () => runLibraryPage(1));
+  qs("btn-library-jump").addEventListener("click", runLibraryJump);
+  qs("library-page-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runLibraryJump();
+  });
   qs("search-query").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runSearch(1, false);
   });
@@ -1586,6 +1651,10 @@ function initEvents() {
   qs("btn-refresh-people").addEventListener("click", loadPeople);
   qs("btn-person-assets-prev").addEventListener("click", () => runPersonAssetsPage(-1));
   qs("btn-person-assets-next").addEventListener("click", () => runPersonAssetsPage(1));
+  qs("btn-person-assets-jump").addEventListener("click", runPersonAssetsJump);
+  qs("person-assets-page-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runPersonAssetsJump();
+  });
   qs("people-show-unnamed").addEventListener("change", loadPeople);
   const createPersonBtn = qs("btn-create-person");
   if (createPersonBtn) {

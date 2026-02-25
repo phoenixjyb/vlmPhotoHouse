@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260225b" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260225c" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -110,6 +110,8 @@
             <div class="pager-row">
               <button id="btn-library-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
               <button id="btn-library-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <input id="library-page-input" class="pager-input" type="number" min="1" step="1" data-i18n-placeholder="page_input_ph" placeholder="Page" />
+              <button id="btn-library-jump" class="btn ghost" type="button" data-i18n="jump_page">Go</button>
               <span id="library-page-meta" class="muted small"></span>
             </div>
             <div id="library-grid" class="asset-grid scroll-grid"></div>
@@ -178,6 +180,8 @@
             <div class="pager-row">
               <button id="btn-person-assets-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
               <button id="btn-person-assets-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <input id="person-assets-page-input" class="pager-input" type="number" min="1" step="1" data-i18n-placeholder="page_input_ph" placeholder="Page" />
+              <button id="btn-person-assets-jump" class="btn ghost" type="button" data-i18n="jump_page">Go</button>
               <span id="person-assets-page-meta" class="muted small"></span>
             </div>
             <div id="person-assets-grid" class="asset-grid scroll-grid"></div>
@@ -278,6 +282,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260225e" defer></script>
+  <script src="/ui/app.js?v=20260225f" defer></script>
 </body>
 </html>
