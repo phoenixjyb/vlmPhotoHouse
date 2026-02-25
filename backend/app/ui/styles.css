@@ -85,6 +85,21 @@ body {
   gap: 0.5rem;
 }
 
+.lang-switch {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.lang-btn {
+  min-width: 52px;
+}
+
+.lang-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 .status-cards {
   margin-top: 0.9rem;
   display: grid;
@@ -337,6 +352,13 @@ textarea:focus {
   max-height: 62vh;
 }
 
+.asset-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
 .section {
   margin-top: 0.85rem;
   padding-top: 0.8rem;
@@ -482,6 +504,53 @@ textarea:focus {
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+.preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(9, 19, 16, 0.92);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.6rem;
+  padding: 0.8rem;
+}
+
+.preview-modal.hidden {
+  display: none;
+}
+
+.preview-close {
+  justify-self: end;
+  border: 1px solid #395248;
+  background: #10271f;
+  color: #e9fff5;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.preview-close:hover {
+  background: #153229;
+}
+
+.preview-modal-body {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.preview-modal-body img,
+.preview-modal-body video {
+  max-width: 96vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #0d1e18;
 }
 
 @keyframes fade-in {

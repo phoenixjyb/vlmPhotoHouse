@@ -30,7 +30,7 @@ class CaptionProvider(Protocol):
 class HTTPCaptionProvider:
     """HTTP-based caption provider that calls remote caption service."""
     
-    def __init__(self, service_url: str = "http://127.0.0.1:8002"):
+    def __init__(self, service_url: str = "http://127.0.0.1:8102"):
         self.service_url = service_url.rstrip('/')
         self.model_name = "http-caption-service"
         
@@ -396,7 +396,7 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     if provider == 'http':
         from .config import get_settings
         settings = get_settings()
-        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8002')
+        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
         return HTTPCaptionProvider(service_url)
     
     # Check if we should use subprocess (external caption models)

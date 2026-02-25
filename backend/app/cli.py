@@ -748,6 +748,165 @@ def captions_backfill(
         typer.echo(f"scanned={scanned} enqueued={enqueued} limit={limit} target_variants={max_variants} profile={profile}")
 
 
+@app.command("captions-backfill-zh")
+def captions_backfill_zh(
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
+    source_model_contains: Optional[str] = typer.Option(None, help="Optional model substring filter for source captions"),
+    source_lang: str = typer.Option("en", help="Source language tag"),
+    target_lang: str = typer.Option("zh-CN", help="Target language tag"),
+    translation_service_url: Optional[str] = typer.Option(None, help="Caption service base URL, defaults to CAPTION_SERVICE_URL"),
+    overwrite_existing_zh: bool = typer.Option(False, help="Overwrite existing generated zh variants"),
+    apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
+    commit_every: int = typer.Option(100, min=20, max=2000, help="Commit cadence"),
+    timeout_sec: float = typer.Option(90.0, min=10.0, max=300.0, help="Per-translation request timeout"),
+) -> None:
+    """Backfill Chinese caption variants by translating existing captions via local caption service."""
+    from pathlib import Path as _Path
+    import httpx
+    from .db import Asset, Caption
+
+    settings = get_settings()
+    base_url = (
+        translation_service_url
+        or os.getenv("CAPTION_SERVICE_URL")
+        or getattr(settings, "caption_service_url", "http://127.0.0.1:8102")
+        or "http://127.0.0.1:8102"
+    ).rstrip("/")
+    src_filter = (source_model_contains or "").strip().lower()
+    bad_texts = {
+        "caption service unavailable",
+        "caption service connection failed",
+        "caption generation error",
+        "caption generation failed",
+    }
+
+    def _is_zh_model(model: str) -> bool:
+        m = (model or "").strip().lower()
+        return ("|zh" in m) or ("-zh" in m) or ("_zh" in m) or ("zh-cn" in m) or ("zh_cn" in m)
+
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id, Asset.path).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + "%"))
+
+        scanned = 0
+        has_source = 0
+        translated = 0
+        skipped_has_zh = 0
+        skipped_no_source = 0
+        failed = 0
+        touched_assets: set[int] = set()
+
+        with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
+            for asset_id, _path in q:
+                if limit and scanned >= limit:
+                    break
+                scanned += 1
+
+                caps = (
+                    session.query(Caption)
+                    .filter(Caption.asset_id == asset_id)
+                    .order_by(Caption.created_at.desc(), Caption.id.desc())
+                    .all()
+                )
+                if not caps:
+                    skipped_no_source += 1
+                    continue
+
+                if (not overwrite_existing_zh) and any(_is_zh_model(c.model or "") for c in caps):
+                    skipped_has_zh += 1
+                    continue
+
+                source_cap = None
+                for c in caps:
+                    txt = (c.text or "").strip()
+                    mdl = (c.model or "").strip()
+                    if not txt:
+                        continue
+                    if txt.lower() in bad_texts:
+                        continue
+                    if _is_zh_model(mdl):
+                        continue
+                    if src_filter and src_filter not in mdl.lower():
+                        continue
+                    source_cap = c
+                    break
+
+                if source_cap is None:
+                    skipped_no_source += 1
+                    continue
+                has_source += 1
+
+                if not apply:
+                    translated += 1
+                    continue
+
+                try:
+                    payload = {
+                        "text": source_cap.text,
+                        "source_lang": source_lang,
+                        "target_lang": target_lang,
+                        "style": "caption",
+                    }
+                    resp = client.post(f"{base_url}/translate", json=payload)
+                    if resp.status_code != 200:
+                        failed += 1
+                        continue
+                    body = resp.json()
+                    zh = (body.get("translation") or "").strip()
+                    if not zh:
+                        failed += 1
+                        continue
+                    model_name = f"{(source_cap.model or 'caption')}|zh-cn"
+                    session.add(
+                        Caption(
+                            asset_id=int(asset_id),
+                            text=zh,
+                            model=model_name,
+                            user_edited=False,
+                            quality_tier="translated",
+                            model_version="zh-v1",
+                        )
+                    )
+                    touched_assets.add(int(asset_id))
+                    translated += 1
+                except Exception:
+                    failed += 1
+
+                if apply and translated % commit_every == 0:
+                    session.commit()
+                    typer.echo(
+                        f"progress scanned={scanned} translated={translated} failed={failed} "
+                        f"skipped_has_zh={skipped_has_zh} skipped_no_source={skipped_no_source}"
+                    )
+
+        if apply:
+            for aid in touched_assets:
+                cnt = (
+                    session.query(func.count(Caption.id))
+                    .filter(Caption.asset_id == aid, Caption.superseded == False)  # noqa: E712
+                    .scalar()
+                    or 0
+                )
+                a = session.get(Asset, aid)
+                if a is not None:
+                    a.caption_variant_count = int(cnt)
+                    a.caption_processed = bool(cnt > 0)
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"captions-backfill-zh ({mode})")
+        typer.echo(
+            f"scanned={scanned} has_source={has_source} translated={translated} failed={failed} "
+            f"skipped_has_zh={skipped_has_zh} skipped_no_source={skipped_no_source} "
+            f"target_lang={target_lang} source_lang={source_lang} base_url={base_url} "
+            f"root={root or '(all)'} limit={limit}"
+        )
+
+
 @app.command("captions-prune-model")
 def captions_prune_model(
     model_contains: str = typer.Option("blip2", help="Case-insensitive substring match against captions.model"),

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260223e" />
+  <title data-i18n="app_title">VLM Photo House</title>
+  <link rel="stylesheet" href="/ui/styles.css?v=20260225a" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -18,123 +18,131 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <h1>VLM Photo House</h1>
-        <p class="subtitle">Faces, captions, videos, and search in one control surface.</p>
+        <h1 data-i18n="app_title">VLM Photo House</h1>
+        <p class="subtitle" data-i18n="subtitle">Faces, captions, videos, and search in one control surface.</p>
       </div>
       <div class="top-actions">
-        <button id="btn-refresh-all" class="btn ghost">Refresh</button>
-        <a class="btn ghost" href="/docs" target="_blank" rel="noopener">API Docs</a>
+        <div id="lang-switch" class="lang-switch">
+          <button class="btn ghost lang-btn" data-lang="en" type="button">EN</button>
+          <button class="btn ghost lang-btn" data-lang="zh" type="button">中文</button>
+        </div>
+        <button id="btn-refresh-all" class="btn ghost" data-i18n="refresh">Refresh</button>
+        <a class="btn ghost" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
       </div>
     </header>
 
     <section class="status-cards">
       <article class="stat-card">
-        <p class="label">Assets</p>
+        <p class="label" data-i18n="assets">Assets</p>
         <p id="stat-assets" class="value">-</p>
       </article>
       <article class="stat-card">
-        <p class="label">Captions</p>
+        <p class="label" data-i18n="captions">Captions</p>
         <p id="stat-captions" class="value">-</p>
       </article>
       <article class="stat-card">
-        <p class="label">Faces</p>
+        <p class="label" data-i18n="faces">Faces</p>
         <p id="stat-faces" class="value">-</p>
       </article>
       <article class="stat-card">
-        <p class="label">People</p>
+        <p class="label" data-i18n="people">People</p>
         <p id="stat-persons" class="value">-</p>
       </article>
       <article class="stat-card">
-        <p class="label">Tasks Pending</p>
+        <p class="label" data-i18n="tasks_pending">Tasks Pending</p>
         <p id="stat-pending" class="value">-</p>
       </article>
       <article class="stat-card">
-        <p class="label">Health</p>
+        <p class="label" data-i18n="health">Health</p>
         <p id="stat-health" class="value">-</p>
       </article>
     </section>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="library">Library</button>
-      <button class="tab" data-tab="people">People</button>
-      <button class="tab" data-tab="map">Map</button>
-      <button class="tab" data-tab="tasks">Tasks</button>
-      <button class="tab" data-tab="admin">Admin</button>
+      <button class="tab active" data-tab="library" data-i18n="tab_library">Library</button>
+      <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
+      <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
+      <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
+      <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
     </nav>
 
     <main>
       <section id="tab-library" class="tab-panel active">
         <div class="panel-grid">
           <div class="panel left-panel">
-            <h2>Search</h2>
+            <h2 data-i18n="search">Search</h2>
             <div class="controls">
               <label>
-                Mode
+                <span data-i18n="mode">Mode</span>
                 <select id="search-mode">
-                  <option value="path">Path</option>
-                  <option value="caption">Caption</option>
-                  <option value="smart">Smart</option>
-                  <option value="person">Person Name</option>
+                  <option value="path" data-i18n="mode_path">Path</option>
+                  <option value="caption" data-i18n="mode_caption">Caption</option>
+                  <option value="smart" data-i18n="mode_smart">Smart</option>
+                  <option value="person" data-i18n="mode_person">Person Name</option>
                 </select>
               </label>
               <label class="grow">
-                Query
-                <input id="search-query" type="text" placeholder="Type query text..." />
+                <span data-i18n="query">Query</span>
+                <input id="search-query" type="text" data-i18n-placeholder="query_ph" placeholder="Type query text..." />
               </label>
             </div>
             <div class="controls">
               <label class="grow">
-                Tags (for smart mode)
-                <input id="search-tags" type="text" placeholder="family, beach, sunset" />
+                <span data-i18n="tags_for_smart">Tags (for smart mode)</span>
+                <input id="search-tags" type="text" data-i18n-placeholder="tags_for_smart_ph" placeholder="family, beach, sunset" />
               </label>
               <label>
-                Media
+                <span data-i18n="media">Media</span>
                 <select id="search-media">
-                  <option value="all">All</option>
-                  <option value="image">Image</option>
-                  <option value="video">Video</option>
+                  <option value="all" data-i18n="media_all">All</option>
+                  <option value="image" data-i18n="media_image">Image</option>
+                  <option value="video" data-i18n="media_video">Video</option>
                 </select>
               </label>
             </div>
             <div class="controls">
-              <button id="btn-search" class="btn">Run Search</button>
-              <button id="btn-library-load" class="btn ghost">Browse Latest</button>
+              <button id="btn-search" class="btn" data-i18n="run_search">Run Search</button>
+              <button id="btn-library-load" class="btn ghost" data-i18n="browse_latest">Browse Latest</button>
             </div>
 
-            <h3>Results</h3>
+            <h3 data-i18n="results">Results</h3>
             <p id="library-result-meta" class="muted"></p>
             <div id="library-grid" class="asset-grid"></div>
           </div>
 
           <div class="panel right-panel">
-            <h2>Inspector</h2>
-            <p id="asset-empty" class="muted">Select any result card to inspect captions, tags, and faces.</p>
+            <h2 data-i18n="inspector">Inspector</h2>
+            <p id="asset-empty" class="muted" data-i18n="asset_empty">Select any result card to inspect captions, tags, and faces.</p>
             <div id="asset-inspector" class="hidden">
               <div class="asset-header">
                 <p id="asset-id" class="mono"></p>
                 <p id="asset-path" class="muted mono small"></p>
+                <div class="asset-header-actions">
+                  <button id="btn-asset-back" class="btn ghost" data-i18n="back_to_results">Back</button>
+                  <button id="btn-preview-fullscreen" class="btn ghost" data-i18n="fullscreen">Full Screen</button>
+                </div>
               </div>
               <div id="asset-preview" class="asset-preview"></div>
 
               <div class="section">
-                <h3>Captions</h3>
+                <h3 data-i18n="captions">Captions</h3>
                 <div class="controls">
-                  <button id="btn-caption-regenerate" class="btn">Regenerate</button>
+                  <button id="btn-caption-regenerate" class="btn" data-i18n="regenerate">Regenerate</button>
                 </div>
                 <div id="caption-list"></div>
               </div>
 
               <div class="section">
-                <h3>Tags</h3>
+                <h3 data-i18n="tags">Tags</h3>
                 <div id="tag-list" class="tag-list"></div>
                 <div class="controls">
-                  <input id="tag-input" type="text" placeholder="comma separated tags" />
-                  <button id="btn-add-tags" class="btn">Add Tags</button>
+                  <input id="tag-input" type="text" data-i18n-placeholder="tags_input_ph" placeholder="comma separated tags" />
+                  <button id="btn-add-tags" class="btn" data-i18n="add_tags">Add Tags</button>
                 </div>
               </div>
 
               <div class="section">
-                <h3>Faces</h3>
+                <h3 data-i18n="faces">Faces</h3>
                 <div id="face-list" class="face-grid"></div>
               </div>
             </div>
@@ -146,20 +154,20 @@
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
-              <h2>People</h2>
+              <h2 data-i18n="people">People</h2>
               <label class="small muted" style="display:flex; align-items:center; gap:6px;">
                 <input id="people-show-unnamed" type="checkbox" />
-                Show unnamed clusters
+                <span data-i18n="show_unnamed_clusters">Show unnamed clusters</span>
               </label>
-              <button id="btn-refresh-people" class="btn ghost">Refresh</button>
+              <button id="btn-refresh-people" class="btn ghost" data-i18n="refresh">Refresh</button>
             </div>
             <div id="people-list" class="people-list"></div>
           </div>
           <div class="panel right-panel">
-            <h2>Person Assets</h2>
-            <p id="person-assets-meta" class="muted">Select a person to view related assets.</p>
+            <h2 data-i18n="person_assets">Person Assets</h2>
+            <p id="person-assets-meta" class="muted" data-i18n="person_assets_meta_default">Select a person to view related assets.</p>
             <div id="person-assets-grid" class="asset-grid"></div>
-            <h3>Unassigned Faces</h3>
+            <h3 data-i18n="unassigned_faces">Unassigned Faces</h3>
             <div id="unassigned-faces" class="face-grid"></div>
           </div>
         </div>
@@ -168,22 +176,22 @@
       <section id="tab-map" class="tab-panel">
         <div class="panel">
           <div class="controls">
-            <h2>Geo Map</h2>
+            <h2 data-i18n="geo_map">Geo Map</h2>
             <label>
-              Media
+              <span data-i18n="media">Media</span>
               <select id="map-media-filter">
-                <option value="all">All</option>
-                <option value="image">Image</option>
-                <option value="video">Video</option>
+                <option value="all" data-i18n="media_all">All</option>
+                <option value="image" data-i18n="media_image">Image</option>
+                <option value="video" data-i18n="media_video">Video</option>
               </select>
             </label>
             <label>
-              Points
+              <span data-i18n="points">Points</span>
               <input id="map-limit" type="number" min="100" max="20000" step="100" value="3000" />
             </label>
-            <button id="btn-refresh-map" class="btn ghost">Refresh Map</button>
+            <button id="btn-refresh-map" class="btn ghost" data-i18n="refresh_map">Refresh Map</button>
           </div>
-          <p id="map-meta" class="muted">Loading map data...</p>
+          <p id="map-meta" class="muted" data-i18n="map_loading">Loading map data...</p>
           <div id="geo-map" class="geo-map"></div>
         </div>
       </section>
@@ -191,21 +199,21 @@
       <section id="tab-tasks" class="tab-panel">
         <div class="panel">
           <div class="controls">
-            <h2>Task Queue</h2>
-            <button id="btn-refresh-tasks" class="btn ghost">Refresh</button>
+            <h2 data-i18n="task_queue">Task Queue</h2>
+            <button id="btn-refresh-tasks" class="btn ghost" data-i18n="refresh">Refresh</button>
           </div>
           <p id="task-meta" class="muted"></p>
           <div class="table-wrap">
             <table class="task-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Type</th>
-                  <th>State</th>
-                  <th>Progress</th>
-                  <th>Retry</th>
-                  <th>Error</th>
-                  <th>Action</th>
+                  <th data-i18n="id">ID</th>
+                  <th data-i18n="type">Type</th>
+                  <th data-i18n="state">State</th>
+                  <th data-i18n="progress">Progress</th>
+                  <th data-i18n="retry">Retry</th>
+                  <th data-i18n="error">Error</th>
+                  <th data-i18n="action">Action</th>
                 </tr>
               </thead>
               <tbody id="task-rows"></tbody>
@@ -217,27 +225,27 @@
       <section id="tab-admin" class="tab-panel">
         <div class="panel-grid">
           <div class="panel">
-            <h2>Health</h2>
+            <h2 data-i18n="health">Health</h2>
             <pre id="admin-health" class="json-box"></pre>
           </div>
           <div class="panel">
-            <h2>Metrics</h2>
+            <h2 data-i18n="metrics">Metrics</h2>
             <pre id="admin-metrics" class="json-box"></pre>
           </div>
           <div class="panel">
-            <h2>Actions</h2>
+            <h2 data-i18n="actions">Actions</h2>
             <div class="controls">
-              <button id="btn-rebuild-index" class="btn">Rebuild Vector Index</button>
-              <button id="btn-recluster" class="btn">Trigger Reclustering</button>
+              <button id="btn-rebuild-index" class="btn" data-i18n="rebuild_vector_index">Rebuild Vector Index</button>
+              <button id="btn-recluster" class="btn" data-i18n="trigger_reclustering">Trigger Reclustering</button>
             </div>
             <div class="controls">
-              <input id="ingest-root" type="text" placeholder="E:\\01_INCOMING" />
-              <button id="btn-ingest" class="btn">Ingest Scan</button>
+              <input id="ingest-root" type="text" data-i18n-placeholder="ingest_root_ph" placeholder="E:\\01_INCOMING" />
+              <button id="btn-ingest" class="btn" data-i18n="ingest_scan">Ingest Scan</button>
             </div>
-            <p class="muted">Use this for controlled maintenance operations from browser.</p>
+            <p class="muted" data-i18n="admin_maintenance_hint">Use this for controlled maintenance operations from browser.</p>
           </div>
           <div class="panel">
-            <h2>Caption/LVFace</h2>
+            <h2 data-i18n="caption_lvface">Caption/LVFace</h2>
             <pre id="admin-services" class="json-box"></pre>
           </div>
         </div>
@@ -246,11 +254,15 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <div id="preview-modal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-label="Asset Preview">
+    <button id="btn-preview-close" class="preview-close" type="button" data-i18n="close_preview">Close</button>
+    <div id="preview-modal-body" class="preview-modal-body"></div>
+  </div>
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260223e" defer></script>
+  <script src="/ui/app.js?v=20260225a" defer></script>
 </body>
 </html>

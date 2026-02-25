@@ -67,7 +67,7 @@ class Settings(BaseModel):
     caption_device: str = Field(default=os.getenv('CAPTION_DEVICE', 'cpu'))  # cpu|cuda
     caption_model: str = Field(default=os.getenv('CAPTION_MODEL', 'auto'))  # model name override
     caption_external_dir: str = Field(default=os.getenv('CAPTION_EXTERNAL_DIR', ''))  # Path to external caption models installation
-    caption_service_url: str = Field(default=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8002'))  # HTTP caption service URL
+    caption_service_url: str = Field(default=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102'))  # HTTP caption service URL
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
     # Backoff configuration (supports legacy env var synonyms)
@@ -139,10 +139,12 @@ def get_settings() -> Settings:
         lvface_external_dir=os.getenv('LVFACE_EXTERNAL_DIR', ''),
         lvface_python_exe=os.getenv('LVFACE_PYTHON_EXE', ''),
         lvface_model_name=os.getenv('LVFACE_MODEL_NAME', 'lvface.onnx'),
+        lvface_service_url=os.getenv('LVFACE_SERVICE_URL', ''),
         caption_provider=os.getenv('CAPTION_PROVIDER', 'stub'),
         caption_device=os.getenv('CAPTION_DEVICE', 'cpu'),
         caption_model=os.getenv('CAPTION_MODEL', 'auto'),
         caption_external_dir=os.getenv('CAPTION_EXTERNAL_DIR', ''),
+        caption_service_url=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102'),
         worker_concurrency=int(os.getenv('WORKER_CONCURRENCY','1')),
         max_task_retries=int(os.getenv('MAX_TASK_RETRIES','3')),
     retry_backoff_base_seconds=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),
