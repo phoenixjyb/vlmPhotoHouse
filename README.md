@@ -1,196 +1,91 @@
-# VLM Photo Engine
+# VLM Photo House
 
-Local-first AI photo engine with comprehensive video processing capabilities. Professional code/data architecture! 🚀
+Local-first photo/video intelligence system with:
+- ingestion from `E:\01_INCOMING`
+- metadata + GPS extraction
+- face detection + face embeddings + person assignment
+- multimodal captions (Qwen3-VL via local HTTP caption service)
+- bilingual web UI
+- SQLite-backed search and task orchestration
 
-## 🎯 Current Status (Sep 3, 2025)
+## Production Repos
 
-### ✅ **Architecture Complete & Production Ready**
-- **📁 Clean Code/Data Separation**: Workspace contains only code, all data assets on Drive E
-- **🧠 Face Processing System**: 10,390 faces detected from 6,564 images (98% embedding success)
-- **💾 Drive E Data Hub**: 35,369+ files organized in E:\VLM_DATA with professional structure
-- **🔧 Helper Infrastructure**: Configuration-driven data access with `drive_e_helper.py`
-- **🎮 RTX 3090 Integration**: LVFace + BLIP2 + multi-service coordination operational
+This project runs as a multi-repo stack under `C:\Users\yanbo\wSpace\vlm-photo-engine`:
 
-### 🔄 **Processing Capabilities** 
-- **🧠 11,528 Face Embeddings**: All accessible via Drive E helper with 512-dimensional vectors
-- **💾 Database Assets**: metadata.sqlite (26.71 MB), app.db (4.13 MB) on Drive E
-- **🎯 Scalable Architecture**: Services updated to use E:/VLM_DATA paths
-- **Ready for Expansion**: Clean foundation for advanced face recognition and search
+1. `vlmPhotoHouse` (this repo): API, worker, DB orchestration, UI, CLI.
+2. `vlmCaptionModels`: caption server (`/caption`, `/translate`) with local Qwen3-VL model.
+3. `LVFace`: external face embedding project used by subprocess provider.
 
-### 📁 **Quick Start - Drive E Architecture**
+## Runtime Defaults (Current)
+
+- API/UI: `http://127.0.0.1:8002` (`/ui`)
+- Caption service: `http://127.0.0.1:8102`
+- DB: `E:\VLM_DATA\databases\metadata.sqlite`
+- Originals: `E:\01_INCOMING`
+- Derived data root: `E:\VLM_DATA\derived`
+- Caption provider: `http` (Qwen3-VL in caption server)
+- Face detection provider: `scrfd` (InsightFace path)
+- Face embedding provider: `lvface` (external subprocess)
+
+## Repo Layout (Production Surface)
+
+Keep and operate from these folders:
+- `backend/` application code
+- `scripts/` launchers (`start-dev-multiproc.ps1` is primary entrypoint)
+- `docs/` current architecture and operations docs
+- `deploy/` deployment files
+- `config/` config templates
+- `tools/` maintenance/admin scripts
+- `tests/` automated tests
+
+Legacy/experimental content is archived outside repo at:
+- `C:\Users\yanbo\wSpace\vlm-photo-engine\archive_unused\20260225-prod-cleanup\`
+
+## Start the Stack (Windows)
+
+From repo root:
+
 ```powershell
-# Access Drive E data via helper
-python tools\drive_e_helper.py
-
-# Start backend with Drive E integration
-cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-# Process faces using Drive E embeddings storage
-python unified_scrfd_service.py  # Saves to E:/VLM_DATA/embeddings/faces/
-
-# Monitor data organization
-Get-ChildItem E:\VLM_DATA -Recurse | Measure-Object | Select-Object Count
+.\scripts\start-dev-multiproc.ps1 -Preset RTX3090 -UseWindowsTerminal
 ```
 
-## Deployment (Hybrid Workstation)
-See `docs/deployment.md` for Docker Compose on Windows + WSL2 with NVIDIA GPUs.
+This starts:
+- API + inline worker (`vlmPhotoHouse`)
+- caption server process (`vlmCaptionModels`, provider `qwen3-vl`)
+- optional voice pane (if available)
 
-## Agent Handoff
-For the current operational state and next actions, start with:
-- `docs/PROJECT_STATUS_CURRENT.md`
+## Core Operations
 
-## Hardware Requirements
+From `backend/`:
 
-### Production Configuration ✅ (Validated)
-- **RTX 3090 (24GB VRAM)**: Primary ML workloads (LVFace, BLIP2, OpenCLIP, TTS/ASR)
-- **Quadro P2000 (5GB VRAM)**: Display output and light tasks
-- **Dual GPU Setup**: Automatic device assignment (cuda:0 → RTX 3090, cuda:1 → P2000)
-- **Windows CUDA**: PyTorch 2.6.0+cu124 with CUDA 12.4 support
-
-### Performance Metrics (RTX 3090)
-- **LVFace Face Embeddings**: 4.24s warmup time
-- **BLIP2 Caption Generation**: 35.2s warmup time
-- **Memory Capacity**: 24GB enables large model batching
-- **Concurrent Workloads**: Face detection + caption generation + embeddings
-
-### Minimum Requirements
-- **8GB+ VRAM**: For basic ML functionality (use LowVRAM preset)
-- **CUDA Compatible GPU**: GTX 1060 or better
-- **16GB+ System RAM**: For model loading and data processing
-- **SSD Storage**: Recommended for model loading performance
-
-## Operations
-Runbook in `docs/operations.md`. Security notes in `docs/security.md`.
-
-## Tests
-To skip all tests locally during fast iteration, set `SKIP_ALL_TESTS=true` (documented in operations).
-
-## Development
-
-- macOS (fast): builds only core dependencies. Heavy ML packages (torch, faiss, open-clip, sentence-transformers) are deferred.
-- GPU/WSL2: enable heavy ML packages for full functionality.
-
-Quickstart for the full dev stack (Windows): see `docs/quick-start-dev.md`.
-WSL/Linux setup and tmux launcher: see `docs/wsl-setup.md`.
-
-### Local dev launchers
-
-- Windows (multi‑pane): `scripts/start-dev-multiproc.ps1`
-	- Presets: `-Preset LowVRAM` (facenet + vitgpt2) or `-Preset RTX3090` (lvface + blip2)
-	- Use `-UseWindowsTerminal` for panes and `-KillExisting` to reset the session
-	- Explicit flags override presets: `-FaceProvider`, `-CaptionProvider`, `-Gpu`, `-ApiPort`
-- WSL/Linux (tmux): `scripts/start-dev-tmux.sh`
-	- Same presets and flags as the Windows launcher (see `--help`)
-
-Warmup/validation (backend CLI):
-- `python -m app.cli validate-lvface`
-- `python -m app.cli validate-caption`
-- `python -m app.cli warmup`
-
-### Video support (optional)
-
-Video ingestion is disabled by default. To enable basic support:
-
-- Set environment variables:
-	- `VIDEO_ENABLED=true`
-	- Optionally adjust `VIDEO_EXTENSIONS` and `VIDEO_KEYFRAME_INTERVAL_SEC`.
-- Install ffmpeg locally for keyframe extraction and metadata probing:
-	- Windows: Use winget or choco, e.g. `winget install Gyan.FFmpeg` or `choco install ffmpeg`.
-	- macOS: `brew install ffmpeg`.
-	- Linux: `apt-get install -y ffmpeg`.
-
-Without ffmpeg, video tasks will no-op gracefully and create stub markers.
-
-Scene detection (optional): set `VIDEO_SCENE_DETECT=true` to enable a scene detection task. If `pyscenedetect` is available, it will be used; otherwise the system falls back to fixed windows of a few seconds. You can install it by adding it to requirements-ml.txt or pip installing `scenedetect`.
-### Environment Matrix
-
-| Platform | Intent | Install | Lock File |
-|----------|--------|---------|-----------|
-| macOS / lightweight | Core only (no GPU) | `pip install -r backend/requirements-core.txt` | `backend/requirements-lock-core.txt` (optional exact) |
-| Windows / Linux (GPU) | Core + ML | `pip install -r backend/requirements-core.txt && pip install -r backend/requirements-ml.txt` | `backend/requirements-lock-ml.txt` (full superset) |
-
-Generate / refresh locks after intentional upgrades:
-```
-pip freeze > backend/requirements-lock-core.txt        # in a core-only venv
-pip freeze > backend/requirements-lock-ml.txt          # in a full (core+ml) venv
-```
-Use the appropriate lock to reproduce an environment:
-```
-pip install -r backend/requirements-lock-core.txt   # mac
-pip install -r backend/requirements-lock-ml.txt     # gpu
+```powershell
+.\.venv\Scripts\python.exe -m app.cli ingest-scan E:\01_INCOMING
+.\.venv\Scripts\python.exe -m app.cli ingest-status E:\01_INCOMING
+.\.venv\Scripts\python.exe -m app.cli captions-backfill --force --limit 0
+.\.venv\Scripts\python.exe -m app.cli captions-backfill-zh --apply --overwrite-stub --batch-size 64
+.\.venv\Scripts\python.exe -m app.cli gps-backfill --root E:\01_INCOMING
+.\.venv\Scripts\python.exe -m app.cli faces-auto-assign --apply --reference-manual-only --include-dnn-assigned --limit 0
 ```
 
-Scripts (after commit) will live in `backend/scripts/`:
-- `setup-core.sh` / `setup-core.ps1`
-- `setup-ml.sh` / `setup-ml.ps1`
+Health checks:
 
-These automate venv creation, pip upgrade, and installs.
-
-Steps:
-
-1. Copy `deploy/env.sample` to `deploy/.env` and adjust paths. On macOS keep `INCLUDE_ML=false`.
-2. From the `deploy/` folder:
-	 - Build and start API:
-		 - `docker compose build api`
-		 - `docker compose up -d`
-	 - GPU/WSL2 (optional): set `INCLUDE_ML=true` and use the GPU override file:
-		 - `export INCLUDE_ML=true`
-		 - `docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile vlm up -d`
-
-Tip: If Docker hangs or errors with unexpected EOF on macOS/WSL2, a VPN/proxy (e.g., Clash) may be interfering. Disable it or exclude local Docker traffic, clear Docker Desktop proxy settings, and restart Docker.
-
-### Face Embedding / Detection Providers
-
-Pipeline components are pluggable and selected via environment variables (see also `app/face_embedding_service.py` and `app/face_detection_service.py`).
-
-Providers:
-
-| Purpose | Provider | Env Value | Dependencies | Notes |
-|---------|----------|-----------|--------------|-------|
-| Embedding | Stub (deterministic hash) | `stub` | none | Fast, used for tests / dev by default |
-| Embedding | Facenet (InceptionResnetV1) | `facenet` | `facenet-pytorch`, `torch`, `torchvision` | 512-D, classic baseline |
-| Embedding | LVFace (ONNX) | `lvface` | `onnxruntime` (and CUDA variant if GPU) | Load custom ONNX model path (see `LVFACE_MODEL_PATH`) |
-| Embedding | Insight (ArcFace) | `insight` | `insightface`, `onnxruntime` | Optional advanced model (kept as fallback) |
-| Detection | Stub (random boxes) | `stub` | none | Non-deterministic; for quick UI smoke |
-| Detection | MTCNN (facenet-pytorch) | `mtcnn` | `facenet-pytorch`, `torch`, `torchvision` | Multi-face detection |
-| Detection | InsightFace/SCRFD | `insight` or `scrfd` | `insightface`, `onnxruntime` | Recommended default for production |
-
-Key Environment Variables:
-
-```
-FACE_EMBED_PROVIDER=stub|facenet|lvface|insight|auto
-FACE_DETECT_PROVIDER=scrfd|insight|mtcnn|stub|auto
-EMBED_DEVICE=cpu|cuda
-LVFACE_MODEL_PATH=./models/lvface.onnx  # path to ONNX file when using lvface
-FORCE_REAL_FACE_PROVIDER=1  # allow real providers during tests (default tests force stub)
+```powershell
+Invoke-RestMethod http://127.0.0.1:8002/health
+Invoke-RestMethod http://127.0.0.1:8002/health/caption
+Invoke-RestMethod http://127.0.0.1:8002/system/usage
 ```
 
-Automatic selection (`FACE_EMBED_PROVIDER=auto`) tries `insight`, `facenet`, then falls back to `stub`. Set explicit provider for predictable deployments.
+## Data Placement Policy
 
-GPU Notes:
+For production usage, keep data off `C:`:
+- originals on `E:\01_INCOMING`
+- DB, thumbnails, embeddings, temp/cache on `E:\VLM_DATA`
 
-1. Install CUDA-enabled wheels for torch / onnxruntime before enabling `EMBED_DEVICE=cuda`.
-2. If CUDA is requested but unavailable, providers log a warning and fall back to CPU.
-3. LVFace uses ONNX Runtime provider order: CUDAExecutionProvider (if present) then CPUExecutionProvider.
+Do not store generated media artifacts in repo folders.
 
-Testing:
+## Documentation
 
-The deterministic stub test (`test_face_embedding_stub.py`) always uses `stub` unless `FORCE_REAL_FACE_PROVIDER=1`.
-
-Example (Facenet GPU run):
-
-```
-pip install facenet-pytorch torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
-export FACE_EMBED_PROVIDER=facenet EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=scrfd
-python -m backend.app.cli embed-dataset  # example future CLI
-```
-
-Example (LVFace ONNX):
-
-```
-pip install onnxruntime-gpu  # or onnxruntime for CPU
-export FACE_EMBED_PROVIDER=lvface LVFACE_MODEL_PATH=/models/lvface.onnx EMBED_DEVICE=cuda FACE_DETECT_PROVIDER=scrfd
-```
-
-Default now uses `FACE_DETECT_PROVIDER=scrfd` (InsightFace path) unless overridden.
+- Current architecture: `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
+- Current status handoff: `docs/PROJECT_STATUS_CURRENT.md`
+- Dev launcher details: `docs/launcher-quickstart.md`
 

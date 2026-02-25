@@ -35,7 +35,9 @@ The stack is local-first and split across repositories/services:
 
 Primary launcher in current workflow:
 - `scripts/start-dev-multiproc.ps1` (dev multipane launcher)
-- `start-multi-proc.ps1` (root-level launcher with caption HTTP service defaults)
+
+Legacy experimental launchers and one-off scripts were archived on 2026-02-25 to:
+- `C:\Users\yanbo\wSpace\vlm-photo-engine\archive_unused\20260225-prod-cleanup\`
 
 ## 3) Storage and Data Layout
 

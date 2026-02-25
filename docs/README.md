@@ -1,106 +1,30 @@
-# VLM Photo Engine - Documentation Index
+# VLM Photo House Documentation
 
-Welcome to the VLM Photo Engine documentation! This local-first AI photo engine provides semantic search, automated captioning, and person recognition for your photo collection.
+This index reflects the current production-oriented repo layout.
 
-## 🚀 Quick Start
+## Start Here
 
-### For Developers
-1. **[Setup Guide](./setup/README.md)** - Get the development environment running
-2. **[Architecture Overview](./architecture/README.md)** - Understand the system design
-3. **[API Documentation](./api/README.md)** - Integrate with the REST API
+- Project overview and runtime defaults: `../README.md`
+- Current operational handoff: `PROJECT_STATUS_CURRENT.md`
+- Current architecture snapshot: `architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
 
-### For Users
-1. **[User Guide](./user/README.md)** - How to use the photo engine
-2. **[Deployment Guide](./deployment/README.md)** - Production deployment options
+## Setup and Launch
 
-### For Contributors
-1. **[Contributing Guide](./contributing/README.md)** - Development workflow and standards
-2. **[Project Status](./project/roadmap.md)** - Current progress and next steps
+- Windows launcher (primary): `../scripts/start-dev-multiproc.ps1`
+- WSL/Linux launcher: `../scripts/start-dev-tmux.sh`
+- Quick dev setup: `quick-start-dev.md`
+- Environment notes: `ENVIRONMENT_MANAGEMENT.md`
 
----
+## Functional Areas
 
-## 📁 Documentation Structure
+- API docs: `api/`
+- Architecture docs: `architecture/`
+- Deployment docs: `deployment/`
+- Operations docs: `operations/`
+- Security docs: `security/`
+- User docs: `user/`
 
-### Core Documentation
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[Current Architecture Snapshot](./architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** | Live/runtime and code-verified architecture baseline | Developers/Operators |
-| **[Product Requirements](./project/prd-v02.md)** | What we're building and why | All |
-| **[Architecture](./architecture/README.md)** | System design and implementation | Developers |
-| **[Roadmap](./project/roadmap.md)** | Project progress and next steps | All |
+## Notes
 
-### Implementation Guides
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[Setup Guide](./setup/README.md)** | Development environment setup | Developers |
-| **[Caption Models Setup](./setup/caption-models-external-setup.md)** | AI model configuration | Developers/Operators |
-| **[Person Search API](./api/person-based-search-api.md)** | Person recognition API usage | Developers |
-
-### Architecture Deep Dive
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[Visual Architecture](./architecture/architecture-diagrams.md)** | Mermaid diagrams of system design | All |
-| **[AI Components](./architecture/ai-components.md)** | AI model integration patterns | Developers |
-| **[Data Model](./architecture/data-model.md)** | Database schema and relationships | Developers |
-| **[Storage Strategy](./architecture/storage-strategy.md)** | File organization and caching | Developers/Operators |
-
-### Operations & Deployment
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[Deployment Guide](./deployment/README.md)** | Production deployment | Operators |
-| **[Operations Runbook](./operations/README.md)** | Daily operations and troubleshooting | Operators |
-| **[Security Guide](./security/README.md)** | Security considerations | Operators |
-
----
-
-## 🎯 Current System Status (August 2025)
-
-### ✅ Production Ready
-- **Caption Generation**: Qwen3-VL integrated (local HTTP + subprocess paths)
-- **Person Recognition**: LVFace model with face detection
-- **Dual Environment**: Backend + External AI models architecture
-- **Health Monitoring**: Comprehensive system status validation
-- **Local Storage**: 20.96 GB of AI models stored locally
-
-### 🚧 In Development
-- End-to-end photo ingestion pipeline
-- Vector search integration
-- Person album generation
-- Event and theme detection
-
-### 📋 Planned
-- Advanced search ranking
-- Video analysis
-- Mobile client support
-- Multi-user collaboration
-
----
-
-## 🔗 Key System Characteristics
-
-- **Local-First**: No cloud dependencies, runs entirely on your hardware
-- **Privacy-Preserving**: All AI processing happens locally
-- **Fast Search**: Sub-500ms search performance target
-- **Modular**: Pluggable AI model providers
-- **Scalable**: From single-user to family deployment
-
----
-
-## 📖 Document Version History
-
-| Version | Date | Major Changes |
-|---------|------|---------------|
-| v2.0 | Aug 2025 | Complete architecture overhaul with dual environment |
-| v1.0 | Aug 2025 | Initial documentation structure |
-
----
-
-## 🆘 Need Help?
-
-- **Issues**: Check the troubleshooting sections in each guide
-- **Questions**: Review the [open questions](./project/open-questions.md) document
-- **Contributing**: See the [contributing guide](./contributing/README.md)
-
----
-
-*Last updated: August 16, 2025*
+- Historical/experimental documents and scripts were archived outside this repo to:
+  - `C:\Users\yanbo\wSpace\vlm-photo-engine\archive_unused\20260225-prod-cleanup\`

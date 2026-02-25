@@ -38,6 +38,7 @@ backend/coverage.xml
 dist/
 build/
 *.log
+*.code-workspace
 docs/_build/
 *.cover
 *.py,cover

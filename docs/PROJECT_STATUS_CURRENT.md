@@ -1,6 +1,6 @@
 # VLM Photo Engine - Current Project Status
 
-Last Updated: 2026-02-24
+Last Updated: 2026-02-25
 
 ## Scope
 This document is the operational handoff for any new agent joining this repository. It reflects the current production-like local setup on Windows with data rooted on Drive E.
@@ -90,6 +90,13 @@ Run full-batch refresh using latest manual labels (re-evaluate unassigned + exis
 ```powershell
 .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --include-dnn-assigned --apply --limit 0
 ```
+
+## Repository Cleanup (2026-02-25)
+- Legacy/experimental scripts and historical reports were archived out of `vlmPhotoHouse` to:
+  - `C:\Users\yanbo\wSpace\vlm-photo-engine\archive_unused\20260225-prod-cleanup\vlmPhotoHouse`
+- Main runtime repo surface is now focused on:
+  - `backend/`, `scripts/`, `docs/`, `deploy/`, `config/`, `tools/`, `tests/`
+- Main README has been refreshed to match current production workflow.
 
 Health check:
 ```powershell

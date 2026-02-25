@@ -2,9 +2,8 @@
 
 Canonical test locations:
 - backend/tests: unit and service-level tests for the API/backend
-- integration_tests: cross-component end-to-end flows that may hit external models or subprocesses
 
-Tests outside these folders (root-level test_*.py or files in development/) are not collected by default.
+Tests outside these folders are not collected by default.
 
 ## How to run
 
@@ -26,5 +25,4 @@ Pytest also works from the repo root with the new pytest.ini.
 
 ## Development helpers
 
-- Ad-hoc dev/demo scripts live under `development/` and are not part of automated test runs.
 - Windows helpers are under `scripts/` (for example, `scripts/test.ps1` and `scripts/test_health.bat`).
