@@ -29,6 +29,12 @@ const state = {
     total: 0,
     shown: 0,
   },
+  unassignedFacesPager: {
+    page: 1,
+    pageSize: 120,
+    total: 0,
+    shown: 0,
+  },
 };
 
 const qs = (id) => document.getElementById(id);
@@ -484,6 +490,30 @@ function updatePersonAssetsPagerUi() {
   meta.textContent = t("pager_status", { page, pages, shown, total });
 }
 
+function updateUnassignedFacesPagerUi() {
+  const prev = qs("btn-unassigned-prev");
+  const next = qs("btn-unassigned-next");
+  const jumpBtn = qs("btn-unassigned-jump");
+  const jumpInput = qs("unassigned-page-input");
+  const meta = qs("unassigned-page-meta");
+  if (!prev || !next || !meta || !jumpBtn || !jumpInput) return;
+
+  const pager = state.unassignedFacesPager || {};
+  const page = Math.max(1, Number(pager.page) || 1);
+  const pages = pageCount(pager.total, pager.pageSize);
+  const shown = Number(pager.shown) || 0;
+  const total = Number(pager.total) || 0;
+
+  prev.disabled = page <= 1;
+  next.disabled = page >= pages || shown <= 0;
+  jumpBtn.disabled = shown <= 0 || pages <= 1;
+  jumpInput.disabled = shown <= 0 || pages <= 1;
+  jumpInput.min = "1";
+  jumpInput.max = String(pages);
+  jumpInput.value = String(page);
+  meta.textContent = t("pager_status", { page, pages, shown, total });
+}
+
 function mbToGiB(mb) {
   const n = Number(mb);
   if (!Number.isFinite(n)) return "-";
@@ -584,6 +614,7 @@ function renderCurrentViewText() {
   }
   updateLibraryPagerUi();
   updatePersonAssetsPagerUi();
+  updateUnassignedFacesPagerUi();
   if (state.selectedAsset) {
     qs("asset-id").textContent = t("asset_prefix", { id: state.selectedAsset.id });
     if (!qs("asset-path").textContent.trim()) {
@@ -592,7 +623,7 @@ function renderCurrentViewText() {
   }
   if (state.activeTab === "people") {
     renderPeopleList();
-    loadUnassignedFaces();
+    loadUnassignedFaces(state.unassignedFacesPager.page || 1);
   }
   if (state.activeTab === "tasks") {
     loadTasks();
@@ -1166,7 +1197,7 @@ async function loadPeople() {
     state.persons = data.persons || [];
     state.namedPersons = named.persons || [];
     renderPeopleList();
-    await loadUnassignedFaces();
+    await loadUnassignedFaces(state.unassignedFacesPager.page || 1);
   } catch (e) {
     showToast(t("people_load_failed", { error: e.message }));
   }
@@ -1257,13 +1288,47 @@ async function runPersonAssetsJump() {
   await loadPersonAssets(personId, target);
 }
 
-async function loadUnassignedFaces() {
+async function runUnassignedFacesPage(delta) {
+  const current = Math.max(1, Number(state.unassignedFacesPager.page) || 1);
+  const target = Math.max(1, current + Number(delta || 0));
+  if (target === current) return;
+  await loadUnassignedFaces(target);
+}
+
+async function runUnassignedFacesJump() {
+  const pages = pageCount(state.unassignedFacesPager.total, state.unassignedFacesPager.pageSize);
+  const input = qs("unassigned-page-input");
+  const target = parsePageInputValue(input?.value, pages);
+  if (!target) return;
+
+  const current = Math.max(1, Number(state.unassignedFacesPager.page) || 1);
+  if (target === current) return;
+  await loadUnassignedFaces(target);
+}
+
+async function loadUnassignedFaces(page = 1) {
   try {
-    const data = await api("/faces?unassigned=true&page=1&page_size=120");
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSize = state.unassignedFacesPager.pageSize || 120;
+    const data = await api(`/faces?unassigned=true&page=${pageNum}&page_size=${pageSize}`);
     const faces = data.faces || [];
+    const total = Number(data.total) || 0;
+    const pages = pageCount(total, pageSize);
+    if (pageNum > pages && total > 0) {
+      await loadUnassignedFaces(pages);
+      return;
+    }
+    state.unassignedFacesPager = {
+      ...state.unassignedFacesPager,
+      page: pageNum,
+      pageSize,
+      total,
+      shown: faces.length,
+    };
     const root = qs("unassigned-faces");
     if (!faces.length) {
       root.innerHTML = `<p class="muted">${esc(t("no_unassigned_faces"))}</p>`;
+      updateUnassignedFacesPagerUi();
       return;
     }
     root.innerHTML = faces
@@ -1285,6 +1350,7 @@ async function loadUnassignedFaces() {
         `
       )
       .join("");
+    updateUnassignedFacesPagerUi();
   } catch (e) {
     showToast(t("unassigned_faces_load_failed", { error: e.message }));
   }
@@ -1654,6 +1720,12 @@ function initEvents() {
   qs("btn-person-assets-jump").addEventListener("click", runPersonAssetsJump);
   qs("person-assets-page-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runPersonAssetsJump();
+  });
+  qs("btn-unassigned-prev").addEventListener("click", () => runUnassignedFacesPage(-1));
+  qs("btn-unassigned-next").addEventListener("click", () => runUnassignedFacesPage(1));
+  qs("btn-unassigned-jump").addEventListener("click", runUnassignedFacesJump);
+  qs("unassigned-page-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runUnassignedFacesJump();
   });
   qs("people-show-unnamed").addEventListener("change", loadPeople);
   const createPersonBtn = qs("btn-create-person");
