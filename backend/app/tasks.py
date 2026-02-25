@@ -1,4 +1,4 @@
-import os, json, time, random, numpy as np
+import os, json, time, random, re, numpy as np
 import subprocess
 import tempfile
 import threading
@@ -343,11 +343,10 @@ class TaskExecutor:
             toks = [t for t in base.replace('-',' ').replace('_',' ').split() if t]
             text = 'Photo' if not toks else ' '.join(toks[:8])
             model_name = 'stub-fallback'
-        # Word cap
+        # Word cap (prefer complete sentences over hard mid-sentence truncation)
         try:
-            parts = text.split()
-            if word_limit > 0 and len(parts) > word_limit:
-                text = ' '.join(parts[:word_limit])
+            if word_limit > 0:
+                text = self._truncate_caption_text(text, word_limit)
         except Exception:
             pass
         # Replace oldest non user_edited if at capacity
@@ -383,6 +382,34 @@ class TaskExecutor:
         except Exception:
             session.rollback()
         return cap
+
+    @staticmethod
+    def _truncate_caption_text(text: str, word_limit: int) -> str:
+        if word_limit <= 0:
+            return text
+        words = [w for w in str(text or '').split() if w]
+        if len(words) <= word_limit:
+            return str(text or '')
+
+        # Prefer ending on sentence punctuation; if needed, look slightly beyond the limit.
+        sentence_end_re = re.compile(r'[.!?。！？][\'")\]]*$')
+
+        def _join(n: int) -> str:
+            return ' '.join(words[:max(1, n)]).strip()
+
+        # 1) Find last sentence boundary within the limit.
+        for i in range(word_limit, 0, -1):
+            if sentence_end_re.search(words[i - 1]):
+                return _join(i)
+
+        # 2) If none within limit, allow a small forward window to finish sentence.
+        forward_limit = min(len(words), word_limit + 24)
+        for i in range(word_limit + 1, forward_limit + 1):
+            if sentence_end_re.search(words[i - 1]):
+                return _join(i)
+
+        # 3) Fallback to hard cap.
+        return _join(word_limit)
 
     def _handle_face(self, session: Session, task: Task):
         payload = task.payload_json or {}
