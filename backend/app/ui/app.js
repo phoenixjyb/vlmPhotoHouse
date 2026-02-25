@@ -135,6 +135,15 @@ const I18N = {
     person_assets_load_failed: "Person assets load failed: {error}",
     unassigned_faces_load_failed: "Unassigned faces load failed: {error}",
     task_meta: "Total={total} | pending={pending} | running={running} | failed={failed} | dead={dead}",
+    task_meta_with_page:
+      "Total={total} | pending={pending} | running={running} | failed={failed} | dead={dead} | showing={shown}",
+    usage_cpu: "CPU",
+    usage_memory: "Memory",
+    usage_gpu: "GPU {index}",
+    usage_no_gpu: "No GPU metrics",
+    usage_unavailable: "Unavailable",
+    usage_util_mem: "util {util}% | mem {used}/{total} GiB",
+    usage_temp: "temp {temp} C",
     cancel: "Cancel",
     task_load_failed: "Task load failed: {error}",
     admin_refresh_failed: "Admin refresh failed: {error}",
@@ -285,6 +294,15 @@ const I18N = {
     person_assets_load_failed: "人物资源加载失败: {error}",
     unassigned_faces_load_failed: "未分配人脸加载失败: {error}",
     task_meta: "总计={total} | 待处理={pending} | 运行中={running} | 失败={failed} | 失效={dead}",
+    task_meta_with_page:
+      "总计={total} | 待处理={pending} | 运行中={running} | 失败={failed} | 失效={dead} | 当前显示={shown}",
+    usage_cpu: "CPU",
+    usage_memory: "内存",
+    usage_gpu: "GPU {index}",
+    usage_no_gpu: "无 GPU 指标",
+    usage_unavailable: "不可用",
+    usage_util_mem: "利用率 {util}% | 显存 {used}/{total} GiB",
+    usage_temp: "温度 {temp} C",
     cancel: "取消",
     task_load_failed: "任务加载失败: {error}",
     admin_refresh_failed: "管理面板刷新失败: {error}",
@@ -339,6 +357,74 @@ function modeLabel(value) {
   if (value === "smart") return t("mode_smart");
   if (value === "person") return t("mode_person");
   return value;
+}
+
+function mbToGiB(mb) {
+  const n = Number(mb);
+  if (!Number.isFinite(n)) return "-";
+  return (n / 1024).toFixed(1);
+}
+
+function bytesToGiB(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return "-";
+  return (n / (1024 ** 3)).toFixed(1);
+}
+
+function renderSystemUsage(usage) {
+  const root = qs("task-system-usage");
+  if (!root) return;
+  if (!usage) {
+    root.innerHTML = "";
+    return;
+  }
+
+  const cpuText = Number.isFinite(Number(usage.cpu_percent))
+    ? `${Number(usage.cpu_percent).toFixed(1)}%`
+    : t("usage_unavailable");
+
+  let memValue = t("usage_unavailable");
+  let memSub = "";
+  if (usage.memory) {
+    const total = bytesToGiB(usage.memory.total);
+    const used = bytesToGiB(usage.memory.used);
+    const pct = Number.isFinite(Number(usage.memory.percent)) ? Number(usage.memory.percent).toFixed(1) : "-";
+    memValue = `${pct}%`;
+    memSub = `${used}/${total} GiB`;
+  }
+
+  const cards = [
+    `<article class="usage-card"><p class="usage-title">${esc(t("usage_cpu"))}</p><p class="usage-value">${esc(cpuText)}</p></article>`,
+    `<article class="usage-card"><p class="usage-title">${esc(t("usage_memory"))}</p><p class="usage-value">${esc(memValue)}</p><p class="usage-sub">${esc(memSub)}</p></article>`,
+  ];
+
+  const gpus = Array.isArray(usage.gpus) ? usage.gpus : [];
+  if (!gpus.length) {
+    cards.push(
+      `<article class="usage-card"><p class="usage-title">GPU</p><p class="usage-value">${esc(
+        t("usage_no_gpu")
+      )}</p></article>`
+    );
+  } else {
+    for (const g of gpus) {
+      const util = Number.isFinite(Number(g.utilization_gpu_percent))
+        ? Number(g.utilization_gpu_percent).toFixed(0)
+        : "-";
+      const used = mbToGiB(g.memory_used_mb);
+      const total = mbToGiB(g.memory_total_mb);
+      const temp = Number.isFinite(Number(g.temperature_c)) ? Number(g.temperature_c).toFixed(0) : "-";
+      cards.push(`
+        <article class="usage-card">
+          <p class="usage-title">${esc(t("usage_gpu", { index: g.index }))}</p>
+          <p class="usage-value">${esc(g.name || "NVIDIA GPU")}</p>
+          <p class="usage-sub">${esc(t("usage_util_mem", { util, used, total }))}</p>
+          <p class="usage-sub">${esc(t("usage_temp", { temp }))}</p>
+        </article>
+      `);
+    }
+  }
+
+  root.innerHTML = cards.join("");
 }
 
 function applyI18n() {
@@ -955,19 +1041,27 @@ async function loadUnassignedFaces() {
 
 async function loadTasks() {
   try {
-    const data = await api("/tasks?page=1&page_size=180");
+    const [data, metrics, usage] = await Promise.all([
+      api("/tasks?page=1&page_size=180"),
+      api("/metrics"),
+      api("/system/usage").catch(() => null),
+    ]);
     const tasks = data.tasks || [];
-    const byState = tasks.reduce((acc, t) => {
-      acc[t.state] = (acc[t.state] || 0) + 1;
-      return acc;
-    }, {});
-    qs("task-meta").textContent = t("task_meta", {
-      total: tasks.length,
-      pending: byState.pending || 0,
-      running: byState.running || 0,
-      failed: byState.failed || 0,
-      dead: byState.dead || 0,
+    const byStateGlobal = metrics?.tasks?.by_state || {};
+    const totalGlobal = metrics?.tasks?.total ?? data.total ?? tasks.length;
+    const pendingGlobal = byStateGlobal.pending || 0;
+    const runningGlobal = byStateGlobal.running || 0;
+    const failedGlobal = byStateGlobal.failed || 0;
+    const deadGlobal = byStateGlobal.dead || 0;
+    qs("task-meta").textContent = t("task_meta_with_page", {
+      total: totalGlobal,
+      pending: pendingGlobal,
+      running: runningGlobal,
+      failed: failedGlobal,
+      dead: deadGlobal,
+      shown: tasks.length,
     });
+    renderSystemUsage(usage);
     qs("task-rows").innerHTML = tasks
       .map((task) => {
         const progress = task.progress_total ? `${task.progress_current || 0}/${task.progress_total}` : "-";

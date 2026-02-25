@@ -425,6 +425,70 @@ def metrics(db_s: Session = Depends(get_db)):
         'task_duration_seconds_avg': avg_duration
     }
 
+@app.get('/system/usage')
+def system_usage():
+    """Lightweight system telemetry for UI (CPU/RAM/GPU)."""
+    out: dict = {
+        'api_version': schemas.API_VERSION,
+        'cpu_percent': None,
+        'memory': None,
+        'gpus': [],
+        'timestamp': int(time.time()),
+    }
+
+    try:
+        import psutil  # type: ignore
+        cpu = psutil.cpu_percent(interval=0.1)
+        vm = psutil.virtual_memory()
+        out['cpu_percent'] = float(cpu)
+        out['memory'] = {
+            'total': int(vm.total),
+            'available': int(vm.available),
+            'used': int(vm.used),
+            'percent': float(vm.percent),
+        }
+    except Exception as e:
+        out['cpu_mem_error'] = str(e)
+
+    try:
+        import subprocess
+        cmd = [
+            'nvidia-smi',
+            '--query-gpu=index,name,memory.total,memory.used,utilization.gpu,temperature.gpu',
+            '--format=csv,noheader,nounits',
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=4, check=False)
+        if proc.returncode == 0:
+            gpus = []
+            for raw in (proc.stdout or '').splitlines():
+                line = raw.strip()
+                if not line:
+                    continue
+                parts = [p.strip() for p in line.split(',', 5)]
+                if len(parts) < 6:
+                    continue
+                idx, name, mem_total, mem_used, util, temp = parts
+                try:
+                    gpus.append({
+                        'index': int(idx),
+                        'name': name,
+                        'memory_total_mb': int(float(mem_total)),
+                        'memory_used_mb': int(float(mem_used)),
+                        'utilization_gpu_percent': float(util),
+                        'temperature_c': float(temp),
+                    })
+                except Exception:
+                    continue
+            out['gpus'] = gpus
+        else:
+            out['gpu_error'] = (proc.stderr or proc.stdout or f'nvidia-smi exit={proc.returncode}').strip()
+    except FileNotFoundError:
+        out['gpu_error'] = 'nvidia-smi not found'
+    except Exception as e:
+        out['gpu_error'] = str(e)
+
+    return out
+
 @app.post('/ingest/scan')
 def trigger_ingest(roots: list[str] = Body(..., embed=True), db_s: Session = Depends(get_db)):
     result = ingest_mod.ingest_paths(db_s, roots)
