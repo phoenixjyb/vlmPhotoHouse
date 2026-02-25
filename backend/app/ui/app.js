@@ -109,6 +109,9 @@ const I18N = {
     caption_save: "Save",
     caption_delete: "Delete",
     no_tags: "No tags.",
+    new_person_name_ph: "New person name",
+    create_person: "Create Person",
+    create_and_assign: "Create + Assign",
     assign_to_person: "Assign to person...",
     current_person: "Current: Person {id}",
     person_fallback: "Person {id}",
@@ -150,6 +153,9 @@ const I18N = {
     caption_saved: "Caption {id} saved",
     caption_deleted: "Caption {id} deleted",
     caption_action_failed: "Caption action failed: {error}",
+    person_name_required: "Please enter a person name",
+    person_created: "Person {name} is ready",
+    person_exists_reused: "Using existing person {name}",
     select_target_first: "Select a target person first",
     invalid_person_selection: "Invalid person selection",
     confirm_delete_face: "Delete face #{id} as non-face detection?",
@@ -268,6 +274,9 @@ const I18N = {
     caption_save: "保存",
     caption_delete: "删除",
     no_tags: "暂无标签。",
+    new_person_name_ph: "新人物姓名",
+    create_person: "新建人物",
+    create_and_assign: "新建并分配",
     assign_to_person: "分配到人物...",
     current_person: "当前: 人物 {id}",
     person_fallback: "人物 {id}",
@@ -309,6 +318,9 @@ const I18N = {
     caption_saved: "描述 {id} 已保存",
     caption_deleted: "描述 {id} 已删除",
     caption_action_failed: "描述操作失败: {error}",
+    person_name_required: "请输入人物姓名",
+    person_created: "人物 {name} 已可用",
+    person_exists_reused: "已使用现有人物 {name}",
     select_target_first: "请先选择目标人物",
     invalid_person_selection: "人物选择无效",
     confirm_delete_face: "将人脸 #{id} 标记为非人脸并删除检测？",
@@ -930,9 +942,10 @@ function renderFaces(faces) {
             <p class="small muted">${esc(t("face_prefix", { id: f.id }))}</p>
             ${sourceLine}
             <select id="face-person-${f.id}">${personOptions(f.person_id)}</select>
+            <input id="face-new-name-${f.id}" type="text" placeholder="${esc(t("new_person_name_ph"))}" />
             <div class="controls">
               <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">${esc(t("assign"))}</button>
-              <button class="btn ghost" data-action="create-person-face" data-face-id="${f.id}">${esc(t("new_person"))}</button>
+              <button class="btn ghost" data-action="create-assign-face" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
               <button class="btn danger" data-action="delete-face" data-face-id="${f.id}">${esc(t("not_face"))}</button>
             </div>
           </div>
@@ -1024,9 +1037,10 @@ async function loadUnassignedFaces() {
             <div class="face-body">
               <p class="small muted">${esc(t("face_asset_prefix", { face: f.id, asset: f.asset_id }))}</p>
               <select id="face-person-unassigned-${f.id}">${personOptions(null)}</select>
+              <input id="face-new-name-unassigned-${f.id}" type="text" placeholder="${esc(t("new_person_name_ph"))}" />
               <div class="controls">
                 <button class="btn ghost" data-action="assign-face-unassigned" data-face-id="${f.id}">${esc(t("assign"))}</button>
-                <button class="btn ghost" data-action="create-person-face" data-face-id="${f.id}">${esc(t("new_person"))}</button>
+                <button class="btn ghost" data-action="create-assign-face-unassigned" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
                 <button class="btn danger" data-action="delete-face-unassigned" data-face-id="${f.id}">${esc(t("not_face"))}</button>
               </div>
             </div>
@@ -1126,7 +1140,30 @@ async function handleCaptionActions(event) {
   }
 }
 
-async function assignFace(faceId, selectorId) {
+async function ensureNamedPerson(nameRaw) {
+  const name = String(nameRaw || "").trim();
+  if (!name) {
+    showToast(t("person_name_required"));
+    return null;
+  }
+  const data = await api("/persons", {
+    method: "POST",
+    body: JSON.stringify({ display_name: name }),
+  });
+  const personId = Number(data?.person_id || 0);
+  if (!personId) {
+    throw new Error(t("invalid_person_selection"));
+  }
+  const displayName = String(data?.display_name || name);
+  if (data?.created) {
+    showToast(t("person_created", { name: displayName }));
+  } else {
+    showToast(t("person_exists_reused", { name: displayName }));
+  }
+  return { personId, displayName };
+}
+
+async function assignFace(faceId, selectorId, newNameInputId = null) {
   const select = qs(selectorId);
   const selected = String(select?.value || "");
   if (!selected) {
@@ -1135,7 +1172,13 @@ async function assignFace(faceId, selectorId) {
   }
 
   if (selected === "__NEW__") {
-    await createPersonFromFace(faceId);
+    const nameRaw = newNameInputId ? qs(newNameInputId)?.value : "";
+    const person = await ensureNamedPerson(nameRaw);
+    if (!person) return;
+    await api(`/faces/${faceId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ person_id: person.personId }),
+    });
     return;
   }
 
@@ -1153,6 +1196,15 @@ async function assignFace(faceId, selectorId) {
   await api(`/faces/${faceId}/assign`, {
     method: "POST",
     body: JSON.stringify({ person_id: personId }),
+  });
+}
+
+async function createAndAssignFaceByName(faceId, inputId) {
+  const person = await ensureNamedPerson(qs(inputId)?.value || "");
+  if (!person) return;
+  await api(`/faces/${faceId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ person_id: person.personId }),
   });
 }
 
@@ -1289,7 +1341,9 @@ function initEvents() {
     if (!faceId) return;
     try {
       if (btn.dataset.action === "assign-face") {
-        await assignFace(faceId, `face-person-${faceId}`);
+        await assignFace(faceId, `face-person-${faceId}`, `face-new-name-${faceId}`);
+      } else if (btn.dataset.action === "create-assign-face") {
+        await createAndAssignFaceByName(faceId, `face-new-name-${faceId}`);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
       } else if (btn.dataset.action === "delete-face") {
@@ -1335,7 +1389,9 @@ function initEvents() {
     if (!faceId) return;
     try {
       if (btn.dataset.action === "assign-face-unassigned") {
-        await assignFace(faceId, `face-person-unassigned-${faceId}`);
+        await assignFace(faceId, `face-person-unassigned-${faceId}`, `face-new-name-unassigned-${faceId}`);
+      } else if (btn.dataset.action === "create-assign-face-unassigned") {
+        await createAndAssignFaceByName(faceId, `face-new-name-unassigned-${faceId}`);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
       } else if (btn.dataset.action === "delete-face-unassigned") {
@@ -1351,6 +1407,19 @@ function initEvents() {
 
   qs("btn-refresh-people").addEventListener("click", loadPeople);
   qs("people-show-unnamed").addEventListener("change", loadPeople);
+  const createPersonBtn = qs("btn-create-person");
+  if (createPersonBtn) {
+    createPersonBtn.addEventListener("click", async () => {
+      try {
+        const person = await ensureNamedPerson(qs("people-new-person-name")?.value || "");
+        if (!person) return;
+        qs("people-new-person-name").value = "";
+        await loadPeople();
+      } catch (err) {
+        showToast(t("person_action_failed", { error: err.message }));
+      }
+    });
+  }
   qs("btn-refresh-map").addEventListener("click", loadGeoMap);
   qs("map-media-filter").addEventListener("change", loadGeoMap);
   qs("btn-refresh-tasks").addEventListener("click", loadTasks);

@@ -401,6 +401,27 @@ def assign_faces_bulk(person_id: int | None = Body(None), face_ids: List[int] = 
     db_s.commit()
     return {'assigned': len(faces), 'person_id': target_person_id, 'new_person_created': created, 'propagation_task_id': propagation_task_id}
 
+@router.post('/persons')
+def create_person(display_name: str = Body(..., embed=True), db_s: Session = Depends(get_db)):
+    name = str(display_name or '').strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='display_name required')
+    normalized = name.lower()
+    existing = (
+        db_s.query(Person)
+        .filter(Person.display_name != None)
+        .filter(func.lower(func.trim(Person.display_name)) == normalized)
+        .order_by(Person.id.asc())
+        .first()
+    )
+    if existing:
+        return {'person_id': int(existing.id), 'display_name': existing.display_name, 'created': False}
+    person = Person(display_name=name, face_count=0)
+    db_s.add(person)
+    db_s.commit()
+    db_s.refresh(person)
+    return {'person_id': int(person.id), 'display_name': person.display_name, 'created': True}
+
 @router.post('/persons/{person_id}/name')
 def rename_person(person_id: int, display_name: str = Body(..., embed=True), db_s: Session = Depends(get_db)):
     person = db_s.get(Person, person_id)
