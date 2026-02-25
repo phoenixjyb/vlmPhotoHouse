@@ -11,6 +11,24 @@ const state = {
   assetMap: new Map(),
   inspectorOriginTab: "library",
   lang: "en",
+  libraryPager: {
+    kind: "latest",
+    mode: "path",
+    q: "",
+    media: "all",
+    tags: [],
+    page: 1,
+    pageSize: 120,
+    total: 0,
+    shown: 0,
+  },
+  personAssetsPager: {
+    personId: null,
+    page: 1,
+    pageSize: 120,
+    total: 0,
+    shown: 0,
+  },
 };
 
 const qs = (id) => document.getElementById(id);
@@ -91,6 +109,7 @@ const I18N = {
     caption_mode_needs_text: "Caption mode needs text",
     person_mode_needs_name: "Person mode needs a name",
     search_results_meta: "Mode: {mode} | Results: {count}",
+    search_results_meta_paged: "Mode: {mode} | Results: {shown}/{total}",
     search_failed: "Search failed: {error}",
     asset_not_found: "Asset #{id} not found",
     asset_prefix: "Asset #{id}",
@@ -133,6 +152,7 @@ const I18N = {
     save_name: "Save Name",
     view_assets: "View Assets",
     person_assets_meta: "Person {id}: {count} assets",
+    person_assets_meta_paged: "Person {id}: showing {shown}/{total}",
     no_unassigned_faces: "No unassigned faces.",
     people_load_failed: "People load failed: {error}",
     person_assets_load_failed: "Person assets load failed: {error}",
@@ -180,6 +200,9 @@ const I18N = {
     ingest_started: "Ingest scan started for {root}",
     ingest_failed: "Ingest failed: {error}",
     no_asset_selected: "Select an asset first",
+    prev_page: "Prev",
+    next_page: "Next",
+    pager_status: "Page {page}/{pages} | showing {shown}/{total}",
   },
   zh: {
     app_title: "VLM 照片屋",
@@ -256,6 +279,7 @@ const I18N = {
     caption_mode_needs_text: "描述模式需要输入文本",
     person_mode_needs_name: "人物模式需要人物名",
     search_results_meta: "模式: {mode} | 结果: {count}",
+    search_results_meta_paged: "模式: {mode} | 结果: {shown}/{total}",
     search_failed: "搜索失败: {error}",
     asset_not_found: "资源 #{id} 未找到",
     asset_prefix: "资源 #{id}",
@@ -298,6 +322,7 @@ const I18N = {
     save_name: "保存名称",
     view_assets: "查看资源",
     person_assets_meta: "人物 {id}: {count} 个资源",
+    person_assets_meta_paged: "人物 {id}: 当前显示 {shown}/{total}",
     no_unassigned_faces: "没有未分配人脸。",
     people_load_failed: "人物加载失败: {error}",
     person_assets_load_failed: "人物资源加载失败: {error}",
@@ -345,6 +370,9 @@ const I18N = {
     ingest_started: "已开始导入扫描: {root}",
     ingest_failed: "导入失败: {error}",
     no_asset_selected: "请先选择一个资源",
+    prev_page: "上一页",
+    next_page: "下一页",
+    pager_status: "第 {page}/{pages} 页 | 当前显示 {shown}/{total}",
   },
 };
 
@@ -369,6 +397,61 @@ function modeLabel(value) {
   if (value === "smart") return t("mode_smart");
   if (value === "person") return t("mode_person");
   return value;
+}
+
+function pageCount(total, pageSize) {
+  const totalNum = Number(total) || 0;
+  const sizeNum = Math.max(1, Number(pageSize) || 1);
+  return Math.max(1, Math.ceil(totalNum / sizeNum));
+}
+
+function isLibraryPaged() {
+  return ["latest", "path", "person"].includes(String(state.libraryPager.kind || ""));
+}
+
+function updateLibraryPagerUi() {
+  const prev = qs("btn-library-prev");
+  const next = qs("btn-library-next");
+  const meta = qs("library-page-meta");
+  if (!prev || !next || !meta) return;
+
+  const pager = state.libraryPager || {};
+  const page = Math.max(1, Number(pager.page) || 1);
+  const pages = pageCount(pager.total, pager.pageSize);
+  const shown = Number(pager.shown) || 0;
+  const total = Number(pager.total);
+  const displayTotal = Number.isFinite(total) && total >= 0 ? total : shown;
+
+  if (!isLibraryPaged()) {
+    prev.disabled = true;
+    next.disabled = true;
+  } else {
+    prev.disabled = page <= 1;
+    next.disabled = page >= pages || shown <= 0;
+  }
+  meta.textContent = t("pager_status", {
+    page,
+    pages,
+    shown,
+    total: displayTotal,
+  });
+}
+
+function updatePersonAssetsPagerUi() {
+  const prev = qs("btn-person-assets-prev");
+  const next = qs("btn-person-assets-next");
+  const meta = qs("person-assets-page-meta");
+  if (!prev || !next || !meta) return;
+
+  const pager = state.personAssetsPager || {};
+  const page = Math.max(1, Number(pager.page) || 1);
+  const pages = pageCount(pager.total, pager.pageSize);
+  const shown = Number(pager.shown) || 0;
+  const total = Number(pager.total) || 0;
+
+  prev.disabled = page <= 1 || !pager.personId;
+  next.disabled = page >= pages || shown <= 0 || !pager.personId;
+  meta.textContent = t("pager_status", { page, pages, shown, total });
 }
 
 function mbToGiB(mb) {
@@ -469,6 +552,8 @@ function renderCurrentViewText() {
   if (state.libraryViewItems.length) {
     renderAssetGrid(state.libraryViewItems, "library-grid");
   }
+  updateLibraryPagerUi();
+  updatePersonAssetsPagerUi();
   if (state.selectedAsset) {
     qs("asset-id").textContent = t("asset_prefix", { id: state.selectedAsset.id });
     if (!qs("asset-path").textContent.trim()) {
@@ -594,15 +679,31 @@ async function refreshDashboard() {
   }
 }
 
-async function loadLibraryLatest() {
+async function loadLibraryLatest(page = 1) {
   try {
-    const data = await api("/assets?page=1&page_size=120");
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSize = state.libraryPager.pageSize || 120;
+    const data = await api(`/assets?page=${pageNum}&page_size=${pageSize}`);
     const assets = data.assets || [];
+    const total = Number(data.total) || assets.length;
+    state.libraryPager = {
+      ...state.libraryPager,
+      kind: "latest",
+      mode: "path",
+      q: "",
+      media: qs("search-media")?.value || "all",
+      tags: [],
+      page: pageNum,
+      pageSize,
+      total,
+      shown: assets.length,
+    };
     qs("library-result-meta").textContent = t("latest_assets_meta", {
       shown: assets.length,
-      total: data.total || assets.length,
+      total,
     });
     renderAssetGrid(assets, "library-grid");
+    updateLibraryPagerUi();
   } catch (e) {
     showToast(t("library_load_failed", { error: e.message }));
   }
@@ -636,20 +737,30 @@ function normalizeSearch(mode, data) {
   return [];
 }
 
-async function runSearch() {
-  const mode = qs("search-mode").value;
-  const q = String(qs("search-query").value || "").trim();
-  const media = qs("search-media").value;
-  const tags = parseTagsInput();
+async function runSearch(page = 1, fromPager = false) {
+  const pageNum = Math.max(1, Number(page) || 1);
+  const pageSize = state.libraryPager.pageSize || 120;
+
+  const mode = fromPager ? state.libraryPager.mode : qs("search-mode").value;
+  const q = fromPager ? String(state.libraryPager.q || "") : String(qs("search-query").value || "").trim();
+  const media = fromPager ? (state.libraryPager.media || "all") : qs("search-media").value;
+  const tags = fromPager ? (Array.isArray(state.libraryPager.tags) ? state.libraryPager.tags : []) : parseTagsInput();
 
   try {
     let payload = null;
+    let kind = mode;
+    let total = 0;
+    let paged = false;
+
     if (mode === "path") {
       if (!q) {
-        await loadLibraryLatest();
+        await loadLibraryLatest(pageNum);
         return;
       }
-      payload = await api(`/search?q=${encodeURIComponent(q)}&page=1&page_size=120`);
+      paged = true;
+      kind = "path";
+      payload = await api(`/search?q=${encodeURIComponent(q)}&page=${pageNum}&page_size=${pageSize}`);
+      total = Number(payload?.total) || 0;
     } else if (mode === "caption") {
       if (!q) {
         showToast(t("caption_mode_needs_text"));
@@ -657,7 +768,7 @@ async function runSearch() {
       }
       payload = await api("/search/captions", {
         method: "POST",
-        body: JSON.stringify({ text: q, k: 120, media }),
+        body: JSON.stringify({ text: q, k: pageSize, media }),
       });
     } else if (mode === "smart") {
       payload = await api("/search/smart", {
@@ -666,7 +777,7 @@ async function runSearch() {
           text: q || null,
           tags: tags.length ? tags : null,
           media,
-          k: 120,
+          k: pageSize,
         }),
       });
     } else if (mode === "person") {
@@ -674,18 +785,56 @@ async function runSearch() {
         showToast(t("person_mode_needs_name"));
         return;
       }
-      payload = await api(`/search/person/name/${encodeURIComponent(q)}?page=1&page_size=120`);
+      paged = true;
+      kind = "person";
+      payload = await api(`/search/person/name/${encodeURIComponent(q)}?page=${pageNum}&page_size=${pageSize}`);
+      total = Number(payload?.total) || 0;
     }
 
     const items = normalizeSearch(mode, payload || {});
-    qs("library-result-meta").textContent = t("search_results_meta", {
-      mode: modeLabel(mode),
-      count: items.length,
-    });
+    if (!paged) {
+      total = items.length;
+    }
+    state.libraryPager = {
+      ...state.libraryPager,
+      kind,
+      mode,
+      q,
+      media,
+      tags,
+      page: pageNum,
+      pageSize,
+      total,
+      shown: items.length,
+    };
+    qs("library-result-meta").textContent = paged
+      ? t("search_results_meta_paged", {
+          mode: modeLabel(mode),
+          shown: items.length,
+          total,
+        })
+      : t("search_results_meta", {
+          mode: modeLabel(mode),
+          count: items.length,
+        });
     renderAssetGrid(items, "library-grid");
+    updateLibraryPagerUi();
   } catch (e) {
     showToast(t("search_failed", { error: e.message }));
   }
+}
+
+async function runLibraryPage(delta) {
+  const current = Math.max(1, Number(state.libraryPager.page) || 1);
+  const target = Math.max(1, current + Number(delta || 0));
+  if (target === current) return;
+
+  const kind = String(state.libraryPager.kind || "latest");
+  if (kind === "latest") {
+    await loadLibraryLatest(target);
+    return;
+  }
+  await runSearch(target, true);
 }
 
 function closeAssetInspector() {
@@ -1008,16 +1157,43 @@ function renderPeopleList() {
     .join("");
 }
 
-async function loadPersonAssets(personId) {
+async function loadPersonAssets(personId, page = 1) {
   try {
-    const data = await api(`/search/person/${personId}?page=1&page_size=120`);
+    const targetPersonId = Number(personId) || null;
+    if (!targetPersonId) return;
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSize = state.personAssetsPager.pageSize || 120;
+    const data = await api(`/search/person/${targetPersonId}?page=${pageNum}&page_size=${pageSize}`);
     const items = data.items || [];
-    qs("person-assets-meta").textContent = t("person_assets_meta", { id: personId, count: items.length });
+    const total = Number(data.total) || items.length;
+    state.personAssetsPager = {
+      ...state.personAssetsPager,
+      personId: targetPersonId,
+      page: pageNum,
+      pageSize,
+      total,
+      shown: items.length,
+    };
+    qs("person-assets-meta").textContent = t("person_assets_meta_paged", {
+      id: targetPersonId,
+      shown: items.length,
+      total,
+    });
     const normalized = items.map((x) => ({ id: x.id, path: x.path }));
     renderAssetGrid(normalized, "person-assets-grid");
+    updatePersonAssetsPagerUi();
   } catch (e) {
     showToast(t("person_assets_load_failed", { error: e.message }));
   }
+}
+
+async function runPersonAssetsPage(delta) {
+  const personId = Number(state.personAssetsPager.personId) || 0;
+  if (!personId) return;
+  const current = Math.max(1, Number(state.personAssetsPager.page) || 1);
+  const target = Math.max(1, current + Number(delta || 0));
+  if (target === current) return;
+  await loadPersonAssets(personId, target);
 }
 
 async function loadUnassignedFaces() {
@@ -1248,10 +1424,12 @@ function initEvents() {
     showToast(t("refreshed"));
   });
 
-  qs("btn-search").addEventListener("click", runSearch);
-  qs("btn-library-load").addEventListener("click", loadLibraryLatest);
+  qs("btn-search").addEventListener("click", () => runSearch(1, false));
+  qs("btn-library-load").addEventListener("click", () => loadLibraryLatest(1));
+  qs("btn-library-prev").addEventListener("click", () => runLibraryPage(-1));
+  qs("btn-library-next").addEventListener("click", () => runLibraryPage(1));
   qs("search-query").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") runSearch();
+    if (e.key === "Enter") runSearch(1, false);
   });
 
   qs("library-grid").addEventListener("click", async (e) => {
@@ -1375,7 +1553,7 @@ function initEvents() {
         await loadPeople();
         showToast(t("person_renamed", { id: personId }));
       } else if (btn.dataset.action === "view-person-assets") {
-        await loadPersonAssets(personId);
+        await loadPersonAssets(personId, 1);
       }
     } catch (err) {
       showToast(t("person_action_failed", { error: err.message }));
@@ -1406,6 +1584,8 @@ function initEvents() {
   });
 
   qs("btn-refresh-people").addEventListener("click", loadPeople);
+  qs("btn-person-assets-prev").addEventListener("click", () => runPersonAssetsPage(-1));
+  qs("btn-person-assets-next").addEventListener("click", () => runPersonAssetsPage(1));
   qs("people-show-unnamed").addEventListener("change", loadPeople);
   const createPersonBtn = qs("btn-create-person");
   if (createPersonBtn) {
@@ -1507,7 +1687,7 @@ async function bootstrap() {
     await loadGeoMap();
   }
   if (q) {
-    await runSearch();
+    await runSearch(1, false);
   }
 
   window.setInterval(async () => {

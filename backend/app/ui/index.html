@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260225a" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260225b" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -107,7 +107,12 @@
 
             <h3 data-i18n="results">Results</h3>
             <p id="library-result-meta" class="muted"></p>
-            <div id="library-grid" class="asset-grid"></div>
+            <div class="pager-row">
+              <button id="btn-library-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
+              <button id="btn-library-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <span id="library-page-meta" class="muted small"></span>
+            </div>
+            <div id="library-grid" class="asset-grid scroll-grid"></div>
           </div>
 
           <div class="panel right-panel">
@@ -170,7 +175,12 @@
           <div class="panel right-panel">
             <h2 data-i18n="person_assets">Person Assets</h2>
             <p id="person-assets-meta" class="muted" data-i18n="person_assets_meta_default">Select a person to view related assets.</p>
-            <div id="person-assets-grid" class="asset-grid"></div>
+            <div class="pager-row">
+              <button id="btn-person-assets-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
+              <button id="btn-person-assets-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <span id="person-assets-page-meta" class="muted small"></span>
+            </div>
+            <div id="person-assets-grid" class="asset-grid scroll-grid"></div>
             <h3 data-i18n="unassigned_faces">Unassigned Faces</h3>
             <div id="unassigned-faces" class="face-grid"></div>
           </div>
@@ -268,6 +278,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260225d" defer></script>
+  <script src="/ui/app.js?v=20260225e" defer></script>
 </body>
 </html>

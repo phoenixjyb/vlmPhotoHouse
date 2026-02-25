@@ -241,6 +241,11 @@ textarea:focus {
   background: var(--primary-strong);
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn.ghost {
   border-color: var(--line);
   background: #ffffff;
@@ -259,6 +264,20 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.55rem;
+}
+
+.scroll-grid {
+  max-height: 62vh;
+  overflow: auto;
+  align-content: start;
+  padding-right: 0.2rem;
+}
+
+.pager-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
 }
 
 .asset-card {
@@ -620,6 +639,9 @@ textarea:focus {
   }
   .asset-grid {
     grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+  .scroll-grid {
+    max-height: 50vh;
   }
   .geo-map {
     min-height: 52vh;
