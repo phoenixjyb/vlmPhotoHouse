@@ -47,6 +47,25 @@ function Get-LVFaceModelName([string]$Dir) {
     return 'LVFace-B_Glint360K.onnx'
 }
 
+function Resolve-GpuIndexByName([string]$NameHint) {
+    if (-not $NameHint) { return $null }
+    try {
+        $rows = & nvidia-smi --query-gpu=index,name --format=csv,noheader,nounits 2>$null
+        foreach ($row in $rows) {
+            $parts = $row -split ',', 2
+            if ($parts.Count -lt 2) { continue }
+            $idx = $parts[0].Trim()
+            $name = $parts[1].Trim()
+            if ($name -match [Regex]::Escape($NameHint)) {
+                return $idx
+            }
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
 Write-Host "Starting dev multiprocess setup (tmux-style)" -ForegroundColor Cyan
 
 # Always kill existing Windows Terminal instances for a fresh session (unless -NoCleanup)
@@ -157,6 +176,7 @@ $env:CAPTION_MODEL = 'auto'
 $env:QWEN2VL_MODEL_NAME = if ($env:QWEN2VL_MODEL_NAME) { $env:QWEN2VL_MODEL_NAME } else { 'Qwen/Qwen3-VL-8B-Instruct' }
 $env:QWEN2VL_LOAD_IN_4BIT = if ($env:QWEN2VL_LOAD_IN_4BIT) { $env:QWEN2VL_LOAD_IN_4BIT } else { 'true' }
 $env:QWEN2VL_4BIT_QUANT_TYPE = if ($env:QWEN2VL_4BIT_QUANT_TYPE) { $env:QWEN2VL_4BIT_QUANT_TYPE } else { 'nf4' }
+$env:CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS = if ($env:CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS) { $env:CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS } else { 'qwen' }
 $env:IMAGE_TAG_PROVIDER = if ($EnableRampp) { 'http' } else { if ($env:IMAGE_TAG_PROVIDER) { $env:IMAGE_TAG_PROVIDER } else { 'stub' } }
 $env:IMAGE_TAG_SERVICE_URL = if ($EnableRampp) { "http://127.0.0.1:$RamppPort" } else { if ($env:IMAGE_TAG_SERVICE_URL) { $env:IMAGE_TAG_SERVICE_URL } else { "http://127.0.0.1:$RamppPort" } }
 $env:IMAGE_TAG_MODEL = if ($env:IMAGE_TAG_MODEL) { $env:IMAGE_TAG_MODEL } else { 'ram-plus' }
@@ -168,7 +188,21 @@ $defaultRamppAdapter = Join-Path $RamppDir 'adapter_rampp.py'
 $env:RAMPP_TAG_SCRIPT = if ($env:RAMPP_TAG_SCRIPT) { $env:RAMPP_TAG_SCRIPT } else { if (Test-Path -LiteralPath $defaultRamppAdapter) { $defaultRamppAdapter } else { '' } }
 $env:RAMPP_MODE = if ($env:RAMPP_MODE) { $env:RAMPP_MODE } else { if ($EnableRampp) { 'script' } else { 'stub' } }
 $env:RAMPP_MODEL_NAME = if ($env:RAMPP_MODEL_NAME) { $env:RAMPP_MODEL_NAME } else { 'ram-plus' }
-$env:RAMPP_CUDA_DEVICE = if ($env:RAMPP_CUDA_DEVICE) { $env:RAMPP_CUDA_DEVICE } else { '1' }  # PyTorch index on this host: 1 => P2000
+$p2000Index = $null
+if ($Preset -eq 'RTX3090') {
+    $p2000Index = Resolve-GpuIndexByName -NameHint 'P2000'
+}
+$env:LVFACE_CUDA_VISIBLE_DEVICES = if ($env:LVFACE_CUDA_VISIBLE_DEVICES) {
+    $env:LVFACE_CUDA_VISIBLE_DEVICES
+} else {
+    if ($Preset -eq 'RTX3090' -and $p2000Index -ne $null) { $p2000Index } else { '' }
+}
+$env:RAMPP_CUDA_DEVICE = if ($env:RAMPP_CUDA_DEVICE) { $env:RAMPP_CUDA_DEVICE } else {
+    if ($Preset -eq 'RTX3090' -and $p2000Index -ne $null) { $p2000Index } else { '1' }
+}
+if ($Preset -eq 'RTX3090' -and -not $env:LVFACE_CUDA_VISIBLE_DEVICES) {
+    Write-Warning "Could not auto-resolve a P2000 GPU index for LVFace; set LVFACE_CUDA_VISIBLE_DEVICES manually if needed."
+}
 $env:RAMPP_ALLOW_STUB_FALLBACK = if ($env:RAMPP_ALLOW_STUB_FALLBACK) { $env:RAMPP_ALLOW_STUB_FALLBACK } else { 'true' }
 $env:ENABLE_INLINE_WORKER = 'true'
 
@@ -224,6 +258,7 @@ $env:TEMP = $env:VLM_TMP_DIR
 
 Write-Host "LVFace: $($env:LVFACE_EXTERNAL_DIR) (model: $($env:LVFACE_MODEL_NAME))" -ForegroundColor DarkCyan
 if ($env:LVFACE_PYTHON_EXE) { Write-Host "LVFace Python: $($env:LVFACE_PYTHON_EXE)" -ForegroundColor DarkCyan }
+if ($env:LVFACE_CUDA_VISIBLE_DEVICES) { Write-Host "LVFace CUDA_VISIBLE_DEVICES: $($env:LVFACE_CUDA_VISIBLE_DEVICES)" -ForegroundColor DarkCyan }
 if ($Preset) {
     $gpuVal = if ($effectiveUseGpu) { 'on' } else { 'off' }
     Write-Host "Preset: $Preset applied (face=$effectiveFace, caption=$effectiveCaption, gpu=$gpuVal)" -ForegroundColor Gray

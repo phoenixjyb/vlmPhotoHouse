@@ -103,7 +103,7 @@ body {
 .status-cards {
   margin-top: 0.9rem;
   display: grid;
-  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 0.6rem;
 }
 

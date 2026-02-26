@@ -20,6 +20,7 @@ class LVFaceSubprocessProvider:
         self.lvface_dir = Path(lvface_dir)
         self.model_name = model_name
         self.target_dim = target_dim
+        self.cuda_visible_devices = (os.getenv("LVFACE_CUDA_VISIBLE_DEVICES", "") or "").strip()
         if python_exe:
             self.python_exe = Path(python_exe)
         else:
@@ -40,6 +41,8 @@ class LVFaceSubprocessProvider:
         model_path = self.lvface_dir / "models" / model_name
         if not model_path.exists():
             raise RuntimeError(f"LVFace model not found: {model_path}")
+        if self.cuda_visible_devices:
+            logger.info("LVFace subprocess pinned via CUDA_VISIBLE_DEVICES=%s", self.cuda_visible_devices)
             
         # Prefer legacy inference.py; fallback to src/inference_onnx.py in newer trees.
         self.legacy_inference_script = self.lvface_dir / "inference.py"
@@ -54,6 +57,10 @@ class LVFaceSubprocessProvider:
                 f"{self.legacy_inference_script} or {self.src_inference_script}"
             )
     
+    @property
+    def dim(self) -> int:
+        return self.target_dim
+
     def embed_face(self, image: Image.Image) -> np.ndarray:
         """Generate face embedding using external LVFace subprocess."""
         # Create temporary image file
@@ -169,6 +176,7 @@ print(json.dumps(embedding.tolist()))
                 capture_output=True,
                 text=True,
                 cwd=str(self.lvface_dir),
+                env=self._subprocess_env(),
             )
             
             if result.returncode != 0:
@@ -185,3 +193,24 @@ print(json.dumps(embedding.tolist()))
                 os.unlink(tmp_path)
             except:
                 pass
+
+    def _subprocess_env(self) -> dict[str, str]:
+        env = os.environ.copy()
+        # Allow routing LVFace ONNXRuntime GPU work to a specific CUDA device set,
+        # independent from the backend process visibility used by other services.
+        if self.cuda_visible_devices:
+            env["CUDA_VISIBLE_DEVICES"] = self.cuda_visible_devices
+            # With CUDA_VISIBLE_DEVICES remapping, ORT device 0 maps to the selected physical GPU.
+            env.setdefault("ORT_CUDA_DEVICE_ID", "0")
+        # Inject the backend's PyTorch lib directory into PATH so the LVFace subprocess's
+        # ONNXRuntime CUDA provider can find cudnn64_9.dll (bundled with torch).
+        try:
+            import torch
+            torch_lib = str(Path(torch.__file__).parent / "lib")
+            if Path(torch_lib).is_dir():
+                sep = ";" if os.name == "nt" else ":"
+                env["PATH"] = torch_lib + sep + env.get("PATH", "")
+                logger.debug("LVFace subprocess: injected torch/lib into PATH: %s", torch_lib)
+        except Exception:
+            pass
+        return env

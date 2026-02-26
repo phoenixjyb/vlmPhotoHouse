@@ -373,7 +373,7 @@ def health_caption():
 
 @app.get('/metrics', response_model=schemas.MetricsResponse)
 def metrics(db_s: Session = Depends(get_db)):
-    from .db import Task, Embedding, Caption, FaceDetection, Person
+    from .db import Task, Embedding, Caption, FaceDetection, Person, AssetTag
     assets_total = db_s.query(Asset).count()
     assets_deleted = db_s.query(Asset).filter(Asset.status=='deleted').count()
     assets_active = assets_total - assets_deleted
@@ -381,6 +381,10 @@ def metrics(db_s: Session = Depends(get_db)):
     captions = db_s.query(Caption).count()
     faces = db_s.query(FaceDetection).count()
     persons = db_s.query(Person).count()
+    tag_links = db_s.query(AssetTag).count()
+    tag_assets = db_s.query(func.count(func.distinct(AssetTag.asset_id))).scalar() or 0
+    tag_by_source_rows = db_s.query(AssetTag.source, func.count(AssetTag.id)).group_by(AssetTag.source).all()
+    tag_by_source = {str(source or '(null)'): int(cnt) for source, cnt in tag_by_source_rows}
     tasks_total = db_s.query(Task).count()
     by_state_rows = db_s.query(Task.state, func.count(Task.id)).group_by(Task.state).all()
     by_state = {state: cnt for state, cnt in by_state_rows}
@@ -419,6 +423,7 @@ def metrics(db_s: Session = Depends(get_db)):
         'captions': captions,
         'faces': faces,
         'persons': persons,
+        'tags': {'total_links': int(tag_links), 'assets_with_tags': int(tag_assets), 'by_source': tag_by_source},
         'tasks': {'total': tasks_total, 'by_state': by_state},
     'vector_index': {'size': index_size, 'dim': index_dim},
         'last_recluster': last_recluster,

@@ -224,12 +224,18 @@ class MetricsVectorIndex(BaseModel):
     size: int
     dim: Optional[int] = None
 
+class MetricsTags(BaseModel):
+    total_links: int
+    assets_with_tags: int
+    by_source: Dict[str, int]
+
 class MetricsResponse(APIBase):
     assets: Dict[str, int]
     embeddings: int
     captions: int
     faces: int
     persons: int
+    tags: MetricsTags
     tasks: MetricsTasks
     vector_index: MetricsVectorIndex
     last_recluster: Optional[Dict[str, int]] = None

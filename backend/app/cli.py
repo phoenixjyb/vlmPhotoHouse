@@ -360,7 +360,7 @@ def faces_auto_assign(
     """Auto-assign unassigned faces to named persons using embedding centroid matching."""
     from pathlib import Path as _Path
     import numpy as _np
-    from collections import defaultdict as _dd
+    from collections import Counter as _Counter, defaultdict as _dd
     from .db import Person, FaceDetection, Asset
 
     _, SessionLocal = _session_factory()
@@ -406,7 +406,9 @@ def faces_auto_assign(
                 missing_ref_emb += 1
                 continue
             try:
-                v = _np.load(p).astype("float32")
+                v = _np.asarray(_np.load(p), dtype="float32").reshape(-1)
+                if v.size == 0:
+                    continue
                 n = float(_np.linalg.norm(v))
                 if n > 0:
                     v = v / n
@@ -414,15 +416,22 @@ def faces_auto_assign(
             except Exception:
                 continue
 
-        centroids: list[tuple[int, str, int, _np.ndarray]] = []
+        centroids: list[tuple[int, str, int, int, _np.ndarray]] = []
         for (pid, pname), vecs in by_person.items():
             if len(vecs) < min_ref_faces:
                 continue
-            c = _np.mean(_np.stack(vecs), axis=0).astype("float32")
+            dims = _Counter(int(v.shape[0]) for v in vecs if v.ndim == 1 and v.size > 0)
+            if not dims:
+                continue
+            target_dim, _ = dims.most_common(1)[0]
+            vecs_same_dim = [v for v in vecs if int(v.shape[0]) == target_dim]
+            if len(vecs_same_dim) < min_ref_faces:
+                continue
+            c = _np.mean(_np.stack(vecs_same_dim), axis=0).astype("float32")
             n = float(_np.linalg.norm(c))
             if n > 0:
                 c = c / n
-            centroids.append((pid, pname, len(vecs), c))
+            centroids.append((pid, pname, len(vecs_same_dim), target_dim, c))
 
         if not centroids:
             typer.echo(
@@ -469,14 +478,19 @@ def faces_auto_assign(
                 missing_face_emb += 1
                 continue
             try:
-                v = _np.load(p).astype("float32")
+                v = _np.asarray(_np.load(p), dtype="float32").reshape(-1)
+                if v.size == 0:
+                    continue
                 n = float(_np.linalg.norm(v))
                 if n > 0:
                     v = v / n
             except Exception:
                 continue
+            eligible = [(pid, pname, c) for pid, pname, _nref, dim, c in centroids if int(v.shape[0]) == int(dim)]
+            if not eligible:
+                continue
             scores = sorted(
-                [(float(_np.dot(v, c)), pid, pname) for pid, pname, _nref, c in centroids],
+                [(float(_np.dot(v, c)), pid, pname) for pid, pname, c in eligible],
                 reverse=True,
             )
             if not scores:
@@ -549,7 +563,7 @@ def faces_auto_assign(
             f"assign_all={assign_all} reference_manual_only={reference_manual_only} "
             f"include_dnn_assigned={include_dnn_assigned}"
         )
-        typer.echo(f"reference_persons={[(pid, name, nref) for pid, name, nref, _ in centroids]}")
+        typer.echo(f"reference_persons={[(pid, name, nref, dim) for pid, name, nref, dim, _ in centroids]}")
         typer.echo(f"matched_per_person={dict(sorted(per_person.items()))}")
         if preview:
             typer.echo("preview (face_id -> person):")
@@ -753,7 +767,7 @@ def captions_tags_backfill(
     root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
     limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
     max_tags: int = typer.Option(8, min=1, max=32, help="Max derived tags per asset"),
-    source_model_contains: Optional[str] = typer.Option(None, help="Optional caption model substring filter"),
+    source_model_contains: Optional[str] = typer.Option("qwen", help="Caption model substring filter (default: qwen)"),
     tag_type: str = typer.Option("caption-auto", help="Type label used for newly-created tags"),
     apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
     commit_every: int = typer.Option(200, min=20, max=5000, help="Commit cadence"),

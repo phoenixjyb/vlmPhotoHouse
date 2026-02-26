@@ -49,6 +49,8 @@ const I18N = {
     captions: "Captions",
     faces: "Faces",
     people: "People",
+    tags_total: "Tag Links",
+    tagged_assets: "Tagged Assets",
     tasks_pending: "Tasks Pending",
     health: "Health",
     tab_library: "Library",
@@ -223,6 +225,8 @@ const I18N = {
     captions: "描述",
     faces: "人脸",
     people: "人物",
+    tags_total: "标签关联",
+    tagged_assets: "已标注资源",
     tasks_pending: "待处理任务",
     health: "健康状态",
     tab_library: "资源库",
@@ -732,13 +736,22 @@ function renderAssetGrid(items, containerId) {
 async function refreshDashboard() {
   try {
     const [health, metrics] = await Promise.all([api("/health"), api("/metrics")]);
-    qs("stat-assets").textContent = metrics.assets?.total ?? "-";
-    qs("stat-captions").textContent = metrics.captions ?? "-";
-    qs("stat-faces").textContent = metrics.faces ?? "-";
-    qs("stat-persons").textContent = metrics.persons ?? "-";
-    qs("stat-pending").textContent = health.pending_tasks ?? "-";
-    qs("stat-health").textContent = health.ok ? t("status_ok") : t("status_degraded");
-    qs("stat-health").style.color = health.ok ? "#0f8a66" : "#b73a3a";
+    const setStat = (id, value) => {
+      const el = qs(id);
+      if (el) el.textContent = value ?? "-";
+    };
+    setStat("stat-assets", metrics.assets?.total);
+    setStat("stat-captions", metrics.captions);
+    setStat("stat-faces", metrics.faces);
+    setStat("stat-persons", metrics.persons);
+    setStat("stat-tags", metrics.tags?.total_links);
+    setStat("stat-tag-assets", metrics.tags?.assets_with_tags);
+    setStat("stat-pending", health.pending_tasks);
+    const healthEl = qs("stat-health");
+    if (healthEl) {
+      healthEl.textContent = health.ok ? t("status_ok") : t("status_degraded");
+      healthEl.style.color = health.ok ? "#0f8a66" : "#b73a3a";
+    }
   } catch (e) {
     showToast(t("dashboard_refresh_failed", { error: e.message }));
   }

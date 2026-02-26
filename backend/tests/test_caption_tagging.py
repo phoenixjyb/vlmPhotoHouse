@@ -3,6 +3,7 @@ from pathlib import Path
 from app.db import Asset, AssetTag, AssetTagBlock, Tag
 from app.main import SessionLocal
 from app.tagging import extract_caption_tag_candidates, upsert_asset_tags
+from app.tasks import _caption_model_allowed_for_auto_tag
 
 
 def test_extract_caption_tag_candidates_canonical_quota():
@@ -105,3 +106,15 @@ def test_upsert_asset_tags_merges_cap_and_img_sources(temp_env_root):
         assert link is not None
         assert link.source == "cap+img"
         assert float(link.score or 0.0) >= 0.84
+
+
+def test_caption_auto_tag_model_filter_defaults_to_qwen(monkeypatch):
+    monkeypatch.delenv("CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS", raising=False)
+    assert _caption_model_allowed_for_auto_tag("http-qwen-vl")
+    assert not _caption_model_allowed_for_auto_tag("http-blip2")
+
+
+def test_caption_auto_tag_model_filter_supports_override(monkeypatch):
+    monkeypatch.setenv("CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS", "blip2")
+    assert _caption_model_allowed_for_auto_tag("http-blip2")
+    assert not _caption_model_allowed_for_auto_tag("http-qwen-vl")

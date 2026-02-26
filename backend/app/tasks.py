@@ -38,6 +38,13 @@ VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_SEG_INDEX_SINGLETON: InMemoryVectorIndex | None = None
 EMBED_SERVICE: EmbeddingService | None = None
 
+
+def _caption_model_allowed_for_auto_tag(model_name: str | None) -> bool:
+    model_filter = str(os.getenv('CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS', 'qwen') or '').strip().lower()
+    if not model_filter:
+        return True
+    return model_filter in str(model_name or '').lower()
+
 class TaskExecutor:
     def __init__(self, session_factory=None, settings=None):
         # Allow tests to instantiate without wiring by pulling from app.main lazily
@@ -375,7 +382,8 @@ class TaskExecutor:
         session.flush()
         # Optionally derive lightweight keyword tags from generated caption text.
         auto_tag_enabled = os.getenv('CAPTION_AUTO_TAG_ENABLE', 'true').lower() in ('1', 'true', 'yes')
-        if auto_tag_enabled and text:
+        model_allowed = _caption_model_allowed_for_auto_tag(model_name)
+        if auto_tag_enabled and text and model_allowed:
             try:
                 from .tagging import extract_caption_tag_candidates, upsert_asset_tags
 
