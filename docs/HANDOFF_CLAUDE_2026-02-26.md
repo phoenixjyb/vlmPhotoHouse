@@ -1,111 +1,119 @@
 # Claude Handoff - 2026-02-26
 
-Last updated: 2026-02-26 (session 2)
+Last updated: 2026-02-27 (end of 2026-02-26 session)
 Owner context: yanbo / vlmPhotoHouse
 
 ## 1) Quick Status
 
-- Repo: `vlmPhotoHouse`
+- Repo: `vlmPhotoHouse` (branch `master`, 5 commits ahead of origin)
 - Data root: `E:\VLM_DATA`
 - Originals root: `E:\01_INCOMING`
 - DB: `E:\VLM_DATA\databases\metadata.sqlite`
 - API: `http://127.0.0.1:8002`
-- Caption server target: `http://127.0.0.1:8102`
+- Caption server: `http://127.0.0.1:8102`
 
-Live DB snapshot (end of session 2):
+Live DB snapshot (end of session):
 - assets: `12336` (images `9979`, videos `2357`)
-- captions rows: draining — was 21521, queue was 7397 pending → ~6069 pending remaining
+- captions: ~22,700+ (draining — 5860 pending caption tasks remain)
 - face detections: `15979`
-- face assigned: `9591`
-- face unassigned: `6388`
-- queue pending: ~6069 (all `caption`)
-- queue running: `3` (all `caption`)
+- face assigned: `9834` (was 9591 at session start → +243)
+- face unassigned: `6144` (was 6387 → -243)
+- queue pending: `~5860` (all `caption`)
+- queue running: `4` (all `caption`)
 
 ## 2) What Was Completed This Session
 
 ### 2a) LVFace Provider Restored
-- Root cause: API process started without LVFace env vars → fell back to StubFaceEmbeddingProvider.
-- Fix: restarted API process with correct env vars:
-  - `FACE_EMBED_PROVIDER=lvface`
-  - `LVFACE_EXTERNAL_DIR=C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace`
-  - `LVFACE_PYTHON_EXE=C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace\.venv\Scripts\python.exe`
-  - `LVFACE_MODEL_NAME=LVFace-B_Glint360K.onnx`
-- API health now confirms: `embed_provider: LVFaceSubprocessProvider`.
+- Root cause: API started without LVFace env vars → StubFaceEmbeddingProvider.
+- Fix: restarted API with correct env vars (see CLAUDE.md for full list).
+- Confirmed: `LVFaceSubprocessProvider` active in `/health`.
 
 ### 2b) LVFace GPU Fix (cudnn64_9.dll)
-- Root cause: `cudnn64_9.dll` was not on the PATH for the LVFace subprocess.
-  The LVFace venv's ORT 1.24.2 requires cuDNN 9.x.
-- Discovery: cuDNN 9 DLLs are bundled in the **backend** venv's torch/lib:
-  `vlmPhotoHouse/.venv/Lib/site-packages/torch/lib/cudnn64_9.dll` (and siblings).
-- Fix: modified `backend/app/lvface_subprocess.py` → `_subprocess_env()` to inject
-  the backend torch/lib directory into the subprocess PATH before subprocess is launched.
-  Verified: ORT now uses `CUDAExecutionProvider` when PATH includes torch/lib.
+- Root cause: `cudnn64_9.dll` not on subprocess PATH for LVFace ORT 1.24.2.
+- Discovery: cuDNN 9 DLLs are bundled in backend venv's torch/lib.
+- Fix: `_subprocess_env()` in `lvface_subprocess.py` now injects backend
+  torch/lib into subprocess PATH before launching inference.
+- Confirmed: `CUDAExecutionProvider` active in LVFace subprocess.
 
-### 2c) dim Property Fix
-- Cosmetic: added `dim` property to `LVFaceSubprocessProvider` (returns `self.target_dim`)
-  so `/health` reports `embed_dim: 128` instead of `null`.
+### 2c) Minor Fixes
+- Added `dim` property to `LVFaceSubprocessProvider` (health now reports embed_dim).
+- Wired `_subprocess_env()` into `subprocess.run()` (was missing).
 
-### 2d) Stale Running Tasks Reset
-- Before restarting the API, 33 stuck `running` caption tasks were reset to `pending`
-  directly in DB to prevent them getting orphaned.
+### 2d) Face Auto-Assignment (243 new)
+Two-phase conservative pass against manual ground truth:
 
-## 3) Current Blockers / Notes
+**Phase 1** (core persons, high confidence):
+- threshold=0.35, margin=0.08, min_ref_faces=10
+- Persons: jane, jane_newborn, yanbo, chuan, meiying, zhiqiang, yixia
+- Result: 220 assigned
+- Distribution: chuan=43, jane=18, jane_newborn=41, meiying=17, yanbo=49, yixia=38, zhiqiang=14
 
-1. Caption queue still draining:
-   - ~6069 pending caption tasks remaining.
-   - Queue draining at ~670 tasks per few minutes while API worker runs.
-   - Caption service: Qwen3-VL-8B-Instruct, nf4, RTX 3090, GPU healthy.
+**Phase 2** (guansuo, tight threshold):
+- threshold=0.42, margin=0.10, min_ref_faces=5
+- Result: 23 assigned
 
-2. API started manually this session (not via startup script):
-   - The API was restarted without `-UseWindowsTerminal` from a bash context.
-   - env vars were set manually — they are correct but not persisted.
-   - If the API process crashes or is restarted, run the startup script:
-     ```powershell
-     .\scripts\start-dev-multiproc.ps1 -UseWindowsTerminal -KillExisting
-     ```
+**Skipped** (too few refs, high false positive risk): caoyujia (2 refs), mumu (4 refs), yinzhi (2 refs)
 
-3. LVFace GPU path now fixed in code but not yet validated end-to-end with real face:
-   - The PATH injection logic runs when `embed_face()` is called.
-   - Next face re-embed or auto-assign pass will use CUDA provider.
+### 2e) Committed & Documented
+- Commit `8d7f916`: all session fixes + CLAUDE.md created
+- CLAUDE.md: created at repo root with full onboarding guide
 
-4. Unassigned faces (6388) still need strategy:
-   - Ground-truth-only auto-assign (`--reference-manual-only`) matched 0/6388.
-   - Best-score distribution: median=0.182, max=0.544 (threshold=0.55).
-   - Consider: expanding manual labels, lowering threshold experimentally, or targeted redetect.
+## 3) Remaining Unassigned Faces Strategy
 
-## 4) Files Modified This Session
+6144 faces remain unassigned. Distribution of why they're hard:
+- Scores against manual centroids are low (median ~0.18, max ~0.54 at default threshold).
+- The 0.35+ threshold pass took the "easy" matches.
+- Remaining faces are likely: low quality crops, unusual angles, partial faces, people
+  with few/no manual labels (caoyujia, mumu, yinzhi, unknown persons).
 
-- `backend/app/lvface_subprocess.py`:
-  - Added `dim` property to `LVFaceSubprocessProvider`
-  - Added torch/lib PATH injection in `_subprocess_env()` for CUDA provider
+Recommended next steps:
+1. **Manual corrections**: Review unassigned faces in UI; manually label any known persons.
+   Especially: add more refs for caoyujia, mumu, yinzhi if you can identify them.
+2. **Propagation**: After manual batch, run:
+   ```powershell
+   .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --apply --limit 0
+   ```
+3. **Include DNN re-eval**: Once more refs exist, run with `--include-dnn-assigned` to
+   re-evaluate borderline DNN assignments.
+4. **Quality/redetect**: For truly hard faces, a targeted redetect pass may help.
 
-No commit was created this session.
+## 4) Current Blockers / Notes
+
+1. **Caption queue still draining**: ~5860 pending. Progressing well (~1500 processed this session).
+   Keep caption service running.
+
+2. **API started manually**: Not via startup script. Env vars are correct (LVFace active).
+   If API restarts, use startup script:
+   ```powershell
+   .\scripts\start-dev-multiproc.ps1 -UseWindowsTerminal -KillExisting
+   ```
+
+3. **No propagation tasks queued**: The CLI auto-assign writes `label_source='dnn'` directly.
+   Propagation tasks are only auto-enqueued via the API manual labeling flow.
+   To force a propagation pass: run faces-auto-assign again with `--include-dnn-assigned`.
 
 ## 5) Files Claude Should Read First
 
-Primary handoff/status:
+- `CLAUDE.md` (repo root) — quick project onboarding
 - `docs/HANDOFF_CLAUDE_2026-02-26.md` (this file)
 - `docs/PROJECT_STATUS_CURRENT.md`
 
-Key runtime files:
-- `scripts/start-dev-multiproc.ps1`
-- `backend/app/config.py`
-- `backend/app/lvface_subprocess.py`
-- `backend/app/face_embedding_service.py`
-
-## 6) Immediate Next Steps (Recommended Order)
-
-1. Monitor caption queue drain — check if queue reaches 0.
-2. Run faces-auto-assign dry-run with lower threshold to assess residual face coverage.
-3. Commit the two fixes to `backend/app/lvface_subprocess.py`.
-4. When next LVFace embed is triggered, verify CUDA provider is active (check logs).
-
-## 7) Command Reference
+## 6) Command Reference
 
 Health check (bypass Clash proxy):
 ```bash
 curl -s --noproxy '*' http://127.0.0.1:8002/health
-curl -s --noproxy '*' http://127.0.0.1:8002/health/caption
+```
+
+Auto-assign dry-run (conservative, core persons):
+```powershell
+cd backend
+..\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.35 --margin 0.08 --min-ref-faces 10 --reference-manual-only --limit 0
+```
+
+Auto-assign apply (add --apply when happy with dry-run):
+```powershell
+..\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --apply --limit 0
 ```
 
 Reset stuck running tasks (after unclean shutdown):
@@ -117,22 +125,7 @@ cur.execute("UPDATE tasks SET state='pending', started_at=NULL WHERE state='runn
 con.commit(); con.close()
 ```
 
-Validate LVFace (from backend dir):
-```powershell
-$env:FACE_EMBED_PROVIDER='lvface'
-$env:LVFACE_EXTERNAL_DIR='C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace'
-$env:LVFACE_PYTHON_EXE='C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace\.venv\Scripts\python.exe'
-$env:LVFACE_MODEL_NAME='LVFace-B_Glint360K.onnx'
-.\.venv\Scripts\python.exe -m app.cli validate-lvface
-```
+## 7) Current Working Tree (after commit 8d7f916)
 
-Dry-run auto-assign (conservative, manual-only refs):
-```powershell
-.\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --limit 0
-```
-
-## 8) Current Working Tree Changes (Uncommitted)
-
-- `backend/app/lvface_subprocess.py` — `dim` property + torch/lib PATH injection
-- `backend/app/cli.py` — from previous session (mixed embed dim fix)
-- `scripts/start-dev-multiproc.ps1` — from previous session
+Clean — all session changes committed.
+New uncommitted: only `docs/HANDOFF_CLAUDE_2026-02-26.md` (this update).
