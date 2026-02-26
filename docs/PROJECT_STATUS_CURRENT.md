@@ -5,6 +5,9 @@ Last Updated: 2026-02-25
 ## Scope
 This document is the operational handoff for any new agent joining this repository. It reflects the current production-like local setup on Windows with data rooted on Drive E.
 
+Latest session handoff:
+- `docs/HANDOFF_CLAUDE_2026-02-26.md`
+
 Architecture companion:
 - `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
 
