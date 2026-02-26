@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 
 from app.db import Asset, AssetTag, AssetTagBlock, Tag
 from app.main import SessionLocal
@@ -118,3 +119,123 @@ def test_caption_auto_tag_model_filter_supports_override(monkeypatch):
     monkeypatch.setenv("CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS", "blip2")
     assert _caption_model_allowed_for_auto_tag("http-blip2")
     assert not _caption_model_allowed_for_auto_tag("http-qwen-vl")
+
+
+def test_tags_catalog_endpoint_lists_counts_and_sources(client, temp_env_root):
+    tag_name = f"stroller-catalog-{uuid4().hex[:8]}"
+    asset1_path = str(Path(temp_env_root["originals"]) / "tags_catalog_asset_1.jpg")
+    asset2_path = str(Path(temp_env_root["originals"]) / "tags_catalog_asset_2.jpg")
+    with SessionLocal() as session:
+        a1 = Asset(path=asset1_path, hash_sha256="d" * 64, mime="image/jpeg")
+        a2 = Asset(path=asset2_path, hash_sha256="e" * 64, mime="image/jpeg")
+        session.add_all([a1, a2])
+        session.commit()
+
+        upsert_asset_tags(
+            session,
+            asset_id=int(a1.id),
+            names=[tag_name],
+            tag_type="object",
+            source="cap",
+            source_model="http-qwen-vl",
+        )
+        session.commit()
+        upsert_asset_tags(
+            session,
+            asset_id=int(a1.id),
+            names=[tag_name],
+            tag_type="object",
+            source="img",
+            source_model="ram-plus",
+        )
+        session.commit()
+        upsert_asset_tags(
+            session,
+            asset_id=int(a2.id),
+            names=[tag_name],
+            tag_type="object",
+            source="img",
+            source_model="ram-plus",
+        )
+        session.commit()
+
+    resp = client.get(f"/tags?q={tag_name}&page=1&page_size=20")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["total"] >= 1
+    stroller = next(row for row in payload["rows"] if row["name"] == tag_name)
+    assert stroller["assets"] == 2
+    assert stroller["links"] == 2
+    assert stroller["sources"]["cap+img"] == 1
+    assert stroller["sources"]["img"] == 1
+
+    resp_img = client.get(f"/tags?q={tag_name}&source=img&page=1&page_size=20")
+    assert resp_img.status_code == 200
+    stroller_img = next(row for row in resp_img.json()["rows"] if row["name"] == tag_name)
+    assert stroller_img["assets"] == 1
+    assert stroller_img["links"] == 1
+
+    resp_bad = client.get("/tags?source=bad-source")
+    assert resp_bad.status_code == 400
+
+
+def test_tag_assets_endpoint_supports_media_and_source_filters(client, temp_env_root):
+    tag_name = f"tag-assets-{uuid4().hex[:8]}"
+    image_path = str(Path(temp_env_root["originals"]) / "tag_assets_image.jpg")
+    video_path = str(Path(temp_env_root["originals"]) / "tag_assets_video.mp4")
+    with SessionLocal() as session:
+        a_img = Asset(path=image_path, hash_sha256="f" * 64, mime="image/jpeg")
+        a_vid = Asset(path=video_path, hash_sha256="0" * 64, mime="video/mp4")
+        session.add_all([a_img, a_vid])
+        session.commit()
+
+        upsert_asset_tags(
+            session,
+            asset_id=int(a_img.id),
+            names=[tag_name],
+            tag_type="object",
+            source="cap",
+            source_model="http-qwen-vl",
+        )
+        session.commit()
+        upsert_asset_tags(
+            session,
+            asset_id=int(a_vid.id),
+            names=[tag_name],
+            tag_type="object",
+            source="img",
+            source_model="ram-plus",
+        )
+        session.commit()
+
+    catalog = client.get(f"/tags?q={tag_name}&page=1&page_size=10")
+    assert catalog.status_code == 200
+    row = next(r for r in catalog.json()["rows"] if r["name"] == tag_name)
+    tag_id = int(row["id"])
+
+    all_assets = client.get(f"/tags/{tag_id}/assets?media=all&source=all&page=1&page_size=20")
+    assert all_assets.status_code == 200
+    all_payload = all_assets.json()
+    assert all_payload["total"] == 2
+    assert len(all_payload["items"]) == 2
+
+    image_only = client.get(f"/tags/{tag_id}/assets?media=image&source=all&page=1&page_size=20")
+    assert image_only.status_code == 200
+    assert image_only.json()["total"] == 1
+    assert str(image_only.json()["items"][0]["mime"]).startswith("image/")
+
+    video_only = client.get(f"/tags/{tag_id}/assets?media=video&source=all&page=1&page_size=20")
+    assert video_only.status_code == 200
+    assert video_only.json()["total"] == 1
+    assert str(video_only.json()["items"][0]["mime"]).startswith("video/")
+
+    source_img = client.get(f"/tags/{tag_id}/assets?media=all&source=img&page=1&page_size=20")
+    assert source_img.status_code == 200
+    assert source_img.json()["total"] == 1
+    assert str(source_img.json()["items"][0]["mime"]).startswith("video/")
+
+    bad_source = client.get(f"/tags/{tag_id}/assets?source=bad")
+    assert bad_source.status_code == 400
+
+    bad_media = client.get(f"/tags/{tag_id}/assets?media=bad")
+    assert bad_media.status_code == 400

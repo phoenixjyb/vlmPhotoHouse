@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260226a" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260227b" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -69,6 +69,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="library" data-i18n="tab_library">Library</button>
       <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
+      <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
       <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
       <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
       <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
@@ -206,6 +207,92 @@
         </div>
       </section>
 
+      <section id="tab-tags" class="tab-panel">
+        <div class="panel-grid">
+          <div class="panel left-panel">
+            <div class="controls">
+              <h2 data-i18n="tag_catalog">Tag Catalog</h2>
+              <label class="grow">
+                <span data-i18n="query">Query</span>
+                <input id="tags-filter-query" type="text" data-i18n-placeholder="tag_filter_name_ph" placeholder="Filter tags..." />
+              </label>
+              <label>
+                <span data-i18n="tag_source">Source</span>
+                <select id="tags-filter-source">
+                  <option value="all" data-i18n="tag_source_all">All</option>
+                  <option value="cap" data-i18n="tag_source_cap">Caption</option>
+                  <option value="img" data-i18n="tag_source_img">Image</option>
+                  <option value="cap+img" data-i18n="tag_source_capimg">Caption+Image</option>
+                  <option value="manual" data-i18n="tag_source_manual">Manual</option>
+                  <option value="rule" data-i18n="tag_source_rule">Rule</option>
+                  <option value="(null)" data-i18n="tag_source_null">Unknown</option>
+                </select>
+              </label>
+              <button id="btn-refresh-tags" class="btn ghost" data-i18n="refresh">Refresh</button>
+            </div>
+            <p id="tags-meta" class="muted"></p>
+            <div class="pager-row">
+              <button id="btn-tags-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
+              <button id="btn-tags-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <input id="tags-page-input" class="pager-input" type="number" min="1" step="1" data-i18n-placeholder="page_input_ph" placeholder="Page" />
+              <button id="btn-tags-jump" class="btn ghost" type="button" data-i18n="jump_page">Go</button>
+              <span id="tags-page-meta" class="muted small"></span>
+            </div>
+            <div class="table-wrap">
+              <table class="task-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="tags">Tags</th>
+                    <th data-i18n="type">Type</th>
+                    <th data-i18n="tag_assets">Assets</th>
+                    <th data-i18n="tag_links">Links</th>
+                    <th data-i18n="tag_sources">Sources</th>
+                    <th data-i18n="action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tags-rows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel right-panel">
+            <div class="controls">
+              <h2 data-i18n="tag_assets_panel">Tag Assets</h2>
+              <label>
+                <span data-i18n="media">Media</span>
+                <select id="tag-assets-media">
+                  <option value="all" data-i18n="media_all">All</option>
+                  <option value="image" data-i18n="media_image">Image</option>
+                  <option value="video" data-i18n="media_video">Video</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="tag_source">Source</span>
+                <select id="tag-assets-source">
+                  <option value="all" data-i18n="tag_source_all">All</option>
+                  <option value="cap" data-i18n="tag_source_cap">Caption</option>
+                  <option value="img" data-i18n="tag_source_img">Image</option>
+                  <option value="cap+img" data-i18n="tag_source_capimg">Caption+Image</option>
+                  <option value="manual" data-i18n="tag_source_manual">Manual</option>
+                  <option value="rule" data-i18n="tag_source_rule">Rule</option>
+                  <option value="(null)" data-i18n="tag_source_null">Unknown</option>
+                </select>
+              </label>
+              <button id="btn-refresh-tag-assets" class="btn ghost" data-i18n="refresh">Refresh</button>
+            </div>
+            <p id="tag-assets-meta" class="muted" data-i18n="tag_assets_meta_default">Select a tag to view related assets.</p>
+            <div class="pager-row">
+              <button id="btn-tag-assets-prev" class="btn ghost" type="button" data-i18n="prev_page">Prev</button>
+              <button id="btn-tag-assets-next" class="btn ghost" type="button" data-i18n="next_page">Next</button>
+              <input id="tag-assets-page-input" class="pager-input" type="number" min="1" step="1" data-i18n-placeholder="page_input_ph" placeholder="Page" />
+              <button id="btn-tag-assets-jump" class="btn ghost" type="button" data-i18n="jump_page">Go</button>
+              <span id="tag-assets-page-meta" class="muted small"></span>
+            </div>
+            <div id="tag-assets-grid" class="asset-grid scroll-grid"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-panel">
         <div class="panel">
           <div class="controls">
@@ -297,6 +384,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260226a" defer></script>
+  <script src="/ui/app.js?v=20260227b" defer></script>
 </body>
 </html>

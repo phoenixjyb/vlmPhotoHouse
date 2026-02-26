@@ -1,4 +1,4 @@
-# VLM Photo House - System Architecture Snapshot (2026-02-24)
+# VLM Photo House - System Architecture Snapshot (2026-02-27)
 
 This document reflects the current architecture from live runtime checks plus current repository code.
 
@@ -14,15 +14,19 @@ This document reflects the current architecture from live runtime checks plus cu
 - Face detection provider: `InsightFaceDetectionProvider`
 - Caption provider: `HTTPCaptionProvider`
 - Caption service: `http://127.0.0.1:8102` (active provider `qwen3-vl`)
+- Image tag provider: `HTTPImageTagProvider`
+- Image tag service: `http://127.0.0.1:8112` (active model `ram-plus`, checkpoint-backed)
 
 Live data snapshot:
-- Assets: `12,336` (image/jpeg: `9,972`; video/mp4: `2,356`)
+- Assets: `12,336` (images: `9,979`; videos: `2,357`)
 - Image embeddings: `9,979`
-- Captions: `14,969`
-- Face detections: `15,993`
-- Persons: `23`
+- Captions (active variants): `24,464`
+- Face detections: `15,978`
+- Persons: `38`
 - Video segments: `22,450`
-- Face assignment audit events: `2,585`
+- Face assignment audit events: `4,309`
+- Tag links: `30,567` (`cap=25,195`, `img=5,361`, `cap+img=7`, `(null)=4`)
+- Image-tag queue: `pending=1,399`, `running=2`, `finished=8,567`, `failed=12` (draining)
 
 ## 2) Topology and Projects
 
@@ -104,13 +108,16 @@ Provider layer:
 - Asset-level status fields maintained in `assets`:
   - `caption_processed`, `caption_variant_count`, `caption_processed_at`, `caption_error_last`.
 - Caption-derived tagging now uses deterministic bilingual canonical mapping in `backend/app/tagging.py` with quota-based selection (`<=8`) and keyword fallback.
+- Caption auto-tagging is Qwen-gated by default via `CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS=qwen` to avoid BLIP-derived tags.
 - Auto-tag entry points:
   - caption generation path in `backend/app/tasks.py`
-  - batch backfill command `captions-tags-backfill` in `backend/app/cli.py`
-- Optional image-tagging path (RAM++ style) is available via HTTP provider integration:
+  - batch backfill command `captions-tags-backfill` in `backend/app/cli.py` (default `source_model_contains=qwen`)
+- Image-tagging path (RAM++ over HTTP) is active:
   - provider module: `backend/app/image_tag_service.py`
   - worker task: `image_tag` in `backend/app/tasks.py`
   - enqueue command: `image-tags-backfill` in `backend/app/cli.py`
+  - RAM++ service/adapter: `rampp/service.py`, `rampp/adapter_rampp.py`
+- Tag upsert merges provenance by source; same tag from both pipelines is tracked as `cap+img`.
 - Per-asset auto-tag suppression is supported:
   - `DELETE /assets/{asset_id}/tags` can remove tags and block re-add for auto-tagging.
   - Blocked tag IDs are persisted in `asset_tag_blocks`; manual add unblocks.
@@ -157,6 +164,7 @@ Provider layer:
 - `tags`, `asset_tags`: tagging catalog and asset links.
 - `asset_tag_blocks`: per-asset blocked auto tags (prevents removed auto tags from coming back).
 - `asset_tags` now tracks provenance fields (`source`, `score`, `model`) for source-aware search/debug.
+- `asset_tags.source` values used in production include `cap`, `img`, and merged `cap+img`.
 - `face_assignment_events`: assignment audit history (manual/dnn/system).
 
 ## 7) UI Architecture
@@ -172,7 +180,7 @@ Main tabs:
 - People: named/unnamed persons, person assets, unassigned face queue.
 - Map: GPS visualization via Leaflet (`/assets/geo`).
 - Tasks: queue monitor + cancel action.
-- Admin: health/metrics, index rebuild, recluster, ingest trigger.
+- Admin: health/metrics (including `tags.total_links`, `tags.assets_with_tags`, `tags.by_source`), index rebuild, recluster, ingest trigger.
 
 ## 8) Model/Provider Matrix (As Wired)
 
@@ -185,10 +193,12 @@ Face detection providers:
 Caption providers:
 - `stub`, `http`, `blip2`, `llava`, `qwen2.5-vl`, `qwen3-vl`, `qwen3`, `auto`
 - External subprocess path supported when `CAPTION_EXTERNAL_DIR` is set.
+- Operational default for caption-derived auto-tagging is Qwen-only (model substring gate: `qwen`).
 
 Image tag providers:
 - `stub`, `http`, `auto` (`IMAGE_TAG_PROVIDER`)
-- RAM++ scaffold service path defaults to `http://127.0.0.1:8112` when enabled.
+- Active path uses RAM++ HTTP service at `http://127.0.0.1:8112` with model `ram-plus`.
+- Runtime/checkpoint: `rampp/.venv-rampp` + `rampp/pretrained/ram_plus_swin_large_14m.pth`.
 
 Voice:
 - Backend proxies to external LLMyTranslate endpoints under `/voice/*`.
@@ -207,6 +217,9 @@ From `backend`:
 .\.venv\Scripts\python.exe -m app.cli ingest-status E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli gps-backfill --root E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --score-threshold 0.30 --margin 0.05 --min-ref-faces 2 --reference-manual-only --include-dnn-assigned --apply --limit 0
+.\.venv\Scripts\python.exe -m app.cli captions-tags-backfill --source-model-contains qwen --max-tags 8 --apply
+.\.venv\Scripts\python.exe -m app.cli image-tags-backfill --only-missing-img --apply
+.\.venv\Scripts\python.exe -m app.cli validate-image-tag
 Invoke-RestMethod -Uri http://127.0.0.1:8002/health
 ```
 
@@ -219,7 +232,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8002/health
 - `ingest.py` enqueues `phash` and video tasks.
 - `tasks.py` defines handlers for `phash` and video tasks.
 - `TaskExecutor.run_once` currently dispatches only:
-  - `embed`, `thumb`, `caption`, `face`, `face_embed`, `person_cluster`, `person_label_propagate`, `dim_backfill`
+  - `embed`, `thumb`, `caption`, `face`, `face_embed`, `person_cluster`, `person_label_propagate`, `dim_backfill`, `image_tag`
 - `phash` and video task types are not currently dispatched by `run_once`.
 
 3. Task state naming inconsistency:
@@ -233,7 +246,7 @@ Invoke-RestMethod -Uri http://127.0.0.1:8002/health
 ## 11) Recommended Source of Truth Going Forward
 
 - Operational truth: `docs/PROJECT_STATUS_CURRENT.md`
-- Architecture truth (this snapshot): `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
+- Architecture truth (this snapshot title date: 2026-02-27): `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
 - Code truth:
   - `backend/app/main.py`
   - `backend/app/tasks.py`

@@ -665,6 +665,148 @@ def search_captions(text: str = Body('', embed=True), k: int = Body(20, embed=Tr
     return {'query': text, 'results': [{'asset_id': a.id, 'path': a.path, 'mime': a.mime} for a in items]}
 
 # --- Tag management ---
+@app.get('/tags')
+def list_tags(
+    q: str = Query('', description='Substring filter for tag name'),
+    source: str = Query('all', description='Filter by source: all|cap|img|cap+img|manual|rule|(null)'),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(120, ge=1, le=500),
+    db_s: Session = Depends(get_db),
+):
+    from sqlalchemy import case
+    from .db import Tag, AssetTag
+
+    name_filter = str(q or '').strip().lower()
+    source_filter = str(source or 'all').strip().lower()
+    allowed_sources = {'all', 'cap', 'img', 'cap+img', 'manual', 'rule', '(null)'}
+    if source_filter not in allowed_sources:
+        raise HTTPException(status_code=400, detail='Invalid source filter')
+
+    count_q = db_s.query(Tag.id).join(AssetTag, AssetTag.tag_id == Tag.id)
+    if name_filter:
+        count_q = count_q.filter(func.lower(Tag.name).like(f"%{name_filter}%"))
+    if source_filter == '(null)':
+        count_q = count_q.filter(AssetTag.source.is_(None))
+    elif source_filter != 'all':
+        count_q = count_q.filter(AssetTag.source == source_filter)
+    total = int(count_q.distinct().count())
+
+    src = func.coalesce(AssetTag.source, '(null)')
+    rows_q = (
+        db_s.query(
+            Tag.id,
+            Tag.name,
+            Tag.type,
+            func.count(AssetTag.id).label('links'),
+            func.count(func.distinct(AssetTag.asset_id)).label('assets'),
+            func.sum(case((src == 'cap', 1), else_=0)).label('cap_links'),
+            func.sum(case((src == 'img', 1), else_=0)).label('img_links'),
+            func.sum(case((src == 'cap+img', 1), else_=0)).label('capimg_links'),
+            func.sum(case((src == 'manual', 1), else_=0)).label('manual_links'),
+            func.sum(case((src == 'rule', 1), else_=0)).label('rule_links'),
+            func.sum(case((src == '(null)', 1), else_=0)).label('null_links'),
+        )
+        .join(AssetTag, AssetTag.tag_id == Tag.id)
+    )
+    if name_filter:
+        rows_q = rows_q.filter(func.lower(Tag.name).like(f"%{name_filter}%"))
+    if source_filter == '(null)':
+        rows_q = rows_q.filter(AssetTag.source.is_(None))
+    elif source_filter != 'all':
+        rows_q = rows_q.filter(AssetTag.source == source_filter)
+    rows = (
+        rows_q.group_by(Tag.id, Tag.name, Tag.type)
+        .order_by(func.count(AssetTag.id).desc(), Tag.name.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        'q': q,
+        'source': source_filter,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'rows': [
+            {
+                'id': int(r.id),
+                'name': r.name,
+                'type': r.type,
+                'assets': int(r.assets or 0),
+                'links': int(r.links or 0),
+                'sources': {
+                    'cap': int(r.cap_links or 0),
+                    'img': int(r.img_links or 0),
+                    'cap+img': int(r.capimg_links or 0),
+                    'manual': int(r.manual_links or 0),
+                    'rule': int(r.rule_links or 0),
+                    '(null)': int(r.null_links or 0),
+                },
+            }
+            for r in rows
+        ],
+    }
+
+
+@app.get('/tags/{tag_id}/assets')
+def list_tag_assets(
+    tag_id: int,
+    media: str = Query('all', description='Filter media: all|image|video'),
+    source: str = Query('all', description='Filter by source: all|cap|img|cap+img|manual|rule|(null)'),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(120, ge=1, le=500),
+    db_s: Session = Depends(get_db),
+):
+    from .db import Tag, AssetTag
+
+    tag = db_s.get(Tag, int(tag_id))
+    if not tag:
+        raise HTTPException(status_code=404, detail='Tag not found')
+
+    media_filter = str(media or 'all').strip().lower()
+    if media_filter not in ('all', 'image', 'video'):
+        raise HTTPException(status_code=400, detail='Invalid media filter')
+
+    source_filter = str(source or 'all').strip().lower()
+    allowed_sources = {'all', 'cap', 'img', 'cap+img', 'manual', 'rule', '(null)'}
+    if source_filter not in allowed_sources:
+        raise HTTPException(status_code=400, detail='Invalid source filter')
+
+    q = (
+        db_s.query(Asset.id, Asset.path, Asset.mime)
+        .join(AssetTag, AssetTag.asset_id == Asset.id)
+        .filter(AssetTag.tag_id == int(tag_id))
+    )
+    if media_filter == 'image':
+        q = q.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
+    elif media_filter == 'video':
+        q = q.filter(Asset.mime.startswith('video'))
+    if source_filter == '(null)':
+        q = q.filter(AssetTag.source.is_(None))
+    elif source_filter != 'all':
+        q = q.filter(AssetTag.source == source_filter)
+
+    total = int(q.count())
+    rows = (
+        q.order_by(Asset.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        'tag': {'id': int(tag.id), 'name': tag.name, 'type': tag.type},
+        'media': media_filter,
+        'source': source_filter,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'items': [
+            {'id': int(aid), 'path': path, 'mime': mime}
+            for aid, path, mime in rows
+        ],
+    }
+
+
 @app.get('/assets/{asset_id}/tags')
 def get_asset_tags(asset_id: int, db_s: Session = Depends(get_db)):
     from .db import Tag, AssetTag

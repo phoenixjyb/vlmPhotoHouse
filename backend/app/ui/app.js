@@ -35,6 +35,24 @@ const state = {
     total: 0,
     shown: 0,
   },
+  tagsPager: {
+    q: "",
+    source: "all",
+    page: 1,
+    pageSize: 200,
+    total: 0,
+    shown: 0,
+  },
+  tagsAssetsPager: {
+    tagId: null,
+    tagName: "",
+    page: 1,
+    pageSize: 120,
+    total: 0,
+    shown: 0,
+    media: "all",
+    source: "all",
+  },
 };
 
 const qs = (id) => document.getElementById(id);
@@ -55,6 +73,7 @@ const I18N = {
     health: "Health",
     tab_library: "Library",
     tab_people: "People",
+    tab_tags: "Tags",
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
@@ -192,6 +211,28 @@ const I18N = {
     regenerate_failed: "Regenerate failed: {error}",
     no_tag_entered: "No tag entered",
     tags_updated: "Tags updated",
+    tag_catalog: "Tag Catalog",
+    tag_filter_name_ph: "Filter tags...",
+    tag_source: "Source",
+    tag_source_all: "All",
+    tag_source_cap: "Caption",
+    tag_source_img: "Image",
+    tag_source_capimg: "Caption+Image",
+    tag_source_manual: "Manual",
+    tag_source_rule: "Rule",
+    tag_source_null: "Unknown",
+    tag_assets: "Assets",
+    tag_links: "Links",
+    tag_sources: "Sources",
+    tag_assets_panel: "Tag Assets",
+    tag_assets_meta_default: "Select a tag to view related assets.",
+    tag_assets_meta: "Tag {name}: {count} assets",
+    tag_assets_meta_paged: "Tag {name}: showing {shown}/{total}",
+    tag_assets_load_failed: "Tag assets load failed: {error}",
+    tag_open_search: "Open in Search",
+    tags_meta: "Tags: {shown} shown of {total}",
+    tags_meta_paged: "Tags: {shown}/{total}",
+    tag_catalog_load_failed: "Tag catalog load failed: {error}",
     remove_tag: "Remove tag",
     tag_removed: "Tag removed",
     tag_update_failed: "Tag update failed: {error}",
@@ -231,6 +272,7 @@ const I18N = {
     health: "健康状态",
     tab_library: "资源库",
     tab_people: "人物",
+    tab_tags: "标签",
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
@@ -368,6 +410,28 @@ const I18N = {
     regenerate_failed: "重生成失败: {error}",
     no_tag_entered: "未输入标签",
     tags_updated: "标签已更新",
+    tag_catalog: "标签总览",
+    tag_filter_name_ph: "筛选标签...",
+    tag_source: "来源",
+    tag_source_all: "全部",
+    tag_source_cap: "描述",
+    tag_source_img: "图像",
+    tag_source_capimg: "描述+图像",
+    tag_source_manual: "手动",
+    tag_source_rule: "规则",
+    tag_source_null: "未知",
+    tag_assets: "资源数",
+    tag_links: "关联数",
+    tag_sources: "来源明细",
+    tag_assets_panel: "标签资源",
+    tag_assets_meta_default: "选择一个标签查看相关资源。",
+    tag_assets_meta: "标签 {name}: {count} 个资源",
+    tag_assets_meta_paged: "标签 {name}: 当前显示 {shown}/{total}",
+    tag_assets_load_failed: "标签资源加载失败: {error}",
+    tag_open_search: "在搜索中打开",
+    tags_meta: "标签: 显示 {shown} / {total}",
+    tags_meta_paged: "标签: {shown}/{total}",
+    tag_catalog_load_failed: "标签总览加载失败: {error}",
     remove_tag: "移除标签",
     tag_removed: "标签已移除",
     tag_update_failed: "标签更新失败: {error}",
@@ -415,6 +479,16 @@ function modeLabel(value) {
   if (value === "smart") return t("mode_smart");
   if (value === "person") return t("mode_person");
   return value;
+}
+
+function tagSourceLabel(value) {
+  if (value === "cap") return t("tag_source_cap");
+  if (value === "img") return t("tag_source_img");
+  if (value === "cap+img") return t("tag_source_capimg");
+  if (value === "manual") return t("tag_source_manual");
+  if (value === "rule") return t("tag_source_rule");
+  if (value === "(null)") return t("tag_source_null");
+  return value || t("tag_source_null");
 }
 
 function pageCount(total, pageSize) {
@@ -516,6 +590,55 @@ function updateUnassignedFacesPagerUi() {
   next.disabled = page >= pages || shown <= 0;
   jumpBtn.disabled = shown <= 0 || pages <= 1;
   jumpInput.disabled = shown <= 0 || pages <= 1;
+  jumpInput.min = "1";
+  jumpInput.max = String(pages);
+  jumpInput.value = String(page);
+  meta.textContent = t("pager_status", { page, pages, shown, total });
+}
+
+function updateTagsPagerUi() {
+  const prev = qs("btn-tags-prev");
+  const next = qs("btn-tags-next");
+  const jumpBtn = qs("btn-tags-jump");
+  const jumpInput = qs("tags-page-input");
+  const meta = qs("tags-page-meta");
+  if (!prev || !next || !meta || !jumpBtn || !jumpInput) return;
+
+  const pager = state.tagsPager || {};
+  const page = Math.max(1, Number(pager.page) || 1);
+  const pages = pageCount(pager.total, pager.pageSize);
+  const shown = Number(pager.shown) || 0;
+  const total = Number(pager.total) || 0;
+
+  prev.disabled = page <= 1;
+  next.disabled = page >= pages || shown <= 0;
+  jumpBtn.disabled = shown <= 0 || pages <= 1;
+  jumpInput.disabled = shown <= 0 || pages <= 1;
+  jumpInput.min = "1";
+  jumpInput.max = String(pages);
+  jumpInput.value = String(page);
+  meta.textContent = t("pager_status", { page, pages, shown, total });
+}
+
+function updateTagAssetsPagerUi() {
+  const prev = qs("btn-tag-assets-prev");
+  const next = qs("btn-tag-assets-next");
+  const jumpBtn = qs("btn-tag-assets-jump");
+  const jumpInput = qs("tag-assets-page-input");
+  const meta = qs("tag-assets-page-meta");
+  if (!prev || !next || !meta || !jumpBtn || !jumpInput) return;
+
+  const pager = state.tagsAssetsPager || {};
+  const page = Math.max(1, Number(pager.page) || 1);
+  const pages = pageCount(pager.total, pager.pageSize);
+  const shown = Number(pager.shown) || 0;
+  const total = Number(pager.total) || 0;
+  const active = Boolean(pager.tagId);
+
+  prev.disabled = page <= 1 || !active;
+  next.disabled = page >= pages || shown <= 0 || !active;
+  jumpBtn.disabled = !active || shown <= 0 || pages <= 1;
+  jumpInput.disabled = !active || shown <= 0 || pages <= 1;
   jumpInput.min = "1";
   jumpInput.max = String(pages);
   jumpInput.value = String(page);
@@ -632,6 +755,14 @@ function renderCurrentViewText() {
   if (state.activeTab === "people") {
     renderPeopleList();
     loadUnassignedFaces(state.unassignedFacesPager.page || 1);
+  }
+  if (state.activeTab === "tags") {
+    loadTagsCatalog(state.tagsPager.page || 1);
+    if (state.tagsAssetsPager.tagId) {
+      loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+    } else {
+      updateTagAssetsPagerUi();
+    }
   }
   if (state.activeTab === "tasks") {
     loadTasks();
@@ -931,6 +1062,162 @@ async function runLibraryJump() {
     return;
   }
   await runSearch(target, true);
+}
+
+async function loadTagsCatalog(page = 1) {
+  try {
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSize = state.tagsPager.pageSize || 200;
+    const qInput = qs("tags-filter-query");
+    const sourceInput = qs("tags-filter-source");
+    const q = String((qInput ? qInput.value : state.tagsPager.q) || "").trim();
+    const source = String((sourceInput ? sourceInput.value : state.tagsPager.source) || "all");
+    const params = new URLSearchParams();
+    params.set("q", q);
+    params.set("source", source);
+    params.set("page", String(pageNum));
+    params.set("page_size", String(pageSize));
+    const data = await api(`/tags?${params.toString()}`);
+    const rows = Array.isArray(data?.rows) ? data.rows : [];
+    const total = Number(data?.total) || 0;
+
+    state.tagsPager = {
+      ...state.tagsPager,
+      q,
+      source,
+      page: pageNum,
+      pageSize,
+      total,
+      shown: rows.length,
+    };
+    if (qInput) qInput.value = q;
+    if (sourceInput) sourceInput.value = source;
+
+    qs("tags-meta").textContent = t("tags_meta_paged", { shown: rows.length, total });
+    qs("tags-rows").innerHTML = rows
+      .map((row) => {
+        const src = row?.sources && typeof row.sources === "object" ? row.sources : {};
+        const sourceText = ["cap", "img", "cap+img", "manual", "rule", "(null)"]
+          .filter((k) => Number(src[k]) > 0)
+          .map((k) => `${tagSourceLabel(k)}:${Number(src[k])}`)
+          .join(" | ");
+        const active = Number(state.tagsAssetsPager.tagId) === Number(row.id) ? "tags-row-active" : "";
+        return `
+          <tr class="${active}">
+            <td>${esc(row.name)}</td>
+            <td>${esc(row.type || "-")}</td>
+            <td>${Number(row.assets) || 0}</td>
+            <td>${Number(row.links) || 0}</td>
+            <td class="small muted">${esc(sourceText || "-")}</td>
+            <td>
+              <button class="btn ghost" data-action="tags-view-assets" data-tag-id="${Number(row.id)}" data-tag-name="${esc(row.name)}">${esc(t("view_assets"))}</button>
+              <button class="btn ghost" data-action="tags-open-search" data-tag-name="${esc(row.name)}">${esc(t("tag_open_search"))}</button>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+    updateTagsPagerUi();
+  } catch (e) {
+    showToast(t("tag_catalog_load_failed", { error: e.message }));
+  }
+}
+
+async function runTagsPage(delta) {
+  const current = Math.max(1, Number(state.tagsPager.page) || 1);
+  const target = Math.max(1, current + Number(delta || 0));
+  if (target === current) return;
+  await loadTagsCatalog(target);
+}
+
+async function runTagsJump() {
+  const pages = pageCount(state.tagsPager.total, state.tagsPager.pageSize);
+  const input = qs("tags-page-input");
+  const target = parsePageInputValue(input?.value, pages);
+  if (!target) return;
+  const current = Math.max(1, Number(state.tagsPager.page) || 1);
+  if (target === current) return;
+  await loadTagsCatalog(target);
+}
+
+async function loadTagAssets(tagId, page = 1) {
+  const id = Number(tagId || 0);
+  if (!id) {
+    state.tagsAssetsPager = {
+      ...state.tagsAssetsPager,
+      tagId: null,
+      tagName: "",
+      page: 1,
+      total: 0,
+      shown: 0,
+    };
+    qs("tag-assets-meta").textContent = t("tag_assets_meta_default");
+    renderAssetGrid([], "tag-assets-grid");
+    updateTagAssetsPagerUi();
+    return;
+  }
+  try {
+    const pageNum = Math.max(1, Number(page) || 1);
+    const pageSize = state.tagsAssetsPager.pageSize || 120;
+    const mediaInput = qs("tag-assets-media");
+    const sourceInput = qs("tag-assets-source");
+    const media = String((mediaInput ? mediaInput.value : state.tagsAssetsPager.media) || "all");
+    const source = String((sourceInput ? sourceInput.value : state.tagsAssetsPager.source) || "all");
+    const params = new URLSearchParams();
+    params.set("media", media);
+    params.set("source", source);
+    params.set("page", String(pageNum));
+    params.set("page_size", String(pageSize));
+    const data = await api(`/tags/${id}/assets?${params.toString()}`);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const total = Number(data?.total) || 0;
+    const tagName = String(data?.tag?.name || state.tagsAssetsPager.tagName || id);
+
+    state.tagsAssetsPager = {
+      ...state.tagsAssetsPager,
+      tagId: id,
+      tagName,
+      page: pageNum,
+      pageSize,
+      total,
+      shown: items.length,
+      media,
+      source,
+    };
+    if (mediaInput) mediaInput.value = media;
+    if (sourceInput) sourceInput.value = source;
+
+    qs("tag-assets-meta").textContent = t("tag_assets_meta_paged", {
+      name: tagName,
+      shown: items.length,
+      total,
+    });
+    renderAssetGrid(items, "tag-assets-grid");
+    updateTagAssetsPagerUi();
+  } catch (e) {
+    showToast(t("tag_assets_load_failed", { error: e.message }));
+  }
+}
+
+async function runTagAssetsPage(delta) {
+  const pager = state.tagsAssetsPager || {};
+  if (!pager.tagId) return;
+  const current = Math.max(1, Number(pager.page) || 1);
+  const target = Math.max(1, current + Number(delta || 0));
+  if (target === current) return;
+  await loadTagAssets(pager.tagId, target);
+}
+
+async function runTagAssetsJump() {
+  const pager = state.tagsAssetsPager || {};
+  if (!pager.tagId) return;
+  const pages = pageCount(pager.total, pager.pageSize);
+  const input = qs("tag-assets-page-input");
+  const target = parsePageInputValue(input?.value, pages);
+  if (!target) return;
+  const current = Math.max(1, Number(pager.page) || 1);
+  if (target === current) return;
+  await loadTagAssets(pager.tagId, target);
 }
 
 function closeAssetInspector() {
@@ -1572,12 +1859,24 @@ function initEvents() {
       if (el.dataset.tab === "tasks") await loadTasks();
       if (el.dataset.tab === "admin") await refreshAdminPanels();
       if (el.dataset.tab === "people") await loadPeople();
+      if (el.dataset.tab === "tags") {
+        await loadTagsCatalog(state.tagsPager.page || 1);
+        if (state.tagsAssetsPager.tagId) {
+          await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+        }
+      }
       if (el.dataset.tab === "map") await loadGeoMap();
     });
   });
 
   qs("btn-refresh-all").addEventListener("click", async () => {
     await Promise.all([refreshDashboard(), loadTasks(), loadPeople(), refreshAdminPanels()]);
+    if (state.activeTab === "tags") {
+      await loadTagsCatalog(state.tagsPager.page || 1);
+      if (state.tagsAssetsPager.tagId) {
+        await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+      }
+    }
     if (state.activeTab === "map") await loadGeoMap();
     showToast(t("refreshed"));
   });
@@ -1610,12 +1909,27 @@ function initEvents() {
     await loadAssetInspector(Number(card.dataset.assetId));
   });
 
+  qs("tag-assets-grid").addEventListener("click", async (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    const originTab = state.activeTab;
+    setActiveTab("library");
+    state.inspectorOriginTab = originTab;
+    await loadAssetInspector(Number(card.dataset.assetId));
+  });
+
   qs("btn-asset-back").addEventListener("click", async () => {
     const returnTab = state.inspectorOriginTab || "library";
     closeAssetInspector();
     if (returnTab !== "library") {
       setActiveTab(returnTab);
       if (returnTab === "people") await loadPeople();
+      if (returnTab === "tags") {
+        await loadTagsCatalog(state.tagsPager.page || 1);
+        if (state.tagsAssetsPager.tagId) {
+          await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+        }
+      }
       if (returnTab === "map") await loadGeoMap();
       if (returnTab === "tasks") await loadTasks();
       if (returnTab === "admin") await refreshAdminPanels();
@@ -1791,6 +2105,35 @@ function initEvents() {
   }
   qs("btn-refresh-map").addEventListener("click", loadGeoMap);
   qs("map-media-filter").addEventListener("change", loadGeoMap);
+  qs("btn-refresh-tags").addEventListener("click", () => loadTagsCatalog(1));
+  qs("btn-tags-prev").addEventListener("click", () => runTagsPage(-1));
+  qs("btn-tags-next").addEventListener("click", () => runTagsPage(1));
+  qs("btn-tags-jump").addEventListener("click", runTagsJump);
+  qs("tags-page-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runTagsJump();
+  });
+  qs("tags-filter-query").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadTagsCatalog(1);
+  });
+  qs("tags-filter-source").addEventListener("change", () => loadTagsCatalog(1));
+  qs("btn-refresh-tag-assets").addEventListener("click", () => {
+    if (!state.tagsAssetsPager.tagId) return;
+    loadTagAssets(state.tagsAssetsPager.tagId, 1);
+  });
+  qs("tag-assets-media").addEventListener("change", () => {
+    if (!state.tagsAssetsPager.tagId) return;
+    loadTagAssets(state.tagsAssetsPager.tagId, 1);
+  });
+  qs("tag-assets-source").addEventListener("change", () => {
+    if (!state.tagsAssetsPager.tagId) return;
+    loadTagAssets(state.tagsAssetsPager.tagId, 1);
+  });
+  qs("btn-tag-assets-prev").addEventListener("click", () => runTagAssetsPage(-1));
+  qs("btn-tag-assets-next").addEventListener("click", () => runTagAssetsPage(1));
+  qs("btn-tag-assets-jump").addEventListener("click", runTagAssetsJump);
+  qs("tag-assets-page-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runTagAssetsJump();
+  });
   qs("btn-refresh-tasks").addEventListener("click", loadTasks);
 
   document.addEventListener("click", async (e) => {
@@ -1815,6 +2158,28 @@ function initEvents() {
       showToast(t("task_cancel_requested", { id: taskId }));
     } catch (err) {
       showToast(t("cancel_failed", { error: err.message }));
+    }
+  });
+
+  qs("tags-rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    if (btn.dataset.action === "tags-view-assets") {
+      const tagId = Number(btn.dataset.tagId || 0);
+      if (!tagId) return;
+      await loadTagAssets(tagId, 1);
+      await loadTagsCatalog(state.tagsPager.page || 1);
+      return;
+    }
+    if (btn.dataset.action === "tags-open-search") {
+      const tagName = String(btn.dataset.tagName || "").trim();
+      if (!tagName) return;
+      setActiveTab("library");
+      qs("search-mode").value = "smart";
+      qs("search-query").value = "";
+      qs("search-tags").value = tagName;
+      qs("search-media").value = "all";
+      await runSearch(1, false);
     }
   });
 
@@ -1864,7 +2229,7 @@ async function bootstrap() {
   setLanguage(langParam || storedLang || "en", false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["library", "people", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && ["library", "people", "tags", "map", "tasks", "admin"].includes(tab)) {
     setActiveTab(tab);
   }
   const q = params.get("q");
@@ -1872,6 +2237,14 @@ async function bootstrap() {
     qs("search-query").value = q;
   }
   await Promise.all([refreshDashboard(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
+  if (state.activeTab === "tags") {
+    await loadTagsCatalog(1);
+    if (state.tagsAssetsPager.tagId) {
+      await loadTagAssets(state.tagsAssetsPager.tagId, 1);
+    } else {
+      updateTagAssetsPagerUi();
+    }
+  }
   if (state.activeTab === "map") {
     await loadGeoMap();
   }

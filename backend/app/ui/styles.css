@@ -537,6 +537,15 @@ textarea:focus {
   vertical-align: top;
 }
 
+.task-table tr.tags-row-active {
+  background: #eef7f2;
+}
+
+.task-table td .btn {
+  margin-right: 0.35rem;
+  margin-top: 0.15rem;
+}
+
 .json-box {
   margin: 0;
   background: #0f241e;
