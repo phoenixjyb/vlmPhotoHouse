@@ -71,8 +71,11 @@ Then provide:
 - `RAMPP_PYTHON_EXE=<python.exe of your RAM++ environment>` (default: `.venv-rampp\Scripts\python.exe`)
 - `RAMPP_MODEL_NAME=ram-plus`
 - `RAMPP_CUDA_DEVICE=1` (PyTorch index for P2000 on this host)
-- `RAMPP_CHECKPOINT=<absolute path to RAM++ checkpoint>`
+- `RAMPP_CHECKPOINT=<absolute path to RAM++ checkpoint>` (launcher default: `rampp\pretrained\ram_plus_swin_large_14m.pth` if present)
 - `RAMPP_ALLOW_STUB_FALLBACK=true` keeps service usable before full RAM++ deps are ready
+
+Checkpoint download reference:
+- `https://huggingface.co/xinyu1205/recognize-anything-plus-model/blob/main/ram_plus_swin_large_14m.pth`
 
 ## Notes
 

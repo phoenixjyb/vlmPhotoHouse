@@ -51,7 +51,22 @@ def _tags_from_external_script(image_path: Path, max_tags: int) -> list[dict[str
         str(max(1, int(max_tags or 8))),
     ]
     run = subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=180)
-    payload = json.loads(run.stdout or "{}")
+    raw_out = str(run.stdout or "").strip()
+    payload: dict[str, object] | None = None
+    try:
+        payload = json.loads(raw_out or "{}")
+    except Exception:
+        for line in reversed(raw_out.splitlines()):
+            line = str(line or "").strip()
+            if not line.startswith("{") or not line.endswith("}"):
+                continue
+            try:
+                payload = json.loads(line)
+                break
+            except Exception:
+                continue
+    if payload is None:
+        raise RuntimeError(f"RAMPP adapter emitted non-JSON output: {raw_out[:500]}")
     raw_tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
     out: list[dict[str, object]] = []
     for item in raw_tags:
@@ -74,6 +89,7 @@ def _tags_from_external_script(image_path: Path, max_tags: int) -> list[dict[str
 @app.get("/health")
 def health() -> dict[str, object]:
     mode = os.getenv("RAMPP_MODE", "stub").strip().lower() or "stub"
+    checkpoint = str(os.getenv("RAMPP_CHECKPOINT", "") or "").strip()
     return {
         "status": "ok",
         "mode": mode,
@@ -81,6 +97,8 @@ def health() -> dict[str, object]:
         "script": os.getenv("RAMPP_TAG_SCRIPT", ""),
         "python": os.getenv("RAMPP_PYTHON_EXE", ""),
         "cuda_device": os.getenv("RAMPP_CUDA_DEVICE", ""),
+        "checkpoint": checkpoint,
+        "checkpoint_exists": bool(checkpoint and Path(checkpoint).exists()),
     }
 
 

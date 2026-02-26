@@ -186,6 +186,8 @@ $ramppVenvPy = Join-Path $RamppDir '.venv-rampp\Scripts\python.exe'
 $env:RAMPP_PYTHON_EXE = if ($env:RAMPP_PYTHON_EXE) { $env:RAMPP_PYTHON_EXE } else { if (Test-Path -LiteralPath $ramppVenvPy) { $ramppVenvPy } else { '' } }
 $defaultRamppAdapter = Join-Path $RamppDir 'adapter_rampp.py'
 $env:RAMPP_TAG_SCRIPT = if ($env:RAMPP_TAG_SCRIPT) { $env:RAMPP_TAG_SCRIPT } else { if (Test-Path -LiteralPath $defaultRamppAdapter) { $defaultRamppAdapter } else { '' } }
+$defaultRamppCheckpoint = Join-Path $RamppDir 'pretrained\ram_plus_swin_large_14m.pth'
+$env:RAMPP_CHECKPOINT = if ($env:RAMPP_CHECKPOINT) { $env:RAMPP_CHECKPOINT } else { if (Test-Path -LiteralPath $defaultRamppCheckpoint) { $defaultRamppCheckpoint } else { '' } }
 $env:RAMPP_MODE = if ($env:RAMPP_MODE) { $env:RAMPP_MODE } else { if ($EnableRampp) { 'script' } else { 'stub' } }
 $env:RAMPP_MODEL_NAME = if ($env:RAMPP_MODEL_NAME) { $env:RAMPP_MODEL_NAME } else { 'ram-plus' }
 $p2000Index = $null
@@ -203,7 +205,8 @@ $env:RAMPP_CUDA_DEVICE = if ($env:RAMPP_CUDA_DEVICE) { $env:RAMPP_CUDA_DEVICE } 
 if ($Preset -eq 'RTX3090' -and -not $env:LVFACE_CUDA_VISIBLE_DEVICES) {
     Write-Warning "Could not auto-resolve a P2000 GPU index for LVFace; set LVFACE_CUDA_VISIBLE_DEVICES manually if needed."
 }
-$env:RAMPP_ALLOW_STUB_FALLBACK = if ($env:RAMPP_ALLOW_STUB_FALLBACK) { $env:RAMPP_ALLOW_STUB_FALLBACK } else { 'true' }
+$hasRamppCheckpoint = ($env:RAMPP_CHECKPOINT -and (Test-Path -LiteralPath $env:RAMPP_CHECKPOINT))
+$env:RAMPP_ALLOW_STUB_FALLBACK = if ($env:RAMPP_ALLOW_STUB_FALLBACK) { $env:RAMPP_ALLOW_STUB_FALLBACK } else { if ($hasRamppCheckpoint) { 'false' } else { 'true' } }
 $env:ENABLE_INLINE_WORKER = 'true'
 
 # Voice proxy defaults (only set if not already present)
@@ -267,7 +270,7 @@ Write-Host "Face provider: $($env:FACE_EMBED_PROVIDER) device=$($env:EMBED_DEVIC
 Write-Host "Face detector: $($env:FACE_DETECT_PROVIDER)" -ForegroundColor DarkCyan
 Write-Host "Caption: $($env:CAPTION_EXTERNAL_DIR) (provider: $($env:CAPTION_PROVIDER)) device=$($env:CAPTION_DEVICE)" -ForegroundColor DarkCyan
 Write-Host "Image tags: provider=$($env:IMAGE_TAG_PROVIDER) url=$($env:IMAGE_TAG_SERVICE_URL) auto_enable=$($env:IMAGE_TAG_AUTO_ENABLE) auto_enqueue=$($env:IMAGE_TAG_AUTO_ENQUEUE)" -ForegroundColor DarkCyan
-Write-Host "RAM++: mode=$($env:RAMPP_MODE) device=$($env:RAMPP_CUDA_DEVICE) (torch index) fallback=$($env:RAMPP_ALLOW_STUB_FALLBACK) python=$($env:RAMPP_PYTHON_EXE) script=$($env:RAMPP_TAG_SCRIPT)" -ForegroundColor DarkCyan
+Write-Host "RAM++: mode=$($env:RAMPP_MODE) device=$($env:RAMPP_CUDA_DEVICE) (torch index) fallback=$($env:RAMPP_ALLOW_STUB_FALLBACK) python=$($env:RAMPP_PYTHON_EXE) script=$($env:RAMPP_TAG_SCRIPT) checkpoint=$($env:RAMPP_CHECKPOINT)" -ForegroundColor DarkCyan
 Write-Host "Backend Python: $pyExe" -ForegroundColor DarkCyan
 
 # Database configuration (optional relocation)
@@ -410,8 +413,10 @@ function Start-RAMPPPane {
         "  if (Test-Path '.\\.venv-rampp\\Scripts\\python.exe') { `$py = '.\\.venv-rampp\\Scripts\\python.exe' } elseif (`"$env:RAMPP_PYTHON_EXE`" -and (Test-Path `"$env:RAMPP_PYTHON_EXE`")) { `$py = `"$env:RAMPP_PYTHON_EXE`" } else { `$py = 'python' }",
         "  `$env:RAMPP_PYTHON_EXE = `$py",
         "  if (-not `$env:RAMPP_TAG_SCRIPT) { `$env:RAMPP_TAG_SCRIPT = (Join-Path (Get-Location).Path 'adapter_rampp.py') }",
+        "  if (-not `$env:RAMPP_CHECKPOINT) { `$ck = Join-Path (Get-Location).Path 'pretrained\\ram_plus_swin_large_14m.pth'; if (Test-Path `$ck) { `$env:RAMPP_CHECKPOINT = `$ck } }",
         "  if (-not `$env:RAMPP_MODE) { `$env:RAMPP_MODE = 'script' }",
         "  if (-not `$env:RAMPP_CUDA_DEVICE) { `$env:RAMPP_CUDA_DEVICE = '1' }",
+        "  if (-not `$env:RAMPP_ALLOW_STUB_FALLBACK) { `$env:RAMPP_ALLOW_STUB_FALLBACK = if (`$env:RAMPP_CHECKPOINT -and (Test-Path `$env:RAMPP_CHECKPOINT)) { 'false' } else { 'true' } }",
         "  Write-Host `"Starting RAM++ tag service on port $RamppPort (mode=`$env:RAMPP_MODE, cuda=`$env:RAMPP_CUDA_DEVICE)...`" -ForegroundColor Cyan",
         "  & `$py -m uvicorn service:app --host 127.0.0.1 --port $RamppPort --reload",
         "} else {",

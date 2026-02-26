@@ -8,6 +8,7 @@ deploy/env
 model-cache/
 .qdrant/
 *.pt
+*.pth
 *.onnx
 *.jpg
 *.png
@@ -48,6 +49,7 @@ htmlcov/
 Thumbs.db
 .DS_Store
 models/
+rampp/pretrained/
 assets/
 **/embeddings/
 **/face_embeddings/
