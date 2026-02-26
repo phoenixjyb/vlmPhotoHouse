@@ -1,6 +1,6 @@
 # Claude Handoff - 2026-02-26
 
-Last updated: 2026-02-27 (end of 2026-02-26 session)
+Last updated: 2026-02-27 (final)
 Owner context: yanbo / vlmPhotoHouse
 
 ## 1) Quick Status
@@ -12,13 +12,13 @@ Owner context: yanbo / vlmPhotoHouse
 - API: `http://127.0.0.1:8002`
 - Caption server: `http://127.0.0.1:8102`
 
-Live DB snapshot (end of session):
+Live DB snapshot (final):
 - assets: `12336` (images `9979`, videos `2357`)
-- captions: ~22,700+ (draining — 5860 pending caption tasks remain)
+- captions: draining — ~5608 pending caption tasks remain
 - face detections: `15979`
-- face assigned: `9834` (was 9591 at session start → +243)
-- face unassigned: `6144` (was 6387 → -243)
-- queue pending: `~5860` (all `caption`)
+- face assigned: `10371` (was 9591 at session start → +780)
+- face unassigned: `5608` (was 6387 → -779)
+- queue pending: `~5608` (all `caption`)
 - queue running: `4` (all `caption`)
 
 ## 2) What Was Completed This Session
@@ -39,20 +39,23 @@ Live DB snapshot (end of session):
 - Added `dim` property to `LVFaceSubprocessProvider` (health now reports embed_dim).
 - Wired `_subprocess_env()` into `subprocess.run()` (was missing).
 
-### 2d) Face Auto-Assignment (243 new)
-Two-phase conservative pass against manual ground truth:
+### 2d) Face Auto-Assignment (779 new total)
+Multi-phase pass against manual ground truth. Total: 6387 → 5608 unassigned.
 
-**Phase 1** (core persons, high confidence):
-- threshold=0.35, margin=0.08, min_ref_faces=10
-- Persons: jane, jane_newborn, yanbo, chuan, meiying, zhiqiang, yixia
-- Result: 220 assigned
-- Distribution: chuan=43, jane=18, jane_newborn=41, meiying=17, yanbo=49, yixia=38, zhiqiang=14
+**Phase 1** — threshold=0.35, margin=0.08, min_ref_faces=10, core 7 persons → **220 assigned**
+- chuan=43, jane=18, jane_newborn=41, meiying=17, yanbo=49, yixia=38, zhiqiang=14
 
-**Phase 2** (guansuo, tight threshold):
-- threshold=0.42, margin=0.10, min_ref_faces=5
-- Result: 23 assigned
+**Phase 2** — threshold=0.42, margin=0.10, guansuo (5 refs) → **23 assigned**
 
-**Skipped** (too few refs, high false positive risk): caoyujia (2 refs), mumu (4 refs), yinzhi (2 refs)
+**Phase 3** — threshold=0.30, margin=0.05, min_ref_faces=10, core 7 persons → **392 assigned**
+- jane=209, chuan=60, jane_newborn=52, yanbo=27, yixia=20, zhiqiang=13, meiying=11
+
+**Phase 4** — threshold=0.38, margin=0.08, guansuo → **110 assigned**
+
+**Final per-person totals (face_count after session):**
+jane=2334, jane_newborn=4238, chuan=1142, yanbo=982, yixia=496, meiying=482, zhiqiang=344, guansuo=303
+
+**Skipped** (too few refs, high FP risk): caoyujia (2 refs), mumu (4 refs), yinzhi (2 refs)
 
 ### 2e) Committed & Documented
 - Commit `8d7f916`: all session fixes + CLAUDE.md created
