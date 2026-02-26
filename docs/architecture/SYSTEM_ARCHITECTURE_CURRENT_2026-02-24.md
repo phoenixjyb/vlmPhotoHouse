@@ -107,6 +107,10 @@ Provider layer:
 - Auto-tag entry points:
   - caption generation path in `backend/app/tasks.py`
   - batch backfill command `captions-tags-backfill` in `backend/app/cli.py`
+- Optional image-tagging path (RAM++ style) is available via HTTP provider integration:
+  - provider module: `backend/app/image_tag_service.py`
+  - worker task: `image_tag` in `backend/app/tasks.py`
+  - enqueue command: `image-tags-backfill` in `backend/app/cli.py`
 - Per-asset auto-tag suppression is supported:
   - `DELETE /assets/{asset_id}/tags` can remove tags and block re-add for auto-tagging.
   - Blocked tag IDs are persisted in `asset_tag_blocks`; manual add unblocks.
@@ -152,6 +156,7 @@ Provider layer:
 - `video_segments`: scene/time segments and segment embeddings.
 - `tags`, `asset_tags`: tagging catalog and asset links.
 - `asset_tag_blocks`: per-asset blocked auto tags (prevents removed auto tags from coming back).
+- `asset_tags` now tracks provenance fields (`source`, `score`, `model`) for source-aware search/debug.
 - `face_assignment_events`: assignment audit history (manual/dnn/system).
 
 ## 7) UI Architecture
@@ -180,6 +185,10 @@ Face detection providers:
 Caption providers:
 - `stub`, `http`, `blip2`, `llava`, `qwen2.5-vl`, `qwen3-vl`, `qwen3`, `auto`
 - External subprocess path supported when `CAPTION_EXTERNAL_DIR` is set.
+
+Image tag providers:
+- `stub`, `http`, `auto` (`IMAGE_TAG_PROVIDER`)
+- RAM++ scaffold service path defaults to `http://127.0.0.1:8112` when enabled.
 
 Voice:
 - Backend proxies to external LLMyTranslate endpoints under `/voice/*`.

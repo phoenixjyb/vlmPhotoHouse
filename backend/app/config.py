@@ -68,6 +68,11 @@ class Settings(BaseModel):
     caption_model: str = Field(default=os.getenv('CAPTION_MODEL', 'auto'))  # model name override
     caption_external_dir: str = Field(default=os.getenv('CAPTION_EXTERNAL_DIR', ''))  # Path to external caption models installation
     caption_service_url: str = Field(default=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102'))  # HTTP caption service URL
+    image_tag_provider: str = Field(default=os.getenv('IMAGE_TAG_PROVIDER', 'stub'))  # stub|http|auto
+    image_tag_service_url: str = Field(default=os.getenv('IMAGE_TAG_SERVICE_URL', 'http://127.0.0.1:8112'))
+    image_tag_model: str = Field(default=os.getenv('IMAGE_TAG_MODEL', 'ram-plus'))
+    image_tag_auto_enable: bool = Field(default=os.getenv('IMAGE_TAG_AUTO_ENABLE', 'false').lower()=='true')
+    image_tag_auto_enqueue: bool = Field(default=os.getenv('IMAGE_TAG_AUTO_ENQUEUE', 'false').lower()=='true')
     worker_concurrency: int = Field(default=int(os.getenv('WORKER_CONCURRENCY','1')))
     max_task_retries: int = Field(default=int(os.getenv('MAX_TASK_RETRIES','3')))
     # Backoff configuration (supports legacy env var synonyms)
@@ -145,6 +150,11 @@ def get_settings() -> Settings:
         caption_model=os.getenv('CAPTION_MODEL', 'auto'),
         caption_external_dir=os.getenv('CAPTION_EXTERNAL_DIR', ''),
         caption_service_url=os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102'),
+        image_tag_provider=os.getenv('IMAGE_TAG_PROVIDER', 'stub'),
+        image_tag_service_url=os.getenv('IMAGE_TAG_SERVICE_URL', 'http://127.0.0.1:8112'),
+        image_tag_model=os.getenv('IMAGE_TAG_MODEL', 'ram-plus'),
+        image_tag_auto_enable=os.getenv('IMAGE_TAG_AUTO_ENABLE', 'false').lower()=='true',
+        image_tag_auto_enqueue=os.getenv('IMAGE_TAG_AUTO_ENQUEUE', 'false').lower()=='true',
         worker_concurrency=int(os.getenv('WORKER_CONCURRENCY','1')),
         max_task_retries=int(os.getenv('MAX_TASK_RETRIES','3')),
     retry_backoff_base_seconds=float(os.getenv('RETRY_BACKOFF_BASE_SECONDS', os.getenv('RETRY_BACKOFF_BASE','2.0'))),

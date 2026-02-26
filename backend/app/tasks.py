@@ -169,6 +169,8 @@ class TaskExecutor:
                     self._handle_person_label_propagate(session, task)
                 elif task.type == 'dim_backfill':
                     self._handle_dim_backfill(session, task)
+                elif task.type == 'image_tag':
+                    self._handle_image_tag(session, task)
             except Exception as exc:
                 task.state = 'failed'
                 task.last_error = str(exc)[:4000]
@@ -389,12 +391,20 @@ class TaskExecutor:
                             for c in candidates
                             if str(c.get('name') or '').strip()
                         }
+                        score_by_name = {
+                            str(c.get('name') or '').strip(): float(c.get('score') or 0.0)
+                            for c in candidates
+                            if str(c.get('name') or '').strip()
+                        }
                         upsert_asset_tags(
                             session,
                             asset_id=asset_id,
                             names=tag_names,
                             tag_type=auto_tag_type,
                             name_types=name_types,
+                            source='cap',
+                            source_model=model_name,
+                            score_by_name=score_by_name,
                         )
             except Exception:
                 logger.warning("Auto-tag derivation failed for asset_id=%s", asset_id, exc_info=True)
@@ -409,6 +419,78 @@ class TaskExecutor:
         except Exception:
             session.rollback()
         return cap
+
+    def _handle_image_tag(self, session: Session, task: Task):
+        payload = task.payload_json or {}
+        asset_id = payload.get('asset_id')
+        max_tags = int(payload.get('max_tags', os.getenv('IMAGE_TAG_MAX_TAGS', '8')) or 8)
+        if not asset_id:
+            raise ValueError('asset_id missing')
+        asset = session.get(Asset, asset_id)
+        if not asset:
+            raise ValueError('asset missing')
+        if bool(asset.mime and str(asset.mime).lower().startswith('video/')):
+            return []
+        src = Path(asset.path)
+        if not src.exists():
+            raise FileNotFoundError(src)
+
+        image_tag_enabled = str(os.getenv('IMAGE_TAG_AUTO_ENABLE', str(getattr(self.settings, 'image_tag_auto_enable', False)))).lower() in ('1', 'true', 'yes')
+        if not image_tag_enabled:
+            return []
+
+        from .image_tag_service import get_image_tag_provider
+        from .tagging import extract_caption_tag_candidates, upsert_asset_tags
+
+        provider = get_image_tag_provider()
+        with Image.open(src) as im_raw:
+            im = safe_exif_transpose(im_raw).convert('RGB')
+            raw = provider.generate_tags(im, max_tags=max(1, max_tags))
+        if not raw:
+            return []
+
+        raw_names = [str(x.get('name') or '').strip() for x in raw if isinstance(x, dict)]
+        raw_names = [x for x in raw_names if x]
+        if not raw_names:
+            return []
+        raw_scores = {
+            str(x.get('name') or '').strip(): float(x.get('score') or 0.0)
+            for x in raw
+            if isinstance(x, dict) and str(x.get('name') or '').strip()
+        }
+
+        candidates = extract_caption_tag_candidates(' '.join(raw_names), max_tags=max(1, max_tags))
+        if candidates:
+            tag_names = [str(c.get('name') or '').strip() for c in candidates if str(c.get('name') or '').strip()]
+            name_types = {
+                str(c.get('name') or '').strip(): str(c.get('type') or 'caption-auto').strip()
+                for c in candidates
+                if str(c.get('name') or '').strip()
+            }
+            score_by_name = {
+                str(c.get('name') or '').strip(): float(c.get('score') or 0.0)
+                for c in candidates
+                if str(c.get('name') or '').strip()
+            }
+        else:
+            tag_names = raw_names[: max(1, max_tags)]
+            name_types = {nm: 'caption-auto' for nm in tag_names}
+            score_by_name = {nm: float(raw_scores.get(nm, 0.0)) for nm in tag_names}
+
+        if not tag_names:
+            return []
+        added = upsert_asset_tags(
+            session,
+            asset_id=int(asset_id),
+            names=tag_names,
+            tag_type='caption-auto',
+            name_types=name_types,
+            source='img',
+            source_model=provider.get_model_name(),
+            score_by_name=score_by_name,
+        )
+        session.commit()
+        return added
 
     @staticmethod
     def _truncate_caption_text(text: str, word_limit: int) -> str:

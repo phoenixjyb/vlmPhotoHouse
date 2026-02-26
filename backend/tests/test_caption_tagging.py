@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.db import Asset, AssetTagBlock
+from app.db import Asset, AssetTag, AssetTagBlock, Tag
 from app.main import SessionLocal
 from app.tagging import extract_caption_tag_candidates, upsert_asset_tags
 
@@ -67,3 +67,41 @@ def test_remove_tag_blocks_auto_readd_and_manual_add_unblocks(client, temp_env_r
 
     names_final = [t["name"] for t in client.get(f"/assets/{asset_id}/tags").json()["tags"]]
     assert "ball pit" in names_final
+
+
+def test_upsert_asset_tags_merges_cap_and_img_sources(temp_env_root):
+    asset_path = str(Path(temp_env_root["originals"]) / "tag_source_merge_asset.jpg")
+    with SessionLocal() as session:
+        asset = Asset(path=asset_path, hash_sha256="c" * 64, mime="image/jpeg")
+        session.add(asset)
+        session.commit()
+        asset_id = int(asset.id)
+
+        upsert_asset_tags(
+            session,
+            asset_id=asset_id,
+            names=["stroller"],
+            tag_type="object",
+            source="cap",
+            source_model="http-qwen-vl",
+            score_by_name={"stroller": 0.61},
+        )
+        session.commit()
+
+        upsert_asset_tags(
+            session,
+            asset_id=asset_id,
+            names=["stroller"],
+            tag_type="object",
+            source="img",
+            source_model="ram-plus",
+            score_by_name={"stroller": 0.84},
+        )
+        session.commit()
+
+        tag = session.query(Tag).filter(Tag.name == "stroller").first()
+        assert tag is not None
+        link = session.query(AssetTag).filter(AssetTag.asset_id == asset_id, AssetTag.tag_id == tag.id).first()
+        assert link is not None
+        assert link.source == "cap+img"
+        assert float(link.score or 0.0) >= 0.84

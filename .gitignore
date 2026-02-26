@@ -26,6 +26,7 @@ backend/.coverage
 backend/coverage.xml
 /.pytest_cache/
 /.venv/
+**/.venv-rampp/
 /venv/
 /ENV/
 /env/

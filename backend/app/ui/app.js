@@ -1125,16 +1125,19 @@ function renderTags(tags) {
     return;
   }
   root.innerHTML = tags
-    .map(
-      (tag) => `
+    .map((tag) => {
+      const meta = [tag.source, tag.model, typeof tag.score === "number" ? `score=${Number(tag.score).toFixed(3)}` : ""]
+        .filter((v) => String(v || "").trim())
+        .join(" | ");
+      return `
         <span class="tag-chip">
-          <span>${esc(tag.name)}</span>
+          <span title="${esc(meta)}">${esc(tag.name)}${tag.source ? `<span class="tag-chip-meta">${esc(tag.source)}</span>` : ""}</span>
           <button class="tag-chip-remove" type="button" data-action="remove-tag" data-tag-id="${Number(tag.id) || 0}" title="${esc(
             t("remove_tag")
           )}" aria-label="${esc(t("remove_tag"))}">&times;</button>
         </span>
       `
-    )
+    })
     .join("");
 }
 

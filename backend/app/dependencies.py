@@ -131,6 +131,25 @@ def ensure_db():
                         conn.exec_driver_sql('ALTER TABLE face_detections ADD COLUMN label_score FLOAT')
                     except Exception:
                         pass
+        # Fallback for asset_tags provenance columns
+        if insp.has_table('asset_tags'):
+            tcols = {c['name'] for c in insp.get_columns('asset_tags')}
+            with engine.begin() as conn:
+                if 'source' not in tcols:
+                    try:
+                        conn.exec_driver_sql('ALTER TABLE asset_tags ADD COLUMN source VARCHAR(16)')
+                    except Exception:
+                        pass
+                if 'score' not in tcols:
+                    try:
+                        conn.exec_driver_sql('ALTER TABLE asset_tags ADD COLUMN score FLOAT')
+                    except Exception:
+                        pass
+                if 'model' not in tcols:
+                    try:
+                        conn.exec_driver_sql('ALTER TABLE asset_tags ADD COLUMN model VARCHAR(64)')
+                    except Exception:
+                        pass
         # Create video_segments table if missing (SQLite)
         if not insp.has_table('video_segments'):
             try:

@@ -6,6 +6,7 @@ Local-first photo/video intelligence system with:
 - face detection + face embeddings + person assignment
 - multimodal captions (Qwen3-VL via local HTTP caption service)
 - caption-derived canonical tagging (`<=8` content tags) with per-asset auto-tag block support
+- optional RAM++ image tagging path with tag provenance (`cap|img|cap+img|manual|rule`)
 - bilingual web UI
 - SQLite-backed search and task orchestration
 
@@ -53,6 +54,7 @@ From repo root:
 This starts:
 - API + inline worker (`vlmPhotoHouse`)
 - caption server process (`vlmCaptionModels`, provider `qwen3-vl`)
+- RAM++ tag service scaffold (`vlmPhotoHouse/rampp`, optional, port `8112`)
 - optional voice pane (if available)
 
 ## Core Operations
@@ -64,6 +66,7 @@ From `backend/`:
 .\.venv\Scripts\python.exe -m app.cli ingest-status E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli captions-backfill --limit 0
 .\.venv\Scripts\python.exe -m app.cli captions-backfill-zh --apply --overwrite-existing-zh --timeout-sec 120
+.\.venv\Scripts\python.exe -m app.cli image-tags-backfill --apply --limit 0
 .\.venv\Scripts\python.exe -m app.cli gps-backfill --root E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --apply --reference-manual-only --include-dnn-assigned --limit 0
 ```
@@ -96,6 +99,7 @@ Tagging notes:
 - `captions-tags-backfill` and caption auto-tagging now map caption phrases to canonical tags with deterministic quotas (`<=8`).
 - Removing a tag from the asset inspector blocks auto re-add for that asset.
 - Manually adding the same tag again clears the block.
+- RAM++ image-tag path uses `rampp\.venv-rampp` and script mode (`RAMPP_MODE=script`) when available.
 
 Remove a tag and block auto re-add (example):
 

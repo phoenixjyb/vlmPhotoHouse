@@ -58,9 +58,11 @@ Clean stub captions, then backfill:
 & $py -m app.cli captions-clean-stubs --root E:\01_INCOMING --apply
 & $py -m app.cli captions-backfill --profile balanced --max-variants 1 --limit 0
 & $py -m app.cli captions-tags-backfill --root E:\01_INCOMING --max-tags 8 --apply
+& $py -m app.cli image-tags-backfill --root E:\01_INCOMING --max-tags 8 --apply
 ```
 
 Tag extraction is canonical and capped (`<=8`), and removed auto tags can be blocked per asset.
+When RAM++ image tagging is enabled, tag source metadata is persisted (`cap`, `img`, `cap+img`, `manual`, `rule`).
 
 ### 2.1) Manual tag remove/block (API)
 

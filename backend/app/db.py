@@ -167,6 +167,9 @@ class AssetTag(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     asset_id: Mapped[int] = mapped_column(ForeignKey('assets.id', ondelete='CASCADE'), index=True, nullable=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id', ondelete='CASCADE'), index=True, nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)  # cap|img|cap+img|manual|rule
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    model: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     Index('idx_asset_tag_unique', asset_id, tag_id, unique=True)
 

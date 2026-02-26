@@ -1,0 +1,7 @@
+# Optional runtime dependencies for real RAM++ inference.
+# Install these in .venv-rampp after base requirements.
+
+numpy>=1.24
+torch
+torchvision
+torchaudio

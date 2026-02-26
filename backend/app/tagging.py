@@ -297,12 +297,45 @@ def extract_caption_tags(text: str, max_tags: int = 8) -> list[str]:
     return [str(x["name"]) for x in extract_caption_tag_candidates(text=text, max_tags=max_tags)]
 
 
+_TAG_SOURCE_VALUES = {"cap", "img", "cap+img", "manual", "rule"}
+
+
+def _normalize_source(raw: str | None) -> str | None:
+    val = _normalize_tag(raw or "").lower()
+    if not val:
+        return None
+    return val if val in _TAG_SOURCE_VALUES else None
+
+
+def _merge_sources(existing: str | None, incoming: str | None) -> str | None:
+    e = _normalize_source(existing)
+    i = _normalize_source(incoming)
+    if i is None:
+        return e
+    if i == "manual":
+        return "manual"
+    if e is None:
+        return i
+    if e == "manual":
+        return "manual"
+    if e == i:
+        return e
+    if "cap+img" in {e, i}:
+        return "cap+img"
+    if {e, i} == {"cap", "img"}:
+        return "cap+img"
+    return i
+
+
 def upsert_asset_tags(
     session: Session,
     asset_id: int,
     names: Iterable[str],
     tag_type: str = "caption-auto",
     name_types: dict[str, str] | None = None,
+    source: str | None = None,
+    source_model: str | None = None,
+    score_by_name: dict[str, float] | None = None,
 ) -> list[str]:
     """Insert missing tag rows and asset-tag links; return newly linked names."""
     normalized_types: dict[str, str] = {}
@@ -311,6 +344,17 @@ def upsert_asset_tags(
         clean_type = _normalize_tag(raw_type)[:32]
         if clean_name and clean_type:
             normalized_types[clean_name] = clean_type
+    normalized_scores: dict[str, float] = {}
+    for raw_name, raw_score in (score_by_name or {}).items():
+        clean_name = _normalize_tag(raw_name)
+        if not clean_name:
+            continue
+        try:
+            normalized_scores[clean_name] = float(raw_score)
+        except Exception:
+            continue
+    incoming_source = _normalize_source(source)
+    incoming_model = _normalize_tag(source_model or "")[:64] or None
 
     blocked_tag_ids = {
         int(tag_id)
@@ -342,6 +386,26 @@ def upsert_asset_tags(
             .first()
         )
         if exists is None:
-            session.add(AssetTag(asset_id=asset_id, tag_id=tag.id))
+            score_val = normalized_scores.get(clean)
+            session.add(
+                AssetTag(
+                    asset_id=asset_id,
+                    tag_id=tag.id,
+                    source=incoming_source,
+                    score=score_val,
+                    model=incoming_model,
+                )
+            )
             added.append(clean)
+            continue
+        merged_source = _merge_sources(getattr(exists, "source", None), incoming_source)
+        if merged_source and getattr(exists, "source", None) != merged_source:
+            exists.source = merged_source
+        if incoming_model:
+            exists.model = "cap+img" if merged_source == "cap+img" else incoming_model
+        if clean in normalized_scores:
+            score_val = normalized_scores[clean]
+            prev = getattr(exists, "score", None)
+            if prev is None or score_val > float(prev):
+                exists.score = score_val
     return added

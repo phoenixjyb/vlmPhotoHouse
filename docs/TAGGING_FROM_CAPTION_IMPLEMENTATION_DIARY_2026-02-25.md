@@ -112,3 +112,58 @@ Files included in that commit:
 ## Operational note
 
 During implementation, active captioning services/jobs were not intentionally stopped or restarted.
+
+## 2026-02-26 Verified Update
+
+This section reflects a direct code-level recheck after additional integration work.
+
+### Current implementation status (verified)
+
+- Canonical extraction entrypoint in active use:
+  - `extract_caption_tag_candidates(...)` in `backend/app/tagging.py`
+- Backward-compatible wrapper still present:
+  - `extract_caption_tags(...)` in `backend/app/tagging.py`
+- Upsert path includes source/model/score metadata and block checks:
+  - `upsert_asset_tags(...)` in `backend/app/tagging.py`
+
+### Runtime integration points (verified)
+
+- Caption worker auto-tag hook:
+  - `backend/app/tasks.py` (`_handle_caption`)
+  - env controls:
+    - `CAPTION_AUTO_TAG_ENABLE`
+    - `CAPTION_AUTO_TAG_MAX_TAGS`
+    - `CAPTION_AUTO_TAG_TYPE`
+- Image-tag fusion path:
+  - `backend/app/tasks.py` (`_handle_image_tag`)
+  - merges `cap` and `img` sources into `cap+img` where applicable.
+
+### CLI/API/UI status (verified)
+
+- Backfill command:
+  - `python -m app.cli captions-tags-backfill ...`
+  - implemented in `backend/app/cli.py`
+- Optional image-tag backfill queue:
+  - `python -m app.cli image-tags-backfill ...`
+  - implemented in `backend/app/cli.py`
+- Tag remove+block API:
+  - `DELETE /assets/{asset_id}/tags` in `backend/app/main.py`
+- Manual add unblocks previously blocked auto-tag:
+  - `POST /assets/{asset_id}/tags` in `backend/app/main.py`
+- UI remove action and refresh:
+  - `backend/app/ui/app.js` + `backend/app/ui/styles.css`
+
+### Data model status (verified)
+
+- `asset_tags` includes:
+  - `source`, `score`, `model`
+- `asset_tag_blocks` exists and is created for backward-compatible DBs by:
+  - `backend/app/dependencies.py`
+
+### Test coverage status (verified)
+
+- `backend/tests/test_caption_tagging.py` currently covers:
+  - canonical quota selection
+  - remove + block behavior
+  - manual re-add unblock behavior
+  - cap/img source merge behavior

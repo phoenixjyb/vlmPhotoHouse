@@ -1,10 +1,13 @@
 param(
     [string]$LvfaceDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace',
     [string]$CaptionDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\vlmCaptionModels',
+    [string]$RamppDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\vlmPhotoHouse\rampp',
     [string]$VoiceDir = 'C:\Users\yanbo\wSpace\llmytranslate',
     [string]$LvfaceModelName = '',
     [int]$ApiPort = 8002,
+    [int]$RamppPort = 8112,
     [int]$VoicePort = 8001,
+    [bool]$EnableRampp = $true,
     [string]$CaptionProvider = 'qwen3-vl',
     [string]$FaceProvider = 'lvface',
     [string]$DbPath = 'E:\VLM_DATA\databases\metadata.sqlite',
@@ -54,7 +57,8 @@ if (-not $NoCleanup) {
     # Clean up any processes using our target ports
     try {
         Write-Host "🔄 Checking for services on target ports..." -ForegroundColor Yellow
-        $portsToCheck = @($ApiPort, $VoicePort, 8000)  # Include common alternative ports
+        $portsToCheck = @($ApiPort, $VoicePort, 8000)
+        if ($EnableRampp) { $portsToCheck += @($RamppPort) }
         foreach ($port in $portsToCheck) {
             try {
                 $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
@@ -84,6 +88,14 @@ if ($UseWindowsTerminal -and $KillExisting) {
 
 Test-DirExists -Path $LvfaceDir -Name 'LVFaceDir'
 Test-DirExists -Path $CaptionDir -Name 'CaptionDir'
+if ($EnableRampp) {
+    if (Test-Path -LiteralPath $RamppDir) {
+        Write-Host "RAM++ dir detected: $RamppDir" -ForegroundColor DarkCyan
+    } else {
+        Write-Warning "RamppDir not found: $RamppDir. Disabling RAM++ startup for this run."
+        $EnableRampp = $false
+    }
+}
 if (Test-Path -LiteralPath $VoiceDir) {
     Write-Host "VoiceDir detected: $VoiceDir" -ForegroundColor DarkCyan
 } else {
@@ -145,6 +157,19 @@ $env:CAPTION_MODEL = 'auto'
 $env:QWEN2VL_MODEL_NAME = if ($env:QWEN2VL_MODEL_NAME) { $env:QWEN2VL_MODEL_NAME } else { 'Qwen/Qwen3-VL-8B-Instruct' }
 $env:QWEN2VL_LOAD_IN_4BIT = if ($env:QWEN2VL_LOAD_IN_4BIT) { $env:QWEN2VL_LOAD_IN_4BIT } else { 'true' }
 $env:QWEN2VL_4BIT_QUANT_TYPE = if ($env:QWEN2VL_4BIT_QUANT_TYPE) { $env:QWEN2VL_4BIT_QUANT_TYPE } else { 'nf4' }
+$env:IMAGE_TAG_PROVIDER = if ($EnableRampp) { 'http' } else { if ($env:IMAGE_TAG_PROVIDER) { $env:IMAGE_TAG_PROVIDER } else { 'stub' } }
+$env:IMAGE_TAG_SERVICE_URL = if ($EnableRampp) { "http://127.0.0.1:$RamppPort" } else { if ($env:IMAGE_TAG_SERVICE_URL) { $env:IMAGE_TAG_SERVICE_URL } else { "http://127.0.0.1:$RamppPort" } }
+$env:IMAGE_TAG_MODEL = if ($env:IMAGE_TAG_MODEL) { $env:IMAGE_TAG_MODEL } else { 'ram-plus' }
+$env:IMAGE_TAG_AUTO_ENABLE = if ($EnableRampp) { 'true' } else { if ($env:IMAGE_TAG_AUTO_ENABLE) { $env:IMAGE_TAG_AUTO_ENABLE } else { 'false' } }
+$env:IMAGE_TAG_AUTO_ENQUEUE = if ($EnableRampp) { 'true' } else { if ($env:IMAGE_TAG_AUTO_ENQUEUE) { $env:IMAGE_TAG_AUTO_ENQUEUE } else { 'false' } }
+$ramppVenvPy = Join-Path $RamppDir '.venv-rampp\Scripts\python.exe'
+$env:RAMPP_PYTHON_EXE = if ($env:RAMPP_PYTHON_EXE) { $env:RAMPP_PYTHON_EXE } else { if (Test-Path -LiteralPath $ramppVenvPy) { $ramppVenvPy } else { '' } }
+$defaultRamppAdapter = Join-Path $RamppDir 'adapter_rampp.py'
+$env:RAMPP_TAG_SCRIPT = if ($env:RAMPP_TAG_SCRIPT) { $env:RAMPP_TAG_SCRIPT } else { if (Test-Path -LiteralPath $defaultRamppAdapter) { $defaultRamppAdapter } else { '' } }
+$env:RAMPP_MODE = if ($env:RAMPP_MODE) { $env:RAMPP_MODE } else { if ($EnableRampp) { 'script' } else { 'stub' } }
+$env:RAMPP_MODEL_NAME = if ($env:RAMPP_MODEL_NAME) { $env:RAMPP_MODEL_NAME } else { 'ram-plus' }
+$env:RAMPP_CUDA_DEVICE = if ($env:RAMPP_CUDA_DEVICE) { $env:RAMPP_CUDA_DEVICE } else { '1' }  # PyTorch index on this host: 1 => P2000
+$env:RAMPP_ALLOW_STUB_FALLBACK = if ($env:RAMPP_ALLOW_STUB_FALLBACK) { $env:RAMPP_ALLOW_STUB_FALLBACK } else { 'true' }
 $env:ENABLE_INLINE_WORKER = 'true'
 
 # Voice proxy defaults (only set if not already present)
@@ -206,6 +231,8 @@ if ($Preset) {
 Write-Host "Face provider: $($env:FACE_EMBED_PROVIDER) device=$($env:EMBED_DEVICE)" -ForegroundColor DarkCyan
 Write-Host "Face detector: $($env:FACE_DETECT_PROVIDER)" -ForegroundColor DarkCyan
 Write-Host "Caption: $($env:CAPTION_EXTERNAL_DIR) (provider: $($env:CAPTION_PROVIDER)) device=$($env:CAPTION_DEVICE)" -ForegroundColor DarkCyan
+Write-Host "Image tags: provider=$($env:IMAGE_TAG_PROVIDER) url=$($env:IMAGE_TAG_SERVICE_URL) auto_enable=$($env:IMAGE_TAG_AUTO_ENABLE) auto_enqueue=$($env:IMAGE_TAG_AUTO_ENQUEUE)" -ForegroundColor DarkCyan
+Write-Host "RAM++: mode=$($env:RAMPP_MODE) device=$($env:RAMPP_CUDA_DEVICE) (torch index) fallback=$($env:RAMPP_ALLOW_STUB_FALLBACK) python=$($env:RAMPP_PYTHON_EXE) script=$($env:RAMPP_TAG_SCRIPT)" -ForegroundColor DarkCyan
 Write-Host "Backend Python: $pyExe" -ForegroundColor DarkCyan
 
 # Database configuration (optional relocation)
@@ -268,8 +295,18 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "validate-caption exited with code $LASTEXITCODE. Continuing, but captions may fall back to stub."
     }
+    if ($EnableRampp) {
+        & $pyExe -m app.cli validate-image-tag
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "validate-image-tag exited with code $LASTEXITCODE. Continuing, but image tags may fall back to stub."
+        }
+    }
     # Warm up providers (loads models)
-    & $pyExe -m app.cli warmup
+    if ($EnableRampp) {
+        & $pyExe -m app.cli warmup --do-image-tag
+    } else {
+        & $pyExe -m app.cli warmup
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "warmup exited with code $LASTEXITCODE."
     }
@@ -328,6 +365,34 @@ function Start-CaptionShell {
     }
 }
 
+function Start-RAMPPPane {
+    if (-not $EnableRampp) { return $null }
+    $activate = ".venv-rampp\\Scripts\\Activate.ps1"
+    $content = @(
+        "Set-Location -LiteralPath `"$RamppDir`"",
+        "if (Test-Path `"$activate`") { . `"$activate`" } else { Write-Warning `"$activate not found in $RamppDir`" }",
+        "if (Test-Path '.\\service.py') {",
+        "  if (Test-Path '.\\.venv-rampp\\Scripts\\python.exe') { `$py = '.\\.venv-rampp\\Scripts\\python.exe' } elseif (`"$env:RAMPP_PYTHON_EXE`" -and (Test-Path `"$env:RAMPP_PYTHON_EXE`")) { `$py = `"$env:RAMPP_PYTHON_EXE`" } else { `$py = 'python' }",
+        "  `$env:RAMPP_PYTHON_EXE = `$py",
+        "  if (-not `$env:RAMPP_TAG_SCRIPT) { `$env:RAMPP_TAG_SCRIPT = (Join-Path (Get-Location).Path 'adapter_rampp.py') }",
+        "  if (-not `$env:RAMPP_MODE) { `$env:RAMPP_MODE = 'script' }",
+        "  if (-not `$env:RAMPP_CUDA_DEVICE) { `$env:RAMPP_CUDA_DEVICE = '1' }",
+        "  Write-Host `"Starting RAM++ tag service on port $RamppPort (mode=`$env:RAMPP_MODE, cuda=`$env:RAMPP_CUDA_DEVICE)...`" -ForegroundColor Cyan",
+        "  & `$py -m uvicorn service:app --host 127.0.0.1 --port $RamppPort --reload",
+        "} else {",
+        "  Write-Warning `'service.py not found under RamppDir`'",
+        "}"
+    ) -join "`n"
+    $path = Join-Path $env:TEMP "rampp-pane-$PID.ps1"
+    Set-Content -LiteralPath $path -Value $content -Encoding UTF8
+    if ($UseWindowsTerminal) {
+        return @{ File = $path; Dir = $RamppDir }
+    } else {
+        Start-Process pwsh -ArgumentList @('-NoExit','-File', $path) -WorkingDirectory $RamppDir
+        return $null
+    }
+}
+
 function Start-VoicePane {
     # Use optimized ASR environment from workload-specific matrix
     $asrActivate = ".venv-asr-311\\Scripts\\Activate.ps1"
@@ -381,6 +446,7 @@ function Start-TTSPane {
 # Launch - 2x2 Grid Layout
 $apiSpec = Start-ApiTab
 $lvSpec = Start-LVFaceShell  
+$ramppSpec = Start-RAMPPPane
 $voiceSpec = Start-VoicePane
 $ttsSpec = Start-TTSPane
 
@@ -399,6 +465,12 @@ if ($UseWindowsTerminal) {
     )
     Write-Host "Executing Windows Terminal with args: $($wtArgs -join ' ')" -ForegroundColor Gray
     Start-Process wt -ArgumentList $wtArgs
+    if ($ramppSpec) {
+        $ramppArgs = @(
+            'new-tab', '--title', "`"RAM++ Tag Service`"", '-d', "`"$($ramppSpec.Dir)`"", 'pwsh', '-NoExit', '-File', "`"$($ramppSpec.File)`""
+        )
+        Start-Process wt -ArgumentList $ramppArgs
+    }
 }
 
 Write-Host "🎯 Launched 2x2 Grid Layout:" -ForegroundColor Green
@@ -406,6 +478,9 @@ Write-Host "  Top Left: VLM Photo Engine (port $ApiPort)" -ForegroundColor Cyan
 Write-Host "  Top Right: Voice Service ASR (port $VoicePort)" -ForegroundColor Cyan
 Write-Host "  Bottom Left: LVFace Environment" -ForegroundColor Cyan
 Write-Host "  Bottom Right: TTS Environment (RTX 3090)" -ForegroundColor Cyan
+if ($EnableRampp) {
+    Write-Host "  Extra Tab: RAM++ Tag Service (port $RamppPort)" -ForegroundColor Cyan
+}
 Write-Host "✅ All workload-specific optimized environments ready (RTX 3090 + CUDA 12.6/12.4)" -ForegroundColor Green
 Write-Host "🧹 Previous instances automatically cleaned up for fresh start" -ForegroundColor Gray
 Write-Host "Tip: Use -NoCleanup to skip automatic cleanup of existing instances." -ForegroundColor Yellow

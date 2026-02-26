@@ -666,8 +666,27 @@ def get_asset_tags(asset_id: int, db_s: Session = Depends(get_db)):
     a = db_s.get(Asset, asset_id)
     if not a:
         raise HTTPException(status_code=404, detail='Asset not found')
-    rows = db_s.query(Tag).join(AssetTag, AssetTag.tag_id==Tag.id).filter(AssetTag.asset_id==asset_id).all()
-    return {'asset_id': asset_id, 'tags': [{'id': t.id, 'name': t.name, 'type': t.type} for t in rows]}
+    rows = (
+        db_s.query(Tag, AssetTag)
+        .join(AssetTag, AssetTag.tag_id==Tag.id)
+        .filter(AssetTag.asset_id==asset_id)
+        .order_by(AssetTag.id.asc())
+        .all()
+    )
+    return {
+        'asset_id': asset_id,
+        'tags': [
+            {
+                'id': t.id,
+                'name': t.name,
+                'type': t.type,
+                'source': at.source,
+                'score': at.score,
+                'model': at.model,
+            }
+            for t, at in rows
+        ],
+    }
 
 @app.post('/assets/{asset_id}/tags')
 def add_asset_tags(asset_id: int, names: list[str] = Body(..., embed=True), tag_type: str | None = Body(None, embed=True), db_s: Session = Depends(get_db)):
@@ -693,9 +712,12 @@ def add_asset_tags(asset_id: int, names: list[str] = Body(..., embed=True), tag_
             db_s.delete(blocked)
         exists = db_s.query(AssetTag).filter(AssetTag.asset_id==asset_id, AssetTag.tag_id==t.id).first()
         if not exists:
-            at = AssetTag(asset_id=asset_id, tag_id=t.id)
+            at = AssetTag(asset_id=asset_id, tag_id=t.id, source='manual', model='manual')
             db_s.add(at)
             added.append(nm)
+        else:
+            exists.source = 'manual'
+            exists.model = 'manual'
     db_s.commit()
     return {'asset_id': asset_id, 'added': added}
 

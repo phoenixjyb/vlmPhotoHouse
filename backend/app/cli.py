@@ -760,8 +760,11 @@ def captions_tags_backfill(
 ) -> None:
     """Derive tags from captions and upsert them into asset_tags."""
     from pathlib import Path as _Path
+    from .dependencies import ensure_db
     from .db import Asset, Caption
     from .tagging import extract_caption_tag_candidates, upsert_asset_tags
+
+    ensure_db()
 
     src_filter = (source_model_contains or "").strip().lower()
     bad_texts = {
@@ -835,6 +838,11 @@ def captions_tags_backfill(
                 for x in derived_candidates
                 if str(x.get("name") or "").strip()
             }
+            score_by_name = {
+                str(x.get("name") or "").strip(): float(x.get("score") or 0.0)
+                for x in derived_candidates
+                if str(x.get("name") or "").strip()
+            }
             if apply:
                 added = upsert_asset_tags(
                     session,
@@ -842,6 +850,9 @@ def captions_tags_backfill(
                     names=derived,
                     tag_type=tag_type,
                     name_types=name_types,
+                    source='cap',
+                    source_model=source_cap.model,
+                    score_by_name=score_by_name,
                 )
                 if added:
                     assets_updated += 1
@@ -867,6 +878,91 @@ def captions_tags_backfill(
             f"no_tags={no_tags} assets_updated={assets_updated} links_added={links_added} "
             f"max_tags={max_tags} tag_type={tag_type} "
             f"source_model_contains={source_model_contains or '(any)'} root={root or '(all)'} limit={limit}"
+        )
+
+
+@app.command("image-tags-backfill")
+def image_tags_backfill(
+    root: Optional[str] = typer.Option(None, help="Optional asset path prefix filter (e.g. E:\\01_INCOMING)"),
+    limit: int = typer.Option(0, min=0, help="Max assets to scan (0 = all matching assets)"),
+    max_tags: int = typer.Option(8, min=1, max=32, help="Max derived tags per asset"),
+    only_missing_img: bool = typer.Option(True, help="Skip assets already containing img/cap+img tag links"),
+    apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
+    commit_every: int = typer.Option(200, min=20, max=5000, help="Commit cadence"),
+) -> None:
+    """Enqueue image-tag tasks (RAM++ HTTP path) for matching image assets."""
+    from pathlib import Path as _Path
+    from .dependencies import ensure_db
+    from .db import Asset, AssetTag, Task
+
+    ensure_db()
+
+    _, SessionLocal = _session_factory()
+    with SessionLocal() as session:
+        q = session.query(Asset.id, Asset.path, Asset.mime).order_by(Asset.id.asc())
+        if root:
+            prefix = str(_Path(root).resolve())
+            q = q.filter(Asset.path.like(prefix + "%"))
+
+        scanned = 0
+        skipped_video = 0
+        skipped_has_img = 0
+        skipped_pending = 0
+        enqueued = 0
+
+        for asset_id, _path, mime in q:
+            if limit and scanned >= limit:
+                break
+            scanned += 1
+            mm = str(mime or "").lower()
+            if mm.startswith("video/"):
+                skipped_video += 1
+                continue
+
+            if only_missing_img:
+                has_img = (
+                    session.query(AssetTag.id)
+                    .filter(AssetTag.asset_id == asset_id, AssetTag.source.in_(["img", "cap+img"]))
+                    .first()
+                )
+                if has_img:
+                    skipped_has_img += 1
+                    continue
+
+            existing_task = session.query(Task).filter(
+                Task.type == 'image_tag',
+                Task.state.in_(['pending', 'running']),
+                Task.payload_json['asset_id'].as_integer() == asset_id,
+            ).first()
+            if existing_task:
+                skipped_pending += 1
+                continue
+
+            if apply:
+                session.add(
+                    Task(
+                        type='image_tag',
+                        priority=115,
+                        payload_json={'asset_id': int(asset_id), 'max_tags': int(max_tags)},
+                    )
+                )
+            enqueued += 1
+
+            if apply and scanned % commit_every == 0:
+                session.commit()
+                typer.echo(
+                    f"progress scanned={scanned} enqueued={enqueued} skipped_has_img={skipped_has_img}"
+                )
+
+        if apply:
+            session.commit()
+
+        mode = "APPLY" if apply else "DRY-RUN"
+        typer.echo(f"image-tags-backfill ({mode})")
+        typer.echo(
+            f"scanned={scanned} enqueued={enqueued} skipped_video={skipped_video} "
+            f"skipped_has_img={skipped_has_img} skipped_pending={skipped_pending} "
+            f"max_tags={max_tags} only_missing_img={only_missing_img} root={root or '(all)'} limit={limit}"
         )
 
 
@@ -1363,10 +1459,34 @@ def validate_caption() -> None:
         raise typer.Exit(1)
 
 
+@app.command()
+def validate_image_tag(strict: bool = typer.Option(False, help="Exit non-zero if provider resolution fails")) -> None:
+    """Validate image tag provider wiring (RAM++ HTTP path)."""
+    from .config import get_settings
+    s = get_settings()
+    typer.echo(
+        f"Image-tag config: provider={getattr(s, 'image_tag_provider', 'stub')} "
+        f"url={getattr(s, 'image_tag_service_url', '')} "
+        f"model={getattr(s, 'image_tag_model', '')} "
+        f"auto_enable={bool(getattr(s, 'image_tag_auto_enable', False))}"
+    )
+    try:
+        from .image_tag_service import get_image_tag_provider
+        prov = get_image_tag_provider()
+        typer.secho(f"Image-tag provider OK: model={prov.get_model_name()}", fg=typer.colors.GREEN)
+    except Exception as e:
+        msg = f"Image-tag provider validation failed: {e}"
+        if strict:
+            typer.secho(msg, fg=typer.colors.RED)
+            raise typer.Exit(1)
+        typer.secho(msg, fg=typer.colors.YELLOW)
+
+
 @app.command("warmup")
 def warmup(
     do_face: bool = typer.Option(True, help="Warm up face embedding provider"),
     do_caption: bool = typer.Option(True, help="Warm up caption provider"),
+    do_image_tag: bool = typer.Option(False, help="Warm up image tagging provider"),
     repeats: int = typer.Option(1, min=1, max=3, help="How many dummy inferences to run per provider"),
 ):
     """Warm up configured providers (loads models and runs a tiny inference)."""
@@ -1406,6 +1526,24 @@ def warmup(
         except Exception as e:
             ok = False
             typer.secho(f"Caption warmup failed: {e}", fg=typer.colors.RED)
+    if do_image_tag:
+        try:
+            from .image_tag_service import get_image_tag_provider as _get_img_tag
+            prov = _get_img_tag()
+            img = _Image.new('RGB', (640, 360), color=(170, 190, 210))
+            t0 = _time.time()
+            last_tags = []
+            for _ in range(repeats):
+                last_tags = prov.generate_tags(img, max_tags=8)
+            t1 = _time.time()
+            preview = ', '.join(str(x.get('name') or '') for x in last_tags[:5] if isinstance(x, dict))
+            typer.secho(
+                f"Image-tag warmup OK: provider={prov.get_model_name()} time={(t1-t0):.2f}s tags='{preview}'",
+                fg=typer.colors.GREEN,
+            )
+        except Exception as e:
+            ok = False
+            typer.secho(f"Image-tag warmup failed: {e}", fg=typer.colors.RED)
     if not ok:
         raise typer.Exit(1)
 

@@ -429,6 +429,12 @@ textarea:focus {
   color: #a62626;
 }
 
+.tag-chip-meta {
+  margin-left: 0.32rem;
+  font-size: 0.7rem;
+  color: #4f7d6d;
+}
+
 .face-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

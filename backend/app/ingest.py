@@ -113,6 +113,10 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
                     Task(type='caption', priority=110, payload_json={'asset_id': asset.id}),
                     Task(type='face', priority=120, payload_json={'asset_id': asset.id}),
                 ])
+                if bool(getattr(settings, 'image_tag_auto_enqueue', False)):
+                    tasks_to_create.append(
+                        Task(type='image_tag', priority=115, payload_json={'asset_id': asset.id})
+                    )
             else:
                 # Minimal video pipeline: probe + keyframes + embed (all optional/no-op stubs for now)
                 if settings.video_enabled:
