@@ -1,119 +1,24 @@
 # Architecture Documentation
 
-This section contains the technical architecture documentation for the VLM Photo Engine.
+## Current Reference
 
-## 📋 Quick Reference
+**[SYSTEM_ARCHITECTURE_2026-02-27.md](./SYSTEM_ARCHITECTURE_2026-02-27.md)**
 
-### Current Snapshot (Use First)
-- **[System Architecture Snapshot (2026-02-24)](./SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** - Current as-running/as-coded architecture baseline
+This is the single authoritative architecture document. It covers:
+- Multi-project topology and why the stack is split this way
+- All AI components (LVFace, InsightFace/SCRFD, Qwen3-VL, RAM++, CLIP, LLMyTranslate)
+- Backend architecture (FastAPI, inline worker, task queue, provider pattern)
+- Frontend architecture (single-page vanilla JS)
+- Database model and provenance tracking
+- All pipeline flows (ingestion, captioning, face detection/recognition, tagging, search)
+- Hardware topology (RTX 3090 / Quadro P2000 assignment)
+- Startup topology and operational commands
+- Current status snapshot (2026-02-27)
+- Design rationale for every major choice
+- Known gaps and issues
 
-### Core Architecture
-- **[Architecture Snapshot](./SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md)** - Current system design document
-- **[Visual Architecture](./architecture-diagrams.md)** - Mermaid diagrams showing system flows
-- **[Data Model](./data-model.md)** - Database schema and relationships
+## Archive
 
-### AI Components
-- **[AI Components](./ai-components.md)** - AI model integration patterns
-- **[Face Recognition](./face-recognition.md)** - Face detection and recognition system
-- **[Captioning & Annotations](./captioning-and-annotations.md)** - Image captioning architecture
-
-### Data Processing
-- **[Ingestion Pipeline](./ingestion-pipeline.md)** - Photo ingestion and processing workflow
-- **[Embedding & Indexing](./embedding-and-indexing.md)** - Vector embedding and search indexing
-- **[Search & Ranking](./search-and-ranking.md)** - Search algorithms and ranking strategies
-- **[Task Queue & Workers](./tasks-queue-and-workers.md)** - Async task processing system
-
-### Infrastructure
-- **[Storage Strategy](./storage-strategy.md)** - File organization and caching
-- **[Hardware Architecture](./hardware-architecture.md)** - Hardware requirements and scaling
-
-### Visual References
-- **[Hardware Graph](./hardware-graph.mmd)** - Hardware component diagram
-- **[Navigation Flow](./navigation.mmd)** - User interface navigation flow
-
----
-
-## 🏗️ System Overview
-
-The VLM Photo Engine uses a **dual environment architecture**:
-
-### Backend Environment (`vlmPhotoHouse/.venv`)
-- FastAPI server on port 8002
-- Database operations (SQLite)
-- Task queue management
-- Health monitoring
-- API endpoints
-
-### Voice Integration (via external service)
-- Thin proxy endpoints under `/voice/*` in the backend
-- Proxies to LLMyTranslate (default: `http://127.0.0.1:8001`)
-- Env-configurable base URL and paths; proxy bypasses system proxies
-
-### External Models Environment (`vlmCaptionModels/.venv`)
-- AI model inference (Qwen3-VL default, Qwen2.5-VL compatibility, BLIP2 fallback)
-- Face recognition (LVFace, MTCNN)
-- 20.96 GB of local model storage
-- JSON IPC communication with backend
-
-### Key Architectural Principles
-1. **Local-First**: All processing happens on user hardware
-2. **Privacy-Preserving**: No data leaves the local system
-3. **Modular**: Pluggable AI model providers
-4. **Scalable**: From development to production deployment
-5. **Fast**: Sub-500ms search performance target
-
----
-
-## 🔄 Data Flow Summary
-
-```
-Photos → Scan → Hash → Metadata → Queue Tasks
-                                      ↓
-                            [Thumbnails, Embeddings, Captions, Faces]
-                                      ↓
-                              Vector Index + Search API
-```
-
----
-
-## 🧩 Provider Architecture
-
-The system uses a **pluggable provider pattern** for AI models:
-
-- **Caption Providers**: Qwen3-VL (default), Qwen2.5-VL (compatibility), BLIP2 (fallback)
-- **Face Providers**: LVFace, MTCNN, Facenet, InsightFace
-- **Health Monitoring**: Each provider has dedicated health endpoints
-- **IPC + HTTP**: Both subprocess JSON IPC and local HTTP caption service are supported
-
----
-
-## 📊 Current Implementation Status
-
-### ✅ Completed
-- Dual environment setup
-- Qwen3-VL caption generation over local HTTP
-- LVFace integration
-- Health monitoring framework
-- Multi-provider architecture
-
-### 🚧 In Progress
-- End-to-end photo ingestion
-- Vector search integration
-- Person album generation
-
-### 📋 Planned
-- Event detection
-- Theme-based albums
-- Advanced search ranking
-
----
-
-*For implementation details, see the individual architecture documents listed above.*
-
----
-
-## 🚀 Developer Experience
-
-- Windows Terminal multi-pane launcher starts API, LVFace, Caption, and Voice panes in one window
-- Standard ports: API 8002; Voice 8001 (overridable)
-- See Quick Start: [../quick-start-dev.md](../quick-start-dev.md)
+Older topic-specific documents (ai-components.md, face-recognition.md, data-model.md,
+hardware-architecture.md, etc.) and the previous SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md
+are preserved in `./archive/` for historical reference.
