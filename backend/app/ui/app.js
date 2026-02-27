@@ -953,11 +953,32 @@ async function openPersonAssetsFromLookup(lookup) {
   return true;
 }
 
+async function openPersonSearchByName(rawQuery) {
+  const q = normalizeVoicePersonName(rawQuery);
+  if (!q) return false;
+  let total = 0;
+  try {
+    const probe = await api(`/search/person/name/${encodeURIComponent(q)}?page=1&page_size=1`);
+    total = Number(probe?.total || 0);
+  } catch (_) {
+    total = 0;
+  }
+  if (total <= 0) return false;
+  setActiveTab("library");
+  qs("search-mode").value = "person";
+  qs("search-query").value = q;
+  qs("search-media").value = "all";
+  await runSearch(1, false);
+  showToast(t("voice_person_opened", { name: q, total }));
+  return true;
+}
+
 async function tryClientPersonAssetsFallback(text) {
   const q = extractVoicePersonAssetsQuery(text);
   if (!q) return false;
   const lookup = await lookupPersonByNameQuery(q);
   if (await openPersonAssetsFromLookup(lookup)) return true;
+  if (await openPersonSearchByName(lookup?.query || q)) return true;
   showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
   return true;
 }
@@ -982,6 +1003,7 @@ async function executeVoiceCommand(text) {
     const q = String(payload?.data?.query || "").trim() || extractVoicePersonAssetsQuery(text) || text;
     const lookup = await lookupPersonByNameQuery(q);
     if (await openPersonAssetsFromLookup(lookup)) return;
+    if (await openPersonSearchByName(lookup?.query || q)) return;
     showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
     return;
   }
