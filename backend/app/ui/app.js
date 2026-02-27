@@ -62,7 +62,14 @@ const I18N = {
   en: {
     app_title: "VLM Photo House",
     subtitle: "Faces, captions, videos, and search in one control surface.",
+    voice_chat: "Voice Chat",
     voice_command: "Voice Command",
+    voice_chat_recording: "Listening for chat...",
+    voice_chat_processing: "Talking to assistant...",
+    voice_chat_failed: "Voice chat failed: {error}",
+    voice_chat_no_reply: "Voice chat returned no reply",
+    voice_chat_reply_audio: "Assistant replied with audio",
+    voice_chat_reply_text: "Assistant: {text}",
     voice_recording: "Listening...",
     voice_processing: "Processing...",
     voice_not_supported: "Voice capture is not supported in this browser",
@@ -272,7 +279,14 @@ const I18N = {
   zh: {
     app_title: "VLM 照片屋",
     subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
+    voice_chat: "语音对话",
     voice_command: "语音命令",
+    voice_chat_recording: "正在聆听（对话）...",
+    voice_chat_processing: "正在对话处理中...",
+    voice_chat_failed: "语音对话失败: {error}",
+    voice_chat_no_reply: "语音对话未返回有效回复",
+    voice_chat_reply_audio: "助手已语音回复",
+    voice_chat_reply_text: "助手：{text}",
     voice_recording: "正在聆听...",
     voice_processing: "处理中...",
     voice_not_supported: "当前浏览器不支持语音采集",
@@ -1084,6 +1098,115 @@ async function runVoiceCommandCapture() {
     }
     state.voiceBusy = false;
     if (voiceBtn) voiceBtn.disabled = false;
+    setVoiceStatus("");
+  }
+}
+
+async function runVoiceConversationCapture() {
+  if (state.voiceBusy) return;
+  const voiceChatBtn = qs("btn-voice-chat");
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    showToast(t("voice_not_supported"));
+    return;
+  }
+  state.voiceBusy = true;
+  if (voiceChatBtn) voiceChatBtn.disabled = true;
+  let stream = null;
+  try {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
+    } catch (_) {
+      showToast(t("voice_denied"));
+      return;
+    }
+    setVoiceStatus(t("voice_chat_recording"));
+    const chunks = [];
+    const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    const chosenMime = mimeCandidates.find(
+      (m) => typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(m)
+    );
+    const recorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+    const stopped = new Promise((resolve, reject) => {
+      recorder.addEventListener("stop", resolve, { once: true });
+      recorder.addEventListener("error", (ev) => reject(ev?.error || new Error("recording error")), { once: true });
+    });
+    recorder.addEventListener("dataavailable", (ev) => {
+      if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+    });
+    recorder.start();
+    await new Promise((r) => window.setTimeout(r, 6000));
+    recorder.stop();
+    await stopped;
+
+    const blob = new Blob(chunks, { type: chunks[0]?.type || chosenMime || "audio/webm" });
+    if (!blob.size) {
+      showToast(t("voice_no_transcript"));
+      return;
+    }
+    setVoiceStatus(t("voice_chat_processing"));
+    const form = new FormData();
+    form.append("audio", blob, "voice-chat.webm");
+    form.append("language", state.lang === "zh" ? "zh" : "en");
+    form.append("voice", "default");
+    form.append("speed", "1.0");
+    form.append("tts_mode", "fast");
+
+    const res = await fetch("/voice/conversation", { method: "POST", body: form });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const ct = res.headers.get("content-type") || "";
+    if (ct.startsWith("audio/")) {
+      const outBlob = await res.blob();
+      const url = URL.createObjectURL(outBlob);
+      let el = qs("voice-chat-audio");
+      if (!el) {
+        el = document.createElement("audio");
+        el.id = "voice-chat-audio";
+        el.style.display = "none";
+        document.body.appendChild(el);
+      }
+      el.src = url;
+      try {
+        await el.play();
+      } catch (_) {}
+      showToast(t("voice_chat_reply_audio"));
+      return;
+    }
+
+    const j = await res.json().catch(() => null);
+    const textReply = String(j?.text_response || j?.text || "").trim();
+    if (textReply) {
+      const brief = textReply.length > 80 ? `${textReply.slice(0, 80)}...` : textReply;
+      showToast(t("voice_chat_reply_text", { text: brief }));
+      if ("speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance(textReply);
+        u.lang = state.lang === "zh" ? "zh-CN" : "en-US";
+        window.speechSynthesis.speak(u);
+      }
+      return;
+    }
+    const err = String(j?.error || "");
+    if (err) {
+      showToast(t("voice_chat_failed", { error: err }));
+      return;
+    }
+    showToast(t("voice_chat_no_reply"));
+  } catch (e) {
+    showToast(t("voice_chat_failed", { error: e.message }));
+  } finally {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    state.voiceBusy = false;
+    if (voiceChatBtn) voiceChatBtn.disabled = false;
     setVoiceStatus("");
   }
 }
@@ -2146,6 +2269,10 @@ function initEvents() {
   const voiceBtn = qs("btn-voice-command");
   if (voiceBtn) {
     voiceBtn.addEventListener("click", runVoiceCommandCapture);
+  }
+  const voiceChatBtn = qs("btn-voice-chat");
+  if (voiceChatBtn) {
+    voiceChatBtn.addEventListener("click", runVoiceConversationCapture);
   }
 
   qs("btn-search").addEventListener("click", () => runSearch(1, false));
