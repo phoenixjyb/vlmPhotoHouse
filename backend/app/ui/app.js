@@ -1869,13 +1869,14 @@ function renderFaces(faces) {
           : `<p class="small muted">${esc(t("label_none"))}</p>`;
         return `
         <article class="face-card">
-          <img src="/faces/${f.id}/crop?size=256" alt="face ${f.id}" />
+          <img src="/faces/${f.id}/crop?size=256" alt="face ${f.id}" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}" />
           <div class="face-body">
             <p class="small muted">${esc(t("face_prefix", { id: f.id }))}</p>
             ${sourceLine}
             <select id="face-person-${f.id}">${personOptions(f.person_id)}</select>
             <input id="face-new-name-${f.id}" type="text" placeholder="${esc(t("new_person_name_ph"))}" />
             <div class="controls">
+              <button class="btn ghost" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}">${esc(t("popup_open_asset"))}</button>
               <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">${esc(t("assign"))}</button>
               <button class="btn ghost" data-action="create-assign-face" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
               <button class="btn danger" data-action="delete-face" data-face-id="${f.id}">${esc(t("not_face"))}</button>
@@ -2039,12 +2040,13 @@ async function loadUnassignedFaces(page = 1) {
       .map(
         (f) => `
           <article class="face-card">
-            <img src="/faces/${f.id}/crop?size=256" alt="face ${f.id}" />
+            <img src="/faces/${f.id}/crop?size=256" alt="face ${f.id}" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}" />
             <div class="face-body">
               <p class="small muted">${esc(t("face_asset_prefix", { face: f.id, asset: f.asset_id }))}</p>
               <select id="face-person-unassigned-${f.id}">${personOptions(null)}</select>
               <input id="face-new-name-unassigned-${f.id}" type="text" placeholder="${esc(t("new_person_name_ph"))}" />
               <div class="controls">
+                <button class="btn ghost" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}">${esc(t("popup_open_asset"))}</button>
                 <button class="btn ghost" data-action="assign-face-unassigned" data-face-id="${f.id}">${esc(t("assign"))}</button>
                 <button class="btn ghost" data-action="create-assign-face-unassigned" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
                 <button class="btn danger" data-action="delete-face-unassigned" data-face-id="${f.id}">${esc(t("not_face"))}</button>
@@ -2228,6 +2230,15 @@ async function deleteFace(faceId) {
   });
 }
 
+async function openAssetFromFaceAssetId(assetId) {
+  const id = Number(assetId || 0);
+  if (!id) return;
+  const originTab = state.activeTab;
+  setActiveTab("library");
+  state.inspectorOriginTab = originTab;
+  await loadAssetInspector(id);
+}
+
 function initEvents() {
   document.querySelectorAll(".lang-btn").forEach((el) => {
     el.addEventListener("click", () => {
@@ -2400,8 +2411,12 @@ function initEvents() {
   });
 
   qs("face-list").addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-action]");
+    const btn = e.target.closest("[data-action]");
     if (!btn) return;
+    if (btn.dataset.action === "open-face-asset") {
+      await openAssetFromFaceAssetId(btn.dataset.assetId);
+      return;
+    }
     const faceId = Number(btn.dataset.faceId);
     if (!faceId) return;
     try {
@@ -2448,8 +2463,12 @@ function initEvents() {
   });
 
   qs("unassigned-faces").addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-action]");
+    const btn = e.target.closest("[data-action]");
     if (!btn) return;
+    if (btn.dataset.action === "open-face-asset") {
+      await openAssetFromFaceAssetId(btn.dataset.assetId);
+      return;
+    }
     const faceId = Number(btn.dataset.faceId);
     if (!faceId) return;
     try {

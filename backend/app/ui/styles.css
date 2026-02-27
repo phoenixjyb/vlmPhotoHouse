@@ -455,6 +455,10 @@ textarea:focus {
   background: #edf3f0;
 }
 
+.face-card img[data-action="open-face-asset"] {
+  cursor: pointer;
+}
+
 .face-body {
   padding: 0.42rem;
 }
