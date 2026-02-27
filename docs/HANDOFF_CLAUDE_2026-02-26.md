@@ -14,11 +14,11 @@ Owner context: yanbo / vlmPhotoHouse
 
 Live DB snapshot (final):
 - assets: `12336` (images `9979`, videos `2357`)
-- captions: draining — ~5017 pending caption tasks remain
+- captions: draining — ~4880 pending caption tasks remain
 - face detections: `15979`
-- face assigned: `10962` (was 9591 at session start → +1371)
-- face unassigned: `5017` (was 6387 → -1370)
-- queue pending: `~5017` (all `caption`)
+- face assigned: `11099` (was 9591 at session start → +1508)
+- face unassigned: `4880` (was 6387 → -1507)
+- queue pending: `~4880` (all `caption`)
 - queue running: `4` (all `caption`)
 
 ## 2) What Was Completed This Session
@@ -55,10 +55,17 @@ Multi-phase pass against manual ground truth. Total: 6387 → 5608 unassigned.
 **Phase 5** — threshold=0.27, margin=0.05, min_ref_faces=10, jane + chuan → **591 assigned**
 - jane=503, chuan=88
 
-**Final per-person totals (face_count after session):**
-jane=2837, jane_newborn=4238, chuan=1230, yanbo=982, yixia=496, meiying=482, zhiqiang=344, guansuo=303
+**Phase 6** — threshold=0.28, margin=0.05, yanbo (32 refs) → **39 assigned**
 
-**Skipped** (too few refs, high FP risk): caoyujia (2 refs), mumu (4 refs), yinzhi (2 refs)
+**Phase 7** — threshold=0.50, margin=0.12, min_ref_faces=2, all remaining persons with 2+ refs → **98 assigned**
+- caoyujia=43, caoyuxin=23, gaozhu=21, mumu=4, yinzhi=7
+
+**Final per-person totals (face_count after session):**
+jane_newborn=4238, jane=2838, chuan=1230, yanbo=1021, yixia=496, meiying=482, zhiqiang=344, guansuo=303
+caoyujia=46, caoyuxin=29, gaozhu=23, yinzhi=9, mumu=8, dave=8
+
+**All persons with ≥2 manual refs now fully utilised.**
+Remaining single-ref persons (yang, james, zengyinqing, shixianhai, zeze): cannot auto-assign safely from 1 ref.
 
 ### 2e) Committed & Documented
 - Commit `8d7f916`: all session fixes + CLAUDE.md created
