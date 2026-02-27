@@ -31,9 +31,10 @@
 - Smart album rule parser
 
 ## P6
-- Whisper integration for voice annotations
-- Album summarization prototype
-- Relevance feedback adjustments
+- Voice proxy hardening + endpoint contract tests (`/voice/transcribe`, `/voice/tts`, `/voice/conversation`) ✅
+- Voice command orchestrator read-only flows (`search/status/browse`, including person-photo intent) ✅
+- Safety/confirmation flow for mutating voice actions (rename, merge, tag add/remove, task enqueue) 📋
+- Voice-out summaries (bilingual EN/ZH) for search results and action confirmations 🔄
 
 ## Continuous
 - Improve test coverage

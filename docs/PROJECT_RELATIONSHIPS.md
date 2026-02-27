@@ -1,94 +1,103 @@
 # Project Relationships and Architecture
 
 ## Overview
-The VLM Photo House project is an AI-powered photo management system that integrates with the independent LLMyTranslate project to provide voice and speech capabilities.
+VLM Photo House is the orchestration and product surface; companion projects provide model/runtime capabilities.  
+This doc reflects the code-level integration currently present in `backend/app`.
 
-## Project Structure
+## Repositories and Responsibilities
 
-### VLM Photo House (Primary Project)
-- **Repository**: `vlm-photo-engine/vlmPhotoHouse`
-- **Purpose**: AI-powered photo management with computer vision and natural language processing
-- **Core Features**:
-  - Photo ingestion and indexing
-  - Face recognition and clustering
-  - Caption generation using vision-language models
-  - Vector search and semantic photo retrieval
-  - Person management and tagging
+### 1) `vlm-photo-engine/vlmPhotoHouse` (primary)
+- API, worker queue, SQLite metadata, Web UI, CLI.
+- Owns user-facing flows for ingest, search, people, tags, and task operations.
+- Key APIs include:
+  - Search: `/search`, `/search/smart`, `/search/captions`, `/search/tags`, `/search/vector`
+  - People/faces: `/persons/*`, `/faces/*`, `/search/person/*`
+  - Tags: `/tags`, `/tags/{tag_id}/assets`, `/assets/{id}/tags`
+  - Tasks/admin: `/tasks/*`, `/admin/tasks/*`
 
-### LLMyTranslate (Independent Service Provider)
-- **Repository**: `llmytranslate`
-- **Purpose**: Independent AI translation and voice processing service
-- **Relationship**: "Lends" ASR (Automatic Speech Recognition) and TTS (Text-to-Speech) services to VLM Photo House
-- **Services Provided**:
-  - Voice-to-text conversion (ASR)
-  - Text-to-speech synthesis (TTS)
-  - Language translation capabilities
+### 2) `vlmCaptionModels`
+- External caption service used by Photo House over HTTP.
+- Typical runtime endpoint from Photo House config: `CAPTION_SERVICE_URL=http://127.0.0.1:8102`.
 
-## Integration Architecture
+### 3) `LVFace`
+- External face embedding project used via subprocess integration.
+- Selected from Photo House provider config; execution remains controlled by Photo House.
 
-### Service Communication
-- **VLM Photo House** runs on port `8000` (main FastAPI service)
-- **LLMyTranslate ASR** runs on port `8001` (voice processing)
-- **LLMyTranslate TTS** runs on port `8002` (speech synthesis)
+### 4) `llmytranslate`
+- External voice runtime (ASR/TTS/conversation + streaming/phone-call features).
+- Consumed by Photo House through `/voice/*` proxy routes.
+- Uses local Ollama runtime for conversational LLM (`http://127.0.0.1:11434` by default).
 
-### Integration Points
-1. **Voice Photo Search**: Users can search photos using voice commands
-2. **Audio Feedback**: TTS provides spoken responses for photo search results
-3. **Accessibility**: Voice interface for hands-free photo management
+### 5) `vlmPhotoHouse/rampp` (in-repo service module)
+- In-repo RAM++ tag service and adapter (`rampp/service.py`, `rampp/adapter_rampp.py`).
+- Exposes HTTP tagging endpoint to backend image-tag provider (`IMAGE_TAG_SERVICE_URL`, default `http://127.0.0.1:8112`).
 
-### Environment Optimization
-Both projects use RTX 3090 GPU optimization:
-- **VLM Photo House**: CUDA 12.6 environment (Python 3.12.10, PyTorch 2.8.0+cu126)
-- **LLMyTranslate**: CUDA 12.4 environment (Python 3.11.9, PyTorch 2.6.0+cu124)
+## Runtime Topology (Current Defaults)
 
-## Development Workflow
+- Photo House API/UI: `http://127.0.0.1:8002`
+- LLMyTranslate: `http://127.0.0.1:8001`
+- Caption service: `http://127.0.0.1:8102`
+- RAM++ tag service: `http://127.0.0.1:8112`
+- Ollama runtime (for LLMyTranslate LLM): `http://127.0.0.1:11434`
 
-### Multi-Service Development
-The enhanced development script (`scripts/start-dev-multiproc.ps1`) orchestrates both projects:
-1. Starts VLM Photo House main service
-2. Launches LLMyTranslate ASR service
-3. Activates LLMyTranslate TTS service
-4. Configures 2x2 Windows Terminal layout for monitoring
+## Integration Boundaries
 
-### Independent Deployment
-Each project can be deployed independently:
-- **VLM Photo House**: Standalone photo management system
-- **LLMyTranslate**: Reusable voice processing service for other applications
+### Caption boundary (active)
+- Backend caption provider calls external caption service over HTTP (`CAPTION_PROVIDER=http` + `CAPTION_SERVICE_URL`).
+- Caption writes are persisted in Photo House DB and all downstream tag derivation remains in Photo House logic.
 
-## Project Dependencies
+### Face boundary (active)
+- Face embedding is delegated to LVFace subprocess/HTTP provider depending on config (`FACE_EMBED_PROVIDER`, `LVFACE_*`).
+- Face detection/assignment orchestration and person identity mutations remain in Photo House APIs/workers.
 
-### VLM Photo House Dependencies
-- FastAPI, Pydantic, SQLAlchemy (web framework)
-- OpenCV, Pillow (image processing)
-- Transformers, torch (AI models)
-- chromadb (vector database)
-- Specific integration with LLMyTranslate API endpoints
+### Image-tag boundary (active)
+- Backend image-tag provider calls RAM++ tag service over HTTP (`IMAGE_TAG_PROVIDER=http` + `IMAGE_TAG_SERVICE_URL`).
+- Tag merge/suppression policy (`cap|img|cap+img` and `asset_tag_blocks`) remains in Photo House.
 
-### LLMyTranslate Dependencies
-- FastAPI (service framework)
-- torch, transformers (AI models)
-- Various TTS/ASR libraries
-- Mobile deployment capabilities (Android/QNN)
+### Voice boundary (active)
+Photo House proxies to LLMyTranslate through `backend/app/routers/voice.py`:
+- `POST /voice/transcribe` -> `/api/voice-chat/transcribe`
+- `POST /voice/tts` -> `/api/tts/synthesize`
+- `POST /voice/conversation` -> `/api/voice-chat/conversation`
+- `GET /voice/health` -> `/api/voice-chat/health`
+- `GET /voice/capabilities` -> `/api/voice-chat/capabilities`
+- `POST /voice/command` executes the Photo House read-only command orchestrator (not proxied upstream)
+  - Current read-only actions include: `search.assets`, `search.people`, `search.tags`, `tasks.status`, `system.status`, `search.person.assets`
+  - Kid scenario implemented: voice phrase like `show me the photos of chuan` resolves person and opens person-assets flow in UI
 
-## Maintenance Strategy
+Current runtime baseline (2026-02-27):
+- STT: Whisper `base`
+- LLM: Ollama (`gemma3:latest` default in conversation route)
+- TTS: Coqui Tacotron2-family models with Edge fallback
+- Host GPU snapshot: `nvidia-smi` index `0=P2000`, `1=RTX3090`; observed voice runtime is RTX3090-centric, while Ollama can attach to both GPUs
 
-### Independent Maintenance
-- Each project maintains its own git repository
-- Version control is independent
-- Breaking changes in one project don't directly affect the other
+### Voice boundary (legacy extension)
+`backend/app/routers/voice_photo.py` exposes extra `/voice/*` demo/photo endpoints (`describe-photo`, `search-photos`, `rtx3090-status`, `photo-demo`).  
+These routes are legacy and need schema-alignment cleanup before being treated as production voice-photo actions.
 
-### Integration Testing
-- Cross-service testing ensures API compatibility
-- Voice functionality testing validates end-to-end workflows
-- Performance testing with RTX 3090 optimization
+### Data/action boundary
+All mutating domain actions (people assignment, tags, tasks) remain in Photo House APIs; external services do not mutate Photo House DB directly.
 
-## Future Expansion
-The architecture supports:
-- Additional voice processing services
-- Multi-language photo descriptions
-- Voice-guided photo organization
-- Integration with other AI services following the same pattern
+## Development Orchestration
+
+`scripts/start-dev-multiproc.ps1` coordinates the multi-service dev stack:
+1. Photo House API/worker pane
+2. LLMyTranslate service pane (ASR/conversation)
+3. LVFace environment pane
+4. LLMyTranslate TTS environment pane
+5. Optional RAM++ service pane
+
+Caption service (`vlmCaptionModels`, port 8102) is expected to run separately in HTTP-provider mode.
+
+## Current Direction
+
+- Keep LLMyTranslate as speech runtime.
+- Keep extending the Photo House voice command orchestrator (intent -> existing API calls).
+- Read-only voice actions are active (including person-photo browse); mutating actions still require future confirmation flow.
+- Return bilingual concise voice/text summaries for outcomes.
+- Use phased rollout defined in architecture doc (`SYSTEM_ARCHITECTURE_2026-02-27.md`, section 5.8).
+- Keep service boundaries explicit: external model runtimes compute; Photo House owns state, policy, and mutations.
 
 ---
-*Last Updated: August 24, 2025*
-*Version: 1.0*
+*Last Updated: 2026-02-27*
+*Version: 2.6*

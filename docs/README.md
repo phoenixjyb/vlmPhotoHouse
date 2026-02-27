@@ -14,6 +14,7 @@ This index reflects the current production-oriented repo layout.
 - WSL/Linux launcher: `../scripts/start-dev-tmux.sh`
 - Quick dev setup: `quick-start-dev.md`
 - Environment notes: `ENVIRONMENT_MANAGEMENT.md`
+- OpenClaw agent runbook: `operations/openclaw-agent-guide.md`
 
 ## Functional Areas
 

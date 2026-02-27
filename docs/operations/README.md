@@ -6,6 +6,7 @@ This section contains operational guides for running and maintaining the VLM Pho
 
 ### Daily Operations
 - **[Operations Runbook](./operations.md)** - Start/stop, monitoring, troubleshooting
+- **[OpenClaw Agent Guide](./openclaw-agent-guide.md)** - API/CLI query + trigger playbook for autonomous agents
 
 ## 🚀 Quick Operations
 

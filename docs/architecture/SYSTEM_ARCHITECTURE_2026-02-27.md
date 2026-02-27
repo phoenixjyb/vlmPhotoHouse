@@ -40,7 +40,7 @@ The stack is deliberately split into separate repositories/services. Each compon
 in its own Python environment and communicates over localhost HTTP.
 
 ```
-H:\wSpace\vlm-photo-engine\
+C:\Users\yanbo\wSpace\vlm-photo-engine\
 ├── vlmPhotoHouse\          ← Main repo (API, UI, worker, CLI)
 ├── LVFace\                 ← Face embedding service (ORT-GPU)
 ├── vlmCaptionModels\       ← Caption HTTP service (Qwen3-VL, BLIP2)
@@ -49,7 +49,7 @@ H:\wSpace\vlm-photo-engine\
 C:\Users\yanbo\wSpace\
 └── llmytranslate\          ← STT/TTS/translation service (voice integration)
 
-H:\wSpace\vlm-photo-engine\vlmPhotoHouse\
+C:\Users\yanbo\wSpace\vlm-photo-engine\vlmPhotoHouse\
 └── rampp\                  ← RAM++ image-tag adapter (runs from vlmPhotoHouse tree)
 ```
 
@@ -58,7 +58,7 @@ H:\wSpace\vlm-photo-engine\vlmPhotoHouse\
 | Reason | Detail |
 |--------|--------|
 | **Conflicting CUDA runtimes** | LVFace uses ONNX Runtime 1.24 + CUDA 12.x while the main backend uses PyTorch 2.x. Subprocess isolation prevents DLL conflicts. |
-| **GPU memory partitioning** | Heavy models (Qwen3-VL 8B, RAM++) run on RTX 3090; lighter workloads can share Quadro P2000. Isolation gives each service dedicated VRAM context. |
+| **GPU memory partitioning** | Memory-heavy models (Qwen3-VL 8B, Ollama LLM, voice STT/TTS) stay on RTX 3090, while RAM++ can run on Quadro P2000. Isolation gives each service dedicated VRAM context. |
 | **Independent restart** | Caption service can OOM-recover without taking down the whole API. |
 | **Separate development velocity** | LVFace and vlmCaptionModels have their own venvs, requirements, and testing cycles. |
 | **HTTP protocol** | All external services expose simple `POST /caption`, `POST /tags`, etc. endpoints. The backend calls them with `httpx`. This makes swapping models (BLIP2 → Qwen3) a config change, not a code change. |
@@ -70,7 +70,8 @@ H:\wSpace\vlm-photo-engine\vlmPhotoHouse\
 | 8002 | vlmPhotoHouse API | FastAPI, inline worker, static UI host |
 | 8102 | vlmCaptionModels | Qwen3-VL-8B nf4 caption server |
 | 8112 | rampp/service.py | RAM++ image tagging |
-| 8xxx | LLMyTranslate | STT/TTS/translation (proxied via /voice/*) |
+| 8001 | LLMyTranslate | STT/TTS/conversation API (proxied via `/voice/*`) |
+| 11434 | Ollama | Local LLM runtime consumed by LLMyTranslate |
 
 ---
 
@@ -80,10 +81,11 @@ Single workstation, Windows 11 Pro:
 
 | GPU | Memory | Primary assignment |
 |-----|--------|-------------------|
-| RTX 3090 (GPU 0) | 24 GB VRAM | Qwen3-VL captioning, CLIP embeddings, LVFace face embedding |
-| Quadro P2000 (GPU 1) | 5 GB VRAM | RAM++ image tagging, overflow workloads |
+| Quadro P2000 (GPU 0, nvidia-smi) | 5 GB VRAM | RAM++ image tagging, overflow/display workloads |
+| RTX 3090 (GPU 1, nvidia-smi) | 24 GB VRAM | Qwen3-VL captioning, voice STT/TTS, primary Ollama load, LVFace embedding |
 
 The `start-dev-multiproc.ps1` launcher pins services to GPUs using `CUDA_VISIBLE_DEVICES`.
+Framework-local CUDA indices can differ from `nvidia-smi` ordering.
 
 **Why Quadro P2000 for RAM++?** RAM++ (SwinL backbone, ~700M params) fits in 5 GB and runs
 comfortably on P2000, freeing the 3090 for Qwen3-VL which needs ~14–16 GB in nf4 quant.
@@ -205,12 +207,88 @@ Why Qwen3-VL vs BLIP2?
 ### 5.7 Voice / LLMyTranslate
 
 - **Project**: `C:\Users\yanbo\wSpace\llmytranslate`
-- **Capabilities**: STT (speech-to-text), TTS (text-to-speech), real-time translation,
-  LLM chatbot, WebSocket audio pipeline
-- **Integration**: vlmPhotoHouse backend proxies to LLMyTranslate under `/voice/*` routes
-  via `backend/app/routers/voice.py` and `backend/app/routers/voice_photo.py`
+- **Capabilities**: STT (speech-to-text), TTS (text-to-speech), conversational LLM,
+  streaming and phone-call style WebSocket pipelines
+- **Integration (active)**: vlmPhotoHouse backend proxies LLMyTranslate under `/voice/*`
+  via `backend/app/routers/voice.py`:
+  - `/voice/transcribe`
+  - `/voice/tts`
+  - `/voice/conversation`
+  - `/voice/health`
+  - `/voice/capabilities`
+  - `/voice/demo`
+  - `/voice/command` (Phase-2 read-only orchestrator in Photo House)
+    - Current read-only actions: `search.assets`, `search.people`, `search.tags`, `tasks.status`, `system.status`, `search.person.assets`
+    - Current kid scenario: voice phrase like `show me the photos of chuan` resolves person and opens the person-assets gallery flow in main UI
+- **Current model stack (runtime baseline, 2026-02-27)**:
+  - **STT**: OpenAI Whisper `base` (local ASR in LLMyTranslate)
+  - **LLM**: Ollama, default conversation model `gemma3:latest`
+  - **TTS**: Coqui TTS Tacotron2-family models; Edge TTS fallback when Coqui path fails
+- **Current GPU execution snapshot (host-specific)**:
+  - `nvidia-smi` index: `0=Quadro P2000`, `1=RTX 3090`
+  - STT/TTS runtime observed on RTX 3090 during live checks
+  - Ollama may appear on both GPUs on this host, with primary LLM VRAM footprint on RTX 3090
+- **Legacy extension routes**: `backend/app/routers/voice_photo.py` exposes extra
+  `/voice/*` demo/photo endpoints and requires schema-alignment cleanup before production use
 - **Why proxied?** Keeps voice capabilities accessible from the same UI origin (port 8002)
   without cross-origin issues, while LLMyTranslate runs as an independent service
+
+### 5.8 Voice Integration Status and Plan (voice-in + voice-out)
+
+**Goal**: enable voice control for search, people/tag operations, and task orchestration
+without bypassing API validation, safety checks, and audit paths.
+
+**Current implementation snapshot (2026-02-27)**:
+- Browser UI includes a top-bar `Voice Command` trigger in `/ui`.
+- Execution flow: mic capture -> `/voice/transcribe` -> `/voice/command` -> UI navigation/action.
+- Read-only person-photo command is active: `search.person.assets` (e.g., `show me the photos of <name>`).
+- Mutating commands remain blocked as `mutate.request` until confirmation phase is implemented.
+
+**Scope boundary**:
+- **In scope (v1-v2)**: query/search/status flows and concise spoken summaries.
+- **In scope (v3+)**: mutating operations with strict confirmation.
+- **Out of scope (current)**: direct DB writes or bypassing existing domain APIs.
+
+**Execution model**:
+1. **Voice-in**: microphone audio -> `/voice/transcribe` -> normalized text command
+2. **Intent/orchestration layer (new)**: map text to a structured action contract
+3. **Action execution**: call existing Photo House APIs
+4. **Voice-out**: return spoken + text summary through `/voice/tts`
+
+**Planned action contract**:
+```json
+{
+  "action": "search.smart | person.rename | tag.add | task.cancel | ...",
+  "mode": "read | mutate",
+  "args": {},
+  "needs_confirmation": true,
+  "confidence": 0.0
+}
+```
+
+**Route mapping (orchestrator -> existing APIs)**:
+- Search intents -> `/search`, `/search/smart`, `/search/captions`, `/search/tags`, `/search/vector`
+- People read intents -> `/search/person/*`, `/persons`, `/faces`
+- People mutate intents -> `/faces/*/assign`, `/persons/{id}/name`, `/persons/merge`
+- Tag intents -> `/tags`, `/tags/{tag_id}/assets`, `/assets/{id}/tags`
+- Task intents -> `/tasks`, `/tasks/{id}`, `/tasks/{id}/cancel`, `/admin/tasks/{id}/requeue`
+
+**Safety and confirmation policy**:
+- Mutating actions require explicit user confirmation before execution.
+- Low-confidence parse falls back to clarification, not execution.
+- All writes must flow through existing APIs so current validation/audit remains effective.
+- Voice responses must include a short action/result summary with target IDs or counts.
+
+**Phased rollout**:
+- **P1**: stabilize `/voice/*` proxy contracts and de-risk legacy `voice_photo` routes
+- **P2**: shipped read-only orchestrator (search + status + browse, including person-photo browse) with bilingual summaries
+- **P3**: add mutating commands with confirmation + dry-run preview
+- **P4**: refine multilingual UX, latency/quality metrics, and interruption behavior
+
+**Acceptance criteria (initial)**:
+- Read-only commands dispatch to correct route family and return usable spoken summaries.
+- Mutating commands never execute without confirmation.
+- Failed actions surface explicit reasons (no silent success-shaped fallback).
 
 ---
 
@@ -281,7 +359,7 @@ Task types dispatched by `TaskExecutor.run_once`:
 | Assets | `routers/assets.py` (in services/) | `/assets/*` |
 | UI static | `routers/ui.py` | `/ui` (serves index.html + JS/CSS) |
 | Voice proxy | `routers/voice.py` | `/voice/*` → LLMyTranslate |
-| Voice photo | `routers/voice_photo.py` | `/voice/photo/*` |
+| Voice photo (legacy) | `routers/voice_photo.py` | `/voice/describe-photo`, `/voice/search-photos`, `/voice/rtx3090-status`, `/voice/photo-demo` |
 
 ### 6.5 Provider Architecture
 
@@ -474,16 +552,17 @@ The UI talks exclusively to the vlmPhotoHouse API at port 8002. No external depe
 
 Primary launcher: `vlmPhotoHouse/scripts/start-dev-multiproc.ps1`
 
-Opens a Windows Terminal 2×2 grid:
+Opens a Windows Terminal 2×2 grid (+ optional RAM++ tab):
 
 | Pane | Service | Command |
 |------|---------|---------|
 | Top-left | vlmPhotoHouse API + worker | `uvicorn app.main:app --port 8002` (from backend/) |
-| Top-right | vlmCaptionModels | `python caption_server.py --port 8102 --provider qwen3-vl` |
-| Bottom-left | RAM++ tag service | `python service.py` (from rampp/) |
-| Bottom-right | (free / monitoring) | |
+| Top-right | LLMyTranslate voice service (ASR) | `uvicorn src.main:app --host 127.0.0.1 --port 8001` |
+| Bottom-left | LVFace environment shell | activate LVFace venv for face-model ops |
+| Bottom-right | LLMyTranslate TTS environment shell | activate `.venv-tts` for Coqui/Edge TTS ops |
+| Extra tab (optional) | RAM++ tag service | `uvicorn service:app --host 127.0.0.1 --port 8112` (from `rampp/`) |
 
-LLMyTranslate started separately when needed (not part of the multiproc launcher).
+Caption service (`vlmCaptionModels`, port 8102) is expected to be running separately for HTTP caption provider mode.
 
 **Env vars** are set in the launcher script and inherited by all processes. The most
 critical are the `FACE_EMBED_PROVIDER=lvface` and `LVFACE_*` vars — without them the API

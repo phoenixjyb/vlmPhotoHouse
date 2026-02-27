@@ -1,0 +1,445 @@
+{
+  "deck_title": "VLM Photo House Architecture Review 2026-02-27",
+  "deck_subtitle": "Bilingual team presentation: architecture, decisions, and lessons learned",
+  "languages": ["en", "zh-CN"],
+  "target_slide_count": 20,
+  "source_document": "docs/architecture/SYSTEM_ARCHITECTURE_2026-02-27.md",
+  "slides": [
+    {
+      "id": 1,
+      "layout": "title",
+      "title": {
+        "en": "VLM Photo House: Architecture Review",
+        "zh": "VLM Photo House：架构评审"
+      },
+      "subtitle": {
+        "en": "Local-First AI Photo & Video Platform",
+        "zh": "本地优先 AI 照片与视频平台"
+      },
+      "speaker_notes": {
+        "en": "Introduce purpose: align the team on architecture, rationale, and future priorities.",
+        "zh": "说明本次分享目标：统一团队对架构、决策依据和后续重点的认知。"
+      },
+      "visual_hint": "Product screenshot + simple architecture overview"
+    },
+    {
+      "id": 2,
+      "layout": "two-column",
+      "title": {
+        "en": "Problem Statement",
+        "zh": "问题定义"
+      },
+      "content": {
+        "en": [
+          "Replace cloud photo services for private family archives",
+          "Keep all data and model inference local",
+          "Support search, captioning, tagging, and person management"
+        ],
+        "zh": [
+          "以本地方案替代云相册管理私有家庭资产",
+          "数据与推理全部本地化",
+          "支持检索、描述、打标与人物管理"
+        ]
+      },
+      "visual_hint": "Before/after architecture (cloud vs local-first)"
+    },
+    {
+      "id": 3,
+      "layout": "two-column",
+      "title": {
+        "en": "Goals and Constraints",
+        "zh": "目标与约束"
+      },
+      "content": {
+        "en": [
+          "Goals: quality, privacy, explainability, maintainability",
+          "Constraints: single workstation, mixed GPU capability, Windows stack",
+          "Principle: practical reliability over theoretical complexity"
+        ],
+        "zh": [
+          "目标：质量、隐私、可解释、可维护",
+          "约束：单机部署、双 GPU 异构、Windows 生态",
+          "原则：实用可靠优先于复杂炫技"
+        ]
+      },
+      "visual_hint": "Checklist with goal/constraint icons"
+    },
+    {
+      "id": 4,
+      "layout": "diagram",
+      "title": {
+        "en": "Multi-Project Topology",
+        "zh": "多仓多服务拓扑"
+      },
+      "content": {
+        "en": [
+          "vlmPhotoHouse: API/UI/worker orchestration",
+          "vlmCaptionModels: Qwen3-VL caption service",
+          "LVFace: face embedding subprocess service",
+          "rampp: RAM++ image-tag service",
+          "LLMyTranslate: voice capability service"
+        ],
+        "zh": [
+          "vlmPhotoHouse：主系统编排",
+          "vlmCaptionModels：Qwen3-VL 描述服务",
+          "LVFace：人脸向量子进程服务",
+          "rampp：RAM++ 图像打标服务",
+          "LLMyTranslate：语音能力服务"
+        ]
+      },
+      "visual_hint": "Service graph with ports 8002/8102/8112"
+    },
+    {
+      "id": 5,
+      "layout": "two-column",
+      "title": {
+        "en": "Why We Split Services",
+        "zh": "为什么拆分服务"
+      },
+      "content": {
+        "en": [
+          "Avoid CUDA/DLL conflicts between frameworks",
+          "Control GPU memory contention",
+          "Enable independent restart and isolation",
+          "Keep model swap as config-only change"
+        ],
+        "zh": [
+          "避免不同框架 CUDA/DLL 冲突",
+          "降低显存抢占与干扰",
+          "支持独立重启与故障隔离",
+          "让换模型变成配置变更"
+        ]
+      },
+      "visual_hint": "Pros/cons matrix"
+    },
+    {
+      "id": 6,
+      "layout": "two-column",
+      "title": {
+        "en": "Hardware Allocation Strategy",
+        "zh": "硬件分工策略"
+      },
+      "content": {
+        "en": [
+          "RTX 3090: Qwen3-VL and heavy inference",
+          "Quadro P2000: RAM++ tagging and overflow",
+          "Outcome: better throughput stability"
+        ],
+        "zh": [
+          "RTX 3090：承载重推理（Qwen3-VL）",
+          "Quadro P2000：承载 RAM++ 及分流任务",
+          "结果：吞吐更稳、冲突更少"
+        ]
+      },
+      "visual_hint": "GPU usage bars"
+    },
+    {
+      "id": 7,
+      "layout": "process",
+      "title": {
+        "en": "End-to-End Processing Flow",
+        "zh": "端到端处理流程"
+      },
+      "content": {
+        "en": [
+          "Ingest -> metadata extraction -> task queue",
+          "Parallel pipelines: embed/caption/face/image_tag",
+          "Persist to SQLite + derived files + vector indexes"
+        ],
+        "zh": [
+          "入库 -> 元数据提取 -> 任务排队",
+          "并行流水线：向量/描述/人脸/图像打标",
+          "写入 SQLite + 派生文件 + 向量索引"
+        ]
+      },
+      "visual_hint": "Pipeline swimlane"
+    },
+    {
+      "id": 8,
+      "layout": "two-column",
+      "title": {
+        "en": "Captioning Choice: Qwen3-VL",
+        "zh": "描述模型选择：Qwen3-VL"
+      },
+      "content": {
+        "en": [
+          "HTTP caption provider on port 8102",
+          "Qwen3-VL-8B (nf4) for richer semantic quality",
+          "Caption quality directly impacts downstream search/tags"
+        ],
+        "zh": [
+          "通过 8102 端口 HTTP 提供描述能力",
+          "Qwen3-VL-8B（nf4）语义质量更高",
+          "描述质量直接影响检索与标签效果"
+        ]
+      },
+      "visual_hint": "Model comparison mini chart"
+    },
+    {
+      "id": 9,
+      "layout": "two-column",
+      "title": {
+        "en": "Dual Tagging Paths",
+        "zh": "双路径打标体系"
+      },
+      "content": {
+        "en": [
+          "Caption-derived canonical tags (source=cap)",
+          "RAM++ image tags (source=img)",
+          "Overlap merged to source=cap+img",
+          "Store score/model/source for provenance"
+        ],
+        "zh": [
+          "描述规范化标签（source=cap）",
+          "RAM++ 图像标签（source=img）",
+          "重叠标签自动融合（source=cap+img）",
+          "保留 score/model/source 以便追溯"
+        ]
+      },
+      "visual_hint": "Venn diagram cap/img"
+    },
+    {
+      "id": 10,
+      "layout": "two-column",
+      "title": {
+        "en": "Why Qwen-Gated Auto-Tagging",
+        "zh": "为什么做 Qwen 门控打标"
+      },
+      "content": {
+        "en": [
+          "Only Qwen-sourced captions trigger auto-tagging",
+          "Prevents lower-quality caption models from polluting tag catalog",
+          "Improves consistency of smart search and analytics"
+        ],
+        "zh": [
+          "仅 Qwen 来源描述触发自动打标",
+          "避免低质量模型污染标签库",
+          "提升智能检索与统计一致性"
+        ]
+      },
+      "visual_hint": "Quality gate diagram"
+    },
+    {
+      "id": 11,
+      "layout": "two-column",
+      "title": {
+        "en": "Face Pipeline Design",
+        "zh": "人脸链路设计"
+      },
+      "content": {
+        "en": [
+          "SCRFD detection + LVFace 128-d embeddings",
+          "Manual labels as trusted seeds",
+          "DNN propagation scales assignment",
+          "All assignments audited in events table"
+        ],
+        "zh": [
+          "SCRFD 检测 + LVFace 128 维向量",
+          "手工标注作为高可信种子",
+          "DNN 传播实现规模化分配",
+          "分配过程全量审计留痕"
+        ]
+      },
+      "visual_hint": "Face detection to identity flow"
+    },
+    {
+      "id": 12,
+      "layout": "two-column",
+      "title": {
+        "en": "Data Model and Provenance",
+        "zh": "数据模型与可追溯性"
+      },
+      "content": {
+        "en": [
+          "Core tables: assets, captions, tags, asset_tags, faces, tasks",
+          "Provenance fields make outputs explainable",
+          "Supports trust-aware debugging and governance"
+        ],
+        "zh": [
+          "核心表：assets/captions/tags/asset_tags/faces/tasks",
+          "来源字段让结果可解释、可追责",
+          "支撑质量治理与问题回溯"
+        ]
+      },
+      "visual_hint": "ER-lite diagram"
+    },
+    {
+      "id": 13,
+      "layout": "two-column",
+      "title": {
+        "en": "UI Information Architecture",
+        "zh": "前端信息架构"
+      },
+      "content": {
+        "en": [
+          "Library: unified retrieval and inspector",
+          "People: identity curation workflow",
+          "Tags: global catalog and tag-to-asset correlation",
+          "Tasks/Admin: observability and operations"
+        ],
+        "zh": [
+          "Library：统一检索与资源详情",
+          "People：人物治理流程",
+          "Tags：全局标签与资产关联",
+          "Tasks/Admin：可观测与运维控制"
+        ]
+      },
+      "visual_hint": "UI tab screenshot collage"
+    },
+    {
+      "id": 14,
+      "layout": "metrics",
+      "title": {
+        "en": "Current Progress Snapshot",
+        "zh": "当前进展快照"
+      },
+      "content": {
+        "en": [
+          "Caption and RAM++ queues are actively draining",
+          "Tag provenance now visible in API and UI",
+          "Architecture docs and operational scripts are aligned"
+        ],
+        "zh": [
+          "描述与 RAM++ 队列持续消化中",
+          "标签来源已在 API/UI 完整可见",
+          "文档与运维流程已完成对齐"
+        ]
+      },
+      "visual_hint": "Dashboard metrics screenshot"
+    },
+    {
+      "id": 15,
+      "layout": "two-column",
+      "title": {
+        "en": "Why These Choices Worked",
+        "zh": "这些选择为什么有效"
+      },
+      "content": {
+        "en": [
+          "Provider abstraction accelerated model evolution",
+          "HTTP boundaries reduced coupling risks",
+          "Local-first strategy matched privacy needs",
+          "Iterative UX updates improved operator efficiency"
+        ],
+        "zh": [
+          "Provider 抽象提升模型迭代效率",
+          "HTTP 边界降低耦合风险",
+          "本地优先策略符合隐私诉求",
+          "持续 UI 迭代提升运营效率"
+        ]
+      },
+      "visual_hint": "Decision-to-impact table"
+    },
+    {
+      "id": 16,
+      "layout": "two-column",
+      "title": {
+        "en": "Lessons Learned: Engineering",
+        "zh": "经验复盘：工程层面"
+      },
+      "content": {
+        "en": [
+          "Process ownership must be explicit",
+          "Queue priority policy matters in mixed pipelines",
+          "Operational commands should be reproducible"
+        ],
+        "zh": [
+          "进程归属必须明确",
+          "混合流水线需要清晰优先级策略",
+          "运维命令要可复现、可审计"
+        ]
+      },
+      "visual_hint": "Risk/mitigation bullets"
+    },
+    {
+      "id": 17,
+      "layout": "two-column",
+      "title": {
+        "en": "Lessons Learned: Model Ops",
+        "zh": "经验复盘：模型运维"
+      },
+      "content": {
+        "en": [
+          "Model readiness requires deps + checkpoint + health + real inference",
+          "Fallback modes help bring-up but must be explicit in production",
+          "GPU mapping policy should be host-documented"
+        ],
+        "zh": [
+          "模型就绪需同时满足依赖/权重/健康/真实推理验证",
+          "回退模式适合调试，线上必须边界清晰",
+          "GPU 映射策略要按主机文档化"
+        ]
+      },
+      "visual_hint": "Readiness checklist"
+    },
+    {
+      "id": 18,
+      "layout": "two-column",
+      "title": {
+        "en": "Lessons Learned: Data Quality",
+        "zh": "经验复盘：数据质量"
+      },
+      "content": {
+        "en": [
+          "Provenance is mandatory for trusted automation",
+          "Historical mixed-model outputs need migration policy",
+          "Human-in-the-loop remains essential for identity quality"
+        ],
+        "zh": [
+          "自动化可信赖的前提是来源可追溯",
+          "历史混合模型输出需要迁移策略",
+          "人物识别仍需人机协同把关"
+        ]
+      },
+      "visual_hint": "Quality control loop"
+    },
+    {
+      "id": 19,
+      "layout": "roadmap",
+      "title": {
+        "en": "Next Improvements",
+        "zh": "下一步改进"
+      },
+      "content": {
+        "en": [
+          "Dispatch missing phash/video tasks in worker",
+          "Unify task state semantics (done vs finished)",
+          "Improve stale-running task recovery on startup",
+          "Continue optimizing tag/face review UX"
+        ],
+        "zh": [
+          "补齐 worker 对 phash/视频任务调度",
+          "统一任务状态语义（done/finished）",
+          "优化启动时 stale-running 恢复机制",
+          "继续提升标签/人脸审核体验"
+        ]
+      },
+      "visual_hint": "Roadmap timeline"
+    },
+    {
+      "id": 20,
+      "layout": "closing",
+      "title": {
+        "en": "Discussion and Alignment",
+        "zh": "讨论与共识"
+      },
+      "content": {
+        "en": [
+          "What is our next reliability milestone?",
+          "Which metrics should gate model changes?",
+          "How do we balance throughput vs review accuracy?"
+        ],
+        "zh": [
+          "下一阶段最优先的可靠性目标是什么？",
+          "模型切换的准入指标应该有哪些？",
+          "如何平衡吞吐效率与审核准确性？"
+        ]
+      },
+      "speaker_notes": {
+        "en": "Close with action items and owners, not just open questions.",
+        "zh": "收尾时建议给出行动项和责任人，而不是只留下开放问题。"
+      },
+      "visual_hint": "Team photo or action-item board"
+    }
+  ]
+}

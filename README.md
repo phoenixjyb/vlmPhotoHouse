@@ -167,6 +167,6 @@ Do not store generated media artifacts in repo folders.
 
 ## Documentation
 
-- Current architecture: `docs/architecture/SYSTEM_ARCHITECTURE_CURRENT_2026-02-24.md`
+- Current architecture: `docs/architecture/SYSTEM_ARCHITECTURE_2026-02-27.md`
 - Current status handoff: `docs/PROJECT_STATUS_CURRENT.md`
 - Dev launcher details: `docs/launcher-quickstart.md`

@@ -53,6 +53,7 @@ const state = {
     media: "all",
     source: "all",
   },
+  voiceBusy: false,
 };
 
 const qs = (id) => document.getElementById(id);
@@ -61,6 +62,17 @@ const I18N = {
   en: {
     app_title: "VLM Photo House",
     subtitle: "Faces, captions, videos, and search in one control surface.",
+    voice_command: "Voice Command",
+    voice_recording: "Listening...",
+    voice_processing: "Processing...",
+    voice_not_supported: "Voice capture is not supported in this browser",
+    voice_denied: "Microphone permission denied",
+    voice_transcribe_failed: "Voice transcription failed: {error}",
+    voice_command_failed: "Voice command failed: {error}",
+    voice_no_transcript: "Could not hear speech clearly",
+    voice_heard: "Heard: {text}",
+    voice_person_opened: "Opened {name} photos ({total})",
+    voice_person_not_found: "No person matched {name}",
     refresh: "Refresh",
     api_docs: "API Docs",
     assets: "Assets",
@@ -260,6 +272,17 @@ const I18N = {
   zh: {
     app_title: "VLM 照片屋",
     subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
+    voice_command: "语音命令",
+    voice_recording: "正在聆听...",
+    voice_processing: "处理中...",
+    voice_not_supported: "当前浏览器不支持语音采集",
+    voice_denied: "麦克风权限被拒绝",
+    voice_transcribe_failed: "语音转写失败: {error}",
+    voice_command_failed: "语音命令失败: {error}",
+    voice_no_transcript: "未清晰识别到语音",
+    voice_heard: "识别到: {text}",
+    voice_person_opened: "已打开 {name} 的照片（{total}）",
+    voice_person_not_found: "未找到人物 {name}",
     refresh: "刷新",
     api_docs: "API 文档",
     assets: "资源",
@@ -823,6 +846,224 @@ async function api(url, opts = {}) {
     throw new Error(String(detail));
   }
   return data;
+}
+
+function setVoiceStatus(message = "") {
+  const el = qs("voice-status");
+  if (el) el.textContent = message;
+}
+
+function extractVoicePersonAssetsQuery(textRaw) {
+  const normalized = String(textRaw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[,.!?;:，。！？；：]/g, " ")
+    .replace(/\s+/g, " ");
+  if (!normalized) return "";
+  const patterns = [
+    /^(?:please\s+)?(?:show me|show|find|open)\s+(?:(?:the|a|an|some)\s+)?(?:photos|photo|pictures|picture|images|image)\s+(?:of\s+)?(.+)$/,
+    /^(?:photos|photo|pictures|picture|images|image)\s+(?:of\s+)?(.+)$/,
+    /^(?:show me|show)\s+(.+?)\s+(?:photos|photo|pictures|picture|images|image)$/,
+    /^(?:show me|show)\s+(.+?)'s\s+(?:photos|photo|pictures|picture|images|image)$/,
+    /^(?:请)?(?:给我看|给我看看|帮我找|找找|找一下|显示|打开|看看)\s*(?:一下)?\s*(.+?)\s*(?:的)?\s*(?:照片|图片|相片|影像|相册)$/,
+    /^(?:请)?(?:帮我)?(?:找|找下|找一下)\s*(.+?)\s*(?:的)?\s*(?:照片|图片|相片|影像|相册)$/,
+  ];
+  for (const p of patterns) {
+    const m = normalized.match(p);
+    if (!m || !m[1]) continue;
+    const q = String(m[1]).trim().replace(/^[\s'"`.,!?;:。！？；：]+|[\s'"`.,!?;:。！？；：]+$/g, "");
+    const q2 = q.replace(/^(?:the|a|an)\s+/i, "").trim();
+    if (q2) return q2;
+    if (q) return q;
+  }
+  return "";
+}
+
+function normalizeVoicePersonName(raw) {
+  let q = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[,.!?;:，。！？；：]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  q = q.replace(/^(?:the|a|an)\s+/i, "").trim();
+  q = q.replace(/\s+[a-z]$/i, "").trim(); // trims noisy suffix like "jane r"
+  return q;
+}
+
+async function lookupPersonByNameQuery(rawQuery) {
+  const base = normalizeVoicePersonName(rawQuery);
+  if (!base) return null;
+  const candidates = [];
+  const push = (v) => {
+    const n = normalizeVoicePersonName(v);
+    if (n && !candidates.includes(n)) candidates.push(n);
+  };
+  push(base);
+  const tokens = base.split(" ").filter((x) => x);
+  if (tokens.length > 1) {
+    push(tokens[0]);
+    push(tokens[tokens.length - 1]);
+  }
+  for (const q of candidates) {
+    let data;
+    try {
+      data = await api(
+        `/persons?page=1&page_size=120&include_faces=false&named_only=true&sort_by=face_count&order=desc&name_query=${encodeURIComponent(q)}`
+      );
+    } catch (_) {
+      continue;
+    }
+    const persons = Array.isArray(data?.persons) ? data.persons : [];
+    if (!persons.length) continue;
+    const qLower = String(q).toLowerCase();
+    let person = persons.find((p) => String(p?.display_name || "").trim().toLowerCase() === qLower);
+    if (!person) {
+      person = persons.find((p) => String(p?.display_name || "").trim().toLowerCase().startsWith(qLower));
+    }
+    if (!person) person = persons[0];
+    const personId = Number(person?.id || 0);
+    if (personId <= 0) continue;
+    let total = 0;
+    try {
+      const assets = await api(`/search/person/${personId}?page=1&page_size=1`);
+      total = Number(assets?.total || 0);
+    } catch (_) {
+      total = 0;
+    }
+    return {
+      personId,
+      personName: String(person?.display_name || q),
+      total,
+      query: q,
+    };
+  }
+  return { personId: 0, personName: "", total: 0, query: base };
+}
+
+async function openPersonAssetsFromLookup(lookup) {
+  const personId = Number(lookup?.personId || 0);
+  if (!personId) return false;
+  const personName = String(lookup?.personName || `#${personId}`);
+  const total = Number(lookup?.total || 0);
+  setActiveTab("people");
+  await loadPeople();
+  await loadPersonAssets(personId, 1);
+  showToast(t("voice_person_opened", { name: personName, total }));
+  return true;
+}
+
+async function tryClientPersonAssetsFallback(text) {
+  const q = extractVoicePersonAssetsQuery(text);
+  if (!q) return false;
+  const lookup = await lookupPersonByNameQuery(q);
+  if (await openPersonAssetsFromLookup(lookup)) return true;
+  showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
+  return true;
+}
+
+async function executeVoiceCommand(text) {
+  const payload = await api("/voice/command", {
+    method: "POST",
+    body: JSON.stringify({ text, language: state.lang, limit: 20 }),
+  });
+  const action = String(payload?.contract?.action || "");
+  if (action === "search.person.assets") {
+    const personId = Number(payload?.data?.person_id || 0);
+    const personName = String(payload?.data?.person_name || "").trim() || `#${personId}`;
+    const total = Number(payload?.data?.total || 0);
+    if (personId > 0) {
+      setActiveTab("people");
+      await loadPeople();
+      await loadPersonAssets(personId, 1);
+      showToast(t("voice_person_opened", { name: personName, total }));
+      return;
+    }
+    const q = String(payload?.data?.query || "").trim() || extractVoicePersonAssetsQuery(text) || text;
+    const lookup = await lookupPersonByNameQuery(q);
+    if (await openPersonAssetsFromLookup(lookup)) return;
+    showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
+    return;
+  }
+  if (action === "help") {
+    const handled = await tryClientPersonAssetsFallback(text);
+    if (handled) return;
+  }
+  const summary = String(payload?.summary_text || "").trim();
+  if (summary) showToast(summary);
+}
+
+async function runVoiceCommandCapture() {
+  if (state.voiceBusy) return;
+  const voiceBtn = qs("btn-voice-command");
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    showToast(t("voice_not_supported"));
+    return;
+  }
+  state.voiceBusy = true;
+  if (voiceBtn) voiceBtn.disabled = true;
+  let stream = null;
+  try {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
+    } catch (_) {
+      showToast(t("voice_denied"));
+      return;
+    }
+    setVoiceStatus(t("voice_recording"));
+    const chunks = [];
+    const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+    const chosenMime = mimeCandidates.find(
+      (m) => typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(m)
+    );
+    const recorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+    const stopped = new Promise((resolve, reject) => {
+      recorder.addEventListener("stop", resolve, { once: true });
+      recorder.addEventListener("error", (ev) => reject(ev?.error || new Error("recording error")), { once: true });
+    });
+    recorder.addEventListener("dataavailable", (ev) => {
+      if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+    });
+    recorder.start();
+    await new Promise((r) => window.setTimeout(r, 5000));
+    recorder.stop();
+    await stopped;
+
+    const blob = new Blob(chunks, { type: chunks[0]?.type || chosenMime || "audio/webm" });
+    if (!blob.size) {
+      showToast(t("voice_no_transcript"));
+      return;
+    }
+    setVoiceStatus(t("voice_processing"));
+    const form = new FormData();
+    form.append("file", blob, "voice.webm");
+    form.append("language", state.lang === "zh" ? "zh" : "en");
+    const asr = await api("/voice/transcribe", { method: "POST", body: form });
+    const transcript = String(asr?.text || asr?.transcript || asr?.result || "").trim();
+    if (!transcript) {
+      const err = String(asr?.error || "");
+      showToast(err ? t("voice_transcribe_failed", { error: err }) : t("voice_no_transcript"));
+      return;
+    }
+    showToast(t("voice_heard", { text: transcript }));
+    await executeVoiceCommand(transcript);
+  } catch (e) {
+    showToast(t("voice_command_failed", { error: e.message }));
+  } finally {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    state.voiceBusy = false;
+    if (voiceBtn) voiceBtn.disabled = false;
+    setVoiceStatus("");
+  }
 }
 
 function setActiveTab(tab) {
@@ -1880,6 +2121,10 @@ function initEvents() {
     if (state.activeTab === "map") await loadGeoMap();
     showToast(t("refreshed"));
   });
+  const voiceBtn = qs("btn-voice-command");
+  if (voiceBtn) {
+    voiceBtn.addEventListener("click", runVoiceCommandCapture);
+  }
 
   qs("btn-search").addEventListener("click", () => runSearch(1, false));
   qs("btn-library-load").addEventListener("click", () => loadLibraryLatest(1));

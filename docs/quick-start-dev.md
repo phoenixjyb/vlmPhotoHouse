@@ -37,6 +37,36 @@ Open UI:
 - Main: http://127.0.0.1:8002/ui
 - Voice demo: http://127.0.0.1:8002/voice/demo
 
+## Current voice model baseline (2026-02-27)
+- STT: Whisper `base` (LLMyTranslate local ASR)
+- LLM: Ollama (default `gemma3:latest` for `/voice/conversation`)
+- TTS: Coqui Tacotron2-family models, Edge TTS fallback
+- Photo House command orchestration endpoint (read-only Phase-2): `POST /voice/command`
+- Implemented read-only person-photo action: `search.person.assets` (e.g., "show me the photos of chuan")
+
+## Voice person-browse flow (kid scenario)
+- Open `http://127.0.0.1:8002/ui`
+- Click **Voice Command** in the top bar and speak:
+  - `show me the photos of chuan`
+  - `显示 chuan 的照片`
+- UI flow: browser mic capture -> `/voice/transcribe` -> `/voice/command` -> auto-switch to **People** tab and open that person's assets.
+
+Direct command test (text-only):
+```powershell
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8002/voice/command' `
+  -ContentType 'application/json' `
+  -Body '{"text":"show me the photos of chuan","language":"en","limit":10}' | ConvertTo-Json -Depth 6
+```
+
+Runtime checks:
+```powershell
+Invoke-RestMethod -Uri 'http://127.0.0.1:8001/api/voice-chat/health' | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/ps' | ConvertTo-Json -Depth 6
+```
+
+GPU note:
+- On this host, `nvidia-smi` index is `0=P2000, 1=RTX3090`; framework-local CUDA indices can differ by process/env.
+
 ## Enable TTS
 By default, if the upstream service doesn't return audio, the API falls back to JSON. You can enable audio in two ways:
 
