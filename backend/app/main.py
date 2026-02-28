@@ -1460,6 +1460,239 @@ app.include_router(voice_router.router, prefix='')
 app.include_router(voice_photo_router.router, prefix='')
 app.include_router(ui_router.router, prefix='')
 
+# --- Albums: Story generation (people/tags/location/caption)
+@app.get('/albums/stories')
+def albums_stories(
+    media: str = Query('all', description='all|image|video'),
+    story_type: str = Query('all', description='all|person|tag|location|caption'),
+    min_assets: int = Query(3, ge=2, le=200),
+    max_stories_per_type: int = Query(6, ge=1, le=30),
+    story_asset_limit: int = Query(24, ge=1, le=200),
+    caption_scan_limit: int = Query(4000, ge=200, le=20000),
+    db_s: Session = Depends(get_db),
+):
+    from collections import defaultdict
+    from .db import Asset, Person, FaceDetection, Tag, AssetTag, Caption
+    from .tagging import extract_caption_tag_candidates
+
+    media_filter = str(media or 'all').strip().lower()
+    if media_filter not in ('all', 'image', 'video'):
+        raise HTTPException(status_code=400, detail='Invalid media filter')
+
+    story_filter = str(story_type or 'all').strip().lower()
+    if story_filter not in ('all', 'person', 'tag', 'location', 'caption'):
+        raise HTTPException(status_code=400, detail='Invalid story type')
+
+    def _apply_media_filter(query):
+        if media_filter == 'image':
+            return query.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
+        if media_filter == 'video':
+            return query.filter(Asset.mime.startswith('video'))
+        return query
+
+    def _hydrate_items(asset_ids: list[int]) -> list[dict]:
+        if not asset_ids:
+            return []
+        rows = db_s.query(Asset.id, Asset.path, Asset.mime).filter(Asset.id.in_(asset_ids)).all()
+        by_id = {
+            int(r.id): {'id': int(r.id), 'path': r.path, 'mime': r.mime}
+            for r in rows
+        }
+        return [by_id[aid] for aid in asset_ids if aid in by_id]
+
+    def _story_id(kind: str, raw: str) -> str:
+        return f"{kind}:{uuid.uuid5(uuid.NAMESPACE_URL, f'{kind}:{raw}').hex[:12]}"
+
+    stories: list[dict] = []
+
+    if story_filter in ('all', 'person'):
+        person_rows = _apply_media_filter(
+            db_s.query(
+                Person.id.label('person_id'),
+                Person.display_name.label('person_name'),
+                func.count(func.distinct(Asset.id)).label('cnt'),
+            )
+            .join(FaceDetection, FaceDetection.person_id == Person.id)
+            .join(Asset, Asset.id == FaceDetection.asset_id)
+            .filter(Asset.status == 'active')
+        ).group_by(Person.id, Person.display_name) \
+         .having(func.count(func.distinct(Asset.id)) >= min_assets) \
+         .order_by(func.count(func.distinct(Asset.id)).desc(), Person.id.asc()) \
+         .limit(max_stories_per_type) \
+         .all()
+
+        for row in person_rows:
+            person_id = int(row.person_id)
+            sample_ids = [
+                int(aid) for (aid,) in _apply_media_filter(
+                    db_s.query(Asset.id)
+                    .join(FaceDetection, FaceDetection.asset_id == Asset.id)
+                    .filter(FaceDetection.person_id == person_id, Asset.status == 'active')
+                ).group_by(Asset.id).order_by(Asset.id.desc()).limit(story_asset_limit).all()
+            ]
+            items = _hydrate_items(sample_ids)
+            if not items:
+                continue
+            title = (str(row.person_name or '').strip() or f"Person {person_id}")
+            stories.append({
+                'id': _story_id('person', str(person_id)),
+                'type': 'person',
+                'title': title,
+                'subtitle': 'Face cluster story',
+                'count': int(row.cnt or 0),
+                'items': items,
+                'open': {'mode': 'person', 'person_id': person_id, 'person_name': title},
+            })
+
+    if story_filter in ('all', 'tag'):
+        tag_rows = _apply_media_filter(
+            db_s.query(
+                Tag.id.label('tag_id'),
+                Tag.name.label('tag_name'),
+                func.count(func.distinct(Asset.id)).label('cnt'),
+            )
+            .join(AssetTag, AssetTag.tag_id == Tag.id)
+            .join(Asset, Asset.id == AssetTag.asset_id)
+            .filter(Asset.status == 'active')
+        ).group_by(Tag.id, Tag.name) \
+         .having(func.count(func.distinct(Asset.id)) >= min_assets) \
+         .order_by(func.count(func.distinct(Asset.id)).desc(), Tag.name.asc()) \
+         .limit(max_stories_per_type) \
+         .all()
+
+        for row in tag_rows:
+            tag_id = int(row.tag_id)
+            sample_ids = [
+                int(aid) for (aid,) in _apply_media_filter(
+                    db_s.query(Asset.id)
+                    .join(AssetTag, AssetTag.asset_id == Asset.id)
+                    .filter(AssetTag.tag_id == tag_id, Asset.status == 'active')
+                ).group_by(Asset.id).order_by(Asset.id.desc()).limit(story_asset_limit).all()
+            ]
+            items = _hydrate_items(sample_ids)
+            if not items:
+                continue
+            tag_name = str(row.tag_name or f"Tag {tag_id}")
+            stories.append({
+                'id': _story_id('tag', str(tag_id)),
+                'type': 'tag',
+                'title': tag_name,
+                'subtitle': 'Tag topic story',
+                'count': int(row.cnt or 0),
+                'items': items,
+                'open': {'mode': 'tag', 'tag_id': tag_id, 'tag_name': tag_name},
+            })
+
+    if story_filter in ('all', 'location'):
+        lat_bucket = func.round(Asset.gps_lat, 2)
+        lon_bucket = func.round(Asset.gps_lon, 2)
+        location_rows = _apply_media_filter(
+            db_s.query(
+                lat_bucket.label('lat_b'),
+                lon_bucket.label('lon_b'),
+                func.count(Asset.id).label('cnt'),
+            )
+            .filter(
+                Asset.status == 'active',
+                Asset.gps_lat != None,
+                Asset.gps_lon != None,
+            )
+        ).group_by(lat_bucket, lon_bucket) \
+         .having(func.count(Asset.id) >= min_assets) \
+         .order_by(func.count(Asset.id).desc()) \
+         .limit(max_stories_per_type) \
+         .all()
+
+        for row in location_rows:
+            if row.lat_b is None or row.lon_b is None:
+                continue
+            lat_value = float(row.lat_b)
+            lon_value = float(row.lon_b)
+            sample_ids = [
+                int(aid) for (aid,) in _apply_media_filter(
+                    db_s.query(Asset.id).filter(
+                        Asset.status == 'active',
+                        Asset.gps_lat != None,
+                        Asset.gps_lon != None,
+                        func.round(Asset.gps_lat, 2) == lat_value,
+                        func.round(Asset.gps_lon, 2) == lon_value,
+                    )
+                ).order_by(Asset.id.desc()).limit(story_asset_limit).all()
+            ]
+            items = _hydrate_items(sample_ids)
+            if not items:
+                continue
+            title = f"Near {lat_value:.2f}, {lon_value:.2f}"
+            stories.append({
+                'id': _story_id('location', f"{lat_value:.2f},{lon_value:.2f}"),
+                'type': 'location',
+                'title': title,
+                'subtitle': 'Geo cluster story',
+                'count': int(row.cnt or 0),
+                'items': items,
+                'open': {'mode': 'location', 'lat': lat_value, 'lon': lon_value},
+            })
+
+    if story_filter in ('all', 'caption'):
+        caption_rows = _apply_media_filter(
+            db_s.query(Caption.asset_id, Caption.text)
+            .join(Asset, Asset.id == Caption.asset_id)
+            .filter(Asset.status == 'active', Caption.superseded == False)
+        ).order_by(Caption.id.desc()).limit(caption_scan_limit).all()
+
+        keyword_assets: dict[str, set[int]] = defaultdict(set)
+        for row in caption_rows:
+            text = str(row.text or '').strip()
+            if not text:
+                continue
+            try:
+                candidates = extract_caption_tag_candidates(text, max_tags=8)
+            except Exception:
+                continue
+            seen: set[str] = set()
+            for cand in candidates:
+                name = str((cand or {}).get('name') or '').strip().lower()
+                if len(name) < 2:
+                    continue
+                if name in seen:
+                    continue
+                seen.add(name)
+                keyword_assets[name].add(int(row.asset_id))
+
+        ranked_caption_topics = sorted(
+            [
+                (name, len(asset_ids), sorted(list(asset_ids), reverse=True))
+                for name, asset_ids in keyword_assets.items()
+                if len(asset_ids) >= min_assets
+            ],
+            key=lambda x: (-x[1], x[0]),
+        )[:max_stories_per_type]
+
+        for name, count, asset_ids in ranked_caption_topics:
+            sample_ids = [int(aid) for aid in asset_ids[:story_asset_limit]]
+            items = _hydrate_items(sample_ids)
+            if not items:
+                continue
+            stories.append({
+                'id': _story_id('caption', name),
+                'type': 'caption',
+                'title': name,
+                'subtitle': 'Caption theme story',
+                'count': int(count),
+                'items': items,
+                'open': {'mode': 'caption', 'query': name},
+            })
+
+    stories.sort(key=lambda s: (-int(s.get('count') or 0), str(s.get('type') or ''), str(s.get('title') or '')))
+    return {
+        'api_version': schemas.API_VERSION,
+        'media': media_filter,
+        'story_type': story_filter,
+        'min_assets': min_assets,
+        'total': len(stories),
+        'stories': stories,
+    }
+
 # --- Albums: Time hierarchy (year -> month -> day)
 @app.get('/albums/time', response_model=schemas.TimeAlbumsResponse)
 def albums_time(limit_per_bucket: int = Query(5, ge=1, le=50), path_prefix: str | None = Query(None, description="Optional prefix to restrict asset paths (test isolation)"), db_s: Session = Depends(get_db)):

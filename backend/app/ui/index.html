@@ -73,6 +73,7 @@
       <button class="tab active" data-tab="library" data-i18n="tab_library">Library</button>
       <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
       <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
+      <button class="tab" data-tab="stories" data-i18n="tab_stories">Stories</button>
       <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
       <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
       <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
@@ -296,6 +297,58 @@
         </div>
       </section>
 
+      <section id="tab-stories" class="tab-panel">
+        <div class="panel-grid">
+          <div class="panel left-panel">
+            <div class="controls">
+              <h2 data-i18n="story_albums">Story Albums</h2>
+              <label>
+                <span data-i18n="story_type">Type</span>
+                <select id="stories-filter-type">
+                  <option value="all" data-i18n="story_type_all">All</option>
+                  <option value="person" data-i18n="story_type_person">Person</option>
+                  <option value="tag" data-i18n="story_type_tag">Tag</option>
+                  <option value="location" data-i18n="story_type_location">Location</option>
+                  <option value="caption" data-i18n="story_type_caption">Caption</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="media">Media</span>
+                <select id="stories-filter-media">
+                  <option value="all" data-i18n="media_all">All</option>
+                  <option value="image" data-i18n="media_image">Image</option>
+                  <option value="video" data-i18n="media_video">Video</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="story_min_assets">Min assets</span>
+                <input id="stories-min-assets" type="number" min="2" max="200" step="1" value="3" />
+              </label>
+              <button id="btn-refresh-stories" class="btn ghost" data-i18n="refresh">Refresh</button>
+            </div>
+            <p id="stories-meta" class="muted"></p>
+            <div class="table-wrap">
+              <table class="task-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="story_type">Type</th>
+                    <th data-i18n="query">Topic</th>
+                    <th data-i18n="assets">Assets</th>
+                    <th data-i18n="action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="stories-rows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel right-panel">
+            <h2 data-i18n="story_assets_panel">Story Assets</h2>
+            <p id="story-assets-meta" class="muted" data-i18n="story_assets_meta_default">Select a story to view related assets.</p>
+            <div id="story-assets-grid" class="asset-grid scroll-grid"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-panel">
         <div class="panel">
           <div class="controls">
@@ -387,6 +440,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260227h" defer></script>
+  <script src="/ui/app.js?v=20260227i" defer></script>
 </body>
 </html>

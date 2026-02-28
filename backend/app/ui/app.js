@@ -53,6 +53,16 @@ const state = {
     media: "all",
     source: "all",
   },
+  stories: {
+    storyType: "all",
+    media: "all",
+    minAssets: 3,
+    maxStoriesPerType: 6,
+    storyAssetLimit: 24,
+    stories: [],
+    selectedStoryId: "",
+    total: 0,
+  },
   voiceBusy: false,
 };
 
@@ -93,6 +103,7 @@ const I18N = {
     tab_library: "Library",
     tab_people: "People",
     tab_tags: "Tags",
+    tab_stories: "Stories",
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
@@ -252,6 +263,23 @@ const I18N = {
     tags_meta: "Tags: {shown} shown of {total}",
     tags_meta_paged: "Tags: {shown}/{total}",
     tag_catalog_load_failed: "Tag catalog load failed: {error}",
+    story_albums: "Story Albums",
+    story_type: "Type",
+    story_type_all: "All",
+    story_type_person: "Person",
+    story_type_tag: "Tag",
+    story_type_location: "Location",
+    story_type_caption: "Caption",
+    story_min_assets: "Min assets",
+    story_meta: "Stories: {shown} shown of {total}",
+    story_assets_panel: "Story Assets",
+    story_assets_meta_default: "Select a story to view related assets.",
+    story_assets_meta: "{title}: showing {shown}/{total}",
+    story_load_failed: "Story albums load failed: {error}",
+    story_view_assets: "View Assets",
+    story_open_context: "Open Context",
+    story_context_opened: "Opened story context",
+    story_context_unavailable: "Story context is unavailable",
     remove_tag: "Remove tag",
     tag_removed: "Tag removed",
     tag_update_failed: "Tag update failed: {error}",
@@ -310,6 +338,7 @@ const I18N = {
     tab_library: "资源库",
     tab_people: "人物",
     tab_tags: "标签",
+    tab_stories: "故事",
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
@@ -469,6 +498,23 @@ const I18N = {
     tags_meta: "标签: 显示 {shown} / {total}",
     tags_meta_paged: "标签: {shown}/{total}",
     tag_catalog_load_failed: "标签总览加载失败: {error}",
+    story_albums: "故事相册",
+    story_type: "类型",
+    story_type_all: "全部",
+    story_type_person: "人物",
+    story_type_tag: "标签",
+    story_type_location: "位置",
+    story_type_caption: "描述",
+    story_min_assets: "最少资源数",
+    story_meta: "故事: 显示 {shown} / {total}",
+    story_assets_panel: "故事资源",
+    story_assets_meta_default: "选择一个故事查看相关资源。",
+    story_assets_meta: "{title}: 当前显示 {shown}/{total}",
+    story_load_failed: "故事相册加载失败: {error}",
+    story_view_assets: "查看资源",
+    story_open_context: "打开上下文",
+    story_context_opened: "已打开故事上下文",
+    story_context_unavailable: "故事上下文不可用",
     remove_tag: "移除标签",
     tag_removed: "标签已移除",
     tag_update_failed: "标签更新失败: {error}",
@@ -516,6 +562,14 @@ function modeLabel(value) {
   if (value === "smart") return t("mode_smart");
   if (value === "person") return t("mode_person");
   return value;
+}
+
+function storyTypeLabel(value) {
+  if (value === "person") return t("story_type_person");
+  if (value === "tag") return t("story_type_tag");
+  if (value === "location") return t("story_type_location");
+  if (value === "caption") return t("story_type_caption");
+  return t("story_type_all");
 }
 
 function tagSourceLabel(value) {
@@ -800,6 +854,9 @@ function renderCurrentViewText() {
     } else {
       updateTagAssetsPagerUi();
     }
+  }
+  if (state.activeTab === "stories") {
+    loadStoryAlbums();
   }
   if (state.activeTab === "tasks") {
     loadTasks();
@@ -1606,6 +1663,125 @@ async function runTagAssetsJump() {
   await loadTagAssets(pager.tagId, target);
 }
 
+function getStoryById(storyId) {
+  const stories = Array.isArray(state.stories?.stories) ? state.stories.stories : [];
+  return stories.find((row) => String(row?.id || "") === String(storyId || "")) || null;
+}
+
+function renderStoryAssets(story) {
+  if (!story) {
+    state.stories = { ...state.stories, selectedStoryId: "" };
+    qs("story-assets-meta").textContent = t("story_assets_meta_default");
+    renderAssetGrid([], "story-assets-grid");
+    return;
+  }
+  const items = Array.isArray(story.items) ? story.items : [];
+  state.stories = { ...state.stories, selectedStoryId: String(story.id || "") };
+  qs("story-assets-meta").textContent = t("story_assets_meta", {
+    title: story.title || story.id || "",
+    shown: items.length,
+    total: Number(story.count) || items.length,
+  });
+  renderAssetGrid(items, "story-assets-grid");
+}
+
+async function openStoryContext(story) {
+  const open = story?.open && typeof story.open === "object" ? story.open : {};
+  if (open.mode === "person" && Number(open.person_id)) {
+    setActiveTab("people");
+    await loadPeople();
+    await loadPersonAssets(Number(open.person_id), 1);
+    showToast(t("story_context_opened"));
+    return;
+  }
+  if (open.mode === "tag" && Number(open.tag_id)) {
+    setActiveTab("tags");
+    await loadTagsCatalog(state.tagsPager.page || 1);
+    await loadTagAssets(Number(open.tag_id), 1);
+    showToast(t("story_context_opened"));
+    return;
+  }
+  if (open.mode === "caption" && String(open.query || "").trim()) {
+    setActiveTab("library");
+    qs("search-mode").value = "caption";
+    qs("search-query").value = String(open.query || "").trim();
+    qs("search-tags").value = "";
+    qs("search-media").value = state.stories.media || "all";
+    await runSearch(1, false);
+    showToast(t("story_context_opened"));
+    return;
+  }
+  if (open.mode === "location") {
+    setActiveTab("map");
+    await loadGeoMap();
+    showToast(t("story_context_opened"));
+    return;
+  }
+  showToast(t("story_context_unavailable"));
+}
+
+async function loadStoryAlbums() {
+  try {
+    const typeInput = qs("stories-filter-type");
+    const mediaInput = qs("stories-filter-media");
+    const minAssetsInput = qs("stories-min-assets");
+    const storyType = String((typeInput ? typeInput.value : state.stories.storyType) || "all").trim().toLowerCase();
+    const media = String((mediaInput ? mediaInput.value : state.stories.media) || "all").trim().toLowerCase();
+    const minAssets = Math.max(2, Number((minAssetsInput ? minAssetsInput.value : state.stories.minAssets) || 3) || 3);
+    const maxStoriesPerType = Math.max(1, Number(state.stories.maxStoriesPerType || 6) || 6);
+    const storyAssetLimit = Math.max(1, Number(state.stories.storyAssetLimit || 24) || 24);
+
+    const params = new URLSearchParams();
+    params.set("story_type", storyType);
+    params.set("media", media);
+    params.set("min_assets", String(minAssets));
+    params.set("max_stories_per_type", String(maxStoriesPerType));
+    params.set("story_asset_limit", String(storyAssetLimit));
+    const data = await api(`/albums/stories?${params.toString()}`);
+    const stories = Array.isArray(data?.stories) ? data.stories : [];
+    const total = Number(data?.total) || stories.length;
+
+    state.stories = {
+      ...state.stories,
+      storyType,
+      media,
+      minAssets,
+      stories,
+      total,
+    };
+    if (typeInput) typeInput.value = storyType;
+    if (mediaInput) mediaInput.value = media;
+    if (minAssetsInput) minAssetsInput.value = String(minAssets);
+
+    qs("stories-meta").textContent = t("story_meta", { shown: stories.length, total });
+    qs("stories-rows").innerHTML = stories
+      .map((story) => {
+        const sid = String(story?.id || "");
+        const active = sid === String(state.stories.selectedStoryId || "") ? "tags-row-active" : "";
+        return `
+          <tr class="${active}">
+            <td>${esc(storyTypeLabel(story?.type || "all"))}</td>
+            <td>
+              <div><strong>${esc(story?.title || sid)}</strong></div>
+              <div class="small muted">${esc(story?.subtitle || "-")}</div>
+            </td>
+            <td>${Number(story?.count) || 0}</td>
+            <td>
+              <button class="btn ghost" data-action="stories-view-assets" data-story-id="${esc(sid)}">${esc(t("story_view_assets"))}</button>
+              <button class="btn ghost" data-action="stories-open-context" data-story-id="${esc(sid)}">${esc(t("story_open_context"))}</button>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const activeStory = getStoryById(state.stories.selectedStoryId) || stories[0] || null;
+    renderStoryAssets(activeStory);
+  } catch (e) {
+    showToast(t("story_load_failed", { error: e.message }));
+  }
+}
+
 function closeAssetInspector() {
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
@@ -2262,6 +2438,7 @@ function initEvents() {
           await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
         }
       }
+      if (el.dataset.tab === "stories") await loadStoryAlbums();
       if (el.dataset.tab === "map") await loadGeoMap();
     });
   });
@@ -2274,6 +2451,7 @@ function initEvents() {
         await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
       }
     }
+    if (state.activeTab === "stories") await loadStoryAlbums();
     if (state.activeTab === "map") await loadGeoMap();
     showToast(t("refreshed"));
   });
@@ -2323,6 +2501,15 @@ function initEvents() {
     await loadAssetInspector(Number(card.dataset.assetId));
   });
 
+  qs("story-assets-grid").addEventListener("click", async (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    const originTab = state.activeTab;
+    setActiveTab("library");
+    state.inspectorOriginTab = originTab;
+    await loadAssetInspector(Number(card.dataset.assetId));
+  });
+
   qs("btn-asset-back").addEventListener("click", async () => {
     const returnTab = state.inspectorOriginTab || "library";
     closeAssetInspector();
@@ -2335,6 +2522,7 @@ function initEvents() {
           await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
         }
       }
+      if (returnTab === "stories") await loadStoryAlbums();
       if (returnTab === "map") await loadGeoMap();
       if (returnTab === "tasks") await loadTasks();
       if (returnTab === "admin") await refreshAdminPanels();
@@ -2547,6 +2735,12 @@ function initEvents() {
   qs("tag-assets-page-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runTagAssetsJump();
   });
+  qs("btn-refresh-stories").addEventListener("click", loadStoryAlbums);
+  qs("stories-filter-type").addEventListener("change", loadStoryAlbums);
+  qs("stories-filter-media").addEventListener("change", loadStoryAlbums);
+  qs("stories-min-assets").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadStoryAlbums();
+  });
   qs("btn-refresh-tasks").addEventListener("click", loadTasks);
 
   document.addEventListener("click", async (e) => {
@@ -2596,6 +2790,24 @@ function initEvents() {
     }
   });
 
+  qs("stories-rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const storyId = String(btn.dataset.storyId || "");
+    const story = getStoryById(storyId);
+    if (!story) return;
+    if (btn.dataset.action === "stories-view-assets") {
+      renderStoryAssets(story);
+      qs("stories-rows")
+        .querySelectorAll("tr")
+        .forEach((row) => row.classList.toggle("tags-row-active", String(row.querySelector("button[data-story-id]")?.dataset.storyId || "") === storyId));
+      return;
+    }
+    if (btn.dataset.action === "stories-open-context") {
+      await openStoryContext(story);
+    }
+  });
+
   qs("btn-rebuild-index").addEventListener("click", async () => {
     try {
       await api("/vector-index/rebuild", { method: "POST" });
@@ -2642,7 +2854,7 @@ async function bootstrap() {
   setLanguage(langParam || storedLang || "en", false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["library", "people", "tags", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && ["library", "people", "tags", "stories", "map", "tasks", "admin"].includes(tab)) {
     setActiveTab(tab);
   }
   const q = params.get("q");
@@ -2657,6 +2869,9 @@ async function bootstrap() {
     } else {
       updateTagAssetsPagerUi();
     }
+  }
+  if (state.activeTab === "stories") {
+    await loadStoryAlbums();
   }
   if (state.activeTab === "map") {
     await loadGeoMap();
