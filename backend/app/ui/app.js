@@ -208,6 +208,7 @@ const I18N = {
     label_line: "label={source}{score}",
     label_score: " score={score}",
     assign: "Assign",
+    mark_stranger: "Stranger",
     not_face: "Not Face",
     face_prefix: "Face #{id}",
     face_asset_prefix: "Face #{face}, asset #{asset}",
@@ -467,6 +468,7 @@ const I18N = {
     label_line: "标签={source}{score}",
     label_score: " 分数={score}",
     assign: "分配",
+    mark_stranger: "陌生人",
     not_face: "非人脸",
     face_prefix: "人脸 #{id}",
     face_asset_prefix: "人脸 #{face}, 资源 #{asset}",
@@ -2239,6 +2241,7 @@ function renderFaces(faces) {
               <button class="btn ghost" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}">${esc(t("popup_open_asset"))}</button>
               <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">${esc(t("assign"))}</button>
               <button class="btn ghost" data-action="create-assign-face" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
+              <button class="btn ghost" data-action="assign-face-stranger" data-face-id="${f.id}">${esc(t("mark_stranger"))}</button>
               <button class="btn danger" data-action="delete-face" data-face-id="${f.id}">${esc(t("not_face"))}</button>
             </div>
           </div>
@@ -2409,6 +2412,7 @@ async function loadUnassignedFaces(page = 1) {
                 <button class="btn ghost" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}">${esc(t("popup_open_asset"))}</button>
                 <button class="btn ghost" data-action="assign-face-unassigned" data-face-id="${f.id}">${esc(t("assign"))}</button>
                 <button class="btn ghost" data-action="create-assign-face-unassigned" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
+                <button class="btn ghost" data-action="assign-face-stranger-unassigned" data-face-id="${f.id}">${esc(t("mark_stranger"))}</button>
                 <button class="btn danger" data-action="delete-face-unassigned" data-face-id="${f.id}">${esc(t("not_face"))}</button>
               </div>
             </div>
@@ -2587,6 +2591,12 @@ async function createPersonFromFace(faceId) {
 async function deleteFace(faceId) {
   await api(`/faces/${faceId}?prune_empty_person=true`, {
     method: "DELETE",
+  });
+}
+
+async function markFaceStranger(faceId) {
+  await api(`/faces/${faceId}/assign-stranger`, {
+    method: "POST",
   });
 }
 
@@ -2808,6 +2818,8 @@ function initEvents() {
         await assignFace(faceId, `face-person-${faceId}`, `face-new-name-${faceId}`);
       } else if (btn.dataset.action === "create-assign-face") {
         await createAndAssignFaceByName(faceId, `face-new-name-${faceId}`);
+      } else if (btn.dataset.action === "assign-face-stranger") {
+        await markFaceStranger(faceId);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
       } else if (btn.dataset.action === "delete-face") {
@@ -2860,6 +2872,8 @@ function initEvents() {
         await assignFace(faceId, `face-person-unassigned-${faceId}`, `face-new-name-unassigned-${faceId}`);
       } else if (btn.dataset.action === "create-assign-face-unassigned") {
         await createAndAssignFaceByName(faceId, `face-new-name-unassigned-${faceId}`);
+      } else if (btn.dataset.action === "assign-face-stranger-unassigned") {
+        await markFaceStranger(faceId);
       } else if (btn.dataset.action === "create-person-face") {
         await createPersonFromFace(faceId);
       } else if (btn.dataset.action === "delete-face-unassigned") {

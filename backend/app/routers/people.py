@@ -12,6 +12,7 @@ from ..face_assignment_audit import record_face_assignment_event
 from .. import schemas
 
 router = APIRouter()
+STRANGER_PERSON_NAME = 'Stranger'
 
 # Helper
 
@@ -75,6 +76,23 @@ def _enqueue_label_propagation(db_s: Session, person_ids: list[int]) -> int | No
     db_s.add(t)
     db_s.flush()
     return int(t.id)
+
+
+def _get_or_create_stranger_person(db_s: Session) -> tuple[Person, bool]:
+    normalized = STRANGER_PERSON_NAME.lower()
+    person = (
+        db_s.query(Person)
+        .filter(Person.display_name != None)
+        .filter(func.lower(func.trim(Person.display_name)) == normalized)
+        .order_by(Person.id.asc())
+        .first()
+    )
+    if person is not None:
+        return person, False
+    person = Person(display_name=STRANGER_PERSON_NAME, face_count=0)
+    db_s.add(person)
+    db_s.flush()
+    return person, True
 
 @router.get('/persons', response_model=schemas.PersonsResponse)
 def list_persons(
@@ -273,6 +291,46 @@ def assign_face(face_id: int, person_id: int | None = Body(None), create_new: bo
     propagation_task_id = _enqueue_label_propagation(db_s, [int(person.id)])
     db_s.commit()
     return {'face_id': face.id, 'person_id': person.id, 'new_person_created': created, 'propagation_task_id': propagation_task_id}
+
+
+@router.post('/faces/{face_id}/assign-stranger')
+def assign_face_stranger(face_id: int, db_s: Session = Depends(get_db)):
+    face = db_s.get(FaceDetection, face_id)
+    if not face:
+        raise HTTPException(status_code=404, detail='face not found')
+    person, created = _get_or_create_stranger_person(db_s)
+    old_person_id = int(face.person_id) if face.person_id is not None else None
+    old_label_source = getattr(face, 'label_source', None)
+    old_label_score = getattr(face, 'label_score', None)
+    face.person_id = person.id  # type: ignore[attr-defined]
+    face.label_source = 'manual'  # type: ignore[attr-defined]
+    face.label_score = None  # type: ignore[attr-defined]
+    record_face_assignment_event(
+        db_s,
+        face=face,
+        source='manual',
+        reason='api.assign_face_stranger',
+        actor='api',
+        old_person_id=old_person_id,
+        new_person_id=int(person.id),
+        old_label_source=old_label_source,
+        new_label_source='manual',
+        old_label_score=float(old_label_score) if old_label_score is not None else None,
+        new_label_score=None,
+    )
+    recompute_ids = [int(person.id)]
+    if old_person_id is not None and old_person_id != int(person.id):
+        recompute_ids.append(old_person_id)
+    _recompute_face_counts(db_s, recompute_ids)
+    propagation_task_id = _enqueue_label_propagation(db_s, [int(person.id)])
+    db_s.commit()
+    return {
+        'face_id': int(face.id),
+        'person_id': int(person.id),
+        'display_name': person.display_name,
+        'new_person_created': created,
+        'propagation_task_id': propagation_task_id,
+    }
 
 @router.delete('/faces/{face_id}')
 def delete_face(face_id: int, prune_empty_person: bool = Query(True), db_s: Session = Depends(get_db)):
