@@ -93,11 +93,11 @@ Caption service (`vlmCaptionModels`, port 8102) is expected to run separately in
 
 - Keep LLMyTranslate as speech runtime.
 - Keep extending the Photo House voice command orchestrator (intent -> existing API calls).
-- Read-only voice actions are active (including person-photo browse); mutating actions still require future confirmation flow.
+- Read actions are active (including person-photo browse); mutating actions now run via explicit confirmation flow (rename, merge, assign Stranger, add tag).
 - Return bilingual concise voice/text summaries for outcomes.
 - Use phased rollout defined in architecture doc (`SYSTEM_ARCHITECTURE_2026-02-27.md`, section 5.8).
 - Keep service boundaries explicit: external model runtimes compute; Photo House owns state, policy, and mutations.
 
 ---
-*Last Updated: 2026-02-27*
-*Version: 2.6*
+*Last Updated: 2026-02-28*
+*Version: 2.7*

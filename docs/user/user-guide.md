@@ -14,15 +14,26 @@ This guide is intentionally short for now and points to the current production U
   - EN: `show me the photos of chuan`
   - ZH: `显示 chuan 的照片`
 - Result: UI opens the `People` tab and loads the same person-assets gallery you get from clicking that person manually.
-- Confirmation-gated mutate support is now enabled for rename:
-  - EN: `rename person chuan to chuan dad` -> `confirm` / `cancel`
-  - ZH: `把川川改名为川爸爸` -> `确认` / `取消`
+- Confirmation-gated mutate support is now enabled for:
+  - Rename person:
+    - EN: `rename person chuan to chuan dad` -> `confirm` / `cancel`
+    - ZH: `把川川改名为川爸爸` -> `确认` / `取消`
+  - Merge people:
+    - EN: `merge person 12 into person 5` -> `confirm` / `cancel`
+    - ZH: `把人物12合并到人物5` -> `确认` / `取消`
+  - Assign face to Stranger:
+    - EN: `assign face 321 to stranger` -> `confirm` / `cancel`
+    - ZH: `把人脸321标记为陌生人` -> `确认` / `取消`
+  - Add manual tag to asset:
+    - EN: `add tag birthday to asset 100` -> `confirm` / `cancel`
+    - ZH: `给资源100添加标签生日` -> `确认` / `取消`
 - Safety: mutating intents without explicit confirmation still do not execute.
 
 ## Voice Chat (Multi-turn Conversation)
 
 - Use **Voice Chat** for free-form conversation with context kept across turns.
 - Use **Reset Chat** to clear the current conversation context and start a fresh one.
+- Use the top `Voice History` panel to review recent transcript/reply/summary events, and `Clear History` to reset it.
 - The flow is: browser recording -> transcribe -> chat turn -> TTS playback (with browser speech fallback when server audio is unavailable).
 
 ## Main Tabs

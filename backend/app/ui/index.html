@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260227h" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260228c" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -34,6 +34,14 @@
         <a class="btn ghost" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
       </div>
     </header>
+
+    <section id="voice-history-panel" class="voice-history-panel">
+      <div class="voice-history-header">
+        <strong data-i18n="voice_history">Voice History</strong>
+        <button id="btn-voice-history-clear" class="btn ghost" data-i18n="voice_history_clear">Clear</button>
+      </div>
+      <div id="voice-history-list" class="voice-history-list"></div>
+    </section>
 
     <section class="status-cards">
       <article class="stat-card">
@@ -491,6 +499,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260228b" defer></script>
+  <script src="/ui/app.js?v=20260228c" defer></script>
 </body>
 </html>

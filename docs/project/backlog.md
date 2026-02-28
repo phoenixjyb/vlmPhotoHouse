@@ -33,7 +33,7 @@
 ## P6
 - Voice proxy hardening + endpoint contract tests (`/voice/transcribe`, `/voice/tts`, `/voice/conversation`) ✅
 - Voice command orchestrator read-only flows (`search/status/browse`, including person-photo intent) ✅
-- Safety/confirmation flow for mutating voice actions (rename, merge, tag add/remove, task enqueue) 📋
+- Safety/confirmation flow for mutating voice actions (rename, merge, assign-stranger, tag add) ✅; remaining mutate intents (tag remove/task ops) 🔄
 - Voice-out summaries (bilingual EN/ZH) for search results and action confirmations 🔄
 
 ## Continuous

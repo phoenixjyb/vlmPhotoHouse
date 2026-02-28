@@ -76,6 +76,7 @@ const state = {
   voiceConversationId: "",
   voicePendingConfirmationToken: "",
   voiceClientId: "",
+  voiceHistory: [],
 };
 
 const qs = (id) => document.getElementById(id);
@@ -94,6 +95,12 @@ const I18N = {
     voice_chat_reply_audio: "Assistant replied with audio",
     voice_chat_reply_text: "Assistant: {text}",
     voice_chat_session_reset: "Voice chat context reset",
+    voice_history: "Voice History",
+    voice_history_clear: "Clear History",
+    voice_history_empty: "No voice interactions yet.",
+    voice_history_you: "You",
+    voice_history_assistant: "Assistant",
+    voice_history_system: "System",
     voice_recording: "Listening...",
     voice_processing: "Processing...",
     voice_not_supported: "Voice capture is not supported in this browser",
@@ -356,6 +363,12 @@ const I18N = {
     voice_chat_reply_audio: "助手已语音回复",
     voice_chat_reply_text: "助手：{text}",
     voice_chat_session_reset: "语音对话上下文已重置",
+    voice_history: "语音记录",
+    voice_history_clear: "清空记录",
+    voice_history_empty: "暂无语音交互记录。",
+    voice_history_you: "你",
+    voice_history_assistant: "助手",
+    voice_history_system: "系统",
     voice_recording: "正在聆听...",
     voice_processing: "处理中...",
     voice_not_supported: "当前浏览器不支持语音采集",
@@ -938,6 +951,7 @@ function renderCurrentViewText() {
   if (state.activeTab === "map") {
     loadGeoMap();
   }
+  renderVoiceHistory();
 }
 
 function esc(s) {
@@ -996,6 +1010,47 @@ async function api(url, opts = {}) {
 function setVoiceStatus(message = "") {
   const el = qs("voice-status");
   if (el) el.textContent = message;
+}
+
+function voiceRoleLabel(role) {
+  if (role === "you") return t("voice_history_you");
+  if (role === "assistant") return t("voice_history_assistant");
+  return t("voice_history_system");
+}
+
+function renderVoiceHistory() {
+  const list = qs("voice-history-list");
+  if (!list) return;
+  const rows = Array.isArray(state.voiceHistory) ? state.voiceHistory : [];
+  if (!rows.length) {
+    list.innerHTML = `<div class="voice-history-empty">${esc(t("voice_history_empty"))}</div>`;
+    return;
+  }
+  list.innerHTML = rows
+    .map((row) => {
+      const role = String(row?.role || "system");
+      const text = String(row?.text || "");
+      const ts = Number(row?.ts || 0);
+      const stamp = ts > 0 ? new Date(ts).toLocaleTimeString() : "";
+      return `<div class="voice-history-entry ${esc(role)}"><div class="voice-history-entry-head"><span class="voice-history-role">${esc(
+        voiceRoleLabel(role)
+      )}</span><span class="voice-history-time">${esc(stamp)}</span></div><div class="voice-history-text">${esc(text)}</div></div>`;
+    })
+    .join("");
+}
+
+function addVoiceHistory(role, text) {
+  const msg = String(text || "").trim();
+  if (!msg) return;
+  const next = Array.isArray(state.voiceHistory) ? state.voiceHistory.slice(-11) : [];
+  next.push({ role: String(role || "system"), text: msg, ts: Date.now() });
+  state.voiceHistory = next;
+  renderVoiceHistory();
+}
+
+function clearVoiceHistory() {
+  state.voiceHistory = [];
+  renderVoiceHistory();
 }
 
 function getOrCreateVoiceClientId() {
@@ -1124,7 +1179,9 @@ async function openPersonAssetsFromLookup(lookup) {
   setActiveTab("people");
   await loadPeople();
   await loadPersonAssets(personId, 1);
-  showToast(t("voice_person_opened", { name: personName, total }));
+  const msg = t("voice_person_opened", { name: personName, total });
+  addVoiceHistory("assistant", msg);
+  showToast(msg);
   return true;
 }
 
@@ -1144,7 +1201,9 @@ async function openPersonSearchByName(rawQuery) {
   qs("search-query").value = q;
   qs("search-media").value = "all";
   await runSearch(1, false);
-  showToast(t("voice_person_opened", { name: q, total }));
+  const msg = t("voice_person_opened", { name: q, total });
+  addVoiceHistory("assistant", msg);
+  showToast(msg);
   return true;
 }
 
@@ -1154,7 +1213,9 @@ async function tryClientPersonAssetsFallback(text) {
   const lookup = await lookupPersonByNameQuery(q);
   if (await openPersonAssetsFromLookup(lookup)) return true;
   if (await openPersonSearchByName(lookup?.query || q)) return true;
-  showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
+  const msg = t("voice_person_not_found", { name: String(lookup?.query || q || "?") });
+  addVoiceHistory("assistant", msg);
+  showToast(msg);
   return true;
 }
 
@@ -1195,14 +1256,18 @@ async function executeVoiceCommand(text) {
       setActiveTab("people");
       await loadPeople();
       await loadPersonAssets(personId, 1);
-      showToast(t("voice_person_opened", { name: personName, total }));
+      const msg = t("voice_person_opened", { name: personName, total });
+      addVoiceHistory("assistant", msg);
+      showToast(msg);
       return;
     }
     const q = String(payload?.data?.query || "").trim() || extractVoicePersonAssetsQuery(text) || text;
     const lookup = await lookupPersonByNameQuery(q);
     if (await openPersonAssetsFromLookup(lookup)) return;
     if (await openPersonSearchByName(lookup?.query || q)) return;
-    showToast(t("voice_person_not_found", { name: String(lookup?.query || q || "?") }));
+    const msg = t("voice_person_not_found", { name: String(lookup?.query || q || "?") });
+    addVoiceHistory("assistant", msg);
+    showToast(msg);
     return;
   }
   if (action === "help") {
@@ -1210,7 +1275,10 @@ async function executeVoiceCommand(text) {
     if (handled) return;
   }
   const summary = String(payload?.summary_text || "").trim();
-  if (summary) showToast(summary);
+  if (summary) {
+    addVoiceHistory("assistant", summary);
+    showToast(summary);
+  }
 }
 
 async function runVoiceCommandCapture() {
@@ -1272,9 +1340,11 @@ async function runVoiceCommandCapture() {
       showToast(err ? t("voice_transcribe_failed", { error: err }) : t("voice_no_transcript"));
       return;
     }
+    addVoiceHistory("you", transcript);
     showToast(t("voice_heard", { text: transcript }));
     await executeVoiceCommand(transcript);
   } catch (e) {
+    addVoiceHistory("system", t("voice_command_failed", { error: e.message }));
     showToast(t("voice_command_failed", { error: e.message }));
   } finally {
     if (stream) {
@@ -1289,7 +1359,9 @@ async function runVoiceCommandCapture() {
 function resetVoiceConversationContext() {
   state.voiceConversationId = "";
   state.voicePendingConfirmationToken = "";
-  showToast(t("voice_chat_session_reset"));
+  const msg = t("voice_chat_session_reset");
+  addVoiceHistory("system", msg);
+  showToast(msg);
 }
 
 async function runVoiceConversationCapture() {
@@ -1352,6 +1424,7 @@ async function runVoiceConversationCapture() {
       showToast(err ? t("voice_transcribe_failed", { error: err }) : t("voice_no_transcript"));
       return;
     }
+    addVoiceHistory("you", transcript);
     showToast(t("voice_heard", { text: transcript }));
 
     const chat = await api("/voice/chat", {
@@ -1371,14 +1444,17 @@ async function runVoiceConversationCapture() {
     if (!textReply) {
       const err = String(chat?.error || "");
       if (err) {
+        addVoiceHistory("system", t("voice_chat_failed", { error: err }));
         showToast(t("voice_chat_failed", { error: err }));
         return;
       }
+      addVoiceHistory("system", t("voice_chat_no_reply"));
       showToast(t("voice_chat_no_reply"));
       return;
     }
 
     const brief = textReply.length > 80 ? `${textReply.slice(0, 80)}...` : textReply;
+    addVoiceHistory("assistant", textReply);
     showToast(t("voice_chat_reply_text", { text: brief }));
 
     const ttsRes = await fetch("/voice/tts", {
@@ -1419,6 +1495,7 @@ async function runVoiceConversationCapture() {
       window.speechSynthesis.speak(u);
     }
   } catch (e) {
+    addVoiceHistory("system", t("voice_chat_failed", { error: e.message }));
     showToast(t("voice_chat_failed", { error: e.message }));
   } finally {
     if (stream) {
@@ -2757,6 +2834,10 @@ function initEvents() {
   const voiceChatResetBtn = qs("btn-voice-chat-reset");
   if (voiceChatResetBtn) {
     voiceChatResetBtn.addEventListener("click", resetVoiceConversationContext);
+  }
+  const voiceHistoryClearBtn = qs("btn-voice-history-clear");
+  if (voiceHistoryClearBtn) {
+    voiceHistoryClearBtn.addEventListener("click", clearVoiceHistory);
   }
 
   qs("btn-search").addEventListener("click", () => runSearch(1, false));

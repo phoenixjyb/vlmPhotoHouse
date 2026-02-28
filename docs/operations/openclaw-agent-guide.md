@@ -200,7 +200,7 @@ Invoke-RestMethod -Method Post `
 Expected contract:
 - `action = search.person.assets`
 - returns `person_id`, `person_name`, `items`, `total`
-- mutating voice intents are blocked as `mutate.request`
+- mutating intents are confirmation-gated (`mutate.*` preview with `confirmation_token`; execute only after confirm)
 
 ### D) Search by tags (read-only)
 
@@ -266,7 +266,7 @@ For each user request:
 
 ## 10) Known current limits
 
-- Voice orchestration is currently **read-only**; mutating intents require future confirmation flow.
+- Voice orchestration supports read intents plus confirmation-gated mutating intents (`rename`, `merge`, `assign-stranger`, `tag-add`).
 - Legacy `voice_photo` routes exist but are not the canonical production control path.
 - Some video/phash backlog behavior may require targeted operational handling outside standard ingest flow.
 

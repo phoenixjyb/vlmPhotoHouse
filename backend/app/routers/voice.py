@@ -15,7 +15,8 @@ from sqlalchemy import func, select
 
 from ..config import get_settings
 from ..dependencies import get_db
-from ..db import Asset, Person, FaceDetection, Task, Tag, AssetTag
+from ..db import Asset, Person, FaceDetection, Task, Tag, AssetTag, AssetTagBlock
+from .people import assign_face_stranger as people_assign_face_stranger, merge_persons as people_merge_persons
 
 router = APIRouter()
 
@@ -106,6 +107,92 @@ def _parse_rename_person_action(normalized_text: str) -> Optional[dict[str, Any]
         new_name = _normalize_person_name(m.group(2))
         if old_query and new_name:
             return {'person_id': None, 'old_query': old_query, 'new_name': new_name}
+    return None
+
+
+def _normalize_person_ref(raw: str) -> tuple[int | None, str]:
+    text = _normalize_person_name(raw)
+    text = re.sub(r'^(?:person|人物)\s*#?', '', text, flags=re.IGNORECASE).strip()
+    if re.fullmatch(r'\d+', text):
+        return int(text), text
+    return None, text
+
+
+def _parse_merge_people_action(normalized_text: str) -> Optional[dict[str, Any]]:
+    m_id = re.match(
+        r"^(?:please\s+)?merge\s+(?:person\s+)?#?(\d+)\s+(?:into|to)\s+(?:person\s+)?#?(\d+)$",
+        normalized_text,
+    )
+    if m_id:
+        src_id = int(m_id.group(1))
+        tgt_id = int(m_id.group(2))
+        return {
+            'source_person_id': src_id,
+            'source_query': str(src_id),
+            'target_person_id': tgt_id,
+            'target_query': str(tgt_id),
+        }
+
+    patterns = (
+        r"^(?:please\s+)?merge\s+(.+?)\s+(?:into|to)\s+(.+)$",
+        r"^(?:请)?(?:把|将)?(.+?)\s*(?:合并到|并入)\s*(.+)$",
+    )
+    for pattern in patterns:
+        m = re.match(pattern, normalized_text)
+        if not m:
+            continue
+        src_id, src_q = _normalize_person_ref(m.group(1))
+        tgt_id, tgt_q = _normalize_person_ref(m.group(2))
+        if (src_id or src_q) and (tgt_id or tgt_q):
+            return {
+                'source_person_id': src_id,
+                'source_query': src_q,
+                'target_person_id': tgt_id,
+                'target_query': tgt_q,
+            }
+    return None
+
+
+def _parse_assign_stranger_action(normalized_text: str) -> Optional[dict[str, Any]]:
+    patterns = (
+        r"^(?:please\s+)?(?:assign|mark|set)\s+face\s+#?(\d+)\s+(?:to|as)\s+stranger$",
+        r"^(?:请)?(?:把|将)?(?:人脸|脸)\s*#?(\d+)\s*(?:标记为|设为|分配给)\s*陌生人$",
+    )
+    for pattern in patterns:
+        m = re.match(pattern, normalized_text)
+        if not m:
+            continue
+        return {'face_id': int(m.group(1))}
+    return None
+
+
+def _normalize_tag_name(raw: str) -> str:
+    text = str(raw or '').strip()
+    text = text.strip(" \t\r\n'\"`“”‘’.,!?;:，。！？；：")
+    return text
+
+
+def _parse_add_tag_action(normalized_text: str) -> Optional[dict[str, Any]]:
+    patterns = (
+        r"^(?:please\s+)?add\s+tag\s+(.+?)\s+to\s+(?:asset|photo|image)\s+#?(\d+)$",
+        r"^(?:please\s+)?tag\s+(?:asset|photo|image)\s+#?(\d+)\s+(?:with\s+)?(.+)$",
+        r"^(?:请)?(?:给|为)?(?:资源|照片|图片|资产)\s*#?(\d+)\s*(?:加标签|添加标签|打上标签)\s*(.+)$",
+    )
+    for pattern in patterns:
+        m = re.match(pattern, normalized_text)
+        if not m:
+            continue
+        if pattern.startswith("^(?:please\\s+)?tag"):
+            aid = int(m.group(1))
+            tag_name = _normalize_tag_name(m.group(2))
+        elif "资源|照片|图片|资产" in pattern:
+            aid = int(m.group(1))
+            tag_name = _normalize_tag_name(m.group(2))
+        else:
+            tag_name = _normalize_tag_name(m.group(1))
+            aid = int(m.group(2))
+        if tag_name:
+            return {'asset_id': aid, 'tag_name': tag_name}
     return None
 
 
@@ -244,6 +331,36 @@ def _parse_voice_action(text: str) -> dict[str, Any]:
             'confidence': 0.9,
         }
 
+    merge_args = _parse_merge_people_action(n)
+    if merge_args:
+        return {
+            'action': 'mutate.people.merge',
+            'mode': 'mutate',
+            'args': merge_args,
+            'needs_confirmation': True,
+            'confidence': 0.9,
+        }
+
+    assign_stranger_args = _parse_assign_stranger_action(n)
+    if assign_stranger_args:
+        return {
+            'action': 'mutate.face.assign_stranger',
+            'mode': 'mutate',
+            'args': assign_stranger_args,
+            'needs_confirmation': True,
+            'confidence': 0.9,
+        }
+
+    add_tag_args = _parse_add_tag_action(n)
+    if add_tag_args:
+        return {
+            'action': 'mutate.asset.tag_add',
+            'mode': 'mutate',
+            'args': add_tag_args,
+            'needs_confirmation': True,
+            'confidence': 0.88,
+        }
+
     mutating_markers = (
         'rename', 'merge', 'delete', 'remove', 'assign', 'unassign', 'add tag',
         'cancel task', 'requeue', 'split person', '重命名', '合并', '删除', '移除', '分配', '取消任务', '重新入队'
@@ -340,6 +457,29 @@ def _voice_summary(action: str, data: dict[str, Any], language: Optional[str]) -
             if zh
             else f'I can rename "{old_name}" to "{new_name}". Say "confirm" to execute, or "cancel" to abort.'
         )
+    if action == 'mutate.pending.merge':
+        source_name = str(data.get('source_name') or '')
+        target_name = str(data.get('target_name') or '')
+        return (
+            f'将把人物“{source_name}”合并到“{target_name}”。请说“确认”执行，或说“取消”放弃。'
+            if zh
+            else f'I can merge "{source_name}" into "{target_name}". Say "confirm" to execute, or "cancel" to abort.'
+        )
+    if action == 'mutate.pending.assign_stranger':
+        face_id = int(data.get('face_id', 0))
+        return (
+            f'将把人脸#{face_id}分配到“Stranger”分组。请说“确认”执行，或说“取消”放弃。'
+            if zh
+            else f'I can assign face #{face_id} to Stranger. Say "confirm" to execute, or "cancel" to abort.'
+        )
+    if action == 'mutate.pending.tag_add':
+        asset_id = int(data.get('asset_id', 0))
+        tag_name = str(data.get('tag_name') or '')
+        return (
+            f'将给资源#{asset_id}添加标签“{tag_name}”。请说“确认”执行，或说“取消”放弃。'
+            if zh
+            else f'I can add tag "{tag_name}" to asset #{asset_id}. Say "confirm" to execute, or "cancel" to abort.'
+        )
     if action == 'mutate.person.rename.done':
         old_name = str(data.get('old_name') or '')
         new_name = str(data.get('new_name') or '')
@@ -369,6 +509,70 @@ def _voice_summary(action: str, data: dict[str, Any], language: Optional[str]) -
             f'人物名称已是“{name}”，无需修改。'
             if zh
             else f'Person is already named "{name}". No change needed.'
+        )
+    if action == 'mutate.people.merge.done':
+        source_name = str(data.get('source_name') or '')
+        target_name = str(data.get('target_name') or '')
+        moved_faces = int(data.get('moved_faces', 0))
+        return (
+            f'已将“{source_name}”合并到“{target_name}”，迁移人脸{moved_faces}个。'
+            if zh
+            else f'Merged "{source_name}" into "{target_name}" and moved {moved_faces} faces.'
+        )
+    if action == 'mutate.people.merge.person_not_found':
+        q = str(data.get('query') or '')
+        return (
+            f'未找到可合并的人物：{q}。'
+            if zh
+            else f'No person found for merge target "{q}".'
+        )
+    if action == 'mutate.people.merge.invalid_target':
+        return (
+            '合并源和目标不能相同。'
+            if zh
+            else 'Merge source and target cannot be the same person.'
+        )
+    if action == 'mutate.face.assign_stranger.done':
+        face_id = int(data.get('face_id', 0))
+        return (
+            f'已将人脸#{face_id}分配到“Stranger”。'
+            if zh
+            else f'Assigned face #{face_id} to Stranger.'
+        )
+    if action == 'mutate.face.assign_stranger.face_not_found':
+        face_id = int(data.get('face_id', 0))
+        return (
+            f'未找到人脸#{face_id}。'
+            if zh
+            else f'Face #{face_id} was not found.'
+        )
+    if action == 'mutate.asset.tag_add.done':
+        asset_id = int(data.get('asset_id', 0))
+        tag_name = str(data.get('tag_name') or '')
+        added = bool(data.get('added', False))
+        if zh:
+            return (
+                f'已为资源#{asset_id}添加标签“{tag_name}”。'
+                if added
+                else f'资源#{asset_id}已包含标签“{tag_name}”，已更新为手工标签来源。'
+            )
+        return (
+            f'Added tag "{tag_name}" to asset #{asset_id}.'
+            if added
+            else f'Asset #{asset_id} already had tag "{tag_name}"; updated to manual tag source.'
+        )
+    if action == 'mutate.asset.tag_add.asset_not_found':
+        asset_id = int(data.get('asset_id', 0))
+        return (
+            f'未找到资源#{asset_id}。'
+            if zh
+            else f'Asset #{asset_id} was not found.'
+        )
+    if action == 'mutate.asset.tag_add.invalid_tag':
+        return (
+            '标签内容为空或无效。'
+            if zh
+            else 'Tag text is empty or invalid.'
         )
     if action == 'mutate.confirm.missing':
         return (
@@ -442,9 +646,9 @@ def _voice_summary(action: str, data: dict[str, Any], language: Optional[str]) -
             else f'Found {total} tags matching "{q}".'
         )
     return (
-        '我目前支持只读语音命令：搜索资产、搜索人物、搜索标签、查看系统或任务状态。'
+        '我目前支持语音命令：搜索资产、搜索人物、搜索标签、查看系统或任务状态，以及带确认的重命名/合并/标签/陌生人分配。'
         if zh
-        else 'I currently support read-only voice commands: asset search, people search, tag search, and status queries.'
+        else 'I currently support voice commands for search/status and confirmation-gated mutations: rename, merge, add tag, and assign stranger.'
     )
 
 
@@ -757,6 +961,14 @@ def voice_command(
             .first()
         )
 
+    def _resolve_person_ref(person_id: int, query: str):
+        pid = int(person_id or 0)
+        q = str(query or '').strip()
+        person_match = _find_person_match(pid, q)
+        if person_match is None:
+            return None, q or str(pid)
+        return person_match, str(person_match[1] or f'#{int(person_match[0])}')
+
     if cancel or action == 'mutate.cancel':
         dropped = _pop_pending_action(client_key, confirmation_token)
         summary_action = 'mutate.cancelled' if dropped else 'mutate.confirm.missing'
@@ -867,6 +1079,185 @@ def voice_command(
                 'data': data,
             }
 
+        if pending_action == 'mutate.people.merge':
+            source_id = int(pending_args.get('source_person_id') or 0)
+            target_id = int(pending_args.get('target_person_id') or 0)
+            source_match, source_label = _resolve_person_ref(source_id, str(pending_args.get('source_query') or ''))
+            target_match, target_label = _resolve_person_ref(target_id, str(pending_args.get('target_query') or ''))
+            if source_match is None:
+                data = {'reason': 'person_not_found', 'query': source_label, 'side': 'source'}
+                summary_text = _voice_summary('mutate.people.merge.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            if target_match is None:
+                data = {'reason': 'person_not_found', 'query': target_label, 'side': 'target'}
+                summary_text = _voice_summary('mutate.people.merge.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            source_person_id = int(source_match[0])
+            target_person_id = int(target_match[0])
+            if source_person_id == target_person_id:
+                data = {'reason': 'invalid_target', 'source_person_id': source_person_id, 'target_person_id': target_person_id}
+                summary_text = _voice_summary('mutate.people.merge.invalid_target', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            try:
+                merge_result = people_merge_persons(target_id=target_person_id, source_ids=[source_person_id], db_s=db_s)
+            except HTTPException as exc:
+                data = {'reason': 'merge_failed', 'detail': str(exc.detail), 'source_person_id': source_person_id, 'target_person_id': target_person_id}
+                summary_text = str(exc.detail or 'merge failed')
+                return {
+                    'success': False,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            data = {
+                'reason': 'confirmed_and_executed',
+                'source_person_id': source_person_id,
+                'target_person_id': target_person_id,
+                'source_name': str(source_match[1] or source_label),
+                'target_name': str(target_match[1] or target_label),
+                'moved_faces': int(merge_result.get('moved_faces', 0)),
+                'propagation_task_id': merge_result.get('propagation_task_id'),
+            }
+            summary_text = _voice_summary('mutate.people.merge.done', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': True,
+                'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        if pending_action == 'mutate.face.assign_stranger':
+            face_id = int(pending_args.get('face_id') or 0)
+            try:
+                result = people_assign_face_stranger(face_id=face_id, db_s=db_s)
+            except HTTPException:
+                data = {'reason': 'face_not_found', 'face_id': face_id}
+                summary_text = _voice_summary('mutate.face.assign_stranger.face_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            data = {
+                'reason': 'confirmed_and_executed',
+                'face_id': face_id,
+                'person_id': int(result.get('person_id') or 0),
+                'person_name': str(result.get('display_name') or 'Stranger'),
+                'propagation_task_id': result.get('propagation_task_id'),
+            }
+            summary_text = _voice_summary('mutate.face.assign_stranger.done', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': True,
+                'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        if pending_action == 'mutate.asset.tag_add':
+            asset_id = int(pending_args.get('asset_id') or 0)
+            tag_name = _normalize_tag_name(str(pending_args.get('tag_name') or ''))
+            if not tag_name:
+                data = {'reason': 'invalid_tag', 'asset_id': asset_id}
+                summary_text = _voice_summary('mutate.asset.tag_add.invalid_tag', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            asset = db_s.get(Asset, asset_id)
+            if asset is None:
+                data = {'reason': 'asset_not_found', 'asset_id': asset_id}
+                summary_text = _voice_summary('mutate.asset.tag_add.asset_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            tag = (
+                db_s.query(Tag)
+                .filter(func.lower(Tag.name) == tag_name.lower())
+                .order_by(Tag.id.asc())
+                .first()
+            )
+            if tag is None:
+                tag = Tag(name=tag_name, type='manual')
+                db_s.add(tag)
+                db_s.flush()
+            blocked = db_s.query(AssetTagBlock).filter(AssetTagBlock.asset_id == asset_id, AssetTagBlock.tag_id == tag.id).first()
+            if blocked is not None:
+                db_s.delete(blocked)
+            link = db_s.query(AssetTag).filter(AssetTag.asset_id == asset_id, AssetTag.tag_id == tag.id).first()
+            added = False
+            if link is None:
+                db_s.add(AssetTag(asset_id=asset_id, tag_id=tag.id, source='manual', model='manual'))
+                added = True
+            else:
+                link.source = 'manual'  # type: ignore[attr-defined]
+                link.model = 'manual'  # type: ignore[attr-defined]
+            db_s.commit()
+            data = {
+                'reason': 'confirmed_and_executed',
+                'asset_id': asset_id,
+                'tag_name': tag_name,
+                'tag_id': int(tag.id),
+                'added': added,
+            }
+            summary_text = _voice_summary('mutate.asset.tag_add.done', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': True,
+                'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
         summary_text = _voice_summary('mutate.confirm.missing', {}, language)
         return {
             'success': True,
@@ -956,6 +1347,177 @@ def voice_command(
                 'expires_in_sec': expires_in,
             }
             summary_text = _voice_summary('mutate.pending.rename', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': False,
+                'contract': contract,
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        if action == 'mutate.people.merge':
+            args = dict(contract.get('args') or {})
+            source_match, source_label = _resolve_person_ref(
+                int(args.get('source_person_id') or 0),
+                str(args.get('source_query') or ''),
+            )
+            target_match, target_label = _resolve_person_ref(
+                int(args.get('target_person_id') or 0),
+                str(args.get('target_query') or ''),
+            )
+            if source_match is None:
+                data = {'reason': 'person_not_found', 'query': source_label, 'side': 'source'}
+                summary_text = _voice_summary('mutate.people.merge.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            if target_match is None:
+                data = {'reason': 'person_not_found', 'query': target_label, 'side': 'target'}
+                summary_text = _voice_summary('mutate.people.merge.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            source_person_id = int(source_match[0])
+            target_person_id = int(target_match[0])
+            if source_person_id == target_person_id:
+                data = {'reason': 'invalid_target', 'source_person_id': source_person_id, 'target_person_id': target_person_id}
+                summary_text = _voice_summary('mutate.people.merge.invalid_target', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            source_name = str(source_match[1] or source_label)
+            target_name = str(target_match[1] or target_label)
+            pending = _put_pending_action(
+                client_key,
+                'mutate.people.merge',
+                {
+                    'source_person_id': source_person_id,
+                    'source_query': source_label,
+                    'source_name': source_name,
+                    'target_person_id': target_person_id,
+                    'target_query': target_label,
+                    'target_name': target_name,
+                },
+            )
+            expires_in = max(1, int(float(pending['expires_at']) - time.time()))
+            data = {
+                'reason': 'confirmation_required',
+                'pending_action': 'mutate.people.merge',
+                'source_person_id': source_person_id,
+                'target_person_id': target_person_id,
+                'source_name': source_name,
+                'target_name': target_name,
+                'confirmation_token': str(pending['token']),
+                'expires_in_sec': expires_in,
+            }
+            summary_text = _voice_summary('mutate.pending.merge', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': False,
+                'contract': contract,
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        if action == 'mutate.face.assign_stranger':
+            args = dict(contract.get('args') or {})
+            face_id = int(args.get('face_id') or 0)
+            face = db_s.get(FaceDetection, face_id)
+            if face is None:
+                data = {'reason': 'face_not_found', 'face_id': face_id}
+                summary_text = _voice_summary('mutate.face.assign_stranger.face_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            pending = _put_pending_action(client_key, 'mutate.face.assign_stranger', {'face_id': face_id})
+            expires_in = max(1, int(float(pending['expires_at']) - time.time()))
+            data = {
+                'reason': 'confirmation_required',
+                'pending_action': 'mutate.face.assign_stranger',
+                'face_id': face_id,
+                'asset_id': int(face.asset_id),
+                'confirmation_token': str(pending['token']),
+                'expires_in_sec': expires_in,
+            }
+            summary_text = _voice_summary('mutate.pending.assign_stranger', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': False,
+                'contract': contract,
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        if action == 'mutate.asset.tag_add':
+            args = dict(contract.get('args') or {})
+            asset_id = int(args.get('asset_id') or 0)
+            tag_name = _normalize_tag_name(str(args.get('tag_name') or ''))
+            if not tag_name:
+                data = {'reason': 'invalid_tag', 'asset_id': asset_id}
+                summary_text = _voice_summary('mutate.asset.tag_add.invalid_tag', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            asset = db_s.get(Asset, asset_id)
+            if asset is None:
+                data = {'reason': 'asset_not_found', 'asset_id': asset_id}
+                summary_text = _voice_summary('mutate.asset.tag_add.asset_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+            pending = _put_pending_action(client_key, 'mutate.asset.tag_add', {'asset_id': asset_id, 'tag_name': tag_name})
+            expires_in = max(1, int(float(pending['expires_at']) - time.time()))
+            data = {
+                'reason': 'confirmation_required',
+                'pending_action': 'mutate.asset.tag_add',
+                'asset_id': asset_id,
+                'tag_name': tag_name,
+                'confirmation_token': str(pending['token']),
+                'expires_in_sec': expires_in,
+            }
+            summary_text = _voice_summary('mutate.pending.tag_add', data, language)
             return {
                 'success': True,
                 'phase': 'phase3-confirmation',
@@ -1101,7 +1663,7 @@ def voice_command(
     summary_text = _voice_summary(action, data, language)
     return {
         'success': True,
-        'phase': 'phase2-read-only',
+        'phase': 'phase3-confirmation',
         'executed': executed,
         'contract': contract,
         'summary_text': summary_text,

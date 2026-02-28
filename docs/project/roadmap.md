@@ -39,7 +39,7 @@ This roadmap reflects what is implemented in `backend/app` today and what is nex
 - Voice command orchestration to existing domain APIs (search/people/tags/tasks) 🔄
 - Read-only voice actions with bilingual spoken summaries (including `search.person.assets`) ✅
 - Main UI voice trigger for person-photo browse flow (`show me the photos of <name>`) ✅
-- Mutating voice action confirmation + dry-run preview before execution 📋
+- Mutating voice action confirmation + preview before execution (rename/merge/assign-stranger/tag-add shipped) 🔄
 - Legacy `voice_photo` routes schema alignment cleanup ⚠️
 
 ## Phase 6 — Video & Events
@@ -54,11 +54,11 @@ This roadmap reflects what is implemented in `backend/app` today and what is nex
 - Backup/restore and Postgres migration option 📋
 
 ## Current Priorities
-1. Add mutating voice commands with explicit confirmation + dry-run preview.
+1. Expand confirmation-gated mutating voice coverage (e.g., tag remove/task actions) and keep explicit preview/confirm flow.
 2. Cleanup/align legacy voice-photo routes.
 3. Close video task dispatch gap.
 4. Continue reliability/observability hardening.
 5. Keep caption/tag pipelines stable while backlogs drain.
 
 ---
-_Last updated: 2026-02-27_
+_Last updated: 2026-02-28_

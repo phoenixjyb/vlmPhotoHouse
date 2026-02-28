@@ -100,6 +100,85 @@ body {
   color: #fff;
 }
 
+.voice-history-panel {
+  margin-top: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 0.7rem 0.9rem;
+}
+
+.voice-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.voice-history-list {
+  margin-top: 0.6rem;
+  max-height: 180px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.voice-history-empty {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.voice-history-entry {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  padding: 0.42rem 0.56rem;
+}
+
+.voice-history-entry.you {
+  border-color: rgba(15, 138, 102, 0.35);
+  background: rgba(15, 138, 102, 0.08);
+}
+
+.voice-history-entry.assistant {
+  border-color: rgba(11, 88, 200, 0.28);
+  background: rgba(11, 88, 200, 0.06);
+}
+
+.voice-history-entry.system {
+  border-color: rgba(230, 126, 34, 0.32);
+  background: rgba(230, 126, 34, 0.08);
+}
+
+.voice-history-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.18rem;
+}
+
+.voice-history-role {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.voice-history-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.voice-history-text {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .status-cards {
   margin-top: 0.9rem;
   display: grid;
