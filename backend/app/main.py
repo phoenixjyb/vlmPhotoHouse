@@ -36,6 +36,11 @@ from .dependencies import get_db, ensure_db
 
 settings = get_settings()
 
+
+def _visible_assets_filter():
+    # Treat NULL as legacy-active for backward compatibility.
+    return (Asset.status == None) | (Asset.status == 'active')
+
 def init_db():
     # Ensure dependencies are bound and schema exists
     ensure_db()
@@ -501,7 +506,7 @@ def trigger_ingest(roots: list[str] = Body(..., embed=True), db_s: Session = Dep
 
 @app.get('/search', response_model=schemas.SearchResponse)
 def search(q: str = Query('', description='Query text (stub substring match on path)'), page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=200), db_s: Session = Depends(get_db)):
-    base = db_s.query(Asset)
+    base = db_s.query(Asset).filter(_visible_assets_filter())
     if q:
         base = base.filter(Asset.path.like(f"%{q}%"))
     total = base.count()
@@ -656,7 +661,7 @@ def search_captions(text: str = Body('', embed=True), k: int = Body(20, embed=Tr
     from sqlalchemy import func as _f
     if not text:
         raise HTTPException(status_code=400, detail='text required')
-    q = db_s.query(Asset).join(Caption, Caption.asset_id==Asset.id).filter(_f.lower(Caption.text).like(f"%{text.lower()}%"))
+    q = db_s.query(Asset).join(Caption, Caption.asset_id==Asset.id).filter(_visible_assets_filter(), _f.lower(Caption.text).like(f"%{text.lower()}%"))
     if media == 'image':
         q = q.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
     elif media == 'video':
@@ -682,7 +687,12 @@ def list_tags(
     if source_filter not in allowed_sources:
         raise HTTPException(status_code=400, detail='Invalid source filter')
 
-    count_q = db_s.query(Tag.id).join(AssetTag, AssetTag.tag_id == Tag.id)
+    count_q = (
+        db_s.query(Tag.id)
+        .join(AssetTag, AssetTag.tag_id == Tag.id)
+        .join(Asset, Asset.id == AssetTag.asset_id)
+        .filter(_visible_assets_filter())
+    )
     if name_filter:
         count_q = count_q.filter(func.lower(Tag.name).like(f"%{name_filter}%"))
     if source_filter == '(null)':
@@ -707,6 +717,8 @@ def list_tags(
             func.sum(case((src == '(null)', 1), else_=0)).label('null_links'),
         )
         .join(AssetTag, AssetTag.tag_id == Tag.id)
+        .join(Asset, Asset.id == AssetTag.asset_id)
+        .filter(_visible_assets_filter())
     )
     if name_filter:
         rows_q = rows_q.filter(func.lower(Tag.name).like(f"%{name_filter}%"))
@@ -775,7 +787,7 @@ def list_tag_assets(
     q = (
         db_s.query(Asset.id, Asset.path, Asset.mime)
         .join(AssetTag, AssetTag.asset_id == Asset.id)
-        .filter(AssetTag.tag_id == int(tag_id))
+        .filter(AssetTag.tag_id == int(tag_id), _visible_assets_filter())
     )
     if media_filter == 'image':
         q = q.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
@@ -928,7 +940,7 @@ def search_by_tags(tags: list[str] = Body(..., embed=True), mode: str = Body('an
     asset_ids = [aid for (aid, _) in q.all()]
     if not asset_ids:
         return {'query': tags, 'results': []}
-    qa = db_s.query(Asset).filter(Asset.id.in_(asset_ids))
+    qa = db_s.query(Asset).filter(Asset.id.in_(asset_ids), _visible_assets_filter())
     if media == 'image':
         qa = qa.filter((Asset.mime == None) | (~Asset.mime.startswith('video')))
     elif media == 'video':
@@ -959,7 +971,13 @@ def search_smart(text: str | None = Body(None, embed=True), tags: list[str] | No
     # Caption match boost
     if text:
         from sqlalchemy import func as _f
-        cq = db_s.query(Caption.asset_id).filter(_f.lower(Caption.text).like(f"%{text.lower()}%")).limit(1000).all()
+        cq = (
+            db_s.query(Caption.asset_id)
+            .join(Asset, Asset.id == Caption.asset_id)
+            .filter(_visible_assets_filter(), _f.lower(Caption.text).like(f"%{text.lower()}%"))
+            .limit(1000)
+            .all()
+        )
         for (aid,) in cq:
             scores[aid] = scores.get(aid, 0.0) + 0.1
     # Tag match boost
@@ -967,7 +985,13 @@ def search_smart(text: str | None = Body(None, embed=True), tags: list[str] | No
         tag_rows = db_s.query(Tag).filter(Tag.name.in_(tags)).all()
         if tag_rows:
             tag_ids = [t.id for t in tag_rows]
-            tq = db_s.query(AssetTag.asset_id).filter(AssetTag.tag_id.in_(tag_ids)).limit(2000).all()
+            tq = (
+                db_s.query(AssetTag.asset_id)
+                .join(Asset, Asset.id == AssetTag.asset_id)
+                .filter(AssetTag.tag_id.in_(tag_ids), _visible_assets_filter())
+                .limit(2000)
+                .all()
+            )
             for (aid,) in tq:
                 scores[aid] = scores.get(aid, 0.0) + 0.1
     # Filter media type
@@ -985,11 +1009,13 @@ def search_smart(text: str | None = Body(None, embed=True), tags: list[str] | No
     top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:k]
     if not top:
         return {'query': {'text': text, 'tags': tags, 'media': media}, 'results': []}
-    aset = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([i for i,_ in top])).all()}
+    aset = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([i for i,_ in top]), _visible_assets_filter()).all()}
     out = []
     for aid, sc in top:
         a = aset.get(aid)
-        out.append({'asset_id': aid, 'score': round(float(sc), 4), 'path': a.path if a else None, 'mime': a.mime if a else None})
+        if not a:
+            continue
+        out.append({'asset_id': aid, 'score': round(float(sc), 4), 'path': a.path, 'mime': a.mime})
     return {'query': {'text': text, 'tags': tags, 'media': media}, 'results': out}
 
 @app.post('/search/video')
@@ -1097,6 +1123,239 @@ def get_video_segments(asset_id: int, db_s: Session = Depends(get_db)):
         ]
     }
 
+
+def _asset_quality_tuple(asset: Asset) -> tuple[int, int, int, int]:
+    pixels = int((getattr(asset, 'width', 0) or 0) * (getattr(asset, 'height', 0) or 0))
+    return (
+        1 if getattr(asset, 'taken_at', None) else 0,
+        pixels,
+        int(getattr(asset, 'file_size', 0) or 0),
+        int(getattr(asset, 'id', 0) or 0),
+    )
+
+
+def _build_similarity_reduction_groups(
+    db_s: Session,
+    min_group_size: int,
+    max_distance: int,
+    sample_limit: int,
+    cluster_limit: int,
+) -> tuple[list[dict], dict]:
+    groups: list[dict] = []
+    visible = _visible_assets_filter()
+
+    sha_rows = (
+        db_s.query(Asset.hash_sha256, func.count(Asset.id).label('cnt'))
+        .filter(visible)
+        .group_by(Asset.hash_sha256)
+        .having(func.count(Asset.id) >= min_group_size)
+        .order_by(func.count(Asset.id).desc())
+        .limit(cluster_limit)
+        .all()
+    )
+    for idx, (sha, cnt) in enumerate(sha_rows):
+        members = db_s.query(Asset).filter(Asset.hash_sha256 == sha, visible).order_by(Asset.id.desc()).all()
+        if len(members) < min_group_size:
+            continue
+        keep = max(members, key=_asset_quality_tuple)
+        hide_ids = [int(a.id) for a in members if int(a.id) != int(keep.id)]
+        groups.append({
+            'group_id': f"sha:{idx + 1}:{str(sha)[:12]}",
+            'kind': 'sha256',
+            'key': sha,
+            'member_count': int(cnt or len(members)),
+            'keep_asset_id': int(keep.id),
+            'hide_asset_ids': hide_ids,
+            'members': [
+                {
+                    'id': int(a.id),
+                    'path': a.path,
+                    'mime': a.mime,
+                    'status': a.status,
+                    'distance': 0,
+                    'is_keep': int(a.id) == int(keep.id),
+                }
+                for a in members
+            ],
+        })
+
+    phash_assets = (
+        db_s.query(Asset)
+        .filter(visible, Asset.perceptual_hash != None)
+        .order_by(Asset.id.desc())
+        .limit(sample_limit)
+        .all()
+    )
+
+    processed: list[tuple[Asset, int]] = []
+    for a in phash_assets:
+        try:
+            processed.append((a, int(str(a.perceptual_hash), 16)))
+        except Exception:
+            continue
+
+    visited: set[int] = set()
+    near_idx = 0
+    for i, (asset_a, hash_a) in enumerate(processed):
+        if int(asset_a.id) in visited:
+            continue
+        group: list[tuple[Asset, int]] = [(asset_a, 0)]
+        visited.add(int(asset_a.id))
+        for j in range(i + 1, len(processed)):
+            asset_b, hash_b = processed[j]
+            if int(asset_b.id) in visited:
+                continue
+            distance = (hash_a ^ hash_b).bit_count()
+            if distance <= max_distance:
+                group.append((asset_b, int(distance)))
+                visited.add(int(asset_b.id))
+        if len(group) < min_group_size:
+            continue
+        keep_asset = max([a for a, _ in group], key=_asset_quality_tuple)
+        hide_ids = [int(a.id) for a, _ in group if int(a.id) != int(keep_asset.id)]
+        near_idx += 1
+        groups.append({
+            'group_id': f"near:{near_idx}:{int(keep_asset.id)}",
+            'kind': 'near',
+            'key': str(getattr(keep_asset, 'perceptual_hash', '') or ''),
+            'member_count': len(group),
+            'keep_asset_id': int(keep_asset.id),
+            'hide_asset_ids': hide_ids,
+            'members': [
+                {
+                    'id': int(a.id),
+                    'path': a.path,
+                    'mime': a.mime,
+                    'status': a.status,
+                    'distance': int(dist),
+                    'is_keep': int(a.id) == int(keep_asset.id),
+                }
+                for a, dist in sorted(group, key=lambda row: (0 if int(row[0].id) == int(keep_asset.id) else 1, row[1], int(row[0].id)))
+            ],
+        })
+        if near_idx >= cluster_limit:
+            break
+
+    groups.sort(key=lambda g: (-int(g.get('member_count', 0)), str(g.get('kind', '')), str(g.get('group_id', ''))))
+    keep_ids = sorted({int(g.get('keep_asset_id')) for g in groups if g.get('keep_asset_id') is not None})
+    hide_ids_unique = sorted({int(aid) for g in groups for aid in (g.get('hide_asset_ids') or [])})
+    summary = {
+        'groups': len(groups),
+        'keep_candidates': len(keep_ids),
+        'hide_candidates': sum(len(g.get('hide_asset_ids') or []) for g in groups),
+        'unique_hide_candidates': len(hide_ids_unique),
+    }
+    return groups, summary
+
+
+@app.get('/duplicates/reduction/preview')
+def preview_similarity_reduction(
+    min_group_size: int = Query(2, ge=2),
+    max_distance: int = Query(5, ge=1, le=32),
+    sample_limit: int = Query(1000, ge=100, le=5000),
+    cluster_limit: int = Query(60, ge=1, le=200),
+    db_s: Session = Depends(get_db),
+):
+    groups, summary = _build_similarity_reduction_groups(
+        db_s=db_s,
+        min_group_size=min_group_size,
+        max_distance=max_distance,
+        sample_limit=sample_limit,
+        cluster_limit=cluster_limit,
+    )
+    return {
+        'api_version': schemas.API_VERSION,
+        'min_group_size': min_group_size,
+        'max_distance': max_distance,
+        'sample_limit': sample_limit,
+        'cluster_limit': cluster_limit,
+        'summary': summary,
+        'groups': groups,
+    }
+
+
+@app.post('/duplicates/reduction/apply')
+def apply_similarity_reduction(
+    min_group_size: int = Body(2, embed=True),
+    max_distance: int = Body(5, embed=True),
+    sample_limit: int = Body(1000, embed=True),
+    cluster_limit: int = Body(60, embed=True),
+    db_s: Session = Depends(get_db),
+):
+    groups, summary = _build_similarity_reduction_groups(
+        db_s=db_s,
+        min_group_size=max(2, int(min_group_size or 2)),
+        max_distance=max(1, min(32, int(max_distance or 5))),
+        sample_limit=max(100, min(5000, int(sample_limit or 1000))),
+        cluster_limit=max(1, min(200, int(cluster_limit or 60))),
+    )
+    keep_ids = {int(g.get('keep_asset_id')) for g in groups if g.get('keep_asset_id') is not None}
+    hide_ids = sorted({int(aid) for g in groups for aid in (g.get('hide_asset_ids') or []) if int(aid) not in keep_ids})
+    if not hide_ids:
+        return {
+            'api_version': schemas.API_VERSION,
+            'suppressed': 0,
+            'summary': summary,
+            'groups': groups,
+            'suppressed_asset_ids': [],
+        }
+
+    assets = db_s.query(Asset).filter(Asset.id.in_(hide_ids), _visible_assets_filter()).all()
+    suppressed_ids: list[int] = []
+    for a in assets:
+        if a.id in keep_ids:
+            continue
+        if getattr(a, 'status', None) != 'suppressed':
+            a.status = 'suppressed'
+            suppressed_ids.append(int(a.id))
+    db_s.commit()
+    return {
+        'api_version': schemas.API_VERSION,
+        'suppressed': len(suppressed_ids),
+        'summary': summary,
+        'groups': groups,
+        'suppressed_asset_ids': suppressed_ids,
+    }
+
+
+@app.post('/duplicates/reduction/restore')
+def restore_similarity_reduction(asset_ids: list[int] | None = Body(None, embed=True), db_s: Session = Depends(get_db)):
+    q = db_s.query(Asset).filter(Asset.status == 'suppressed')
+    if asset_ids is not None:
+        if not asset_ids:
+            return {'api_version': schemas.API_VERSION, 'restored': 0, 'asset_ids': []}
+        q = q.filter(Asset.id.in_(asset_ids))
+    rows = q.all()
+    restored_ids: list[int] = []
+    for a in rows:
+        a.status = 'active'
+        restored_ids.append(int(a.id))
+    db_s.commit()
+    return {'api_version': schemas.API_VERSION, 'restored': len(restored_ids), 'asset_ids': restored_ids}
+
+
+@app.get('/assets/suppressed')
+def list_suppressed_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500), db_s: Session = Depends(get_db)):
+    q = db_s.query(Asset).filter(Asset.status == 'suppressed')
+    total = q.count()
+    rows = q.order_by(Asset.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        'api_version': schemas.API_VERSION,
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'items': [
+            {
+                'id': int(a.id),
+                'path': a.path,
+                'mime': a.mime,
+                'status': a.status,
+            }
+            for a in rows
+        ],
+    }
+
+
 @app.get('/duplicates', response_model=schemas.DuplicatesResponse)
 def list_duplicates(min_group_size: int = Query(2, ge=2), mode: str = Query('all', description='sha256|phash|all'), page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db_s: Session = Depends(get_db)):
     results: dict = {'api_version': schemas.API_VERSION}
@@ -1105,6 +1364,7 @@ def list_duplicates(min_group_size: int = Query(2, ge=2), mode: str = Query('all
     if mode in ('all','sha256'):
         sha_groups_q = (
             db_s.query(Asset.hash_sha256, func.count(Asset.id).label('cnt'))
+            .filter(_visible_assets_filter())
             .group_by(Asset.hash_sha256)
             .having(func.count(Asset.id) >= min_group_size)
             .order_by(func.count(Asset.id).desc())
@@ -1113,13 +1373,13 @@ def list_duplicates(min_group_size: int = Query(2, ge=2), mode: str = Query('all
         sha_groups = sha_groups_q.offset(offset).limit(slice_limit).all()
         sha_list = []
         for h, cnt in sha_groups:
-            assets = db_s.query(Asset.id, Asset.path).filter(Asset.hash_sha256==h).all()
+            assets = db_s.query(Asset.id, Asset.path).filter(Asset.hash_sha256==h, _visible_assets_filter()).all()
             sha_list.append({'hash': h, 'count': cnt, 'assets': [{'id': a.id, 'path': a.path} for a in assets]})
         results['sha256'] = {'page': page, 'page_size': page_size, 'total_groups': total_sha, 'groups': sha_list}
     if mode in ('all','phash'):
         phash_groups_q = (
             db_s.query(Asset.perceptual_hash, func.count(Asset.id).label('cnt'))
-            .filter(Asset.perceptual_hash != None)
+            .filter(_visible_assets_filter(), Asset.perceptual_hash != None)
             .group_by(Asset.perceptual_hash)
             .having(func.count(Asset.id) >= min_group_size)
             .order_by(func.count(Asset.id).desc())
@@ -1128,14 +1388,14 @@ def list_duplicates(min_group_size: int = Query(2, ge=2), mode: str = Query('all
         phash_groups = phash_groups_q.offset(offset).limit(slice_limit).all()
         phash_list = []
         for ph, cnt in phash_groups:
-            assets = db_s.query(Asset.id, Asset.path).filter(Asset.perceptual_hash==ph).all()
+            assets = db_s.query(Asset.id, Asset.path).filter(Asset.perceptual_hash==ph, _visible_assets_filter()).all()
             phash_list.append({'phash': ph, 'count': cnt, 'assets': [{'id': a.id, 'path': a.path} for a in assets]})
         results['phash'] = {'page': page, 'page_size': page_size, 'total_groups': total_ph, 'groups': phash_list}
     return results
 
 @app.get('/duplicates/near', response_model=schemas.NearDuplicatesResponse)
 def near_duplicates(max_distance: int = Query(5, ge=1, le=32), sample_limit: int = Query(1000, le=5000), cluster_limit: int = Query(50, le=200), page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=200), db_s: Session = Depends(get_db)):
-    assets = db_s.query(Asset.id, Asset.path, Asset.perceptual_hash).filter(Asset.perceptual_hash != None).limit(sample_limit).all()
+    assets = db_s.query(Asset.id, Asset.path, Asset.perceptual_hash).filter(_visible_assets_filter(), Asset.perceptual_hash != None).limit(sample_limit).all()
     processed = []
     def hex_to_int(h: str) -> int:
         try: return int(h, 16)
@@ -1224,11 +1484,13 @@ def vector_search(text: str | None = Body(None), asset_id: int | None = Body(Non
         apath = asset.path if isinstance(asset.path, str) else str(asset.path)
         query_vec = tasks_mod.EMBED_SERVICE.embed_image_stub(apath)
     matches = tasks_mod.INDEX_SINGLETON.search(query_vec, k=k)
-    assets_map = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([mid for mid,_ in matches])).all()}
+    assets_map = {a.id: a for a in db_s.query(Asset).filter(Asset.id.in_([mid for mid,_ in matches]), _visible_assets_filter()).all()}
     result_items = []
     for mid, score in matches:
         aobj = assets_map.get(mid)
-        result_items.append({'asset_id': mid, 'score': float(score), 'path': aobj.path if aobj else None})
+        if not aobj:
+            continue
+        result_items.append({'asset_id': mid, 'score': float(score), 'path': aobj.path})
     return {'api_version': schemas.API_VERSION, 'query': {'text': text, 'asset_id': asset_id}, 'k': k, 'results': result_items}
 
 # --- Asset ingestion (upload) ---
@@ -1300,7 +1562,7 @@ async def upload_asset(data: bytes = Body(..., description='Raw image bytes'), f
 
 @app.get('/assets', response_model=schemas.AssetsListResponse)
 def list_assets(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500), db_s: Session = Depends(get_db)):
-    q = db_s.query(Asset)
+    q = db_s.query(Asset).filter(_visible_assets_filter())
     total = q.count()
     rows = q.order_by(Asset.id.desc()).offset((page-1)*page_size).limit(page_size).all()
     assets = []
@@ -1359,7 +1621,7 @@ def list_geo_assets(
     media_val = (media or 'all').lower()
     if media_val not in ('all', 'image', 'video'):
         raise HTTPException(status_code=400, detail='media must be one of all|image|video')
-    q = db_s.query(Asset).filter(Asset.gps_lat != None, Asset.gps_lon != None)
+    q = db_s.query(Asset).filter(_visible_assets_filter(), Asset.gps_lat != None, Asset.gps_lon != None)
     if media_val == 'image':
         q = q.filter(Asset.mime.like('image/%'))
     elif media_val == 'video':
@@ -1712,7 +1974,7 @@ def albums_time(limit_per_bucket: int = Query(5, ge=1, le=50), path_prefix: str 
     y_l = year_expr.label('y')
     m_l = month_expr.label('m')
     d_l = day_expr.label('d')
-    base_q = db_s.query(y_l, m_l, d_l, func.count(Asset.id).label('cnt'))
+    base_q = db_s.query(y_l, m_l, d_l, func.count(Asset.id).label('cnt')).filter(_visible_assets_filter())
     if path_prefix:
         base_q = base_q.filter(Asset.path.like(f"{path_prefix}%"))
     rows = base_q.group_by(y_l, m_l, d_l).order_by(y_l, m_l, d_l).all()
@@ -1728,7 +1990,7 @@ def albums_time(limit_per_bucket: int = Query(5, ge=1, le=50), path_prefix: str 
         filt = [func.strftime('%Y', ts_col)==y, func.strftime('%m', ts_col)==m, func.strftime('%d', ts_col)==d]
         if path_prefix:
             filt.append(Asset.path.like(f"{path_prefix}%"))
-        q = db_s.query(Asset.id).filter(*filt)\
+        q = db_s.query(Asset.id).filter(_visible_assets_filter(), *filt)\
             .order_by(Asset.id.desc()).limit(limit_per_bucket).all()
         ids = [rid for (rid,) in q]
         day_map[(y,m,d)] = [meta[0], ids]

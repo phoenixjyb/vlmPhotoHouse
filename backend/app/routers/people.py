@@ -619,7 +619,7 @@ def search_photos_by_person(
     )
     
     # Query assets with pagination
-    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery))
+    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery), ((Asset.status == None) | (Asset.status == 'active')))
     total = base_query.count()
     
     assets = (
@@ -677,7 +677,7 @@ def search_photos_by_person_name(
     )
     
     # Query assets with pagination
-    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery))
+    base_query = db_s.query(Asset).filter(Asset.id.in_(asset_ids_subquery), ((Asset.status == None) | (Asset.status == 'active')))
     total = base_query.count()
     
     assets = (
@@ -758,16 +758,18 @@ def vector_search_with_person_filter(
     # Get asset details
     assets_map = {
         a.id: a for a in 
-        db_s.query(Asset).filter(Asset.id.in_([mid for mid, _ in matches])).all()
+        db_s.query(Asset).filter(Asset.id.in_([mid for mid, _ in matches]), ((Asset.status == None) | (Asset.status == 'active'))).all()
     }
     
     result_items = []
     for mid, score in matches:
         aobj = assets_map.get(mid)
+        if not aobj:
+            continue
         result_items.append({
             'asset_id': mid,
             'score': float(score),
-            'path': aobj.path if aobj else None
+            'path': aobj.path
         })
     
     response = {

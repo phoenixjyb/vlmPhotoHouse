@@ -74,6 +74,7 @@
       <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
       <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
       <button class="tab" data-tab="stories" data-i18n="tab_stories">Stories</button>
+      <button class="tab" data-tab="similarity" data-i18n="tab_similarity">Similarity</button>
       <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
       <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
       <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
@@ -349,6 +350,55 @@
         </div>
       </section>
 
+      <section id="tab-similarity" class="tab-panel">
+        <div class="panel-grid">
+          <div class="panel left-panel">
+            <div class="controls">
+              <h2 data-i18n="similarity_title">Similarity Reduction</h2>
+              <label>
+                <span data-i18n="similarity_min_group_size">Min group</span>
+                <input id="sim-min-group-size" type="number" min="2" max="20" step="1" value="2" />
+              </label>
+              <label>
+                <span data-i18n="similarity_max_distance">Max distance</span>
+                <input id="sim-max-distance" type="number" min="1" max="32" step="1" value="5" />
+              </label>
+              <label>
+                <span data-i18n="similarity_sample_limit">Sample</span>
+                <input id="sim-sample-limit" type="number" min="100" max="5000" step="100" value="1000" />
+              </label>
+              <label>
+                <span data-i18n="similarity_cluster_limit">Clusters</span>
+                <input id="sim-cluster-limit" type="number" min="1" max="200" step="1" value="60" />
+              </label>
+              <button id="btn-sim-preview" class="btn ghost" data-i18n="similarity_preview">Preview</button>
+              <button id="btn-sim-apply" class="btn" data-i18n="similarity_apply">Hide Similar</button>
+              <button id="btn-sim-restore" class="btn ghost" data-i18n="similarity_restore_all">Restore Hidden</button>
+            </div>
+            <p id="sim-meta" class="muted"></p>
+            <div class="table-wrap">
+              <table class="task-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="similarity_kind">Kind</th>
+                    <th data-i18n="query">Group</th>
+                    <th data-i18n="similarity_keep">Keep</th>
+                    <th data-i18n="similarity_hide_count">Hide</th>
+                    <th data-i18n="action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="sim-rows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel right-panel">
+            <h2 data-i18n="similarity_group_assets_panel">Group Assets</h2>
+            <p id="sim-assets-meta" class="muted" data-i18n="similarity_group_assets_meta_default">Select a group to inspect candidates.</p>
+            <div id="sim-assets-grid" class="asset-grid scroll-grid"></div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-panel">
         <div class="panel">
           <div class="controls">
@@ -440,6 +490,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260227i" defer></script>
+  <script src="/ui/app.js?v=20260227j" defer></script>
 </body>
 </html>

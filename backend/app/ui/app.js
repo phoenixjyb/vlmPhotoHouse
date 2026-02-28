@@ -63,6 +63,15 @@ const state = {
     selectedStoryId: "",
     total: 0,
   },
+  similarity: {
+    minGroupSize: 2,
+    maxDistance: 5,
+    sampleLimit: 1000,
+    clusterLimit: 60,
+    groups: [],
+    selectedGroupId: "",
+    summary: null,
+  },
   voiceBusy: false,
 };
 
@@ -104,6 +113,7 @@ const I18N = {
     tab_people: "People",
     tab_tags: "Tags",
     tab_stories: "Stories",
+    tab_similarity: "Similarity",
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
@@ -280,6 +290,29 @@ const I18N = {
     story_open_context: "Open Context",
     story_context_opened: "Opened story context",
     story_context_unavailable: "Story context is unavailable",
+    similarity_title: "Similarity Reduction",
+    similarity_min_group_size: "Min group",
+    similarity_max_distance: "Max distance",
+    similarity_sample_limit: "Sample",
+    similarity_cluster_limit: "Clusters",
+    similarity_preview: "Preview",
+    similarity_apply: "Hide Similar",
+    similarity_restore_all: "Restore Hidden",
+    similarity_meta:
+      "Groups={groups} | keep={keep} | hide={hide} | unique hide={unique_hide}",
+    similarity_kind: "Kind",
+    similarity_kind_sha: "Exact",
+    similarity_kind_near: "Near",
+    similarity_keep: "Keep",
+    similarity_hide_count: "Hide",
+    similarity_view_group: "View Group",
+    similarity_group_assets_panel: "Group Assets",
+    similarity_group_assets_meta_default: "Select a group to inspect candidates.",
+    similarity_group_assets_meta: "{kind} group: keep #{keep}, hide {hide}",
+    similarity_load_failed: "Similarity preview failed: {error}",
+    similarity_apply_done: "Hidden similar assets: {count}",
+    similarity_restore_done: "Restored hidden assets: {count}",
+    similarity_action_failed: "Similarity action failed: {error}",
     remove_tag: "Remove tag",
     tag_removed: "Tag removed",
     tag_update_failed: "Tag update failed: {error}",
@@ -339,6 +372,7 @@ const I18N = {
     tab_people: "人物",
     tab_tags: "标签",
     tab_stories: "故事",
+    tab_similarity: "相似图",
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
@@ -515,6 +549,28 @@ const I18N = {
     story_open_context: "打开上下文",
     story_context_opened: "已打开故事上下文",
     story_context_unavailable: "故事上下文不可用",
+    similarity_title: "相似图收敛",
+    similarity_min_group_size: "最小组大小",
+    similarity_max_distance: "最大距离",
+    similarity_sample_limit: "采样",
+    similarity_cluster_limit: "聚类上限",
+    similarity_preview: "预览",
+    similarity_apply: "隐藏相似项",
+    similarity_restore_all: "恢复隐藏项",
+    similarity_meta: "分组={groups} | 保留={keep} | 隐藏={hide} | 唯一隐藏={unique_hide}",
+    similarity_kind: "类型",
+    similarity_kind_sha: "完全重复",
+    similarity_kind_near: "近重复",
+    similarity_keep: "保留",
+    similarity_hide_count: "隐藏数",
+    similarity_view_group: "查看分组",
+    similarity_group_assets_panel: "分组资源",
+    similarity_group_assets_meta_default: "选择一个分组查看候选。",
+    similarity_group_assets_meta: "{kind} 分组: 保留 #{keep}, 隐藏 {hide}",
+    similarity_load_failed: "相似图预览失败: {error}",
+    similarity_apply_done: "已隐藏相似资源: {count}",
+    similarity_restore_done: "已恢复隐藏资源: {count}",
+    similarity_action_failed: "相似图操作失败: {error}",
     remove_tag: "移除标签",
     tag_removed: "标签已移除",
     tag_update_failed: "标签更新失败: {error}",
@@ -570,6 +626,12 @@ function storyTypeLabel(value) {
   if (value === "location") return t("story_type_location");
   if (value === "caption") return t("story_type_caption");
   return t("story_type_all");
+}
+
+function similarityKindLabel(value) {
+  if (value === "sha256") return t("similarity_kind_sha");
+  if (value === "near") return t("similarity_kind_near");
+  return value || "-";
 }
 
 function tagSourceLabel(value) {
@@ -857,6 +919,9 @@ function renderCurrentViewText() {
   }
   if (state.activeTab === "stories") {
     loadStoryAlbums();
+  }
+  if (state.activeTab === "similarity") {
+    loadSimilarityPreview();
   }
   if (state.activeTab === "tasks") {
     loadTasks();
@@ -1782,6 +1847,125 @@ async function loadStoryAlbums() {
   }
 }
 
+function similarityOptionsFromUi() {
+  const minGroupSize = Math.max(2, Number(qs("sim-min-group-size")?.value || state.similarity.minGroupSize || 2) || 2);
+  const maxDistance = Math.max(1, Math.min(32, Number(qs("sim-max-distance")?.value || state.similarity.maxDistance || 5) || 5));
+  const sampleLimit = Math.max(100, Math.min(5000, Number(qs("sim-sample-limit")?.value || state.similarity.sampleLimit || 1000) || 1000));
+  const clusterLimit = Math.max(1, Math.min(200, Number(qs("sim-cluster-limit")?.value || state.similarity.clusterLimit || 60) || 60));
+  return { minGroupSize, maxDistance, sampleLimit, clusterLimit };
+}
+
+function getSimilarityGroupById(groupId) {
+  const groups = Array.isArray(state.similarity?.groups) ? state.similarity.groups : [];
+  return groups.find((g) => String(g?.group_id || "") === String(groupId || "")) || null;
+}
+
+function renderSimilarityGroupAssets(group) {
+  if (!group) {
+    state.similarity = { ...state.similarity, selectedGroupId: "" };
+    qs("sim-assets-meta").textContent = t("similarity_group_assets_meta_default");
+    renderAssetGrid([], "sim-assets-grid");
+    return;
+  }
+  const members = Array.isArray(group.members) ? group.members : [];
+  const items = members.map((m) => ({ id: m.id, path: m.path, mime: m.mime }));
+  state.similarity = { ...state.similarity, selectedGroupId: String(group.group_id || "") };
+  qs("sim-assets-meta").textContent = t("similarity_group_assets_meta", {
+    kind: similarityKindLabel(group.kind),
+    keep: Number(group.keep_asset_id) || 0,
+    hide: Array.isArray(group.hide_asset_ids) ? group.hide_asset_ids.length : 0,
+  });
+  renderAssetGrid(items, "sim-assets-grid");
+}
+
+async function loadSimilarityPreview() {
+  try {
+    const opts = similarityOptionsFromUi();
+    const params = new URLSearchParams();
+    params.set("min_group_size", String(opts.minGroupSize));
+    params.set("max_distance", String(opts.maxDistance));
+    params.set("sample_limit", String(opts.sampleLimit));
+    params.set("cluster_limit", String(opts.clusterLimit));
+    const data = await api(`/duplicates/reduction/preview?${params.toString()}`);
+    const groups = Array.isArray(data?.groups) ? data.groups : [];
+    const summary = data?.summary && typeof data.summary === "object" ? data.summary : {};
+
+    state.similarity = {
+      ...state.similarity,
+      ...opts,
+      groups,
+      summary,
+    };
+    qs("sim-min-group-size").value = String(opts.minGroupSize);
+    qs("sim-max-distance").value = String(opts.maxDistance);
+    qs("sim-sample-limit").value = String(opts.sampleLimit);
+    qs("sim-cluster-limit").value = String(opts.clusterLimit);
+
+    qs("sim-meta").textContent = t("similarity_meta", {
+      groups: Number(summary.groups) || groups.length,
+      keep: Number(summary.keep_candidates) || 0,
+      hide: Number(summary.hide_candidates) || 0,
+      unique_hide: Number(summary.unique_hide_candidates) || 0,
+    });
+    qs("sim-rows").innerHTML = groups
+      .map((group) => {
+        const gid = String(group?.group_id || "");
+        const active = gid === String(state.similarity.selectedGroupId || "") ? "tags-row-active" : "";
+        const hideCount = Array.isArray(group?.hide_asset_ids) ? group.hide_asset_ids.length : 0;
+        const keyText = String(group?.key || "").slice(0, 24);
+        return `
+          <tr class="${active}">
+            <td>${esc(similarityKindLabel(group?.kind || ""))}</td>
+            <td class="mono small">${esc(keyText || gid)}</td>
+            <td>#${Number(group?.keep_asset_id) || 0}</td>
+            <td>${hideCount}</td>
+            <td>
+              <button class="btn ghost" data-action="sim-view-group" data-group-id="${esc(gid)}">${esc(t("similarity_view_group"))}</button>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const activeGroup = getSimilarityGroupById(state.similarity.selectedGroupId) || groups[0] || null;
+    renderSimilarityGroupAssets(activeGroup);
+  } catch (e) {
+    showToast(t("similarity_load_failed", { error: e.message }));
+  }
+}
+
+async function applySimilarityReduction() {
+  const opts = similarityOptionsFromUi();
+  try {
+    const data = await api("/duplicates/reduction/apply", {
+      method: "POST",
+      body: JSON.stringify({
+        min_group_size: opts.minGroupSize,
+        max_distance: opts.maxDistance,
+        sample_limit: opts.sampleLimit,
+        cluster_limit: opts.clusterLimit,
+      }),
+    });
+    showToast(t("similarity_apply_done", { count: Number(data?.suppressed) || 0 }));
+    await Promise.all([loadSimilarityPreview(), refreshDashboard()]);
+  } catch (e) {
+    showToast(t("similarity_action_failed", { error: e.message }));
+  }
+}
+
+async function restoreSimilarityReduction() {
+  try {
+    const data = await api("/duplicates/reduction/restore", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    showToast(t("similarity_restore_done", { count: Number(data?.restored) || 0 }));
+    await Promise.all([loadSimilarityPreview(), refreshDashboard()]);
+  } catch (e) {
+    showToast(t("similarity_action_failed", { error: e.message }));
+  }
+}
+
 function closeAssetInspector() {
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
@@ -2439,6 +2623,7 @@ function initEvents() {
         }
       }
       if (el.dataset.tab === "stories") await loadStoryAlbums();
+      if (el.dataset.tab === "similarity") await loadSimilarityPreview();
       if (el.dataset.tab === "map") await loadGeoMap();
     });
   });
@@ -2452,6 +2637,7 @@ function initEvents() {
       }
     }
     if (state.activeTab === "stories") await loadStoryAlbums();
+    if (state.activeTab === "similarity") await loadSimilarityPreview();
     if (state.activeTab === "map") await loadGeoMap();
     showToast(t("refreshed"));
   });
@@ -2510,6 +2696,15 @@ function initEvents() {
     await loadAssetInspector(Number(card.dataset.assetId));
   });
 
+  qs("sim-assets-grid").addEventListener("click", async (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    const originTab = state.activeTab;
+    setActiveTab("library");
+    state.inspectorOriginTab = originTab;
+    await loadAssetInspector(Number(card.dataset.assetId));
+  });
+
   qs("btn-asset-back").addEventListener("click", async () => {
     const returnTab = state.inspectorOriginTab || "library";
     closeAssetInspector();
@@ -2523,6 +2718,7 @@ function initEvents() {
         }
       }
       if (returnTab === "stories") await loadStoryAlbums();
+      if (returnTab === "similarity") await loadSimilarityPreview();
       if (returnTab === "map") await loadGeoMap();
       if (returnTab === "tasks") await loadTasks();
       if (returnTab === "admin") await refreshAdminPanels();
@@ -2741,6 +2937,14 @@ function initEvents() {
   qs("stories-min-assets").addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadStoryAlbums();
   });
+  qs("btn-sim-preview").addEventListener("click", loadSimilarityPreview);
+  qs("btn-sim-apply").addEventListener("click", applySimilarityReduction);
+  qs("btn-sim-restore").addEventListener("click", restoreSimilarityReduction);
+  ["sim-min-group-size", "sim-max-distance", "sim-sample-limit", "sim-cluster-limit"].forEach((id) => {
+    qs(id).addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loadSimilarityPreview();
+    });
+  });
   qs("btn-refresh-tasks").addEventListener("click", loadTasks);
 
   document.addEventListener("click", async (e) => {
@@ -2808,6 +3012,18 @@ function initEvents() {
     }
   });
 
+  qs("sim-rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action='sim-view-group']");
+    if (!btn) return;
+    const groupId = String(btn.dataset.groupId || "");
+    const group = getSimilarityGroupById(groupId);
+    if (!group) return;
+    renderSimilarityGroupAssets(group);
+    qs("sim-rows")
+      .querySelectorAll("tr")
+      .forEach((row) => row.classList.toggle("tags-row-active", String(row.querySelector("button[data-group-id]")?.dataset.groupId || "") === groupId));
+  });
+
   qs("btn-rebuild-index").addEventListener("click", async () => {
     try {
       await api("/vector-index/rebuild", { method: "POST" });
@@ -2854,7 +3070,7 @@ async function bootstrap() {
   setLanguage(langParam || storedLang || "en", false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["library", "people", "tags", "stories", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && ["library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"].includes(tab)) {
     setActiveTab(tab);
   }
   const q = params.get("q");
@@ -2872,6 +3088,9 @@ async function bootstrap() {
   }
   if (state.activeTab === "stories") {
     await loadStoryAlbums();
+  }
+  if (state.activeTab === "similarity") {
+    await loadSimilarityPreview();
   }
   if (state.activeTab === "map") {
     await loadGeoMap();
