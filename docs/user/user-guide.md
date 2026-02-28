@@ -16,6 +16,12 @@ This guide is intentionally short for now and points to the current production U
 - Result: UI opens the `People` tab and loads the same person-assets gallery you get from clicking that person manually.
 - Safety: mutating intents (rename/merge/delete/assign, etc.) are still blocked by the voice command orchestrator in current phase.
 
+## Voice Chat (Multi-turn Conversation)
+
+- Use **Voice Chat** for free-form conversation with context kept across turns.
+- Use **Reset Chat** to clear the current conversation context and start a fresh one.
+- The flow is: browser recording -> transcribe -> chat turn -> TTS playback (with browser speech fallback when server audio is unavailable).
+
 ## Main Tabs
 
 - `Library`: browse assets, open inspector, read/edit captions, and add/remove tags.

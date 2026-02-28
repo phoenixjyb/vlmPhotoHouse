@@ -124,3 +124,88 @@ def test_voice_command_show_person_photos_chinese(client, temp_env_root, voice_e
     assert payload['contract']['mode'] == 'read'
     assert payload['data']['person_name'] == '川川'
     assert payload['data']['total'] >= 1
+
+
+def test_voice_chat_turn_keeps_conversation_id(client, voice_env, monkeypatch):
+    _ = voice_env
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload, status_code=200, text=''):
+            self._payload = payload
+            self.status_code = status_code
+            self.text = text
+
+        def json(self):
+            return self._payload
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            calls.append({'url': url, 'headers': headers, 'json': json})
+            return FakeResponse(
+                {
+                    'response': 'Hello from assistant.',
+                    'conversation_id': json.get('conversation_id') or 'new-conv-id',
+                    'model_used': 'gemma3:latest',
+                },
+                status_code=200,
+            )
+
+    monkeypatch.setattr('app.routers.voice.httpx.AsyncClient', FakeAsyncClient)
+
+    resp = client.post(
+        '/voice/chat',
+        json={'text': 'hi there', 'conversation_id': 'conv-123', 'language': 'en', 'model': 'gemma3:latest'},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload['success'] is True
+    assert payload['text_response'] == 'Hello from assistant.'
+    assert payload['conversation_id'] == 'conv-123'
+    assert calls, 'expected provider call'
+    assert str(calls[0]['url']).endswith('/api/chat/message')
+    assert calls[0]['json']['conversation_id'] == 'conv-123'
+    assert calls[0]['json']['message'] == 'hi there'
+
+
+def test_voice_chat_turn_surfaces_provider_error(client, voice_env, monkeypatch):
+    _ = voice_env
+
+    class FakeResponse:
+        def __init__(self, payload, status_code=500, text='provider error'):
+            self._payload = payload
+            self.status_code = status_code
+            self.text = text
+
+        def json(self):
+            return self._payload
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            return FakeResponse({'error': 'provider unavailable'}, status_code=500, text='provider unavailable')
+
+    monkeypatch.setattr('app.routers.voice.httpx.AsyncClient', FakeAsyncClient)
+
+    resp = client.post('/voice/chat', json={'text': 'hello'})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload['success'] is False
+    assert 'provider unavailable' in str(payload['error'])

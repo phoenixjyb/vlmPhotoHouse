@@ -73,6 +73,7 @@ const state = {
     summary: null,
   },
   voiceBusy: false,
+  voiceConversationId: "",
 };
 
 const qs = (id) => document.getElementById(id);
@@ -82,6 +83,7 @@ const I18N = {
     app_title: "VLM Photo House",
     subtitle: "Faces, captions, videos, and search in one control surface.",
     voice_chat: "Voice Chat",
+    voice_chat_reset: "Reset Chat",
     voice_command: "Voice Command",
     voice_chat_recording: "Listening for chat...",
     voice_chat_processing: "Talking to assistant...",
@@ -89,6 +91,7 @@ const I18N = {
     voice_chat_no_reply: "Voice chat returned no reply",
     voice_chat_reply_audio: "Assistant replied with audio",
     voice_chat_reply_text: "Assistant: {text}",
+    voice_chat_session_reset: "Voice chat context reset",
     voice_recording: "Listening...",
     voice_processing: "Processing...",
     voice_not_supported: "Voice capture is not supported in this browser",
@@ -342,6 +345,7 @@ const I18N = {
     app_title: "VLM 照片屋",
     subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
     voice_chat: "语音对话",
+    voice_chat_reset: "重置对话",
     voice_command: "语音命令",
     voice_chat_recording: "正在聆听（对话）...",
     voice_chat_processing: "正在对话处理中...",
@@ -349,6 +353,7 @@ const I18N = {
     voice_chat_no_reply: "语音对话未返回有效回复",
     voice_chat_reply_audio: "助手已语音回复",
     voice_chat_reply_text: "助手：{text}",
+    voice_chat_session_reset: "语音对话上下文已重置",
     voice_recording: "正在聆听...",
     voice_processing: "处理中...",
     voice_not_supported: "当前浏览器不支持语音采集",
@@ -1226,6 +1231,11 @@ async function runVoiceCommandCapture() {
   }
 }
 
+function resetVoiceConversationContext() {
+  state.voiceConversationId = "";
+  showToast(t("voice_chat_session_reset"));
+}
+
 async function runVoiceConversationCapture() {
   if (state.voiceBusy) return;
   const voiceChatBtn = qs("btn-voice-chat");
@@ -1274,55 +1284,84 @@ async function runVoiceConversationCapture() {
       showToast(t("voice_no_transcript"));
       return;
     }
+
     setVoiceStatus(t("voice_chat_processing"));
-    const form = new FormData();
-    form.append("audio", blob, "voice-chat.webm");
-    form.append("language", state.lang === "zh" ? "zh" : "en");
-    form.append("voice", "default");
-    form.append("speed", "1.0");
-    form.append("tts_mode", "fast");
+    const asrForm = new FormData();
+    asrForm.append("file", blob, "voice-chat.webm");
+    asrForm.append("language", state.lang === "zh" ? "zh" : "en");
+    const asr = await api("/voice/transcribe", { method: "POST", body: asrForm });
+    const transcript = String(asr?.text || asr?.transcript || asr?.result || "").trim();
+    if (!transcript) {
+      const err = String(asr?.error || "");
+      showToast(err ? t("voice_transcribe_failed", { error: err }) : t("voice_no_transcript"));
+      return;
+    }
+    showToast(t("voice_heard", { text: transcript }));
 
-    const res = await fetch("/voice/conversation", { method: "POST", body: form });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+    const chat = await api("/voice/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        text: transcript,
+        conversation_id: state.voiceConversationId || null,
+        language: state.lang,
+        model: "gemma3:latest",
+      }),
+    });
+    const textReply = String(chat?.text_response || chat?.text || "").trim();
+    const nextConversationId = String(chat?.conversation_id || "").trim();
+    if (nextConversationId) {
+      state.voiceConversationId = nextConversationId;
     }
-    const ct = res.headers.get("content-type") || "";
-    if (ct.startsWith("audio/")) {
-      const outBlob = await res.blob();
-      const url = URL.createObjectURL(outBlob);
-      let el = qs("voice-chat-audio");
-      if (!el) {
-        el = document.createElement("audio");
-        el.id = "voice-chat-audio";
-        el.style.display = "none";
-        document.body.appendChild(el);
+    if (!textReply) {
+      const err = String(chat?.error || "");
+      if (err) {
+        showToast(t("voice_chat_failed", { error: err }));
+        return;
       }
-      el.src = url;
-      try {
-        await el.play();
-      } catch (_) {}
-      showToast(t("voice_chat_reply_audio"));
+      showToast(t("voice_chat_no_reply"));
       return;
     }
 
-    const j = await res.json().catch(() => null);
-    const textReply = String(j?.text_response || j?.text || "").trim();
-    if (textReply) {
-      const brief = textReply.length > 80 ? `${textReply.slice(0, 80)}...` : textReply;
-      showToast(t("voice_chat_reply_text", { text: brief }));
-      if ("speechSynthesis" in window) {
-        const u = new SpeechSynthesisUtterance(textReply);
-        u.lang = state.lang === "zh" ? "zh-CN" : "en-US";
-        window.speechSynthesis.speak(u);
+    const brief = textReply.length > 80 ? `${textReply.slice(0, 80)}...` : textReply;
+    showToast(t("voice_chat_reply_text", { text: brief }));
+
+    const ttsRes = await fetch("/voice/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: textReply,
+        language: state.lang === "zh" ? "zh" : "en",
+        voice: "default",
+        speed: 1.0,
+        format: "audio/wav",
+      }),
+    });
+    if (ttsRes.ok) {
+      const ct = ttsRes.headers.get("content-type") || "";
+      if (ct.startsWith("audio/")) {
+        const outBlob = await ttsRes.blob();
+        const url = URL.createObjectURL(outBlob);
+        let el = qs("voice-chat-audio");
+        if (!el) {
+          el = document.createElement("audio");
+          el.id = "voice-chat-audio";
+          el.style.display = "none";
+          document.body.appendChild(el);
+        }
+        el.src = url;
+        try {
+          await el.play();
+          showToast(t("voice_chat_reply_audio"));
+          return;
+        } catch (_) {}
       }
-      return;
     }
-    const err = String(j?.error || "");
-    if (err) {
-      showToast(t("voice_chat_failed", { error: err }));
-      return;
+
+    if ("speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(textReply);
+      u.lang = state.lang === "zh" ? "zh-CN" : "en-US";
+      window.speechSynthesis.speak(u);
     }
-    showToast(t("voice_chat_no_reply"));
   } catch (e) {
     showToast(t("voice_chat_failed", { error: e.message }));
   } finally {
@@ -2658,6 +2697,10 @@ function initEvents() {
   const voiceChatBtn = qs("btn-voice-chat");
   if (voiceChatBtn) {
     voiceChatBtn.addEventListener("click", runVoiceConversationCapture);
+  }
+  const voiceChatResetBtn = qs("btn-voice-chat-reset");
+  if (voiceChatResetBtn) {
+    voiceChatResetBtn.addEventListener("click", resetVoiceConversationContext);
   }
 
   qs("btn-search").addEventListener("click", () => runSearch(1, false));

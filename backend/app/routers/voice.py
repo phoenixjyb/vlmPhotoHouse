@@ -410,6 +410,92 @@ async def conversation(
         raise HTTPException(status_code=502, detail=f'Conversation proxy failed: {e}')
 
 
+@router.post('/voice/chat')
+async def voice_chat(
+    text: str = Body(..., embed=True),
+    conversation_id: Optional[str] = Body(None, embed=True),
+    language: Optional[str] = Body('en', embed=True),
+    model: Optional[str] = Body('gemma3:latest', embed=True),
+):
+    """Text chat proxy with persistent conversation context support."""
+    s = _require_enabled()
+    message = str(text or '').strip()
+    if not message:
+        return JSONResponse({'success': False, 'error': 'Empty message'}, status_code=200)
+
+    chat_path = os.getenv('VOICE_CHAT_MESSAGE_PATH', '/api/chat/message')
+    if not str(chat_path).startswith('/'):
+        chat_path = '/' + str(chat_path)
+    url = s.voice_external_base_url.rstrip('/') + str(chat_path)
+    headers = {'Authorization': f'Bearer {s.voice_api_key}'} if s.voice_api_key else {}
+    payload: dict[str, Any] = {
+        'message': message,
+        'model': model or 'gemma3:latest',
+        'platform': 'vlmPhotoHouse',
+    }
+    if conversation_id:
+        payload['conversation_id'] = str(conversation_id).strip()
+    try:
+        async with httpx.AsyncClient(timeout=s.voice_timeout_sec, trust_env=False) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            try:
+                resp = r.json()
+            except Exception:
+                return JSONResponse(
+                    {
+                        'success': False,
+                        'error': r.text or f'Chat provider status {r.status_code}',
+                        'status': r.status_code,
+                        'conversation_id': payload.get('conversation_id'),
+                    },
+                    status_code=200,
+                )
+
+            if not isinstance(resp, dict):
+                return JSONResponse(
+                    {
+                        'success': False,
+                        'error': 'Unexpected chat provider response shape',
+                        'conversation_id': payload.get('conversation_id'),
+                    },
+                    status_code=200,
+                )
+
+            text_response = str(resp.get('response') or resp.get('text_response') or resp.get('text') or '').strip()
+            resolved_conversation_id = str(resp.get('conversation_id') or payload.get('conversation_id') or '').strip()
+            if text_response:
+                return JSONResponse(
+                    {
+                        'success': True,
+                        'text_response': text_response,
+                        'conversation_id': resolved_conversation_id or None,
+                        'language': language or 'en',
+                        'model': str(resp.get('model_used') or payload.get('model') or 'gemma3:latest'),
+                    },
+                    status_code=200,
+                )
+
+            err = resp.get('detail') or resp.get('error') or r.text or f'Chat provider status {r.status_code}'
+            return JSONResponse(
+                {
+                    'success': False,
+                    'error': str(err),
+                    'status': r.status_code,
+                    'conversation_id': resolved_conversation_id or None,
+                },
+                status_code=200,
+            )
+    except httpx.HTTPError as e:
+        return JSONResponse(
+            {
+                'success': False,
+                'error': f'Chat proxy failed: {e}',
+                'conversation_id': payload.get('conversation_id'),
+            },
+            status_code=200,
+        )
+
+
 # --- Health and capabilities ---
 @router.get('/voice/health')
 async def voice_health():
