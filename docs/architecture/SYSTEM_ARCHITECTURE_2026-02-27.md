@@ -216,11 +216,13 @@ Why Qwen3-VL vs BLIP2?
   - `/voice/transcribe`
   - `/voice/tts`
   - `/voice/conversation`
+  - `/voice/chat`
   - `/voice/health`
   - `/voice/capabilities`
   - `/voice/demo`
-  - `/voice/command` (Phase-2 read-only orchestrator in Photo House)
-    - Current read-only actions: `search.assets`, `search.people`, `search.tags`, `tasks.status`, `system.status`, `search.person.assets`
+  - `/voice/command` (confirmation-gated orchestrator in Photo House)
+    - Current read actions: `search.assets`, `search.people`, `search.tags`, `tasks.status`, `system.status`, `search.person.assets`
+    - Current mutate action: `mutate.person.rename` (requires explicit confirm/cancel step)
     - Current kid scenario: voice phrase like `show me the photos of chuan` resolves person and opens the person-assets gallery flow in main UI
 - **Current model stack (runtime baseline, 2026-02-27)**:
   - **STT**: OpenAI Whisper `base` (local ASR in LLMyTranslate)
@@ -243,8 +245,11 @@ without bypassing API validation, safety checks, and audit paths.
 **Current implementation snapshot (2026-02-27)**:
 - Browser UI includes a top-bar `Voice Command` trigger in `/ui`.
 - Execution flow: mic capture -> `/voice/transcribe` -> `/voice/command` -> UI navigation/action.
+- Voice conversation flow: mic capture -> `/voice/transcribe` -> `/voice/chat` (context-aware text turn) -> `/voice/tts`.
 - Read-only person-photo command is active: `search.person.assets` (e.g., `show me the photos of <name>`).
-- Mutating commands remain blocked as `mutate.request` until confirmation phase is implemented.
+- Mutating rename is active behind confirmation gates:
+  - initial command creates a pending action preview
+  - follow-up `confirm` executes, `cancel` aborts.
 
 **Scope boundary**:
 - **In scope (v1-v2)**: query/search/status flows and concise spoken summaries.
@@ -285,7 +290,7 @@ without bypassing API validation, safety checks, and audit paths.
 **Phased rollout**:
 - **P1**: stabilize `/voice/*` proxy contracts and de-risk legacy `voice_photo` routes
 - **P2**: shipped read-only orchestrator (search + status + browse, including person-photo browse) with bilingual summaries
-- **P3**: add mutating commands with confirmation + dry-run preview
+- **P3**: shipped first mutating command with confirmation (`person.rename`); continue expanding mutate coverage with preview/confirm policy
 - **P4**: refine multilingual UX, latency/quality metrics, and interruption behavior
 
 **Acceptance criteria (initial)**:

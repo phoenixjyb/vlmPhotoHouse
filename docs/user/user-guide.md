@@ -7,14 +7,17 @@ This guide is intentionally short for now and points to the current production U
 - Open: `http://127.0.0.1:8002/ui`
 - Language: switch EN/ZH from the top bar.
 
-## Voice Command (Read-only)
+## Voice Command
 
 - Use the **Voice Command** button in the top bar for short voice queries.
 - Current kid-friendly example:
   - EN: `show me the photos of chuan`
   - ZH: `显示 chuan 的照片`
 - Result: UI opens the `People` tab and loads the same person-assets gallery you get from clicking that person manually.
-- Safety: mutating intents (rename/merge/delete/assign, etc.) are still blocked by the voice command orchestrator in current phase.
+- Confirmation-gated mutate support is now enabled for rename:
+  - EN: `rename person chuan to chuan dad` -> `confirm` / `cancel`
+  - ZH: `把川川改名为川爸爸` -> `确认` / `取消`
+- Safety: mutating intents without explicit confirmation still do not execute.
 
 ## Voice Chat (Multi-turn Conversation)
 

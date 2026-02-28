@@ -42,7 +42,7 @@ def test_voice_command_search_assets_read_only(client, temp_env_root, voice_env)
 def test_voice_command_blocks_mutating_request(client, voice_env):
     _ = voice_env
 
-    resp = client.post('/voice/command', json={'text': 'rename person 12 to Alice', 'language': 'en'})
+    resp = client.post('/voice/command', json={'text': 'merge person 12 into person 5', 'language': 'en'})
     assert resp.status_code == 200
     payload = resp.json()
     assert payload['success'] is True
@@ -124,6 +124,72 @@ def test_voice_command_show_person_photos_chinese(client, temp_env_root, voice_e
     assert payload['contract']['mode'] == 'read'
     assert payload['data']['person_name'] == '川川'
     assert payload['data']['total'] >= 1
+
+
+def test_voice_command_rename_requires_confirmation(client, temp_env_root, voice_env):
+    _ = voice_env
+
+    with SessionLocal() as session:
+        person = Person(display_name='VoiceTempAlpha', face_count=1)
+        session.add(person)
+        session.commit()
+
+    resp = client.post(
+        '/voice/command',
+        json={'text': 'rename person voicetempalpha to VoiceTempAlpha2', 'language': 'en', 'client_id': 'voice-confirm-test-1'},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload['success'] is True
+    assert payload['executed'] is False
+    assert payload['contract']['action'] == 'mutate.person.rename'
+    assert payload['contract']['needs_confirmation'] is True
+    assert payload['data']['reason'] == 'confirmation_required'
+    assert str(payload['data'].get('confirmation_token') or '').strip()
+
+
+def test_voice_command_rename_confirm_executes(client, temp_env_root, voice_env):
+    _ = voice_env
+
+    with SessionLocal() as session:
+        person = Person(display_name='VoiceTempBeta', face_count=1)
+        session.add(person)
+        session.commit()
+        person_id = int(person.id)
+
+    prepare = client.post(
+        '/voice/command',
+        json={
+            'text': f'rename person {person_id} to VoiceTempBeta2',
+            'language': 'en',
+            'client_id': 'voice-confirm-test-2',
+        },
+    )
+    assert prepare.status_code == 200
+    token = str(prepare.json().get('data', {}).get('confirmation_token') or '')
+    assert token
+
+    confirm = client.post(
+        '/voice/command',
+        json={
+            'text': 'confirm',
+            'language': 'en',
+            'client_id': 'voice-confirm-test-2',
+            'confirm': True,
+            'confirmation_token': token,
+        },
+    )
+    assert confirm.status_code == 200
+    payload = confirm.json()
+    assert payload['success'] is True
+    assert payload['executed'] is True
+    assert payload['contract']['action'] == 'mutate.person.rename'
+    assert payload['data']['reason'] == 'confirmed_and_executed'
+
+    with SessionLocal() as session:
+        renamed = session.get(Person, person_id)
+        assert renamed is not None
+        assert renamed.display_name == 'voicetempbeta2'
 
 
 def test_voice_chat_turn_keeps_conversation_id(client, voice_env, monkeypatch):

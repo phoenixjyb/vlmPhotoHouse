@@ -7,6 +7,9 @@ import subprocess
 import tempfile
 import os
 import re
+import time
+import uuid
+from threading import Lock
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
@@ -16,6 +19,10 @@ from ..db import Asset, Person, FaceDetection, Task, Tag, AssetTag
 
 router = APIRouter()
 
+_VOICE_CONFIRM_TTL_SEC = int(os.getenv('VOICE_CONFIRM_TTL_SEC', '180') or '180')
+_VOICE_PENDING_BY_CLIENT: dict[str, dict[str, Any]] = {}
+_VOICE_PENDING_LOCK = Lock()
+
 
 def _require_enabled():
     s = get_settings()
@@ -24,6 +31,82 @@ def _require_enabled():
     if s.voice_provider != 'external' or not s.voice_external_base_url:
         raise HTTPException(status_code=501, detail='External voice service not configured')
     return s
+
+
+def _normalize_client_id(client_id: Optional[str]) -> str:
+    raw = str(client_id or '').strip()
+    if not raw:
+        return 'default'
+    sanitized = re.sub(r'[^a-zA-Z0-9._:-]+', '', raw)
+    return sanitized[:80] or 'default'
+
+
+def _cleanup_expired_pending_actions(now_ts: Optional[float] = None) -> None:
+    now = float(now_ts or time.time())
+    with _VOICE_PENDING_LOCK:
+        expired = [client for client, rec in _VOICE_PENDING_BY_CLIENT.items() if float(rec.get('expires_at', 0.0)) < now]
+        for client in expired:
+            _VOICE_PENDING_BY_CLIENT.pop(client, None)
+
+
+def _put_pending_action(client_id: str, action: str, args: dict[str, Any]) -> dict[str, Any]:
+    now = float(time.time())
+    rec = {
+        'token': str(uuid.uuid4()),
+        'client_id': client_id,
+        'action': action,
+        'args': dict(args),
+        'created_at': now,
+        'expires_at': now + float(max(30, _VOICE_CONFIRM_TTL_SEC)),
+    }
+    with _VOICE_PENDING_LOCK:
+        _VOICE_PENDING_BY_CLIENT[client_id] = rec
+    return rec
+
+
+def _pop_pending_action(client_id: str, confirmation_token: Optional[str]) -> Optional[dict[str, Any]]:
+    _cleanup_expired_pending_actions()
+    with _VOICE_PENDING_LOCK:
+        rec = _VOICE_PENDING_BY_CLIENT.get(client_id)
+        if not rec:
+            return None
+        token = str(confirmation_token or '').strip()
+        if token and token != str(rec.get('token') or ''):
+            return None
+        _VOICE_PENDING_BY_CLIENT.pop(client_id, None)
+        return dict(rec)
+
+
+def _normalize_person_name(value: str) -> str:
+    cleaned = str(value or '').strip(" \t\r\n'\"`“”‘’.,!?;:，。！？；：")
+    cleaned = re.sub(r"^(?:the|a|an)\s+", "", cleaned, flags=re.IGNORECASE).strip()
+    return cleaned
+
+
+def _parse_rename_person_action(normalized_text: str) -> Optional[dict[str, Any]]:
+    m_id = re.match(r"^(?:please\s+)?rename\s+person\s+#?(\d+)\s+(?:to|as)\s+(.+)$", normalized_text)
+    if m_id:
+        new_name = _normalize_person_name(m_id.group(2))
+        if new_name:
+            return {
+                'person_id': int(m_id.group(1)),
+                'old_query': str(m_id.group(1)),
+                'new_name': new_name,
+            }
+
+    rename_patterns = (
+        r"^(?:please\s+)?(?:rename|change name of)\s+(?:person\s+)?(.+?)\s+(?:to|as)\s+(.+)$",
+        r"^(?:请)?(?:把|将)?(?:人物)?\s*(.+?)\s*(?:改名为|重命名为|改成|叫做)\s*(.+)$",
+    )
+    for pattern in rename_patterns:
+        m = re.match(pattern, normalized_text)
+        if not m:
+            continue
+        old_query = _normalize_person_name(m.group(1))
+        new_name = _normalize_person_name(m.group(2))
+        if old_query and new_name:
+            return {'person_id': None, 'old_query': old_query, 'new_name': new_name}
+    return None
 
 
 def _piper_tts_bytes(text: str, exe_path: str, model_path: str) -> Optional[bytes]:
@@ -109,6 +192,56 @@ def _parse_voice_action(text: str) -> dict[str, Any]:
             'args': {},
             'needs_confirmation': False,
             'confidence': 0.0,
+        }
+
+    confirm_phrases = (
+        'yes',
+        'confirm',
+        'go ahead',
+        'do it',
+        'ok',
+        'okay',
+        'sure',
+        '确定',
+        '确认',
+        '执行',
+        '是',
+    )
+    if n in confirm_phrases:
+        return {
+            'action': 'mutate.confirm',
+            'mode': 'mutate',
+            'args': {},
+            'needs_confirmation': False,
+            'confidence': 0.92,
+        }
+
+    cancel_phrases = (
+        'cancel',
+        'no',
+        'stop',
+        'never mind',
+        '取消',
+        '不要',
+        '算了',
+    )
+    if n in cancel_phrases:
+        return {
+            'action': 'mutate.cancel',
+            'mode': 'mutate',
+            'args': {},
+            'needs_confirmation': False,
+            'confidence': 0.92,
+        }
+
+    rename_args = _parse_rename_person_action(n)
+    if rename_args:
+        return {
+            'action': 'mutate.person.rename',
+            'mode': 'mutate',
+            'args': rename_args,
+            'needs_confirmation': True,
+            'confidence': 0.9,
         }
 
     mutating_markers = (
@@ -198,6 +331,56 @@ def _voice_summary(action: str, data: dict[str, Any], language: Optional[str]) -
             '这是写入类操作，请先确认后再执行。'
             if zh
             else 'This is a mutating request and requires confirmation before execution.'
+        )
+    if action == 'mutate.pending.rename':
+        old_name = str(data.get('old_name') or '')
+        new_name = str(data.get('new_name') or '')
+        return (
+            f'将把人物“{old_name}”重命名为“{new_name}”。请说“确认”执行，或说“取消”放弃。'
+            if zh
+            else f'I can rename "{old_name}" to "{new_name}". Say "confirm" to execute, or "cancel" to abort.'
+        )
+    if action == 'mutate.person.rename.done':
+        old_name = str(data.get('old_name') or '')
+        new_name = str(data.get('new_name') or '')
+        return (
+            f'已将人物“{old_name}”重命名为“{new_name}”。'
+            if zh
+            else f'Renamed person "{old_name}" to "{new_name}".'
+        )
+    if action == 'mutate.person.rename.person_not_found':
+        q = str(data.get('query') or data.get('person_id') or '')
+        return (
+            f'未找到可重命名的人物：{q}。'
+            if zh
+            else f'No person found to rename for "{q}".'
+        )
+    if action == 'mutate.person.rename.name_conflict':
+        new_name = str(data.get('new_name') or '')
+        conflict_name = str(data.get('conflict_name') or '')
+        return (
+            f'无法重命名为“{new_name}”，该名称已被人物“{conflict_name}”使用。'
+            if zh
+            else f'Cannot rename to "{new_name}" because that name is already used by "{conflict_name}".'
+        )
+    if action == 'mutate.person.rename.no_change':
+        name = str(data.get('name') or '')
+        return (
+            f'人物名称已是“{name}”，无需修改。'
+            if zh
+            else f'Person is already named "{name}". No change needed.'
+        )
+    if action == 'mutate.confirm.missing':
+        return (
+            '当前没有待确认的写入操作。'
+            if zh
+            else 'There is no pending mutating request to confirm.'
+        )
+    if action == 'mutate.cancelled':
+        return (
+            '已取消待确认的写入操作。'
+            if zh
+            else 'Canceled the pending mutating request.'
         )
     if action == 'system.status':
         if zh:
@@ -530,17 +713,263 @@ def voice_command(
     text: str = Body(..., embed=True),
     language: Optional[str] = Body('en', embed=True),
     limit: int = Body(5, embed=True),
+    client_id: Optional[str] = Body(None, embed=True),
+    confirm: bool = Body(False, embed=True),
+    cancel: bool = Body(False, embed=True),
+    confirmation_token: Optional[str] = Body(None, embed=True),
     db_s: Session = Depends(get_db),
 ):
     _require_enabled()
+    _cleanup_expired_pending_actions()
     contract = _parse_voice_action(text)
     safe_limit = max(1, min(int(limit), 20))
+    client_key = _normalize_client_id(client_id)
+    action = str(contract.get('action') or 'help')
+
+    def _find_person_match(person_id: int, query: str):
+        if person_id > 0:
+            return (
+                db_s.query(Person.id, Person.display_name, Person.face_count)
+                .filter(Person.id == person_id)
+                .first()
+            )
+        q = str(query or '').strip()
+        if not q:
+            return None
+        return (
+            db_s.query(Person.id, Person.display_name, Person.face_count)
+            .filter(Person.display_name != None)
+            .filter(func.lower(Person.display_name).like(f"%{q.lower()}%"))
+            .order_by(Person.face_count.desc(), Person.id.asc())
+            .first()
+        )
+
+    def _find_name_conflict(person_id: int, new_name: str):
+        normalized = str(new_name or '').strip().lower()
+        if not normalized:
+            return None
+        return (
+            db_s.query(Person.id, Person.display_name)
+            .filter(Person.id != person_id)
+            .filter(Person.display_name != None)
+            .filter(func.lower(func.trim(Person.display_name)) == normalized)
+            .order_by(Person.id.asc())
+            .first()
+        )
+
+    if cancel or action == 'mutate.cancel':
+        dropped = _pop_pending_action(client_key, confirmation_token)
+        summary_action = 'mutate.cancelled' if dropped else 'mutate.confirm.missing'
+        summary_text = _voice_summary(summary_action, {}, language)
+        data = {
+            'reason': 'cancelled' if dropped else 'no_pending_confirmation',
+            'pending_action': str(dropped.get('action') or '') if dropped else None,
+        }
+        return {
+            'success': True,
+            'phase': 'phase3-confirmation',
+            'executed': False,
+            'contract': contract,
+            'summary_text': summary_text,
+            'tts_text': summary_text,
+            'data': data,
+        }
+
+    if confirm or action == 'mutate.confirm':
+        pending = _pop_pending_action(client_key, confirmation_token)
+        if pending is None:
+            summary_text = _voice_summary('mutate.confirm.missing', {}, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': False,
+                'contract': contract,
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': {'reason': 'no_pending_confirmation'},
+            }
+
+        pending_action = str(pending.get('action') or '')
+        pending_args = dict(pending.get('args') or {})
+        if pending_action == 'mutate.person.rename':
+            person_id = int(pending_args.get('person_id') or 0)
+            new_name = _normalize_person_name(str(pending_args.get('new_name') or ''))
+            person = db_s.get(Person, person_id) if person_id > 0 else None
+            if person is None:
+                data = {
+                    'reason': 'person_not_found',
+                    'person_id': person_id,
+                    'query': pending_args.get('old_query') or person_id,
+                }
+                summary_text = _voice_summary('mutate.person.rename.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            old_name = str(person.display_name or f'#{int(person.id)}')
+            if old_name.strip().lower() == new_name.lower():
+                data = {'reason': 'no_change', 'name': old_name, 'person_id': int(person.id)}
+                summary_text = _voice_summary('mutate.person.rename.no_change', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            conflict = _find_name_conflict(int(person.id), new_name)
+            if conflict is not None:
+                conflict_name = str(conflict[1] or f'#{int(conflict[0])}')
+                data = {
+                    'reason': 'name_conflict',
+                    'person_id': int(person.id),
+                    'old_name': old_name,
+                    'new_name': new_name,
+                    'conflict_person_id': int(conflict[0]),
+                    'conflict_name': conflict_name,
+                }
+                summary_text = _voice_summary('mutate.person.rename.name_conflict', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            person.display_name = new_name  # type: ignore[attr-defined]
+            db_s.commit()
+            data = {
+                'reason': 'confirmed_and_executed',
+                'person_id': int(person.id),
+                'old_name': old_name,
+                'new_name': new_name,
+            }
+            summary_text = _voice_summary('mutate.person.rename.done', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': True,
+                'contract': {'action': pending_action, 'mode': 'mutate', 'needs_confirmation': False, 'args': pending_args},
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
+        summary_text = _voice_summary('mutate.confirm.missing', {}, language)
+        return {
+            'success': True,
+            'phase': 'phase3-confirmation',
+            'executed': False,
+            'contract': contract,
+            'summary_text': summary_text,
+            'tts_text': summary_text,
+            'data': {'reason': 'unknown_pending_action', 'pending_action': pending_action},
+        }
 
     if contract.get('mode') == 'mutate':
+        if action == 'mutate.person.rename':
+            args = dict(contract.get('args') or {})
+            person_id = int(args.get('person_id') or 0)
+            query = str(args.get('old_query') or '').strip()
+            new_name = _normalize_person_name(str(args.get('new_name') or ''))
+            person_match = _find_person_match(person_id, query)
+            if person_match is None:
+                data = {'reason': 'person_not_found', 'query': query or person_id}
+                summary_text = _voice_summary('mutate.person.rename.person_not_found', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            target_person_id = int(person_match[0])
+            old_name = str(person_match[1] or f'#{target_person_id}')
+            if old_name.strip().lower() == new_name.lower():
+                data = {'reason': 'no_change', 'name': old_name, 'person_id': target_person_id}
+                summary_text = _voice_summary('mutate.person.rename.no_change', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            conflict = _find_name_conflict(target_person_id, new_name)
+            if conflict is not None:
+                conflict_name = str(conflict[1] or f'#{int(conflict[0])}')
+                data = {
+                    'reason': 'name_conflict',
+                    'person_id': target_person_id,
+                    'old_name': old_name,
+                    'new_name': new_name,
+                    'conflict_person_id': int(conflict[0]),
+                    'conflict_name': conflict_name,
+                }
+                summary_text = _voice_summary('mutate.person.rename.name_conflict', data, language)
+                return {
+                    'success': True,
+                    'phase': 'phase3-confirmation',
+                    'executed': False,
+                    'contract': contract,
+                    'summary_text': summary_text,
+                    'tts_text': summary_text,
+                    'data': data,
+                }
+
+            pending = _put_pending_action(
+                client_key,
+                'mutate.person.rename',
+                {
+                    'person_id': target_person_id,
+                    'old_query': query,
+                    'old_name': old_name,
+                    'new_name': new_name,
+                },
+            )
+            expires_in = max(1, int(float(pending['expires_at']) - time.time()))
+            data = {
+                'reason': 'confirmation_required',
+                'pending_action': 'mutate.person.rename',
+                'person_id': target_person_id,
+                'old_name': old_name,
+                'new_name': new_name,
+                'confirmation_token': str(pending['token']),
+                'expires_in_sec': expires_in,
+            }
+            summary_text = _voice_summary('mutate.pending.rename', data, language)
+            return {
+                'success': True,
+                'phase': 'phase3-confirmation',
+                'executed': False,
+                'contract': contract,
+                'summary_text': summary_text,
+                'tts_text': summary_text,
+                'data': data,
+            }
+
         summary_text = _voice_summary('mutate.request', {}, language)
         return {
             'success': True,
-            'phase': 'phase2-read-only',
+            'phase': 'phase3-confirmation',
             'executed': False,
             'contract': contract,
             'summary_text': summary_text,
@@ -548,7 +977,6 @@ def voice_command(
             'data': {'reason': 'confirmation_required'},
         }
 
-    action = str(contract.get('action') or 'help')
     data: dict[str, Any]
     executed = True
 

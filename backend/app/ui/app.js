@@ -74,6 +74,8 @@ const state = {
   },
   voiceBusy: false,
   voiceConversationId: "",
+  voicePendingConfirmationToken: "",
+  voiceClientId: "",
 };
 
 const qs = (id) => document.getElementById(id);
@@ -996,6 +998,36 @@ function setVoiceStatus(message = "") {
   if (el) el.textContent = message;
 }
 
+function getOrCreateVoiceClientId() {
+  const key = "vlm_voice_client_id";
+  const existing = String(window.localStorage.getItem(key) || "").trim();
+  if (existing) return existing;
+  const next =
+    (window.crypto && typeof window.crypto.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : `voice-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`) || `voice-${Date.now()}`;
+  window.localStorage.setItem(key, next);
+  return next;
+}
+
+function normalizeVoiceControlText(textRaw) {
+  return String(textRaw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[,.!?;:，。！？；：]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function isVoiceConfirmText(textRaw) {
+  const n = normalizeVoiceControlText(textRaw);
+  return ["yes", "confirm", "go ahead", "do it", "ok", "okay", "sure", "确定", "确认", "执行", "是"].includes(n);
+}
+
+function isVoiceCancelText(textRaw) {
+  const n = normalizeVoiceControlText(textRaw);
+  return ["cancel", "no", "stop", "never mind", "取消", "不要", "算了"].includes(n);
+}
+
 function extractVoicePersonAssetsQuery(textRaw) {
   const normalized = String(textRaw || "")
     .trim()
@@ -1127,10 +1159,33 @@ async function tryClientPersonAssetsFallback(text) {
 }
 
 async function executeVoiceCommand(text) {
+  const wantsConfirm = isVoiceConfirmText(text);
+  const wantsCancel = isVoiceCancelText(text);
+  const requestBody = {
+    text,
+    language: state.lang,
+    limit: 20,
+    client_id: state.voiceClientId || "default",
+  };
+  if (wantsConfirm && state.voicePendingConfirmationToken) {
+    requestBody.confirm = true;
+    requestBody.confirmation_token = state.voicePendingConfirmationToken;
+  }
+  if (wantsCancel && state.voicePendingConfirmationToken) {
+    requestBody.cancel = true;
+    requestBody.confirmation_token = state.voicePendingConfirmationToken;
+  }
   const payload = await api("/voice/command", {
     method: "POST",
-    body: JSON.stringify({ text, language: state.lang, limit: 20 }),
+    body: JSON.stringify(requestBody),
   });
+  const reason = String(payload?.data?.reason || "");
+  const pendingToken = String(payload?.data?.confirmation_token || "").trim();
+  if (reason === "confirmation_required" && pendingToken) {
+    state.voicePendingConfirmationToken = pendingToken;
+  } else if (reason === "confirmed_and_executed" || reason === "cancelled" || reason === "no_pending_confirmation") {
+    state.voicePendingConfirmationToken = "";
+  }
   const action = String(payload?.contract?.action || "");
   if (action === "search.person.assets") {
     const personId = Number(payload?.data?.person_id || 0);
@@ -1233,6 +1288,7 @@ async function runVoiceCommandCapture() {
 
 function resetVoiceConversationContext() {
   state.voiceConversationId = "";
+  state.voicePendingConfirmationToken = "";
   showToast(t("voice_chat_session_reset"));
 }
 
@@ -3121,6 +3177,7 @@ function initEvents() {
 }
 
 async function bootstrap() {
+  state.voiceClientId = getOrCreateVoiceClientId();
   const params = new URLSearchParams(window.location.search);
   const langParam = params.get("lang");
   const storedLang = window.localStorage.getItem("vlm_ui_lang");
