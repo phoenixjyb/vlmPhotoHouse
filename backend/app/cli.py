@@ -988,6 +988,9 @@ def captions_backfill_zh(
     source_lang: str = typer.Option("en", help="Source language tag"),
     target_lang: str = typer.Option("zh-CN", help="Target language tag"),
     translation_service_url: Optional[str] = typer.Option(None, help="Caption service base URL, defaults to CAPTION_SERVICE_URL"),
+    translation_provider: str = typer.Option("service", help="Translator backend: service|ollama"),
+    ollama_base_url: str = typer.Option("http://127.0.0.1:11434", help="Ollama base URL when translation_provider=ollama"),
+    ollama_model: str = typer.Option("gemma2:2b", help="Ollama model used when translation_provider=ollama"),
     overwrite_existing_zh: bool = typer.Option(False, help="Overwrite existing generated zh variants"),
     apply: bool = typer.Option(True, help="Apply changes (set false for dry-run)"),
     commit_every: int = typer.Option(100, min=20, max=2000, help="Commit cadence"),
@@ -999,12 +1002,16 @@ def captions_backfill_zh(
     from .db import Asset, Caption
 
     settings = get_settings()
+    provider = (translation_provider or "service").strip().lower()
+    if provider not in {"service", "ollama"}:
+        raise typer.BadParameter("translation_provider must be one of: service, ollama")
     base_url = (
         translation_service_url
         or os.getenv("CAPTION_SERVICE_URL")
         or getattr(settings, "caption_service_url", "http://127.0.0.1:8102")
         or "http://127.0.0.1:8102"
     ).rstrip("/")
+    ollama_url = (ollama_base_url or "http://127.0.0.1:11434").rstrip("/")
     src_filter = (source_model_contains or "").strip().lower()
     bad_texts = {
         "caption service unavailable",
@@ -1031,6 +1038,39 @@ def captions_backfill_zh(
         skipped_no_source = 0
         failed = 0
         touched_assets: set[int] = set()
+
+        def _translate_text(client: httpx.Client, source_text: str) -> str:
+            if provider == "ollama":
+                prompt = (
+                    f"Translate the following text from {source_lang} to {target_lang}. "
+                    "Return only the translated text with no explanation.\n\n"
+                    f"Text:\n{source_text}"
+                )
+                resp = client.post(
+                    f"{ollama_url}/api/generate",
+                    json={
+                        "model": ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": 0.1},
+                    },
+                )
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Ollama translate HTTP {resp.status_code}")
+                body = resp.json()
+                return (body.get("response") or "").strip()
+
+            payload = {
+                "text": source_text,
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "style": "caption",
+            }
+            resp = client.post(f"{base_url}/translate", json=payload)
+            if resp.status_code != 200:
+                raise RuntimeError(f"Service translate HTTP {resp.status_code}")
+            body = resp.json()
+            return (body.get("translation") or "").strip()
 
         with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
             for asset_id, _path in q:
@@ -1077,22 +1117,14 @@ def captions_backfill_zh(
                     continue
 
                 try:
-                    payload = {
-                        "text": source_cap.text,
-                        "source_lang": source_lang,
-                        "target_lang": target_lang,
-                        "style": "caption",
-                    }
-                    resp = client.post(f"{base_url}/translate", json=payload)
-                    if resp.status_code != 200:
-                        failed += 1
-                        continue
-                    body = resp.json()
-                    zh = (body.get("translation") or "").strip()
+                    zh = _translate_text(client, source_cap.text)
                     if not zh:
                         failed += 1
                         continue
-                    model_name = f"{(source_cap.model or 'caption')}|zh-cn"
+                    if provider == "ollama":
+                        model_name = f"{(source_cap.model or 'caption')}|zh-cn|ollama:{ollama_model}"
+                    else:
+                        model_name = f"{(source_cap.model or 'caption')}|zh-cn"
                     session.add(
                         Caption(
                             asset_id=int(asset_id),
@@ -1134,7 +1166,8 @@ def captions_backfill_zh(
         typer.echo(
             f"scanned={scanned} has_source={has_source} translated={translated} failed={failed} "
             f"skipped_has_zh={skipped_has_zh} skipped_no_source={skipped_no_source} "
-            f"target_lang={target_lang} source_lang={source_lang} base_url={base_url} "
+            f"target_lang={target_lang} source_lang={source_lang} "
+            f"provider={provider} base_url={base_url} ollama_url={ollama_url} ollama_model={ollama_model} "
             f"root={root or '(all)'} limit={limit}"
         )
 

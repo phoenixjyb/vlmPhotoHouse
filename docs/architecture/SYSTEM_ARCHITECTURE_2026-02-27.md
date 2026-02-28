@@ -22,9 +22,11 @@ Core capabilities:
 - **Image tagging (RAM++)**: RAM++ recognition model produces independent tag set.
 - **Face detection**: InsightFace SCRFD detects faces per frame.
 - **Face recognition**: LVFace produces 128-dim face embeddings for identity clustering.
-- **Person assignment**: manual labeling + DNN propagation against named-person centroids.
+- **Person assignment**: manual labeling + Stranger grouping + DNN propagation against named-person centroids.
 - **Vector search**: FAISS-backed similarity search over image and face embedding spaces.
 - **Hybrid smart search**: combines vector similarity, caption text, and tag filters.
+- **Story albums**: generated collections by person/tag/location/caption themes.
+- **Similarity reduction**: non-destructive duplicate suppression with explicit restore.
 - **GPS map view**: Leaflet-based geographic browsing of geotagged media.
 - **Voice integration**: proxies to LLMyTranslate for STT/TTS alongside photo browsing.
 
@@ -269,8 +271,9 @@ without bypassing API validation, safety checks, and audit paths.
 **Route mapping (orchestrator -> existing APIs)**:
 - Search intents -> `/search`, `/search/smart`, `/search/captions`, `/search/tags`, `/search/vector`
 - People read intents -> `/search/person/*`, `/persons`, `/faces`
-- People mutate intents -> `/faces/*/assign`, `/persons/{id}/name`, `/persons/merge`
+- People mutate intents -> `/faces/*/assign`, `/faces/*/assign-stranger`, `/persons/{id}/name`, `/persons/merge`
 - Tag intents -> `/tags`, `/tags/{tag_id}/assets`, `/assets/{id}/tags`
+- Story/similarity intents -> `/albums/stories`, `/duplicates/reduction/*`, `/assets/suppressed`
 - Task intents -> `/tasks`, `/tasks/{id}`, `/tasks/{id}/cancel`, `/admin/tasks/{id}/requeue`
 
 **Safety and confirmation policy**:
@@ -356,6 +359,7 @@ Task types dispatched by `TaskExecutor.run_once`:
 | Router | File | Routes |
 |--------|------|--------|
 | People / faces | `routers/people.py` | `/persons/*`, `/faces/*`, `/search/*` |
+| Albums / similarity | `main.py` | `/albums/time`, `/albums/stories`, `/duplicates/*`, `/assets/suppressed` |
 | Assets | `routers/assets.py` (in services/) | `/assets/*` |
 | UI static | `routers/ui.py` | `/ui` (serves index.html + JS/CSS) |
 | Voice proxy | `routers/voice.py` | `/voice/*` → LLMyTranslate |
@@ -484,8 +488,9 @@ task: face_embed
 
 ```
 Manual path (UI/API):
-  POST /persons/{id}/faces/{face_id}  →  label_source='manual'
-  └── enqueue person_label_propagate task
+  POST /faces/{face_id}/assign           → label_source='manual'
+  POST /faces/{face_id}/assign-stranger  → assigns/reuses named person 'Stranger'
+  └── enqueue person_label_propagate task for affected identity
 
 task: person_label_propagate
   └── load manual-labeled face embeddings for each known person
@@ -522,6 +527,32 @@ task: image_tag
 /search/person/*    → person-scoped similarity search
 ```
 
+### 8.8 Story Albums
+
+```
+GET /albums/stories
+  └── generate grouped albums by:
+      person  (face assignments)
+      tag     (asset_tags topics)
+      location(gps bucket)
+      caption (caption keyword themes)
+  └── return story metadata + sample asset items + context-open hints
+```
+
+### 8.9 Similarity Reduction
+
+```
+GET  /duplicates/reduction/preview
+  └── build exact (sha256) + near (phash distance) groups
+  └── choose best candidate per group, mark others as hide candidates
+
+POST /duplicates/reduction/apply
+  └── set hide candidates to assets.status='suppressed' (no deletion)
+
+POST /duplicates/reduction/restore
+  └── restore suppressed assets back to assets.status='active'
+```
+
 ---
 
 ## 9. Frontend Architecture
@@ -538,7 +569,10 @@ Main tabs:
 - **Library**: asset grid, search (text/vector/hybrid), asset inspector (media player,
   captions panel, tags panel with remove/block flow, face assignment panel per asset)
 - **People**: named/unnamed person list, per-person asset gallery, unassigned face queue
-  with manual assignment
+  with manual assignment + Stranger quick-label action
+- **Tags**: global tag catalog and tag-scoped asset browsing
+- **Stories**: generated albums by person/tag/location/caption themes
+- **Similarity**: duplicate reduction preview/apply/restore (non-destructive)
 - **Map**: Leaflet GPS visualization of geotagged media (`/assets/geo`)
 - **Tasks**: live queue monitor, cancel actions
 - **Admin**: health/metrics dashboard (tags, face counts, embed counts), index rebuild,

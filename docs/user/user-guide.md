@@ -19,7 +19,10 @@ This guide is intentionally short for now and points to the current production U
 ## Main Tabs
 
 - `Library`: browse assets, open inspector, read/edit captions, and add/remove tags.
-- `People`: review faces, assign identities, run person cleanup workflows.
+- `People`: review faces, assign identities, and use `Stranger` for unknown faces.
+- `Tags`: browse global tag catalog and open related assets.
+- `Stories`: browse generated story albums by person/tag/location/caption themes.
+- `Similarity`: preview near-duplicates and hide/recover redundant items without deletion.
 - `Map`: view geo-tagged assets.
 - `Tasks`: monitor queue and system usage (CPU/RAM/GPU).
 - `Admin`: health checks and maintenance actions.
@@ -29,12 +32,13 @@ This guide is intentionally short for now and points to the current production U
 1. Ingest new media from `E:\01_INCOMING`.
 2. Wait for caption/face/embedding tasks to finish.
 3. Review unassigned faces in `People`.
-4. Correct labels manually where needed.
+4. Use `Stranger` for unknown faces and correct known labels manually.
 5. Run auto-assign propagation from the latest manual labels.
 
 ## Notes
 
 - Captions are generated locally through the caption service (`qwen3-vl` path).
+- Caption variants are currently Qwen-based only (`http-qwen-vl`, `http-qwen-vl|zh-cn`).
 - All production data is expected on `E:\VLM_DATA`.
 
 ## Manual Commands (Operator Tutorial)
@@ -107,7 +111,7 @@ Resume:
 
 ```powershell
 Start-Process -FilePath $py -WorkingDirectory (Get-Location).Path `
-  -ArgumentList @('-m','app.cli','captions-backfill-zh','--apply','--overwrite-existing-zh','--timeout-sec','120')
+  -ArgumentList @('-m','app.cli','captions-backfill-zh','--apply','--overwrite-existing-zh','--source-model-contains','qwen','--timeout-sec','120')
 ```
 
 ### 4) Face detection and auto-label

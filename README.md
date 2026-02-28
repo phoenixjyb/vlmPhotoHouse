@@ -4,9 +4,12 @@ Local-first photo/video intelligence system with:
 - ingestion from `E:\01_INCOMING`
 - metadata + GPS extraction
 - face detection + face embeddings + person assignment
+- dedicated `Stranger` face grouping action for quick unknown-person labeling
 - multimodal captions (Qwen3-VL via local HTTP caption service)
 - caption-derived canonical tagging (`<=8` content tags) with per-asset auto-tag block support
 - optional RAM++ image tagging path with tag provenance (`cap|img|cap+img|manual|rule`)
+- generated story albums from person/tag/location/caption themes
+- non-destructive similarity reduction (keep best candidate, hide redundant assets)
 - bilingual web UI
 - SQLite-backed search and task orchestration
 
@@ -65,7 +68,7 @@ From `backend/`:
 .\.venv\Scripts\python.exe -m app.cli ingest-scan E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli ingest-status E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli captions-backfill --limit 0
-.\.venv\Scripts\python.exe -m app.cli captions-backfill-zh --apply --overwrite-existing-zh --timeout-sec 120
+.\.venv\Scripts\python.exe -m app.cli captions-backfill-zh --apply --overwrite-existing-zh --source-model-contains qwen --timeout-sec 120
 .\.venv\Scripts\python.exe -m app.cli image-tags-backfill --apply --limit 0
 .\.venv\Scripts\python.exe -m app.cli gps-backfill --root E:\01_INCOMING
 .\.venv\Scripts\python.exe -m app.cli faces-auto-assign --apply --reference-manual-only --include-dnn-assigned --limit 0
@@ -125,7 +128,7 @@ Resume Chinese translation backfill:
 
 ```powershell
 Start-Process -FilePath $py -WorkingDirectory (Get-Location).Path `
-  -ArgumentList @('-m','app.cli','captions-backfill-zh','--apply','--overwrite-existing-zh','--timeout-sec','120')
+  -ArgumentList @('-m','app.cli','captions-backfill-zh','--apply','--overwrite-existing-zh','--source-model-contains','qwen','--timeout-sec','120')
 ```
 
 Re-detect faces for assets that currently have no face detections:
