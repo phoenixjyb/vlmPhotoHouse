@@ -190,6 +190,20 @@ class TaskExecutor:
                     self._handle_dim_backfill(session, task)
                 elif task.type == 'image_tag':
                     self._handle_image_tag(session, task)
+                elif task.type == 'phash':
+                    self._handle_phash(session, task)
+                elif task.type == 'video_probe':
+                    self._handle_video_probe(session, task)
+                elif task.type == 'video_keyframes':
+                    self._handle_video_keyframes(session, task)
+                elif task.type == 'video_embed':
+                    self._handle_video_embed(session, task)
+                elif task.type == 'video_scene_detect':
+                    self._handle_video_scene_detect(session, task)
+                elif task.type == 'video_segment_embed':
+                    self._handle_video_segment_embed(session, task)
+                else:
+                    raise ValueError(f'Unsupported task type: {task.type}')
             except Exception as exc:
                 task.state = 'failed'
                 task.last_error = str(exc)[:4000]

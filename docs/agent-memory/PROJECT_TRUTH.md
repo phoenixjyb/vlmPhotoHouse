@@ -135,13 +135,9 @@ Ingest creates tasks for the pipeline. The main active task families are:
 
 There are also video and phash tasks in the codebase.
 
-Important current code gap:
-
-- `backend\app\tasks.py` defines handlers for `phash` and video task types
-- `TaskExecutor.run_once()` does not dispatch those task types yet
-- so the worker loop is still incomplete for that part of the intended pipeline
-
-That is a real product-readiness issue, not just a stale doc issue.
+Worker dispatch now covers the implemented `phash` and video task families,
+including segment embeddings. Unknown task types fail explicitly instead of
+being marked finished without a handler.
 
 ## Optional Subsystems
 
