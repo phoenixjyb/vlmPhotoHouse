@@ -1,10 +1,11 @@
 param(
-    [string]$LvfaceDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\LVFace',
-    [string]$CaptionDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\vlmCaptionModels',
-    [string]$RamppDir = 'C:\Users\yanbo\wSpace\vlm-photo-engine\vlmPhotoHouse\rampp',
-    [string]$VoiceDir = 'C:\Users\yanbo\wSpace\llmytranslate',
+    [string]$LvfaceDir = '',
+    [string]$CaptionDir = '',
+    [string]$RamppDir = '',
+    [string]$VoiceDir = '',
     [string]$LvfaceModelName = '',
     [int]$ApiPort = 8002,
+    [string]$ApiHost = '127.0.0.1',
     [int]$RamppPort = 8112,
     [int]$VoicePort = 8001,
     [bool]$EnableRampp = $true,
@@ -17,17 +18,46 @@ param(
     [switch]$Gpu,
     [switch]$UseWindowsTerminal,
     [switch]$KillExisting,  # Deprecated - now always kills existing instances
-    [switch]$NoCleanup     # Skip cleanup of existing instances/ports
+    [switch]$NoCleanup,     # Skip cleanup of existing instances/ports
+    [switch]$TailscaleAccess,
+    [switch]$PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$stackRoot = Split-Path -Parent $repoRoot
+$outerWorkspaceRoot = Split-Path -Parent $stackRoot
+
+$lvfacePathSource = 'override'
+if ([string]::IsNullOrWhiteSpace($LvfaceDir)) {
+    $LvfaceDir = Join-Path $stackRoot 'LVFace'
+    $lvfacePathSource = 'derived'
+}
+$captionPathSource = 'override'
+if ([string]::IsNullOrWhiteSpace($CaptionDir)) {
+    $CaptionDir = Join-Path $stackRoot 'vlmCaptionModels'
+    $captionPathSource = 'derived'
+}
+$ramppPathSource = 'override'
+if ([string]::IsNullOrWhiteSpace($RamppDir)) {
+    $RamppDir = Join-Path $repoRoot 'rampp'
+    $ramppPathSource = 'derived'
+}
+$voicePathSource = 'override'
+if ([string]::IsNullOrWhiteSpace($VoiceDir)) {
+    $VoiceDir = Join-Path $outerWorkspaceRoot 'llmytranslate'
+    $voicePathSource = 'derived'
+}
+$backendRoot = Join-Path $repoRoot 'backend'
+
+if ($TailscaleAccess) {
+    $ApiHost = '0.0.0.0'
+}
+
 function Resolve-BackendPython {
-    $backend = Join-Path $PSScriptRoot '..' | Join-Path -ChildPath 'backend'
     # Use optimized VLM Photo Engine environment (Python 3.12.10 + PyTorch 2.8.0+cu126)
-    $py = Join-Path $backend '..' | Join-Path -ChildPath '.venv/Scripts/python.exe'
-    if (Test-Path -LiteralPath $py) { return $py }
-    return 'python'
+    return (Join-Path $repoRoot '.venv\Scripts\python.exe')
 }
 
 function Test-DirExists([string]$Path, [string]$Name) {
@@ -64,6 +94,113 @@ function Resolve-GpuIndexByName([string]$NameHint) {
         return $null
     }
     return $null
+}
+
+# Resolve the effective profile before preflight so reported values match a real launch.
+$effectiveFace = $FaceProvider
+$effectiveCaption = $CaptionProvider
+$effectiveUseGpu = [bool]$Gpu
+if ($Preset) {
+    switch ($Preset.ToLowerInvariant()) {
+        'lowvram' {
+            $effectiveFace = 'facenet'
+            $effectiveCaption = 'vitgpt2'
+            $effectiveUseGpu = $true
+        }
+        'rtx3090' {
+            $effectiveFace = 'lvface'
+            $effectiveCaption = 'qwen3-vl'
+            $effectiveUseGpu = $true
+        }
+        default {
+            Write-Warning "Unknown preset '$Preset'. Ignoring preset."
+        }
+    }
+    # Allow explicit flags to override preset values.
+    if ($PSBoundParameters.ContainsKey('FaceProvider')) { $effectiveFace = $FaceProvider }
+    if ($PSBoundParameters.ContainsKey('CaptionProvider')) { $effectiveCaption = $CaptionProvider }
+    if ($PSBoundParameters.ContainsKey('Gpu')) { $effectiveUseGpu = [bool]$Gpu }
+}
+
+function Show-LauncherPreflight {
+    Write-Host "VLM Photo House launcher preflight (no processes or files will be changed)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Resolved workspace paths:" -ForegroundColor Cyan
+    Write-Host "  PhotoHouse: $repoRoot" -ForegroundColor Gray
+    Write-Host "  Backend:    $backendRoot" -ForegroundColor Gray
+    Write-Host "  LVFace:     $LvfaceDir ($lvfacePathSource)" -ForegroundColor Gray
+    Write-Host "  Captions:   $CaptionDir ($captionPathSource)" -ForegroundColor Gray
+    Write-Host "  RAM++:      $RamppDir ($ramppPathSource)" -ForegroundColor Gray
+    Write-Host "  Voice:      $VoiceDir ($voicePathSource)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Runtime configuration:" -ForegroundColor Cyan
+    Write-Host "  Backend Python: $pyExe" -ForegroundColor Gray
+    Write-Host "  API:            ${ApiHost}:$ApiPort" -ForegroundColor Gray
+    Write-Host "  Providers:      face=$effectiveFace caption=$effectiveCaption gpu=$effectiveUseGpu" -ForegroundColor Gray
+    Write-Host "  Data root:      $DataRoot" -ForegroundColor Gray
+    Write-Host "  Originals:      $OriginalsPath" -ForegroundColor Gray
+    Write-Host "  Database:       $DbPath" -ForegroundColor Gray
+    Write-Host ""
+
+    $checks = @(
+        [pscustomobject]@{ Name = 'PhotoHouse repository'; Path = $repoRoot; Required = $true },
+        [pscustomobject]@{ Name = 'Backend directory'; Path = $backendRoot; Required = $true },
+        [pscustomobject]@{ Name = 'Repo-root Python'; Path = $pyExe; Required = $true },
+        [pscustomobject]@{ Name = 'LVFace repository'; Path = $LvfaceDir; Required = $true },
+        [pscustomobject]@{ Name = 'Caption repository'; Path = $CaptionDir; Required = $true },
+        [pscustomobject]@{ Name = 'RAM++ directory'; Path = $RamppDir; Required = [bool]$EnableRampp },
+        [pscustomobject]@{ Name = 'Voice repository'; Path = $VoiceDir; Required = $false },
+        [pscustomobject]@{ Name = 'Data root'; Path = $DataRoot; Required = $false },
+        [pscustomobject]@{ Name = 'Originals directory'; Path = $OriginalsPath; Required = $false },
+        [pscustomobject]@{ Name = 'Database file'; Path = $DbPath; Required = $false }
+    )
+
+    $missingRequired = @()
+    Write-Host "Path checks:" -ForegroundColor Cyan
+    foreach ($check in $checks) {
+        $exists = Test-Path -LiteralPath $check.Path
+        if ($exists) {
+            Write-Host "  OK       $($check.Name): $($check.Path)" -ForegroundColor Green
+        } elseif ($check.Required) {
+            Write-Host "  MISSING  $($check.Name): $($check.Path)" -ForegroundColor Red
+            $missingRequired += $check.Name
+        } else {
+            Write-Host "  OPTIONAL $($check.Name): $($check.Path)" -ForegroundColor Yellow
+        }
+    }
+
+    if ($missingRequired.Count -gt 0) {
+        throw "Preflight failed; missing required paths: $($missingRequired -join ', ')"
+    }
+}
+
+$pyExe = Resolve-BackendPython
+
+if ($PreflightOnly) {
+    Show-LauncherPreflight
+    Write-Host "Preflight passed. No launcher actions were performed." -ForegroundColor Green
+    return
+}
+
+# Validate required prerequisites before cleanup or any other launcher mutation.
+Test-DirExists -Path $backendRoot -Name 'BackendDir'
+Test-DirExists -Path $LvfaceDir -Name 'LVFaceDir'
+Test-DirExists -Path $CaptionDir -Name 'CaptionDir'
+if (-not (Test-Path -LiteralPath $pyExe -PathType Leaf)) {
+    throw "Repo-root Python executable not found: $pyExe"
+}
+if ($EnableRampp) {
+    if (Test-Path -LiteralPath $RamppDir) {
+        Write-Host "RAM++ dir detected: $RamppDir" -ForegroundColor DarkCyan
+    } else {
+        Write-Warning "RamppDir not found: $RamppDir. Disabling RAM++ startup for this run."
+        $EnableRampp = $false
+    }
+}
+if (Test-Path -LiteralPath $VoiceDir) {
+    Write-Host "VoiceDir detected: $VoiceDir" -ForegroundColor DarkCyan
+} else {
+    Write-Warning "VoiceDir not found: $VoiceDir. Voice pane will still open but may warn."
 }
 
 Write-Host "Starting dev multiprocess setup (tmux-style)" -ForegroundColor Cyan
@@ -103,48 +240,6 @@ if (-not $NoCleanup) {
 if ($UseWindowsTerminal -and $KillExisting) {
     # This block is now redundant as we always clean up above
     Write-Host "Note: -KillExisting flag is redundant as we always clean up existing instances" -ForegroundColor Gray
-}
-
-Test-DirExists -Path $LvfaceDir -Name 'LVFaceDir'
-Test-DirExists -Path $CaptionDir -Name 'CaptionDir'
-if ($EnableRampp) {
-    if (Test-Path -LiteralPath $RamppDir) {
-        Write-Host "RAM++ dir detected: $RamppDir" -ForegroundColor DarkCyan
-    } else {
-        Write-Warning "RamppDir not found: $RamppDir. Disabling RAM++ startup for this run."
-        $EnableRampp = $false
-    }
-}
-if (Test-Path -LiteralPath $VoiceDir) {
-    Write-Host "VoiceDir detected: $VoiceDir" -ForegroundColor DarkCyan
-} else {
-    Write-Warning "VoiceDir not found: $VoiceDir. Voice pane will still open but may warn."
-}
-
-# Resolve effective profile (preset -> explicit overrides)
-$effectiveFace = $FaceProvider
-$effectiveCaption = $CaptionProvider
-$effectiveUseGpu = [bool]$Gpu
-if ($Preset) {
-    switch ($Preset.ToLowerInvariant()) {
-        'lowvram' {
-            $effectiveFace = 'facenet'
-            $effectiveCaption = 'vitgpt2'
-            $effectiveUseGpu = $true
-        }
-        'rtx3090' {
-            $effectiveFace = 'lvface'
-            $effectiveCaption = 'qwen3-vl'
-            $effectiveUseGpu = $true
-        }
-        default {
-            Write-Warning "Unknown preset '$Preset'. Ignoring preset."
-        }
-    }
-    # Allow explicit flags to override preset
-    if ($PSBoundParameters.ContainsKey('FaceProvider')) { $effectiveFace = $FaceProvider }
-    if ($PSBoundParameters.ContainsKey('CaptionProvider')) { $effectiveCaption = $CaptionProvider }
-    if ($PSBoundParameters.ContainsKey('Gpu')) { $effectiveUseGpu = [bool]$Gpu }
 }
 
 # Environment for backend (using effective values)
@@ -240,10 +335,6 @@ if ($effectiveUseGpu) {
 }
 
 # Optional: video flags can be enabled by the user in their session if needed
-
-$backendRoot = Join-Path $PSScriptRoot '..' | Join-Path -ChildPath 'backend'
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$pyExe = Resolve-BackendPython
 
 # Canonical runtime data paths on Drive E
 $env:VLM_DATA_ROOT = $DataRoot
@@ -355,7 +446,7 @@ try {
 function Start-ApiTab {
     $content = @(
         "Set-Location -LiteralPath `"$backendRoot`"",
-        "& `"$pyExe`" -m uvicorn app.main:app --host 127.0.0.1 --port $ApiPort --reload"
+        "& `"$pyExe`" -m uvicorn app.main:app --host $ApiHost --port $ApiPort --reload"
     ) -join "`n"
     $path = Join-Path $env:TEMP "api-pane-$PID.ps1"
     Set-Content -LiteralPath $path -Value $content -Encoding UTF8
@@ -514,12 +605,18 @@ if ($UseWindowsTerminal) {
 }
 
 Write-Host "🎯 Launched 2x2 Grid Layout:" -ForegroundColor Green
-Write-Host "  Top Left: VLM Photo Engine (port $ApiPort)" -ForegroundColor Cyan  
+Write-Host "  Top Left: VLM Photo Engine (host $ApiHost, port $ApiPort)" -ForegroundColor Cyan
 Write-Host "  Top Right: Voice Service ASR (port $VoicePort)" -ForegroundColor Cyan
 Write-Host "  Bottom Left: LVFace Environment" -ForegroundColor Cyan
 Write-Host "  Bottom Right: TTS Environment (RTX 3090)" -ForegroundColor Cyan
 if ($EnableRampp) {
     Write-Host "  Extra Tab: RAM++ Tag Service (port $RamppPort)" -ForegroundColor Cyan
+}
+if ($TailscaleAccess -or $ApiHost -eq '0.0.0.0') {
+    Write-Host "🌐 Tailscale remote voice quickstart:" -ForegroundColor Green
+    Write-Host "  1) tailscale serve --bg --https=443 http://127.0.0.1:$ApiPort" -ForegroundColor Gray
+    Write-Host "  2) Open https://<this-node>.<tailnet>.ts.net/ui from your other device" -ForegroundColor Gray
+    Write-Host "  (HTTPS is recommended for browser microphone access on remote devices)" -ForegroundColor DarkGray
 }
 Write-Host "✅ All workload-specific optimized environments ready (RTX 3090 + CUDA 12.6/12.4)" -ForegroundColor Green
 Write-Host "🧹 Previous instances automatically cleaned up for fresh start" -ForegroundColor Gray

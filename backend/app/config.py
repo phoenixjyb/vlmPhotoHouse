@@ -1,6 +1,27 @@
 import os
 from pydantic import BaseModel, Field
 from functools import lru_cache
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover
+    load_dotenv = None
+
+
+def _load_local_env_files() -> None:
+    """Load repo-local env files without overriding already-exported variables."""
+    if load_dotenv is None:
+        return
+    here = Path(__file__).resolve()
+    backend_root = here.parent.parent
+    repo_root = backend_root.parent
+    for candidate in (repo_root / ".env", backend_root / ".env"):
+        if candidate.exists():
+            load_dotenv(candidate, override=False)
+
+
+_load_local_env_files()
 
 def _default_data_root() -> str:
     return os.getenv("VLM_DATA_ROOT", r"E:\VLM_DATA")

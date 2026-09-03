@@ -33,6 +33,18 @@ DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_RO
 THUMB_SIZES = [256, 1024]
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
 
+DEFAULT_DETAILED_CAPTION_PROMPT = (
+    "Write a factual, search-friendly description of this photo in 80 to 120 words. "
+    "Use only directly visible evidence. Describe the main subjects, actions, setting, important objects, "
+    "clothing, colors, lighting, composition, and clearly readable text. Do not identify people or infer "
+    "relationships, protected or sensitive traits, events, occasions, locations, landmarks, or organizations. "
+    "Name a brand, model, place, landmark, or organization only when its exact name or logo is clearly legible "
+    "and unambiguous; otherwise use a generic description. Transcribe text only when confident and call it "
+    "partial or unclear instead of guessing. For phones or devices, describe visible color, case, controls, "
+    "screen content, and use, but do not guess the brand or model. Avoid speculative words such as likely, "
+    "probably, suggests, or appears to be. Return one coherent paragraph without hidden context."
+)
+
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_SEG_INDEX_SINGLETON: InMemoryVectorIndex | None = None
@@ -317,7 +329,8 @@ class TaskExecutor:
         force = bool(payload.get('force', False))
         profile = (payload.get('profile') or os.getenv('CAPTION_PROFILE','balanced')).lower()
         max_variants = int(os.getenv('CAPTION_MAX_VARIANTS','3') or '3')
-        word_limit = int(os.getenv('CAPTION_WORD_LIMIT','40') or '40')
+        word_limit = int(os.getenv('CAPTION_WORD_LIMIT','120') or '120')
+        caption_prompt = (os.getenv('CAPTION_PROMPT', DEFAULT_DETAILED_CAPTION_PROMPT) or '').strip()
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
@@ -331,7 +344,7 @@ class TaskExecutor:
             from .caption_service import get_caption_provider
             prov = get_caption_provider()
             caption_image = self._load_caption_image(asset)
-            text = prov.generate_caption(caption_image)
+            text = prov.generate_caption(caption_image, prompt=caption_prompt or None)
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
@@ -1380,5 +1393,3 @@ class TaskExecutor:
         jitter = raw * random.uniform(0.2, 0.6)
         from datetime import timedelta
         return timedelta(seconds=raw + jitter)
-
-

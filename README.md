@@ -60,6 +60,23 @@ This starts:
 - RAM++ tag service scaffold (`vlmPhotoHouse/rampp`, optional, port `8112`)
 - optional voice pane (if available)
 
+### Remote voice access over Tailscale
+
+Use Tailscale mode to bind API/UI on all interfaces (voice proxy remains local inside this machine):
+
+```powershell
+.\scripts\start-dev-multiproc.ps1 -Preset RTX3090 -UseWindowsTerminal -TailscaleAccess
+```
+
+Then publish secure access in tailnet (recommended for browser microphone support):
+
+```powershell
+tailscale serve --bg --https=443 http://127.0.0.1:8002
+```
+
+Open from another device:
+- `https://<this-node>.<tailnet>.ts.net/ui`
+
 ## Core Operations
 
 From `backend/`:

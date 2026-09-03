@@ -52,7 +52,7 @@ class CaptionSubprocessProvider:
                 f"Caption inference script not found. Expected one of: {inference_backend} or {inference_py}"
             )
     
-    def generate_caption(self, image: Image.Image) -> str:
+    def generate_caption(self, image: Image.Image, prompt: str | None = None) -> str:
         """Generate caption using external caption models subprocess."""
         # Create temporary image file
         with tempfile.NamedTemporaryFile(suffix='.png', delete=False, dir=_caption_tmp_dir()) as tmp:
@@ -78,6 +78,8 @@ class CaptionSubprocessProvider:
                     "--model", self.model_name,
                     "--image", tmp_path
                 ]
+                if prompt:
+                    cmd.extend(["--prompt", prompt])
                 
                 # Prepare environment variables - inherit current env and add caption-specific ones
                 env = os.environ.copy()
