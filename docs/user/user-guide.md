@@ -5,6 +5,7 @@ This guide is intentionally short for now and points to the current production U
 ## Access
 
 - Open: `http://127.0.0.1:8002/ui`
+- Remote (Tailscale): `https://<this-node>.<tailnet>.ts.net/ui` (after `-TailscaleAccess` launch + `tailscale serve`)
 - Language: switch EN/ZH from the top bar.
 
 ## Voice Command
@@ -32,13 +33,13 @@ This guide is intentionally short for now and points to the current production U
 ## Voice Chat (Multi-turn Conversation)
 
 - Use **Voice Chat** for free-form conversation with context kept across turns.
-- Use **Reset Chat** to clear the current conversation context and start a fresh one.
+- Use **Delete Chat** to delete current conversation context/history; UI will ask for confirmation first and will call backend chat-delete (`/voice/chat/delete`) when a conversation ID exists.
 - Use the top `Voice History` panel to review recent transcript/reply/summary events, and `Clear History` to reset it.
 - The flow is: browser recording -> transcribe -> chat turn -> TTS playback (with browser speech fallback when server audio is unavailable).
 
 ## Main Tabs
 
-- `Library`: browse assets, open inspector, read/edit captions, and add/remove tags.
+- `Library`: browse assets, open inspector, read/edit captions, add/remove tags, and delete photo/asset from inspector controls (with confirmation).
 - `People`: review faces, assign identities, and use `Stranger` for unknown faces.
 - `Tags`: browse global tag catalog and open related assets.
 - `Stories`: browse generated story albums by person/tag/location/caption themes.

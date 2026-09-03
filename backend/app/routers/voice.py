@@ -883,6 +883,63 @@ async def voice_chat(
         )
 
 
+@router.post('/voice/chat/delete')
+async def voice_chat_delete(
+    conversation_id: str = Body(..., embed=True),
+):
+    """Delete a remote chat conversation by conversation_id via provider proxy."""
+    s = _require_enabled()
+    conv_id = str(conversation_id or '').strip()
+    if not conv_id:
+        return JSONResponse({'success': False, 'error': 'Empty conversation_id'}, status_code=200)
+
+    delete_path = os.getenv('VOICE_CHAT_DELETE_PATH', '/api/chat/delete')
+    if not str(delete_path).startswith('/'):
+        delete_path = '/' + str(delete_path)
+    url = s.voice_external_base_url.rstrip('/') + str(delete_path)
+    headers = {'Authorization': f'Bearer {s.voice_api_key}'} if s.voice_api_key else {}
+    payload = {'conversation_id': conv_id}
+
+    try:
+        async with httpx.AsyncClient(timeout=s.voice_timeout_sec, trust_env=False) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            try:
+                resp = r.json()
+            except Exception:
+                err_text = str(r.text or f'Chat delete provider status {r.status_code}')
+                if r.status_code >= 400:
+                    return JSONResponse(
+                        {'success': False, 'error': err_text, 'status': r.status_code, 'conversation_id': conv_id},
+                        status_code=200,
+                    )
+                return JSONResponse({'success': True, 'conversation_id': conv_id}, status_code=200)
+
+            if not isinstance(resp, dict):
+                return JSONResponse(
+                    {
+                        'success': False,
+                        'error': 'Unexpected chat delete provider response shape',
+                        'status': r.status_code,
+                        'conversation_id': conv_id,
+                    },
+                    status_code=200,
+                )
+
+            if bool(resp.get('success', r.status_code < 400)):
+                return JSONResponse({'success': True, 'conversation_id': conv_id}, status_code=200)
+
+            err = resp.get('detail') or resp.get('error') or r.text or f'Chat delete provider status {r.status_code}'
+            return JSONResponse(
+                {'success': False, 'error': str(err), 'status': r.status_code, 'conversation_id': conv_id},
+                status_code=200,
+            )
+    except httpx.HTTPError as e:
+        return JSONResponse(
+            {'success': False, 'error': f'Chat delete proxy failed: {e}', 'conversation_id': conv_id},
+            status_code=200,
+        )
+
+
 # --- Health and capabilities ---
 @router.get('/voice/health')
 async def voice_health():

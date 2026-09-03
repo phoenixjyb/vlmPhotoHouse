@@ -86,7 +86,7 @@ const I18N = {
     app_title: "VLM Photo House",
     subtitle: "Faces, captions, videos, and search in one control surface.",
     voice_chat: "Voice Chat",
-    voice_chat_reset: "Reset Chat",
+    voice_chat_reset: "Delete Chat",
     voice_command: "Voice Command",
     voice_chat_recording: "Listening for chat...",
     voice_chat_processing: "Talking to assistant...",
@@ -95,6 +95,11 @@ const I18N = {
     voice_chat_reply_audio: "Assistant replied with audio",
     voice_chat_reply_text: "Assistant: {text}",
     voice_chat_session_reset: "Voice chat context reset",
+    confirm_delete_voice_chat: "Delete current voice conversation and history?",
+    voice_chat_deleted: "Voice conversation deleted",
+    voice_chat_deleted_local_only: "Local chat context deleted; remote delete failed: {error}",
+    confirm_delete_voice_history: "Delete all voice history entries?",
+    voice_history_deleted: "Voice history deleted",
     voice_history: "Voice History",
     voice_history_clear: "Clear History",
     voice_history_empty: "No voice interactions yet.",
@@ -344,6 +349,13 @@ const I18N = {
     ingest_started: "Ingest scan started for {root}",
     ingest_failed: "Ingest failed: {error}",
     no_asset_selected: "Select an asset first",
+    delete_photo: "Delete Photo",
+    delete_asset: "Delete Asset",
+    confirm_delete_photo: "Delete photo #{id} from the library record? Local files will be kept.",
+    confirm_delete_asset: "Delete asset #{id} and remove local files? This cannot be undone.",
+    photo_deleted: "Photo #{id} deleted (files kept)",
+    asset_deleted: "Asset #{id} deleted (files removed)",
+    asset_delete_failed: "Delete failed: {error}",
     prev_page: "Prev",
     next_page: "Next",
     jump_page: "Go",
@@ -354,7 +366,7 @@ const I18N = {
     app_title: "VLM 照片屋",
     subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
     voice_chat: "语音对话",
-    voice_chat_reset: "重置对话",
+    voice_chat_reset: "删除对话",
     voice_command: "语音命令",
     voice_chat_recording: "正在聆听（对话）...",
     voice_chat_processing: "正在对话处理中...",
@@ -363,6 +375,11 @@ const I18N = {
     voice_chat_reply_audio: "助手已语音回复",
     voice_chat_reply_text: "助手：{text}",
     voice_chat_session_reset: "语音对话上下文已重置",
+    confirm_delete_voice_chat: "删除当前语音对话和历史记录？",
+    voice_chat_deleted: "语音对话已删除",
+    voice_chat_deleted_local_only: "本地对话已删除；远端删除失败：{error}",
+    confirm_delete_voice_history: "删除全部语音历史记录？",
+    voice_history_deleted: "语音历史已删除",
     voice_history: "语音记录",
     voice_history_clear: "清空记录",
     voice_history_empty: "暂无语音交互记录。",
@@ -611,6 +628,13 @@ const I18N = {
     ingest_started: "已开始导入扫描: {root}",
     ingest_failed: "导入失败: {error}",
     no_asset_selected: "请先选择一个资源",
+    delete_photo: "删除照片",
+    delete_asset: "删除资源",
+    confirm_delete_photo: "删除照片 #{id} 的资源库记录？将保留本地文件。",
+    confirm_delete_asset: "删除资源 #{id} 并移除本地文件？此操作不可撤销。",
+    photo_deleted: "照片 #{id} 已删除（保留文件）",
+    asset_deleted: "资源 #{id} 已删除（已移除文件）",
+    asset_delete_failed: "删除失败: {error}",
     prev_page: "上一页",
     next_page: "下一页",
     jump_page: "跳转",
@@ -1053,6 +1077,12 @@ function clearVoiceHistory() {
   renderVoiceHistory();
 }
 
+function requestClearVoiceHistory() {
+  if (!window.confirm(t("confirm_delete_voice_history"))) return;
+  clearVoiceHistory();
+  showToast(t("voice_history_deleted"));
+}
+
 function getOrCreateVoiceClientId() {
   const key = "vlm_voice_client_id";
   const existing = String(window.localStorage.getItem(key) || "").trim();
@@ -1356,10 +1386,31 @@ async function runVoiceCommandCapture() {
   }
 }
 
-function resetVoiceConversationContext() {
+async function resetVoiceConversationContext() {
+  if (!window.confirm(t("confirm_delete_voice_chat"))) return;
+  const conversationId = String(state.voiceConversationId || "").trim();
+  let remoteDeleteError = "";
+  if (conversationId) {
+    try {
+      const dropped = await api("/voice/chat/delete", {
+        method: "POST",
+        body: JSON.stringify({ conversation_id: conversationId }),
+      });
+      if (!dropped?.success) {
+        remoteDeleteError = String(dropped?.error || "provider rejected delete");
+      }
+    } catch (e) {
+      remoteDeleteError = String(e?.message || e || "delete request failed");
+    }
+  }
   state.voiceConversationId = "";
   state.voicePendingConfirmationToken = "";
-  const msg = t("voice_chat_session_reset");
+  clearVoiceHistory();
+  const msg = conversationId
+    ? remoteDeleteError
+      ? t("voice_chat_deleted_local_only", { error: remoteDeleteError })
+      : t("voice_chat_deleted")
+    : t("voice_chat_session_reset");
   addVoiceHistory("system", msg);
   showToast(msg);
 }
@@ -2766,6 +2817,42 @@ async function deleteFace(faceId) {
   });
 }
 
+async function refreshLibraryCurrentView() {
+  const kind = String(state.libraryPager.kind || "latest");
+  const page = Math.max(1, Number(state.libraryPager.page) || 1);
+  if (kind === "latest") {
+    await loadLibraryLatest(page);
+    return;
+  }
+  await runSearch(page, true);
+}
+
+async function deleteSelectedAsset(removeFiles = false) {
+  if (!state.selectedAsset) {
+    showToast(t("no_asset_selected"));
+    return;
+  }
+  const assetId = Number(state.selectedAsset.id || 0);
+  if (!assetId) {
+    showToast(t("no_asset_selected"));
+    return;
+  }
+  const confirmKey = removeFiles ? "confirm_delete_asset" : "confirm_delete_photo";
+  if (!window.confirm(t(confirmKey, { id: assetId }))) return;
+  try {
+    await api(`/assets/${assetId}/delete`, {
+      method: "POST",
+      body: JSON.stringify(!!removeFiles),
+    });
+    state.assetMap.delete(assetId);
+    closeAssetInspector();
+    await Promise.all([refreshLibraryCurrentView(), refreshDashboard()]);
+    showToast(t(removeFiles ? "asset_deleted" : "photo_deleted", { id: assetId }));
+  } catch (e) {
+    showToast(t("asset_delete_failed", { error: e.message }));
+  }
+}
+
 async function markFaceStranger(faceId) {
   await api(`/faces/${faceId}/assign-stranger`, {
     method: "POST",
@@ -2837,7 +2924,7 @@ function initEvents() {
   }
   const voiceHistoryClearBtn = qs("btn-voice-history-clear");
   if (voiceHistoryClearBtn) {
-    voiceHistoryClearBtn.addEventListener("click", clearVoiceHistory);
+    voiceHistoryClearBtn.addEventListener("click", requestClearVoiceHistory);
   }
 
   qs("btn-search").addEventListener("click", () => runSearch(1, false));
@@ -2966,6 +3053,19 @@ function initEvents() {
       showToast(t("tag_update_failed", { error: e.message }));
     }
   });
+
+  const deletePhotoBtn = qs("btn-delete-photo");
+  if (deletePhotoBtn) {
+    deletePhotoBtn.addEventListener("click", async () => {
+      await deleteSelectedAsset(false);
+    });
+  }
+  const deleteAssetBtn = qs("btn-delete-asset");
+  if (deleteAssetBtn) {
+    deleteAssetBtn.addEventListener("click", async () => {
+      await deleteSelectedAsset(true);
+    });
+  }
 
   qs("tag-list").addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-action='remove-tag']");
