@@ -4,6 +4,11 @@ Snapshot date: 2026-04-07
 
 This file is intentionally time-stamped. Refresh it when queue counts or major risks change.
 
+2026-09-03 follow-up: the task-dispatch gap described below was closed by
+wiring the existing `phash` and video handlers into `TaskExecutor.run_once()`
+and making unknown task types fail explicitly. The queue counts in this file
+remain the historical 2026-04-07 snapshot.
+
 ## Live Snapshot
 
 Verified from the live API and SQLite DB:
@@ -70,10 +75,9 @@ These are the main issues that still separate the project from a cleaner product
    - Repo-local `.env` defaults still point at `CAPTION_PROVIDER=blip2`.
    - The live runtime depends on launcher-exported env for the real provider mix.
 
-4. Worker dispatch is still incomplete for some task types.
-   - `phash` and video task handlers exist in `backend\app\tasks.py`.
-   - `TaskExecutor.run_once()` does not dispatch them yet.
-   - That is a real functional gap for the intended full pipeline.
+4. Worker dispatch for `phash` and video task types was incomplete in this
+   snapshot. It was closed on 2026-09-03; unknown task types now fail instead
+   of being silently marked finished.
 
 5. There is still residual repair work in data and tasks.
    - `46` tasks are failed.
@@ -90,9 +94,8 @@ Highest value next steps:
 2. Triage and repair the `46` failed tasks by type.
 3. Remove or reconcile the `2` stale asset rows.
 4. Decide the canonical caption runtime and align launcher plus docs around it.
-5. Dispatch `phash` and video task types in `TaskExecutor.run_once()`.
-6. Reduce env drift by making `.env` defaults safer or clearly labeling them as non-production defaults.
-7. Collapse stale handoff docs into pointers so future agents stop reading old runtime assumptions.
+5. Reduce env drift by making `.env` defaults safer or clearly labeling them as non-production defaults.
+6. Collapse stale handoff docs into pointers so future agents stop reading old runtime assumptions.
 
 ## Practical Definition Of "Product Ready" For This Repo
 
