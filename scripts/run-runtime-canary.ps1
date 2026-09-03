@@ -66,6 +66,10 @@ $databaseBefore = [ordered]@{
     bytes = (Get-Item -LiteralPath $databasePath).Length
     sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $databasePath).Hash
     wal_present = Test-Path -LiteralPath ($databasePath + '-wal')
+    wal_bytes = if (Test-Path -LiteralPath ($databasePath + '-wal')) {
+        (Get-Item -LiteralPath ($databasePath + '-wal')).Length
+    } else { 0 }
+    shm_present = Test-Path -LiteralPath ($databasePath + '-shm')
 }
 $apiPid = $null
 $captionPid = $null
@@ -149,12 +153,17 @@ $databaseAfter = [ordered]@{
     bytes = (Get-Item -LiteralPath $databasePath).Length
     sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $databasePath).Hash
     wal_present = Test-Path -LiteralPath ($databasePath + '-wal')
+    wal_bytes = if (Test-Path -LiteralPath ($databasePath + '-wal')) {
+        (Get-Item -LiteralPath ($databasePath + '-wal')).Length
+    } else { 0 }
+    shm_present = Test-Path -LiteralPath ($databasePath + '-shm')
 }
 $apiStillListening = $null -ne (Get-ListeningProcessId -Port 8002)
 $captionStillListening = $null -ne (Get-ListeningProcessId -Port 8102)
 $databaseUnchanged = (
     $databaseBefore.bytes -eq $databaseAfter.bytes -and
-    $databaseBefore.sha256 -eq $databaseAfter.sha256
+    $databaseBefore.sha256 -eq $databaseAfter.sha256 -and
+    $databaseAfter.wal_bytes -eq 0
 )
 $captionReceiptHash = if ($captionReceipt) {
     (Get-FileHash -Algorithm SHA256 -LiteralPath $captionReceipt.FullName).Hash
