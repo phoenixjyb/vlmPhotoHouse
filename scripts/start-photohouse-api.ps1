@@ -18,6 +18,8 @@ param(
     [int]$HealthTimeoutSec = 5,
     [ValidateRange(1, 365)]
     [int]$LogRetention = 14,
+    [switch]$DisableInlineWorker,
+    [switch]$NoAutoMigrate,
     [switch]$Detached,
     [switch]$PreflightOnly
 )
@@ -49,6 +51,8 @@ if ($PreflightOnly) {
     Show-PhotoHouseRuntimeContext -Context $context -Operation 'API startup'
     Write-Host "  API endpoint:   http://127.0.0.1:$ApiPort/health" -ForegroundColor Gray
     Write-Host "  Caption path:   $CaptionProvider -> $CaptionServiceUrl" -ForegroundColor Gray
+    Write-Host "  Inline worker:  $(-not [bool]$DisableInlineWorker)" -ForegroundColor Gray
+    Write-Host "  Auto migrate:   $(-not [bool]$NoAutoMigrate)" -ForegroundColor Gray
     Write-Host "  Run mode:       $(if ($Detached) { 'detached' } else { 'foreground-owned' })" -ForegroundColor Gray
     Write-Host "  curl.exe:       $curlAvailable" -ForegroundColor Gray
     if ($missing.Count -gt 0) {
@@ -93,7 +97,9 @@ Initialize-PhotoHouseRuntimeEnvironment `
     -CaptionServiceUrl $CaptionServiceUrl `
     -LvfaceModelName $LvfaceModelName `
     -EmbedDevice $EmbedDevice `
-    -CaptionDevice $CaptionDevice
+    -CaptionDevice $CaptionDevice `
+    -EnableInlineWorker (-not [bool]$DisableInlineWorker) `
+    -AutoMigrate (-not [bool]$NoAutoMigrate)
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $controlLog = Join-Path $context.LogRoot "api-control-$stamp.log"
@@ -117,7 +123,7 @@ function Test-PhotoHouseReadyHealth {
         $null -ne $Health -and
         [bool]$Health.ok -and
         [bool]$Health.db_ok -and
-        [bool]$Health.worker_enabled
+        [bool]$Health.worker_enabled -eq (-not [bool]$DisableInlineWorker)
     )
 }
 
@@ -142,8 +148,8 @@ try {
         if (-not [bool]$existingHealth.ok -or -not [bool]$existingHealth.db_ok) {
             throw "PhotoHouse responded on port $ApiPort but reported an unhealthy database."
         }
-        if (-not [bool]$existingHealth.worker_enabled) {
-            throw "PhotoHouse responded on port $ApiPort but its inline worker is disabled."
+        if ([bool]$existingHealth.worker_enabled -ne (-not [bool]$DisableInlineWorker)) {
+            throw "PhotoHouse responded on port $ApiPort with a different inline-worker mode."
         }
         Write-PhotoHouseLog -Path $controlLog -Message "PhotoHouse API already healthy on 127.0.0.1:$ApiPort; startup skipped."
         return
@@ -161,7 +167,7 @@ try {
         '--port', $ApiPort.ToString(),
         '--log-level', 'info'
     )
-    Write-PhotoHouseLog -Path $controlLog -Message "Starting PhotoHouse API on 127.0.0.1:$ApiPort."
+    Write-PhotoHouseLog -Path $controlLog -Message "Starting PhotoHouse API on 127.0.0.1:$ApiPort; worker_enabled=$(-not [bool]$DisableInlineWorker); auto_migrate=$(-not [bool]$NoAutoMigrate)."
     $process = Start-Process `
         -FilePath $context.PythonExe `
         -WorkingDirectory $context.BackendRoot `

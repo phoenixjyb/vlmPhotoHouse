@@ -58,6 +58,9 @@ After the preflights pass, the corresponding operations are:
 # Long-running API plus inline worker; the script remains its foreground owner
 .\scripts\start-photohouse-api.ps1
 
+# Health/UI canary with no queue processing and no schema migration
+.\scripts\start-photohouse-api.ps1 -DisableInlineWorker -NoAutoMigrate
+
 # One idempotent scan of E:\01_INCOMING
 .\scripts\run-photo-intake.ps1
 ```
@@ -78,6 +81,10 @@ start before that caption service is ready.
 API startup separately verifies the PhotoHouse health identity, database, and
 inline worker before declaring readiness. If port 8002 belongs to an unknown or
 unhealthy process, it fails without killing that process.
+
+For a bounded health/UI canary, combine `-DisableInlineWorker` and
+`-NoAutoMigrate`. Readiness then requires `worker_enabled=false`; this mode must
+not be mistaken for the production queue-draining launcher.
 
 `tools\morning-intake-and-start.ps1` remains only as a compatibility coordinator
 for an existing caller: it starts the caption service, runs intake, and then

@@ -101,13 +101,16 @@ function Initialize-PhotoHouseRuntimeEnvironment {
         [string]$CaptionServiceUrl = 'http://127.0.0.1:8102',
         [string]$LvfaceModelName = 'LVFace-B_Glint360K.onnx',
         [string]$EmbedDevice = 'cuda:0',
-        [string]$CaptionDevice = 'cuda:0'
+        [string]$CaptionDevice = 'cuda:0',
+        [bool]$EnableInlineWorker = $true,
+        [bool]$AutoMigrate = $true
     )
 
     $databaseUriPath = ($Context.DatabasePath -replace '\\', '/')
     $env:RUN_MODE = 'api'
     $env:PYTHONPATH = $Context.BackendRoot
-    $env:ENABLE_INLINE_WORKER = 'true'
+    $env:ENABLE_INLINE_WORKER = if ($EnableInlineWorker) { 'true' } else { 'false' }
+    $env:AUTO_MIGRATE = if ($AutoMigrate) { 'true' } else { 'false' }
     $env:FACE_EMBED_PROVIDER = 'lvface'
     $env:FACE_DETECT_PROVIDER = 'scrfd'
     $env:FACE_EMBED_DIM = '128'
