@@ -93,6 +93,13 @@ space. Moving to LVFace's full 512-dimensional output requires a versioned
 re-embed and recluster migration; never mix 128- and 512-dimensional vectors in
 the same active person index.
 
+The versioned artifact schema records legacy 128/512-dimensional vectors as
+`unknown-legacy` without rewriting their active paths. Landmark-aligned LVFace
+512-dimensional vectors can be retained separately with status `shadow` by
+`scripts\run-aligned-face-shadow-canary.py`. A shadow artifact is evaluation
+evidence only: it does not change a face assignment, person centroid, task, or
+the active `face_detections.embedding_path`.
+
 ## Quick start (presets)
 
 Run from the repo root (`vlmPhotoHouse`). Use `-UseWindowsTerminal` for panes and `-KillExisting` to reset the session.

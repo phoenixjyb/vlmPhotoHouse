@@ -606,51 +606,97 @@ class TaskExecutor:
                     with _Im.open(src) as im_det:
                         w,h = safe_exif_transpose(im_det).size
                     size = min(w,h)*0.4
-                    dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size})())
+                    dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size,'landmarks':None})())
                 else:
                     logger.warning(f"Face detection failed for asset_id={asset.id}; skipping fallback box insertion", exc_info=True)
-            existing_boxes = [(float(f.bbox_x), float(f.bbox_y), float(f.bbox_w), float(f.bbox_h)) for f in faces]
+            detector_model = type(provider).__name__ if 'provider' in locals() else None
+            known_faces = [
+                ((float(f.bbox_x), float(f.bbox_y), float(f.bbox_w), float(f.bbox_h)), f)
+                for f in faces
+            ]
             for d in dets:
                 cand = (float(d.x), float(d.y), float(d.w), float(d.h))
-                is_dup = any(_iou(cand, box) >= dedupe_iou for box in existing_boxes)
-                if is_dup and supplement_only:
+                best_match = max(
+                    ((_iou(cand, box), existing_face) for box, existing_face in known_faces),
+                    default=(0.0, None),
+                    key=lambda item: item[0],
+                )
+                landmarks = getattr(d, 'landmarks', None)
+                landmarks_json = (
+                    [[float(x), float(y)] for x, y in landmarks]
+                    if landmarks is not None and len(landmarks) == 5
+                    else None
+                )
+                if best_match[0] >= dedupe_iou and supplement_only:
+                    existing_face = best_match[1]
+                    if (
+                        existing_face is not None
+                        and landmarks_json is not None
+                        and not existing_face.landmarks_json
+                    ):
+                        existing_face.landmarks_json = landmarks_json
+                        existing_face.landmark_model = detector_model
                     continue
-                face = FaceDetection(asset_id=asset.id, bbox_x=cand[0], bbox_y=cand[1], bbox_w=cand[2], bbox_h=cand[3], embedding_path=None)
+                face = FaceDetection(
+                    asset_id=asset.id,
+                    bbox_x=cand[0],
+                    bbox_y=cand[1],
+                    bbox_w=cand[2],
+                    bbox_h=cand[3],
+                    embedding_path=None,
+                    landmarks_json=landmarks_json,
+                    landmark_model=detector_model,
+                )
                 session.add(face)
-                existing_boxes.append(cand)
+                known_faces.append((cand, face))
             session.flush()
             faces = session.query(FaceDetection).filter(FaceDetection.asset_id==asset.id).all()
         # Generate / ensure crops
         out_dir = DERIVED_DIR / 'faces' / '256'
+        aligned_dir = DERIVED_DIR / 'faces' / 'aligned-112'
+        out_dir.mkdir(parents=True, exist_ok=True)
+        aligned_dir.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as im_raw:
             im = safe_exif_transpose(im_raw)
             w, h = im.size
             for face in faces:
                 crop_path = out_dir / f"{face.id}.jpg"
-                if crop_path.exists():
-                    continue
-                x1 = int(max(0, face.bbox_x))
-                y1 = int(max(0, face.bbox_y))
-                x2 = int(min(w, face.bbox_x + face.bbox_w))
-                y2 = int(min(h, face.bbox_y + face.bbox_h))
-                # Optional margin expansion
-                try:
-                    from .config import get_settings as _gs
-                    _s = _gs()
-                    margin = getattr(_s, 'face_crop_margin', 0.0)
-                except Exception:
-                    margin = 0.0
-                if margin > 0:
-                    mw = int(margin * max(w,h))
-                    x1 = max(0, x1 - mw)
-                    y1 = max(0, y1 - mw)
-                    x2 = min(w, x2 + mw)
-                    y2 = min(h, y2 + mw)
-                if x2 <= x1 or y2 <= y1:
-                    continue
-                face_crop = im.crop((x1, y1, x2, y2))
-                face_crop.thumbnail((256,256))
-                face_crop.convert('RGB').save(crop_path, 'JPEG', quality=85)
+                if not crop_path.exists():
+                    x1 = int(max(0, face.bbox_x))
+                    y1 = int(max(0, face.bbox_y))
+                    x2 = int(min(w, face.bbox_x + face.bbox_w))
+                    y2 = int(min(h, face.bbox_y + face.bbox_h))
+                    # Optional margin expansion
+                    try:
+                        from .config import get_settings as _gs
+                        _s = _gs()
+                        margin = getattr(_s, 'face_crop_margin', 0.0)
+                    except Exception:
+                        margin = 0.0
+                    if margin > 0:
+                        mw = int(margin * max(w,h))
+                        x1 = max(0, x1 - mw)
+                        y1 = max(0, y1 - mw)
+                        x2 = min(w, x2 + mw)
+                        y2 = min(h, y2 + mw)
+                    if x2 > x1 and y2 > y1:
+                        face_crop = im.crop((x1, y1, x2, y2))
+                        face_crop.thumbnail((256,256))
+                        face_crop.convert('RGB').save(crop_path, 'JPEG', quality=85)
+
+                if face.landmarks_json:
+                    aligned_path = aligned_dir / f"{face.id}.png"
+                    if not aligned_path.exists():
+                        try:
+                            from .face_alignment import align_face_112
+                            aligned = align_face_112(im, face.landmarks_json)
+                            aligned.save(aligned_path, 'PNG')
+                        except Exception:
+                            logger.warning(
+                                "Could not align face_id=%s from stored landmarks",
+                                face.id,
+                                exc_info=True,
+                            )
         # enqueue embedding tasks for faces lacking embeddings
         for face in faces:
             if not face.embedding_path:
