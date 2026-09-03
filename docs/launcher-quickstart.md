@@ -86,6 +86,11 @@ For a bounded health/UI canary, combine `-DisableInlineWorker` and
 `-NoAutoMigrate`. Readiness then requires `worker_enabled=false`; this mode must
 not be mistaken for the production queue-draining launcher.
 
+For a fully retained one-sample runtime check, use
+`scripts\run-runtime-canary.ps1`. It owns both services in one shell, verifies
+the UI and API health, runs one detailed-caption request, compares the database
+SHA-256 before and after, stops both exact PIDs, and writes a JSON receipt.
+
 `tools\morning-intake-and-start.ps1` remains only as a compatibility coordinator
 for an existing caller: it starts the caption service, runs intake, and then
 starts the API with `-Detached`. New automation should use the three independent

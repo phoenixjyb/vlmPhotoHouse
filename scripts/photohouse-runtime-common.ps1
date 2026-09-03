@@ -185,7 +185,7 @@ function Get-PhotoHouseCaptionHealth {
 function Get-PhotoHouseHealth {
     [CmdletBinding()]
     param(
-        [ValidateRange(1, 30)]
+        [ValidateRange(1, 65535)]
         [int]$Port = 8002,
         [ValidateRange(1, 30)]
         [int]$TimeoutSec = 5,
