@@ -474,3 +474,76 @@ def test_voice_chat_turn_surfaces_provider_error(client, voice_env, monkeypatch)
     payload = resp.json()
     assert payload['success'] is False
     assert 'provider unavailable' in str(payload['error'])
+
+
+def test_voice_chat_delete_success(client, voice_env, monkeypatch):
+    _ = voice_env
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload, status_code=200, text=''):
+            self._payload = payload
+            self.status_code = status_code
+            self.text = text
+
+        def json(self):
+            return self._payload
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            calls.append({'url': url, 'headers': headers, 'json': json})
+            return FakeResponse({'success': True}, status_code=200)
+
+    monkeypatch.setattr('app.routers.voice.httpx.AsyncClient', FakeAsyncClient)
+
+    resp = client.post('/voice/chat/delete', json={'conversation_id': 'conv-delete-123'})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload['success'] is True
+    assert payload['conversation_id'] == 'conv-delete-123'
+    assert calls, 'expected provider delete call'
+    assert str(calls[0]['url']).endswith('/api/chat/delete')
+    assert calls[0]['json']['conversation_id'] == 'conv-delete-123'
+
+
+def test_voice_chat_delete_surfaces_provider_error(client, voice_env, monkeypatch):
+    _ = voice_env
+
+    class FakeResponse:
+        def __init__(self, payload, status_code=500, text='provider delete error'):
+            self._payload = payload
+            self.status_code = status_code
+            self.text = text
+
+        def json(self):
+            return self._payload
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            return FakeResponse({'error': 'provider delete unavailable'}, status_code=500, text='provider delete unavailable')
+
+    monkeypatch.setattr('app.routers.voice.httpx.AsyncClient', FakeAsyncClient)
+
+    resp = client.post('/voice/chat/delete', json={'conversation_id': 'conv-delete-500'})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload['success'] is False
+    assert 'provider delete unavailable' in str(payload['error'])

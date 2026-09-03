@@ -28,6 +28,8 @@ This directory contains utility scripts, monitoring tools, and administrative ut
 - `progress_diary.py` - Processing progress tracking and reporting
 
 ### System Administration
+- `morning-intake-and-start.ps1` - Compatibility coordinator for the former combined Windows task; prefer the independent runtime scripts
+- `../scripts/start-caption-service.ps1` - Guarded persistent Qwen3-VL service launcher for the Windows RTX 3090
 - `gpu_precheck_validation.py` - GPU setup validation and checking
 - `configure_gpu.py` - Configure and validate RTX 3090 device mapping
 - `photo_ingestion_guide.py` - Photo ingestion workflow utilities
@@ -79,6 +81,11 @@ python tools/gpu_monitor_plot.py
 
 ### Administration
 ```bash
+# Read-only Windows runtime checks (PowerShell)
+.\scripts\start-caption-service.ps1 -PreflightOnly
+.\scripts\start-photohouse-api.ps1 -PreflightOnly
+.\scripts\run-photo-intake.ps1 -PreflightOnly
+
 # Validate GPU setup
 python tools/gpu_precheck_validation.py
 

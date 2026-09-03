@@ -1,5 +1,5 @@
 import os, random, logging
-from typing import Protocol, List
+from typing import Protocol, List, Optional, Tuple
 from functools import lru_cache
 from dataclasses import dataclass
 from PIL import Image
@@ -11,6 +11,7 @@ class DetectedFace:
     y: float
     w: float
     h: float
+    landmarks: Optional[Tuple[Tuple[float, float], ...]] = None
 
 class FaceDetectionProvider(Protocol):
     def detect(self, image: Image.Image) -> List[DetectedFace]: ...
@@ -44,14 +45,19 @@ class MTCNNDetectionProvider:
         self.mtcnn = MTCNN(keep_all=True, device=self.device)
     def detect(self, image: Image.Image) -> List[DetectedFace]:  # pragma: no cover heavy
         import numpy as np
-        boxes, probs = self.mtcnn.detect(image)
+        boxes, probs, points = self.mtcnn.detect(image, landmarks=True)
         out: List[DetectedFace] = []
         if boxes is None:
             return out
-        for (x1, y1, x2, y2) in boxes:
+        for index, (x1, y1, x2, y2) in enumerate(boxes):
             x1 = float(max(0,x1)); y1 = float(max(0,y1))
             x2 = float(max(x1+1,x2)); y2 = float(max(y1+1,y2))
-            out.append(DetectedFace(x1, y1, x2 - x1, y2 - y1))
+            landmarks = None
+            if points is not None and index < len(points):
+                landmarks = tuple(
+                    (float(point[0]), float(point[1])) for point in points[index]
+                )
+            out.append(DetectedFace(x1, y1, x2 - x1, y2 - y1, landmarks))
         return out
 
 class InsightFaceDetectionProvider:
@@ -92,7 +98,13 @@ class InsightFaceDetectionProvider:
             x1, y1, x2, y2 = f.bbox.tolist()
             x1 = float(max(0, x1)); y1 = float(max(0, y1))
             x2 = float(max(x1 + 1, x2)); y2 = float(max(y1 + 1, y2))
-            out.append(DetectedFace(x1, y1, x2 - x1, y2 - y1))
+            raw_landmarks = getattr(f, 'kps', None)
+            landmarks = None
+            if raw_landmarks is not None:
+                landmarks = tuple(
+                    (float(point[0]), float(point[1])) for point in raw_landmarks
+                )
+            out.append(DetectedFace(x1, y1, x2 - x1, y2 - y1, landmarks))
         return out
 
 @lru_cache()

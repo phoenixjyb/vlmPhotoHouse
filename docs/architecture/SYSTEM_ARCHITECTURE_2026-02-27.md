@@ -217,6 +217,7 @@ Why Qwen3-VL vs BLIP2?
   - `/voice/tts`
   - `/voice/conversation`
   - `/voice/chat`
+  - `/voice/chat/delete`
   - `/voice/health`
   - `/voice/capabilities`
   - `/voice/demo`
@@ -236,6 +237,8 @@ Why Qwen3-VL vs BLIP2?
   `/voice/*` demo/photo endpoints and requires schema-alignment cleanup before production use
 - **Why proxied?** Keeps voice capabilities accessible from the same UI origin (port 8002)
   without cross-origin issues, while LLMyTranslate runs as an independent service
+- **Remote tailnet access (optional)**: launch API with `-TailscaleAccess` (`0.0.0.0` bind) and
+  expose HTTPS via `tailscale serve --https=443 http://127.0.0.1:8002` so remote browsers can use microphone safely.
 
 ### 5.8 Voice Integration Status and Plan (voice-in + voice-out)
 
@@ -574,7 +577,8 @@ Single-page web application. Server-hosted as static files from `backend/app/ui/
 
 Main tabs:
 - **Library**: asset grid, search (text/vector/hybrid), asset inspector (media player,
-  captions panel, tags panel with remove/block flow, face assignment panel per asset)
+  captions panel, tags panel with remove/block flow, face assignment panel per asset,
+  plus confirmation-gated photo/asset delete controls)
 - **People**: named/unnamed person list, per-person asset gallery, unassigned face queue
   with manual assignment + Stranger quick-label action
 - **Tags**: global tag catalog and tag-scoped asset browsing
@@ -584,6 +588,10 @@ Main tabs:
 - **Tasks**: live queue monitor, cancel actions
 - **Admin**: health/metrics dashboard (tags, face counts, embed counts), index rebuild,
   recluster, ingest trigger
+
+Top bar voice controls include `Voice Command`, `Voice Chat`, `Delete Chat`, and `Voice History` clear;
+destructive clears/deletes require explicit browser confirmation before execution, and `Delete Chat` uses `/voice/chat/delete`
+to request remote conversation deletion when `conversation_id` is available before local context cleanup.
 
 The UI talks exclusively to the vlmPhotoHouse API at port 8002. No external dependencies.
 

@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, Text, Float, LargeBinary, Index, JSON
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, Text, Float, LargeBinary, Index, JSON, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from typing import Optional, List as _List
@@ -95,12 +95,54 @@ class FaceDetection(Base):
     bbox_h: Mapped[float] = mapped_column(Float, nullable=False)
     person_id: Mapped[Optional[int]] = mapped_column(ForeignKey('persons.id', ondelete='SET NULL'), nullable=True, index=True)
     embedding_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    landmarks_json: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    landmark_model: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     label_source: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)  # manual|dnn
     label_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
 
     asset = relationship('Asset', back_populates='faces')
     person = relationship('Person', back_populates='faces')
+
+
+class FaceEmbeddingArtifact(Base):
+    __tablename__ = 'face_embedding_artifacts'
+    __table_args__ = (
+        UniqueConstraint('face_id', 'model_version', name='uq_face_embedding_artifact_version'),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    face_id: Mapped[int] = mapped_column(
+        ForeignKey('face_detections.id', ondelete='CASCADE'), index=True, nullable=False
+    )
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(96), nullable=False, index=True)
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    alignment: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    storage_path: Mapped[str] = mapped_column(String, nullable=False)
+    vector_checksum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default='shadow', index=True)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+
+
+class PersonEmbeddingArtifact(Base):
+    __tablename__ = 'person_embedding_artifacts'
+    __table_args__ = (
+        UniqueConstraint('person_id', 'model_version', name='uq_person_embedding_artifact_version'),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey('persons.id', ondelete='CASCADE'), index=True, nullable=False
+    )
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(96), nullable=False, index=True)
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_face_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    storage_path: Mapped[str] = mapped_column(String, nullable=False)
+    vector_checksum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default='shadow', index=True)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
 
 class FaceAssignmentEvent(Base):
     __tablename__ = 'face_assignment_events'

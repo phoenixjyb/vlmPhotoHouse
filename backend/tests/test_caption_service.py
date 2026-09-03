@@ -6,12 +6,63 @@ import numpy as np
 from unittest.mock import patch, MagicMock
 
 from app.caption_service import (
+    _build_caption_provider,
     get_caption_provider,
+    HTTPCaptionProvider,
     StubCaptionProvider,
     LlavaNextCaptionProvider,
     Qwen2VLCaptionProvider,
     BLIP2CaptionProvider,
 )
+
+
+def test_http_caption_provider_sends_prompt(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        text = ''
+
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url):
+            return FakeResponse({
+                'status': 'healthy',
+                'active_provider': 'qwen3-vl',
+                'model_cache_ready': True,
+            })
+
+        def post(self, url, files, data=None):
+            calls.append({'url': url, 'data': data})
+            return FakeResponse({'caption': 'A detailed caption.'})
+
+    monkeypatch.setattr('app.caption_service.httpx.Client', FakeClient)
+    monkeypatch.setattr('app.caption_service._caption_tmp_dir', lambda: str(tmp_path))
+
+    provider = HTTPCaptionProvider('http://127.0.0.1:8102')
+    prompt = 'Describe every visible device factually.'
+    result = provider.generate_caption(Image.new('RGB', (32, 32)), prompt=prompt)
+
+    assert result == 'A detailed caption.'
+    assert provider.get_model_name() == 'qwen3-vl-http'
+    assert calls == [{
+        'url': 'http://127.0.0.1:8102/caption',
+        'data': {'prompt': prompt},
+    }]
 
 
 def test_get_caption_provider_default():
@@ -39,31 +90,28 @@ def test_stub_caption_provider():
 @pytest.mark.parametrize('provider_name,expected_class', [
     ('stub', StubCaptionProvider),
     ('llava-next', LlavaNextCaptionProvider),
-    ('qwen2.5-vl', Qwen2VLCaptionProvider),
+    ('qwen2.5-vl', HTTPCaptionProvider),
     ('blip2', BLIP2CaptionProvider),
 ])
-def test_provider_selection(provider_name, expected_class):
+def test_provider_selection(provider_name, expected_class, monkeypatch):
     """Test that provider selection works correctly."""
-    import os
-    heavy_enabled = os.getenv('CAPTION_TEST_ENABLE_HEAVY','false').lower() in ('1','true','yes') or bool(os.getenv('CAPTION_EXTERNAL_DIR',''))
-    if provider_name != 'stub' and not heavy_enabled:
-        pytest.skip("Skipping heavy caption providers; enable with CAPTION_TEST_ENABLE_HEAVY=1 or set CAPTION_EXTERNAL_DIR")
-    with patch('app.config.settings') as mock_settings:
-        mock_settings.caption_provider = provider_name
-        mock_settings.caption_device = 'cpu'
-        mock_settings.caption_model = 'auto'
-        
-        # For real model providers, mock the model loading to avoid heavy dependencies
-        if provider_name != 'stub':
-            with patch('transformers.AutoProcessor'), \
-                 patch('transformers.LlavaNextForConditionalGeneration'), \
-                 patch('transformers.Qwen2VLForConditionalGeneration'), \
-                 patch('transformers.Blip2ForConditionalGeneration'):
-                provider = get_caption_provider()
-        else:
-            provider = get_caption_provider()
-            
-        assert isinstance(provider, expected_class)
+    from types import SimpleNamespace
+
+    settings = SimpleNamespace(
+        caption_external_dir='',
+        caption_service_url='http://127.0.0.1:8102',
+        caption_model='auto',
+        run_mode='tests',
+    )
+    monkeypatch.delenv('CAPTION_EXTERNAL_DIR', raising=False)
+    response = MagicMock(status_code=503)
+    client = MagicMock()
+    client.__enter__.return_value.get.return_value = response
+    with patch('app.config.get_settings', return_value=settings), \
+         patch('app.caption_service.httpx.Client', return_value=client):
+        provider = _build_caption_provider(provider_name, 'cpu')
+
+    assert isinstance(provider, expected_class)
 
 
 def test_caption_task_integration():
@@ -80,7 +128,9 @@ def test_caption_task_integration():
     
     task.payload_json = {'asset_id': 1}
     asset.path = '/fake/path/test_image.jpg'
+    asset.mime = 'image/jpeg'
     session.get.return_value = asset
+    session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     
     executor = TaskExecutor()
     
@@ -104,6 +154,10 @@ def test_caption_task_integration():
         # Verify calls
         mock_provider.assert_called_once()
         mock_caption_provider.generate_caption.assert_called_once()
+        _, caption_kwargs = mock_caption_provider.generate_caption.call_args
+        assert "80 to 120 words" in caption_kwargs["prompt"]
+        assert "do not guess the brand or model" in caption_kwargs["prompt"]
+        assert "Avoid speculative words" in caption_kwargs["prompt"]
         session.add.assert_called_once()
         session.commit.assert_called_once()
 
@@ -122,12 +176,15 @@ def test_caption_fallback_on_error():
     
     task.payload_json = {'asset_id': 1}
     asset.path = '/fake/path/test_image.jpg'
+    asset.mime = 'image/jpeg'
     session.get.return_value = asset
+    session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     
     executor = TaskExecutor()
     
     # Mock PIL Image loading to fail
-    with patch('PIL.Image.open', side_effect=Exception('Model loading failed')):
+    with patch.dict('os.environ', {'CAPTION_ENABLE_STUB_FALLBACK': 'true'}), \
+         patch('PIL.Image.open', side_effect=Exception('Model loading failed')):
         result = executor._handle_caption(session, task)
         
         # Should still add a caption using fallback

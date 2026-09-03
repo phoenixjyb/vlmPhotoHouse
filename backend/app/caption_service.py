@@ -42,8 +42,9 @@ class HTTPCaptionProvider:
                 if response.status_code == 200:
                     health_data = response.json()
                     logger.info(f"Connected to caption service: {health_data.get('status', 'unknown')}")
-                    if health_data.get('models_loaded'):
-                        self.model_name = f"http-{'-'.join(health_data['models_loaded'])}"
+                    active_provider = str(health_data.get('active_provider') or '').strip()
+                    if health_data.get('model_cache_ready') and active_provider:
+                        self.model_name = f"{active_provider}-http"
                 else:
                     logger.warning(f"Caption service health check failed: {response.status_code}")
         except httpx.RequestError as e:
@@ -59,14 +60,16 @@ class HTTPCaptionProvider:
             image.save(tmp_path, format='PNG')
             max_retries = max(1, int(os.getenv("CAPTION_HTTP_RETRIES", "2") or "2"))
             retry_delay = float(os.getenv("CAPTION_HTTP_RETRY_DELAY_SEC", "1.0") or "1.0")
+            request_timeout = max(5.0, float(os.getenv("CAPTION_HTTP_TIMEOUT_SEC", "180") or "180"))
             last_err: Exception | None = None
 
             for attempt in range(1, max_retries + 1):
                 # Send to caption service with proxy bypass
-                with httpx.Client(timeout=30.0, trust_env=False) as client:
+                with httpx.Client(timeout=request_timeout, trust_env=False) as client:
                     with open(tmp_path, 'rb') as f:
                         files = {'file': ('image.png', f, 'image/png')}
-                        response = client.post(f"{self.service_url}/caption", files=files)
+                        data = {'prompt': prompt} if prompt else None
+                        response = client.post(f"{self.service_url}/caption", files=files, data=data)
 
                 if response.status_code == 200:
                     result = response.json()
@@ -392,29 +395,17 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
     """Build a specific caption provider."""
     provider = provider.lower()
     qwen_aliases = ('qwen2vl', 'qwen', 'qwen2-vl', 'qwen2.5-vl', 'qwen3-vl', 'qwen3')
-    
-    # HTTP caption service provider
-    if provider == 'http':
-        from .config import get_settings
-        settings = get_settings()
-        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
-        return HTTPCaptionProvider(service_url)
-    
-    # Route Qwen providers through the local caption HTTP service when configured.
-    # This keeps model execution in caption_server.py (qwen3-vl on GPU) instead of
-    # in-process/subprocess backend fallback paths.
-    if provider in qwen_aliases:
-        from .config import get_settings
-        settings = get_settings()
-        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
-        if service_url:
-            return HTTPCaptionProvider(service_url)
-    
-    # Check if we should use subprocess (external caption models)
     from .config import get_settings
     settings = get_settings()
     caption_external_dir = getattr(settings, 'caption_external_dir', '') or os.getenv('CAPTION_EXTERNAL_DIR', '')
     
+    # HTTP caption service provider
+    if provider == 'http':
+        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
+        return HTTPCaptionProvider(service_url)
+    
+    # Prefer the external caption repo when configured. This keeps CLI/API behavior
+    # aligned with the multi-repo local stack without requiring the HTTP caption service.
     if caption_external_dir and provider != 'stub':
         from .caption_subprocess import (
             Qwen2VLSubprocessProvider, 
@@ -432,11 +423,18 @@ def _build_caption_provider(provider: str, device: str) -> CaptionProvider:
         else:
             # Generic subprocess provider for any other provider
             return CaptionSubprocessProvider(caption_external_dir, provider, model_name, device)
+
+    # Route Qwen providers through the local caption HTTP service when configured.
+    # This keeps model execution in caption_server.py when no external repo is wired.
+    if provider in qwen_aliases:
+        service_url = getattr(settings, 'caption_service_url', None) or os.getenv('CAPTION_SERVICE_URL', 'http://127.0.0.1:8102')
+        if service_url:
+            return HTTPCaptionProvider(service_url)
     
     # Fallback to built-in providers
     if provider == 'stub':
         return StubCaptionProvider()
-    elif provider in ('llava', 'llava_next'):
+    elif provider in ('llava', 'llava_next', 'llava-next'):
         model_name = os.getenv('LLAVA_MODEL_NAME', 'llava-hf/llava-v1.6-mistral-7b-hf')
         return LlavaNextCaptionProvider(model_name, device)
     elif provider in qwen_aliases:
