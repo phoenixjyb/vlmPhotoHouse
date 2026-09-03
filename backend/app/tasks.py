@@ -15,6 +15,12 @@ import imagehash
 from datetime import datetime, timedelta
 from . import metrics as metrics_mod
 from .gps_utils import probe_video_metadata
+from .caption_policy import (
+    DEFAULT_DETAILED_CAPTION_PROMPT,
+    bilingual_caption_issues,
+    parse_bilingual_caption,
+    truncate_caption_text,
+)
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,18 +38,6 @@ DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_RO
 ( DERIVED_DIR / 'person_embeddings').mkdir(parents=True, exist_ok=True)
 THUMB_SIZES = [256, 1024]
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
-
-DEFAULT_DETAILED_CAPTION_PROMPT = (
-    "Write a factual, search-friendly description of this photo in 80 to 120 words. "
-    "Use only directly visible evidence. Describe the main subjects, actions, setting, important objects, "
-    "clothing, colors, lighting, composition, and clearly readable text. Do not identify people or infer "
-    "relationships, protected or sensitive traits, events, occasions, locations, landmarks, or organizations. "
-    "Name a brand, model, place, landmark, or organization only when its exact name or logo is clearly legible "
-    "and unambiguous; otherwise use a generic description. Transcribe text only when confident and call it "
-    "partial or unclear instead of guessing. For phones or devices, describe visible color, case, controls, "
-    "screen content, and use, but do not guess the brand or model. Avoid speculative words such as likely, "
-    "probably, suggests, or appears to be. Return one coherent paragraph without hidden context."
-)
 
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
@@ -385,6 +379,18 @@ class TaskExecutor:
                 text = self._truncate_caption_text(text, word_limit)
         except Exception:
             pass
+        bilingual_output = parse_bilingual_caption(text)
+        if 'ZH-CN: ...' in caption_prompt:
+            policy_issues = bilingual_caption_issues(text)
+            if policy_issues:
+                asset.caption_processed_at = datetime.utcnow()
+                asset.caption_error_last = 'caption policy validation failed: ' + ', '.join(policy_issues)
+                session.commit()
+                raise ValueError(asset.caption_error_last)
+        caption_model_version = None
+        if bilingual_output and 'zh-cn' not in model_name.lower():
+            model_name = f'{model_name}|bilingual-en-zh-cn'
+            caption_model_version = 'bilingual-v1'
         # Replace oldest non user_edited if at capacity
         if existing and len(existing) >= max_variants:
             target = next((c for c in existing if not c.user_edited), None)
@@ -392,6 +398,7 @@ class TaskExecutor:
                 return existing[-1]
             target.text = text
             target.model = model_name
+            target.model_version = caption_model_version
             session.commit()
             return target
         # Infer quality tier
@@ -404,7 +411,14 @@ class TaskExecutor:
             qtier = 'balanced'
         elif 'vit' in model_name.lower() or 'mini' in model_name.lower():
             qtier = 'fast'
-        cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False, quality_tier=qtier, model_version=None)
+        cap = Caption(
+            asset_id=asset_id,
+            text=text,
+            model=model_name,
+            user_edited=False,
+            quality_tier=qtier,
+            model_version=caption_model_version,
+        )
         session.add(cap)
         session.flush()
         # Optionally derive lightweight keyword tags from generated caption text.
@@ -529,31 +543,7 @@ class TaskExecutor:
 
     @staticmethod
     def _truncate_caption_text(text: str, word_limit: int) -> str:
-        if word_limit <= 0:
-            return text
-        words = [w for w in str(text or '').split() if w]
-        if len(words) <= word_limit:
-            return str(text or '')
-
-        # Prefer ending on sentence punctuation; if needed, look slightly beyond the limit.
-        sentence_end_re = re.compile(r'[.!?。！？][\'")\]]*$')
-
-        def _join(n: int) -> str:
-            return ' '.join(words[:max(1, n)]).strip()
-
-        # 1) Find last sentence boundary within the limit.
-        for i in range(word_limit, 0, -1):
-            if sentence_end_re.search(words[i - 1]):
-                return _join(i)
-
-        # 2) If none within limit, allow a small forward window to finish sentence.
-        forward_limit = min(len(words), word_limit + 24)
-        for i in range(word_limit + 1, forward_limit + 1):
-            if sentence_end_re.search(words[i - 1]):
-                return _join(i)
-
-        # 3) Fallback to hard cap.
-        return _join(word_limit)
+        return truncate_caption_text(text, word_limit)
 
     def _handle_face(self, session: Session, task: Task):
         payload = task.payload_json or {}

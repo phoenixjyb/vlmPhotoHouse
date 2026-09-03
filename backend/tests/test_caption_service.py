@@ -144,7 +144,10 @@ def test_caption_task_integration():
         
         # Create mock provider
         mock_caption_provider = Mock()
-        mock_caption_provider.generate_caption.return_value = 'Test caption'
+        english = ' '.join(['adult'] + ['visible'] * 59)
+        mock_caption_provider.generate_caption.return_value = (
+            f'EN: {english}\n\nZH-CN: 一位成人站在可见的建筑旁。'
+        )
         mock_caption_provider.get_model_name.return_value = 'test-model'
         mock_provider.return_value = mock_caption_provider
         
@@ -155,10 +158,14 @@ def test_caption_task_integration():
         mock_provider.assert_called_once()
         mock_caption_provider.generate_caption.assert_called_once()
         _, caption_kwargs = mock_caption_provider.generate_caption.call_args
-        assert "80 to 120 words" in caption_kwargs["prompt"]
-        assert "do not guess the brand or model" in caption_kwargs["prompt"]
-        assert "Avoid speculative words" in caption_kwargs["prompt"]
+        assert '60 to 120 English words' in caption_kwargs['prompt']
+        assert 'ZH-CN: ...' in caption_kwargs['prompt']
+        assert 'do not guess the brand, model' in caption_kwargs['prompt']
+        assert 'Avoid unsupported inference' in caption_kwargs['prompt']
         session.add.assert_called_once()
+        added_caption = session.add.call_args.args[0]
+        assert added_caption.model == 'test-model|bilingual-en-zh-cn'
+        assert added_caption.model_version == 'bilingual-v1'
         session.commit.assert_called_once()
 
 

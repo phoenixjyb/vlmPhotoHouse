@@ -72,9 +72,12 @@ PhotoHouse checkout, use cross-session locks, and write retained logs under
 
 The caption launcher loads `models\qwen3-vl-8b-instruct` in 4-bit NF4, pins it
 to the RTX 3090, and requires the service to report a loaded Qwen3-VL cache on
-that GPU. It uses one inference slot and a factual 80-120 word prompt covering
+that GPU. It uses one inference slot and a shared bilingual prompt covering
 subjects, actions, setting, objects, clothing, lighting, composition, readable
-text, and phone/device details when genuinely visible. The PhotoHouse API now
+text, and detailed phone/device attributes when genuinely visible. Each result
+contains a 60-120 word English paragraph followed by a fact-aligned natural
+Simplified Chinese paragraph. The prompt also requires neutral person terms,
+respectful family-photo wording, and no inferred intent. The PhotoHouse API now
 defaults to `CAPTION_PROVIDER=http` at `http://127.0.0.1:8102` and refuses to
 start before that caption service is ready.
 

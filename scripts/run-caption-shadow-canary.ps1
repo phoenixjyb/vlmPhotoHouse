@@ -12,22 +12,35 @@ param(
     [ValidateRange(1, 1024)]
     [int]$MaxFileMiB = 40,
     [string[]]$ExcludedDirectoryNames = @('.thumbnails', 'thumbnails', '@eadir', '$recycle.bin', 'system volume information'),
-    [string]$Prompt = (
-        'Write a factual, search-friendly description of this photo in 80 to 120 words. ' +
-        'Use only directly visible evidence. Describe the main subjects, actions, setting, important objects, ' +
-        'clothing, colors, lighting, composition, and clearly readable text. Do not identify people or infer ' +
-        'relationships, protected or sensitive traits, events, occasions, locations, landmarks, or organizations. ' +
-        'Name a brand, model, place, landmark, or organization only when its exact name or logo is clearly legible ' +
-        'and unambiguous; otherwise use a generic description. Transcribe text only when confident and call it ' +
-        'partial or unclear instead of guessing. For phones or devices, describe visible color, case, controls, ' +
-        'screen content, and use, but do not guess the brand or model. Avoid speculative words such as likely, ' +
-        'probably, suggests, or appears to be. Return one coherent paragraph without hidden context.'
-    ),
+    [string]$Prompt = '',
     [switch]$PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$promptPath = Join-Path $repoRoot 'config\detailed-caption-prompt.txt'
+if ([string]::IsNullOrWhiteSpace($Prompt)) {
+    if (-not (Test-Path -LiteralPath $promptPath -PathType Leaf)) {
+        throw "Detailed caption prompt not found: $promptPath"
+    }
+    $Prompt = (Get-Content -LiteralPath $promptPath -Raw -Encoding UTF8).Trim()
+}
+
+function Get-BilingualCaptionParts {
+    param([string]$Caption)
+
+    $match = [regex]::Match(
+        [string]$Caption,
+        '^\s*EN:\s*(?<english>.+?)\s*\r?\n\s*\r?\n\s*ZH-CN:\s*(?<chinese>.+?)\s*$',
+        ([System.Text.RegularExpressions.RegexOptions]::Singleline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    )
+    if (-not $match.Success) { return $null }
+    return [pscustomobject]@{
+        English = $match.Groups['english'].Value.Trim()
+        Chinese = $match.Groups['chinese'].Value.Trim()
+    }
+}
 
 function Invoke-LocalJsonGet {
     param([string]$Url)
@@ -173,6 +186,12 @@ foreach ($sample in $samples) {
         http_total_seconds = $null
         generation_time_seconds = $null
         word_count = 0
+        english_word_count = 0
+        chinese_character_count = 0
+        chinese_script_ok = $false
+        bilingual_format_ok = $false
+        policy_violation_terms = @()
+        chinese_policy_violation_terms = @()
         provider = $null
         model = $null
         caption = $null
@@ -211,7 +230,26 @@ foreach ($sample in $samples) {
         $record.provider = [string]$response.provider
         $record.model = [string]$response.model
         $record.caption = [string]$response.caption
-        $record.word_count = @(($record.caption -split '\s+' | Where-Object { $_ })).Count
+        $parts = Get-BilingualCaptionParts -Caption $record.caption
+        if ($parts) {
+            $record.bilingual_format_ok = $true
+            $record.english_word_count = @(($parts.English -split '\s+' | Where-Object { $_ })).Count
+            $record.chinese_character_count = ($parts.Chinese -replace '\s', '').Length
+            $record.chinese_script_ok = [regex]::IsMatch($parts.Chinese, '[\u4e00-\u9fff]')
+            $policyPattern = '(?i)\b(seemingly|apparently|likely|probably|possibly|perhaps|maybe|suggests|man|woman|boy|girl|nude|naked|diaper|underwear|capturing|recording|photographing)\b|looks like|no clothing|without clothing|taking (a |the )?(photo|picture|video)|appear(s|ing)? to (capture|take|record|photograph|call|message)|seem(s|ing)? to (capture|take|record|photograph|call|message)'
+            $record.policy_violation_terms = @(
+                [regex]::Matches($parts.English, $policyPattern) |
+                    ForEach-Object { $_.Value.ToLowerInvariant() } |
+                    Sort-Object -Unique
+            )
+            $chinesePolicyPattern = '似乎|好像|可能|看起来|大概|或许|推测|拍摄|拍照|录像|录制|男人|女人|男子|女子|男孩|女孩|男性|女性|裸体|赤裸|尿布|内衣|没穿衣服'
+            $record.chinese_policy_violation_terms = @(
+                [regex]::Matches($parts.Chinese, $chinesePolicyPattern) |
+                    ForEach-Object { $_.Value } |
+                    Sort-Object -Unique
+            )
+            $record.word_count = $record.english_word_count
+        }
     } catch {
         $record.error = $_.Exception.Message
     } finally {
@@ -233,6 +271,19 @@ $p95 = if ($latencies.Count -gt 0) {
 $meanLatency = if ($latencies.Count -gt 0) { ($latencies | Measure-Object -Average).Average } else { $null }
 $wordCounts = @($successful | ForEach-Object { [int]$_.word_count })
 $meanWords = if ($wordCounts.Count -gt 0) { ($wordCounts | Measure-Object -Average).Average } else { $null }
+$formatFailures = @($successful | Where-Object { -not [bool]$_.bilingual_format_ok }).Count
+$chineseScriptFailures = @($successful | Where-Object { -not [bool]$_.chinese_script_ok }).Count
+$lengthFailures = @($successful | Where-Object {
+    [int]$_.english_word_count -lt 60 -or [int]$_.english_word_count -gt 120
+}).Count
+$policyViolationCount = @($successful | Where-Object { @($_.policy_violation_terms).Count -gt 0 }).Count
+$chinesePolicyViolationCount = @($successful | Where-Object {
+    @($_.chinese_policy_violation_terms).Count -gt 0
+}).Count
+$chineseCounts = @($successful | ForEach-Object { [int]$_.chinese_character_count })
+$meanChineseCharacters = if ($chineseCounts.Count -gt 0) {
+    ($chineseCounts | Measure-Object -Average).Average
+} else { $null }
 
 $receipt = [ordered]@{
     schema = 'photohouse.qwen3_vl_shadow.v1'
@@ -257,6 +308,13 @@ $receipt = [ordered]@{
         mean_http_seconds = $meanLatency
         p95_http_seconds = $p95
         mean_word_count = $meanWords
+        mean_english_word_count = $meanWords
+        mean_chinese_character_count = $meanChineseCharacters
+        bilingual_format_failure_count = $formatFailures
+        chinese_script_failure_count = $chineseScriptFailures
+        english_length_failure_count = $lengthFailures
+        policy_violation_count = $policyViolationCount
+        chinese_policy_violation_count = $chinesePolicyViolationCount
     }
     results = $results
 }
@@ -270,4 +328,18 @@ Write-Host ("Success={0}/{1}; mean={2:N2}s; p95={3:N2}s; mean_words={4:N1}" -f $
 
 if ($successful.Count -ne $results.Count) {
     throw "Shadow canary completed with $($results.Count - $successful.Count) failure(s)."
+}
+if (
+    $formatFailures -ne 0 -or
+    $chineseScriptFailures -ne 0 -or
+    $lengthFailures -ne 0 -or
+    $policyViolationCount -ne 0 -or
+    $chinesePolicyViolationCount -ne 0
+) {
+    throw (
+        "Shadow canary quality gate failed: bilingual_format=$formatFailures " +
+        "chinese_script=$chineseScriptFailures english_length=$lengthFailures " +
+        "policy_violations=$policyViolationCount " +
+        "chinese_policy_violations=$chinesePolicyViolationCount."
+    )
 }
