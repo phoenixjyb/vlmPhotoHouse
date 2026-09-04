@@ -207,12 +207,12 @@ foreach ($sample in $samples) {
             default { 'image/jpeg' }
         }
         $writeOut = & curl.exe `
-            --silent --show-error --fail --noproxy '*' `
+            --silent --show-error --fail --globoff --noproxy '*' `
             --max-time $TimeoutSec `
             --output $tempResponse `
             --write-out '%{http_code}|%{time_total}' `
             --form "file=@$($sample.FullName);type=$mime" `
-            --form "prompt=$Prompt" `
+            --form-string "prompt=$Prompt" `
             "$CaptionServiceUrl/caption" 2>&1
         $curlExit = $LASTEXITCODE
         $parts = (($writeOut -join '') -split '\|', 2)
