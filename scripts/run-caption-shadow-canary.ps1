@@ -53,8 +53,12 @@ function ConvertTo-NeutralPersonTerms {
     $neutral = [regex]::Replace($neutral, '\bgirl\b', 'child', 'IgnoreCase')
     $neutral = [regex]::Replace($neutral, '\bboys\b', 'children', 'IgnoreCase')
     $neutral = [regex]::Replace($neutral, '\bboy\b', 'child', 'IgnoreCase')
-    $neutral = $neutral -replace '男孩|女孩', '儿童'
-    return ($neutral -replace '男人|女人|男子|女子|男性|女性', '成人')
+    $childTerms = '\u7537\u5b69|\u5973\u5b69'
+    $adultTerms = '\u7537\u4eba|\u5973\u4eba|\u7537\u5b50|\u5973\u5b50|\u7537\u6027|\u5973\u6027'
+    $childReplacement = [string][char]0x513F + [char]0x7AE5
+    $adultReplacement = [string][char]0x6210 + [char]0x4EBA
+    $neutral = $neutral -replace $childTerms, $childReplacement
+    return ($neutral -replace $adultTerms, $adultReplacement)
 }
 
 function Invoke-LocalJsonGet {
