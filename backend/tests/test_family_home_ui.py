@@ -42,6 +42,7 @@ def test_family_home_copy_is_bilingual_and_responsive():
 def test_album_composer_is_bilingual_and_uses_persistent_draft_api():
     html = (UI_ROOT / "index.html").read_text(encoding="utf-8")
     javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
+    stories_html = html.split('id="tab-stories"', 1)[1].split('id="tab-similarity"', 1)[0]
 
     assert 'id="album-draft-list"' in html
     assert 'id="album-title"' in html
@@ -54,3 +55,4 @@ def test_album_composer_is_bilingual_and_uses_persistent_draft_api():
     assert 'method: "PATCH"' in javascript
     assert 'album_drafts_title: "Saved album drafts"' in javascript
     assert 'album_drafts_title: "已保存的相册草稿"' in javascript
+    assert stories_html.index('id="album-draft-list"') < stories_html.index('id="album-composer-title"')
