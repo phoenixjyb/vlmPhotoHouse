@@ -67,7 +67,17 @@ def test_http_caption_provider_sends_prompt(monkeypatch, tmp_path):
 
 def test_get_caption_provider_default():
     """Test that default configuration returns StubCaptionProvider."""
-    provider = get_caption_provider()
+    from types import SimpleNamespace
+
+    test_settings = SimpleNamespace(
+        caption_provider='stub',
+        caption_device='cpu',
+        run_mode='tests',
+    )
+    get_caption_provider.cache_clear()
+    with patch('app.config.settings', test_settings):
+        provider = get_caption_provider()
+    get_caption_provider.cache_clear()
     assert isinstance(provider, StubCaptionProvider)
 
 
@@ -190,7 +200,10 @@ def test_caption_fallback_on_error():
     executor = TaskExecutor()
     
     # Mock PIL Image loading to fail
-    with patch.dict('os.environ', {'CAPTION_ENABLE_STUB_FALLBACK': 'true'}), \
+    with patch.dict('os.environ', {
+        'CAPTION_ENABLE_STUB_FALLBACK': 'true',
+        'CAPTION_PROMPT': 'Write one short factual English caption.',
+    }), \
          patch('PIL.Image.open', side_effect=Exception('Model loading failed')):
         result = executor._handle_caption(session, task)
         
