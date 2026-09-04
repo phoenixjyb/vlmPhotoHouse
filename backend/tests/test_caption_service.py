@@ -246,6 +246,8 @@ def test_caption_task_uses_second_correction_for_remaining_policy_issue():
     assert provider.generate_caption.call_count == 3
     second_retry_prompt = provider.generate_caption.call_args_list[2].kwargs['prompt']
     assert 'Previous validation issues: chinese_policy.' in second_retry_prompt
+    assert '<rejected_caption>' in second_retry_prompt
+    assert 'ZH-CN: 一位成人正在拍摄可见的建筑。' in second_retry_prompt
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
 
 

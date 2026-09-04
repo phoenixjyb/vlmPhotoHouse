@@ -398,7 +398,7 @@ class TaskExecutor:
                 and caption_image is not None
                 and policy_retry_count < max_policy_retries
             ):
-                retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues)
+                retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues, text)
                 text = prov.generate_caption(caption_image, prompt=retry_prompt)
                 policy_retry_count += 1
                 text = neutralize_person_terms(text)
