@@ -99,7 +99,19 @@ def test_retry_prompt_reasserts_complete_bilingual_contract():
     assert '60 to 120 factual English words' in retry_prompt
     assert 'target 75 to 95 words' in retry_prompt
     assert 'had only 53 words' in retry_prompt
+    assert 'without saying or implying taking photos, capturing, recording, calling, or messaging' in retry_prompt
     assert 'Previous validation issues: english_words=53, english_policy.' in retry_prompt
+
+
+def test_retry_prompt_explains_chinese_policy_correction():
+    retry_prompt = build_caption_retry_prompt(
+        DEFAULT_DETAILED_CAPTION_PROMPT,
+        ['english_policy', 'chinese_policy'],
+    )
+
+    assert 'Use only person, adult, or child for people' in retry_prompt
+    assert 'Use only 人、成人、儿童 for people' in retry_prompt
+    assert 'without 似乎、可能、看起来、拍摄、拍照、录像、录制' in retry_prompt
 
 
 def test_person_terms_are_neutralized_in_both_languages():

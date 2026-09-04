@@ -91,6 +91,19 @@ def build_caption_retry_prompt(prompt: str, issues: list[str] | None = None) -> 
                 f' The previous English paragraph had {word_count} words. Tighten it while preserving '
                 'the directly visible facts and the matching Chinese rendering.'
             )
+    if 'english_policy' in issue_list:
+        context += (
+            ' The previous English paragraph used disallowed speculative, gendered, sensitive, or '
+            'unproven camera or phone activity wording. Use only person, adult, or child for people; '
+            'describe visible poses and device details without saying or implying taking photos, '
+            'capturing, recording, calling, or messaging.'
+        )
+    if 'chinese_policy' in issue_list:
+        context += (
+            ' The previous Chinese paragraph used disallowed speculative, gendered, sensitive, or '
+            'unproven camera or phone activity wording. Use only 人、成人、儿童 for people and '
+            'describe visible poses and device details without 似乎、可能、看起来、拍摄、拍照、录像、录制.'
+        )
     if issue_list:
         context += f' Previous validation issues: {", ".join(issue_list)}.'
     return f'{str(prompt or "").strip()}\n\n{CAPTION_RETRY_INSTRUCTION}{context}'.strip()
