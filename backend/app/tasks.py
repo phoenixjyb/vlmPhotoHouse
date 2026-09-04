@@ -18,6 +18,7 @@ from .gps_utils import probe_video_metadata
 from .caption_policy import (
     DEFAULT_DETAILED_CAPTION_PROMPT,
     bilingual_caption_issues,
+    build_caption_retry_prompt,
     parse_bilingual_caption,
     truncate_caption_text,
 )
@@ -348,6 +349,8 @@ class TaskExecutor:
         text = ''
         model_name = 'unknown'
         err = None
+        prov = None
+        caption_image = None
         try:
             from .caption_service import get_caption_provider
             prov = get_caption_provider()
@@ -382,6 +385,16 @@ class TaskExecutor:
         bilingual_output = parse_bilingual_caption(text)
         if 'ZH-CN: ...' in caption_prompt:
             policy_issues = bilingual_caption_issues(text)
+            if policy_issues and prov is not None and caption_image is not None:
+                retry_prompt = build_caption_retry_prompt(caption_prompt)
+                text = prov.generate_caption(caption_image, prompt=retry_prompt)
+                try:
+                    if word_limit > 0:
+                        text = self._truncate_caption_text(text, word_limit)
+                except Exception:
+                    pass
+                bilingual_output = parse_bilingual_caption(text)
+                policy_issues = bilingual_caption_issues(text)
             if policy_issues:
                 asset.caption_processed_at = datetime.utcnow()
                 asset.caption_error_last = 'caption policy validation failed: ' + ', '.join(policy_issues)

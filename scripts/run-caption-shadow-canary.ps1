@@ -178,6 +178,13 @@ $promptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-promp
     $Prompt,
     [System.Text.UTF8Encoding]::new($false)
 )
+$retryPromptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-prompt-retry-{0}.txt" -f [Guid]::NewGuid().ToString('N'))
+$retryInstruction = 'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words, then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified Chinese rendering of the same visible facts. Include both paragraphs, remove speculative or sensitive wording, and return no other text.'
+[System.IO.File]::WriteAllText(
+    $retryPromptFormPath,
+    "$Prompt`n`n$retryInstruction",
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 foreach ($sample in $samples) {
     $relative = $sample.FullName.Substring($InputRoot.TrimEnd('\').Length).TrimStart('\')
@@ -188,6 +195,7 @@ foreach ($sample in $samples) {
         bytes = [int64]$sample.Length
         sha256 = $null
         status = 'error'
+        attempt_count = 0
         http_code = $null
         http_total_seconds = $null
         generation_time_seconds = $null
@@ -212,49 +220,70 @@ foreach ($sample in $samples) {
             '.webp' { 'image/webp' }
             default { 'image/jpeg' }
         }
-        $writeOut = & curl.exe `
-            --silent --show-error --fail --globoff --noproxy '*' `
-            --max-time $TimeoutSec `
-            --output $tempResponse `
-            --write-out '%{http_code}|%{time_total}' `
-            --form "file=@$($sample.FullName);type=$mime" `
-            --form "prompt=<$promptFormPath" `
-            "$CaptionServiceUrl/caption" 2>&1
-        $curlExit = $LASTEXITCODE
-        $parts = (($writeOut -join '') -split '\|', 2)
-        if ($parts.Count -eq 2) {
-            $record.http_code = $parts[0]
-            $record.http_total_seconds = [double]$parts[1]
-        }
-        if ($curlExit -ne 0) {
-            throw "curl.exe exited with code ${curlExit}: $($writeOut -join ' ')"
-        }
+        $totalHttpSeconds = 0.0
+        foreach ($activePromptFormPath in @($promptFormPath, $retryPromptFormPath)) {
+            $record.attempt_count++
+            $record.bilingual_format_ok = $false
+            $record.chinese_script_ok = $false
+            $record.english_word_count = 0
+            $record.chinese_character_count = 0
+            $record.word_count = 0
+            $record.policy_violation_terms = @()
+            $record.chinese_policy_violation_terms = @()
+            $writeOut = & curl.exe `
+                --silent --show-error --fail --globoff --noproxy '*' `
+                --max-time $TimeoutSec `
+                --output $tempResponse `
+                --write-out '%{http_code}|%{time_total}' `
+                --form "file=@$($sample.FullName);type=$mime" `
+                --form "prompt=<$activePromptFormPath" `
+                "$CaptionServiceUrl/caption" 2>&1
+            $curlExit = $LASTEXITCODE
+            $responseParts = (($writeOut -join '') -split '\|', 2)
+            if ($responseParts.Count -eq 2) {
+                $record.http_code = $responseParts[0]
+                $totalHttpSeconds += [double]$responseParts[1]
+                $record.http_total_seconds = $totalHttpSeconds
+            }
+            if ($curlExit -ne 0) {
+                throw "curl.exe exited with code ${curlExit}: $($writeOut -join ' ')"
+            }
 
-        $response = Get-Content -LiteralPath $tempResponse -Raw -Encoding UTF8 | ConvertFrom-Json
-        $record.status = 'ok'
-        $record.generation_time_seconds = [double]$response.generation_time_seconds
-        $record.provider = [string]$response.provider
-        $record.model = [string]$response.model
-        $record.caption = [string]$response.caption
-        $parts = Get-BilingualCaptionParts -Caption $record.caption
-        if ($parts) {
-            $record.bilingual_format_ok = $true
-            $record.english_word_count = @(($parts.English -split '\s+' | Where-Object { $_ })).Count
-            $record.chinese_character_count = ($parts.Chinese -replace '\s', '').Length
-            $record.chinese_script_ok = [regex]::IsMatch($parts.Chinese, '[\u4e00-\u9fff]')
-            $policyPattern = '(?i)\b(seemingly|apparently|likely|probably|possibly|perhaps|maybe|suggests|man|woman|boy|girl|nude|naked|diaper|underwear|capturing|recording|photographing)\b|looks like|no clothing|without clothing|taking (a |the )?(photo|picture|video)|appear(s|ing)? to (capture|take|record|photograph|call|message)|seem(s|ing)? to (capture|take|record|photograph|call|message)'
-            $record.policy_violation_terms = @(
-                [regex]::Matches($parts.English, $policyPattern) |
-                    ForEach-Object { $_.Value.ToLowerInvariant() } |
-                    Sort-Object -Unique
+            $response = Get-Content -LiteralPath $tempResponse -Raw -Encoding UTF8 | ConvertFrom-Json
+            $record.status = 'ok'
+            $record.generation_time_seconds = [double]$response.generation_time_seconds
+            $record.provider = [string]$response.provider
+            $record.model = [string]$response.model
+            $record.caption = [string]$response.caption
+            $captionParts = Get-BilingualCaptionParts -Caption $record.caption
+            if ($captionParts) {
+                $record.bilingual_format_ok = $true
+                $record.english_word_count = @(($captionParts.English -split '\s+' | Where-Object { $_ })).Count
+                $record.chinese_character_count = ($captionParts.Chinese -replace '\s', '').Length
+                $record.chinese_script_ok = [regex]::IsMatch($captionParts.Chinese, '[\u4e00-\u9fff]')
+                $policyPattern = '(?i)\b(seemingly|apparently|likely|probably|possibly|perhaps|maybe|suggests|man|woman|boy|girl|nude|naked|diaper|underwear|capturing|recording|photographing)\b|looks like|no clothing|without clothing|taking (a |the )?(photo|picture|video)|appear(s|ing)? to (capture|take|record|photograph|call|message)|seem(s|ing)? to (capture|take|record|photograph|call|message)'
+                $record.policy_violation_terms = @(
+                    [regex]::Matches($captionParts.English, $policyPattern) |
+                        ForEach-Object { $_.Value.ToLowerInvariant() } |
+                        Sort-Object -Unique
+                )
+                $chinesePolicyPattern = '似乎|好像|可能|看起来|大概|或许|推测|拍摄|拍照|录像|录制|男人|女人|男子|女子|男孩|女孩|男性|女性|裸体|赤裸|尿布|内衣|没穿衣服'
+                $record.chinese_policy_violation_terms = @(
+                    [regex]::Matches($captionParts.Chinese, $chinesePolicyPattern) |
+                        ForEach-Object { $_.Value } |
+                        Sort-Object -Unique
+                )
+                $record.word_count = $record.english_word_count
+            }
+            $qualityOk = (
+                [bool]$record.bilingual_format_ok -and
+                [bool]$record.chinese_script_ok -and
+                [int]$record.english_word_count -ge 60 -and
+                [int]$record.english_word_count -le 120 -and
+                @($record.policy_violation_terms).Count -eq 0 -and
+                @($record.chinese_policy_violation_terms).Count -eq 0
             )
-            $chinesePolicyPattern = '似乎|好像|可能|看起来|大概|或许|推测|拍摄|拍照|录像|录制|男人|女人|男子|女子|男孩|女孩|男性|女性|裸体|赤裸|尿布|内衣|没穿衣服'
-            $record.chinese_policy_violation_terms = @(
-                [regex]::Matches($parts.Chinese, $chinesePolicyPattern) |
-                    ForEach-Object { $_.Value } |
-                    Sort-Object -Unique
-            )
-            $record.word_count = $record.english_word_count
+            if ($qualityOk) { break }
         }
     } catch {
         $record.error = $_.Exception.Message
@@ -267,6 +296,7 @@ foreach ($sample in $samples) {
     Write-Host ("[{0}/{1}] {2} {3:N2}s {4} words  {5}" -f $results.Count, $samples.Count, $record.status, $elapsedForDisplay, $record.word_count, $relative)
 }
 Remove-Item -LiteralPath $promptFormPath -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $retryPromptFormPath -Force -ErrorAction SilentlyContinue
 
 $successful = @($results | Where-Object { $_.status -eq 'ok' })
 $latencies = @($successful | ForEach-Object { [double]$_.http_total_seconds } | Sort-Object)
@@ -288,6 +318,7 @@ $chinesePolicyViolationCount = @($successful | Where-Object {
     @($_.chinese_policy_violation_terms).Count -gt 0
 }).Count
 $chineseCounts = @($successful | ForEach-Object { [int]$_.chinese_character_count })
+$retryCount = @($results | Where-Object { [int]$_.attempt_count -gt 1 }).Count
 $meanChineseCharacters = if ($chineseCounts.Count -gt 0) {
     ($chineseCounts | Measure-Object -Average).Average
 } else { $null }
@@ -322,6 +353,7 @@ $receipt = [ordered]@{
         english_length_failure_count = $lengthFailures
         policy_violation_count = $policyViolationCount
         chinese_policy_violation_count = $chinesePolicyViolationCount
+        corrective_retry_count = $retryCount
     }
     results = $results
 }

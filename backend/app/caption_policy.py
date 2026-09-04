@@ -6,6 +6,12 @@ from pathlib import Path
 
 CAPTION_PROMPT_PATH = Path(__file__).resolve().parents[2] / 'config' / 'detailed-caption-prompt.txt'
 DEFAULT_DETAILED_CAPTION_PROMPT = CAPTION_PROMPT_PATH.read_text(encoding='utf-8').strip()
+CAPTION_RETRY_INSTRUCTION = (
+    'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words, '
+    'then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified '
+    'Chinese rendering of the same visible facts. Include both paragraphs, remove speculative or '
+    'sensitive wording, and return no other text.'
+)
 BILINGUAL_CAPTION_RE = re.compile(
     r'^\s*EN:\s*(?P<english>.+?)\s*\r?\n\s*\r?\n\s*ZH-CN:\s*(?P<chinese>.+?)\s*$',
     flags=re.DOTALL | re.IGNORECASE,
@@ -51,6 +57,10 @@ def bilingual_caption_issues(
     if CHINESE_POLICY_RE.search(chinese):
         issues.append('chinese_policy')
     return issues
+
+
+def build_caption_retry_prompt(prompt: str) -> str:
+    return f'{str(prompt or "").strip()}\n\n{CAPTION_RETRY_INSTRUCTION}'.strip()
 
 
 def truncate_caption_text(text: str, word_limit: int) -> str:

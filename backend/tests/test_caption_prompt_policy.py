@@ -4,6 +4,7 @@ from app.caption_policy import (
     CAPTION_PROMPT_PATH,
     DEFAULT_DETAILED_CAPTION_PROMPT,
     bilingual_caption_issues,
+    build_caption_retry_prompt,
     parse_bilingual_caption,
     truncate_caption_text,
 )
@@ -47,7 +48,8 @@ def test_windows_caption_scripts_load_the_canonical_prompt():
     assert 'chinese_policy_violation_count' in canary
     assert '--globoff' in canary
     assert '[System.Text.UTF8Encoding]::new($false)' in canary
-    assert '--form "prompt=<$promptFormPath"' in canary
+    assert '--form "prompt=<$activePromptFormPath"' in canary
+    assert 'corrective_retry_count' in canary
 
 
 def test_bilingual_word_cap_does_not_break_cross_language_alignment():
@@ -81,6 +83,15 @@ def test_bilingual_policy_rejects_inferred_activity_and_missing_chinese():
     assert 'english_policy' in issues
     assert 'chinese_policy' in issues
     assert bilingual_caption_issues('EN: English only.') == ['format']
+
+
+def test_retry_prompt_reasserts_complete_bilingual_contract():
+    retry_prompt = build_caption_retry_prompt(DEFAULT_DETAILED_CAPTION_PROMPT)
+
+    assert retry_prompt.startswith(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert 'CORRECTION REQUIRED' in retry_prompt
+    assert 'Include both paragraphs' in retry_prompt
+    assert '60 to 120 factual English words' in retry_prompt
 
 
 def test_legacy_monolingual_word_cap_is_unchanged():
