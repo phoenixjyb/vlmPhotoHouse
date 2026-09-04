@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260228c" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260904a" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -19,7 +19,7 @@
     <header class="topbar">
       <div>
         <h1 data-i18n="app_title">VLM Photo House</h1>
-        <p class="subtitle" data-i18n="subtitle">Faces, captions, videos, and search in one control surface.</p>
+        <p class="subtitle" data-i18n="subtitle">A private home for your family memories.</p>
       </div>
       <div class="top-actions">
         <div id="lang-switch" class="lang-switch">
@@ -79,7 +79,8 @@
     </section>
 
     <nav class="tabs">
-      <button class="tab active" data-tab="library" data-i18n="tab_library">Library</button>
+      <button class="tab active" data-tab="home" data-i18n="tab_home">Home</button>
+      <button class="tab" data-tab="library" data-i18n="tab_library">Library</button>
       <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
       <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
       <button class="tab" data-tab="stories" data-i18n="tab_stories">Stories</button>
@@ -90,7 +91,61 @@
     </nav>
 
     <main>
-      <section id="tab-library" class="tab-panel active">
+      <section id="tab-home" class="tab-panel active">
+        <div class="home-hero">
+          <p class="home-eyebrow" data-i18n="home_eyebrow">YOUR FAMILY LIBRARY</p>
+          <h2 data-i18n="home_title">Find the moments that matter</h2>
+          <p class="home-intro" data-i18n="home_intro">Search naturally by person, activity, place, or memory.</p>
+          <div class="home-search-row">
+            <label class="grow">
+              <span class="sr-only" data-i18n="family_search">Family search</span>
+              <input id="home-search-query" type="search" data-i18n-placeholder="home_search_ph" placeholder="Try: Jane playing outside" />
+            </label>
+            <button id="btn-home-search" class="btn home-search-btn" type="button" data-i18n="find_memories">Find Memories</button>
+          </div>
+          <div id="home-search-suggestions" class="home-suggestions" aria-label="Search suggestions">
+            <button class="home-suggestion" type="button" data-home-query="playing outside" data-i18n="home_suggestion_play">Playing outside</button>
+            <button class="home-suggestion" type="button" data-home-query="birthday" data-i18n="home_suggestion_birthday">Birthday moments</button>
+            <button class="home-suggestion" type="button" data-home-query="family trip" data-i18n="home_suggestion_trip">Family trips</button>
+          </div>
+          <div id="home-search-interpretation" class="home-search-interpretation hidden" aria-live="polite"></div>
+        </div>
+
+        <div class="home-section-heading">
+          <div>
+            <p class="home-eyebrow" data-i18n="home_recent_eyebrow">LATEST ADDITIONS</p>
+            <h2 data-i18n="home_recent_title">Recent moments</h2>
+          </div>
+          <button id="btn-home-view-library" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+        </div>
+        <div id="home-recent-grid" class="asset-grid home-asset-grid"></div>
+
+        <div class="home-columns">
+          <section class="panel home-panel">
+            <div class="home-section-heading compact">
+              <div>
+                <p class="home-eyebrow" data-i18n="home_people_eyebrow">FAMILY</p>
+                <h2 data-i18n="home_people_title">People you know</h2>
+              </div>
+              <button id="btn-home-view-people" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+            </div>
+            <div id="home-people-list" class="home-people-list"></div>
+          </section>
+
+          <section class="panel home-panel">
+            <div class="home-section-heading compact">
+              <div>
+                <p class="home-eyebrow" data-i18n="home_albums_eyebrow">READY TO EXPLORE</p>
+                <h2 data-i18n="home_albums_title">Suggested albums</h2>
+              </div>
+              <button id="btn-home-view-stories" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+            </div>
+            <div id="home-story-list" class="home-story-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="tab-library" class="tab-panel">
         <div class="panel-grid">
           <div class="panel left-panel">
             <h2 data-i18n="search">Search</h2>
@@ -127,6 +182,7 @@
               <button id="btn-search" class="btn" data-i18n="run_search">Run Search</button>
               <button id="btn-library-load" class="btn ghost" data-i18n="browse_latest">Browse Latest</button>
             </div>
+            <div id="search-interpretation" class="home-search-interpretation hidden" aria-live="polite"></div>
 
             <h3 data-i18n="results">Results</h3>
             <p id="library-result-meta" class="muted"></p>
@@ -501,6 +557,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260302a" defer></script>
+  <script src="/ui/app.js?v=20260904a" defer></script>
 </body>
 </html>

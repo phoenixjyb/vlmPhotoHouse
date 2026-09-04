@@ -1,5 +1,10 @@
 const state = {
-  activeTab: "library",
+  activeTab: "home",
+  home: {
+    recent: [],
+    people: [],
+    stories: [],
+  },
   selectedAsset: null,
   persons: [],
   namedPersons: [],
@@ -84,7 +89,7 @@ const qs = (id) => document.getElementById(id);
 const I18N = {
   en: {
     app_title: "VLM Photo House",
-    subtitle: "Faces, captions, videos, and search in one control surface.",
+    subtitle: "A private home for your family memories.",
     voice_chat: "Voice Chat",
     voice_chat_reset: "Delete Chat",
     voice_command: "Voice Command",
@@ -126,6 +131,7 @@ const I18N = {
     tagged_assets: "Tagged Assets",
     tasks_pending: "Tasks Pending",
     health: "Health",
+    tab_home: "Home",
     tab_library: "Library",
     tab_people: "People",
     tab_tags: "Tags",
@@ -134,6 +140,33 @@ const I18N = {
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
+    home_eyebrow: "YOUR FAMILY LIBRARY",
+    home_title: "Find the moments that matter",
+    home_intro: "Search naturally by person, activity, place, or memory.",
+    family_search: "Family search",
+    home_search_ph: "Try: Jane playing outside",
+    find_memories: "Find Memories",
+    home_suggestion_play: "Playing outside",
+    home_suggestion_birthday: "Birthday moments",
+    home_suggestion_trip: "Family trips",
+    home_recent_eyebrow: "LATEST ADDITIONS",
+    home_recent_title: "Recent moments",
+    home_people_eyebrow: "FAMILY",
+    home_people_title: "People you know",
+    home_albums_eyebrow: "READY TO EXPLORE",
+    home_albums_title: "Suggested albums",
+    home_person_photos: "{count} photos",
+    home_story_assets: "{count} memories",
+    home_empty_recent: "No recent photos are available yet.",
+    home_empty_people: "Name a few people to see family shortcuts here.",
+    home_empty_stories: "Suggested albums will appear as captions and tags become available.",
+    home_load_failed: "Home could not be refreshed: {error}",
+    home_search_required: "Describe the memory you want to find.",
+    search_filter_query: "Memory",
+    search_filter_mode: "Search",
+    search_filter_media: "Media",
+    search_mode_family: "Smart family search",
+    view_all: "View all",
     search: "Search",
     mode: "Mode",
     mode_path: "Path",
@@ -364,7 +397,7 @@ const I18N = {
   },
   zh: {
     app_title: "VLM 照片屋",
-    subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
+    subtitle: "属于家人的私密回忆空间。",
     voice_chat: "语音对话",
     voice_chat_reset: "删除对话",
     voice_command: "语音命令",
@@ -406,6 +439,7 @@ const I18N = {
     tagged_assets: "已标注资源",
     tasks_pending: "待处理任务",
     health: "健康状态",
+    tab_home: "首页",
     tab_library: "资源库",
     tab_people: "人物",
     tab_tags: "标签",
@@ -414,6 +448,33 @@ const I18N = {
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
+    home_eyebrow: "家庭影像库",
+    home_title: "找到真正重要的时刻",
+    home_intro: "用人物、活动、地点或回忆自然地搜索。",
+    family_search: "家庭搜索",
+    home_search_ph: "例如：Jane 在户外玩耍",
+    find_memories: "寻找回忆",
+    home_suggestion_play: "户外玩耍",
+    home_suggestion_birthday: "生日时刻",
+    home_suggestion_trip: "家庭旅行",
+    home_recent_eyebrow: "最近加入",
+    home_recent_title: "最近时刻",
+    home_people_eyebrow: "家人",
+    home_people_title: "熟悉的人",
+    home_albums_eyebrow: "值得探索",
+    home_albums_title: "推荐相册",
+    home_person_photos: "{count} 张照片",
+    home_story_assets: "{count} 个回忆",
+    home_empty_recent: "暂时没有可显示的最近照片。",
+    home_empty_people: "为几个人命名后，这里会出现家人快捷入口。",
+    home_empty_stories: "随着描述和标签增加，这里会出现推荐相册。",
+    home_load_failed: "首页刷新失败：{error}",
+    home_search_required: "请描述你想寻找的回忆。",
+    search_filter_query: "回忆",
+    search_filter_mode: "搜索",
+    search_filter_media: "媒体",
+    search_mode_family: "家庭智能搜索",
+    view_all: "查看全部",
     search: "搜索",
     mode: "模式",
     mode_path: "路径",
@@ -939,6 +1000,9 @@ function setLanguage(lang, persist = true) {
 }
 
 function renderCurrentViewText() {
+  if (state.activeTab === "home") {
+    renderHome();
+  }
   if (state.libraryViewItems.length) {
     renderAssetGrid(state.libraryViewItems, "library-grid");
   }
@@ -1560,6 +1624,7 @@ async function runVoiceConversationCapture() {
 
 function setActiveTab(tab) {
   state.activeTab = tab;
+  document.body.dataset.activeTab = tab;
   document.querySelectorAll(".tab").forEach((el) => {
     el.classList.toggle("active", el.dataset.tab === tab);
   });
@@ -1597,6 +1662,149 @@ function renderAssetGrid(items, containerId) {
     .join("");
 }
 
+function renderHomePeople() {
+  const root = qs("home-people-list");
+  if (!root) return;
+  const people = Array.isArray(state.home.people) ? state.home.people : [];
+  if (!people.length) {
+    root.innerHTML = `<p class="muted">${esc(t("home_empty_people"))}</p>`;
+    return;
+  }
+  root.innerHTML = people
+    .map((person) => {
+      const faceId = Number((person.sample_faces || [])[0] || 0);
+      const image = faceId
+        ? `<img loading="lazy" src="/faces/${faceId}/crop?size=256" alt="" />`
+        : `<span class="home-person-placeholder" aria-hidden="true">${esc(String(person.display_name || "?").slice(0, 1))}</span>`;
+      return `
+        <button class="home-person-row" type="button" data-action="home-open-person" data-person-id="${Number(person.id) || 0}">
+          ${image}
+          <span class="home-row-copy">
+            <p><strong>${esc(person.display_name || t("person_fallback", { id: person.id }))}</strong></p>
+            <p class="small muted">${esc(t("home_person_photos", { count: Number(person.face_count) || 0 }))}</p>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderHomeStories() {
+  const root = qs("home-story-list");
+  if (!root) return;
+  const stories = Array.isArray(state.home.stories) ? state.home.stories : [];
+  if (!stories.length) {
+    root.innerHTML = `<p class="muted">${esc(t("home_empty_stories"))}</p>`;
+    return;
+  }
+  root.innerHTML = stories
+    .map((story) => {
+      const firstAsset = (story.items || [])[0] || null;
+      const image = firstAsset?.id
+        ? `<img loading="lazy" src="/assets/${Number(firstAsset.id)}/thumbnail?size=256" alt="" />`
+        : "";
+      return `
+        <button class="home-story-row" type="button" data-action="home-open-story" data-story-id="${esc(story.id || "")}">
+          ${image}
+          <span class="home-row-copy">
+            <p><strong>${esc(story.title || story.id || "")}</strong></p>
+            <p class="small muted">${esc(storyTypeLabel(story.type))} · ${esc(
+              t("home_story_assets", { count: Number(story.count) || 0 })
+            )}</p>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderHome() {
+  const recent = Array.isArray(state.home.recent) ? state.home.recent : [];
+  const recentRoot = qs("home-recent-grid");
+  if (recentRoot) {
+    if (recent.length) {
+      renderAssetGrid(recent, "home-recent-grid");
+    } else {
+      recentRoot.innerHTML = `<p class="muted">${esc(t("home_empty_recent"))}</p>`;
+    }
+  }
+  renderHomePeople();
+  renderHomeStories();
+}
+
+async function loadHome() {
+  try {
+    const [recent, people, stories] = await Promise.all([
+      api("/assets?page=1&page_size=8"),
+      api("/persons?page=1&page_size=6&include_faces=true&named_only=true&sort_by=face_count&order=desc"),
+      api("/albums/stories?media=all&story_type=all&min_assets=3&max_stories_per_type=2&story_asset_limit=4&caption_scan_limit=400"),
+    ]);
+    state.home = {
+      recent: Array.isArray(recent?.assets) ? recent.assets : [],
+      people: Array.isArray(people?.persons) ? people.persons : [],
+      stories: Array.isArray(stories?.stories) ? stories.stories : [],
+    };
+    renderHome();
+  } catch (e) {
+    showToast(t("home_load_failed", { error: e.message }));
+  }
+}
+
+function inferFamilySearchMedia(query) {
+  const value = String(query || "").toLowerCase();
+  if (/\b(video|videos|movie|movies)\b|视频|录像|影片/.test(value)) return "video";
+  if (/\b(photo|photos|picture|pictures|image|images)\b|照片|图片|相片/.test(value)) return "image";
+  return "all";
+}
+
+function renderFamilySearchInterpretation(query, mode, media) {
+  const chips = [
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_query"))}</strong>${esc(query)}</span>`,
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_mode"))}</strong>${esc(
+      mode === "person" ? modeLabel("person") : t("search_mode_family")
+    )}</span>`,
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_media"))}</strong>${esc(mediaLabel(media))}</span>`,
+  ].join("");
+  for (const id of ["home-search-interpretation", "search-interpretation"]) {
+    const root = qs(id);
+    if (!root) continue;
+    root.innerHTML = chips;
+    root.classList.remove("hidden");
+  }
+}
+
+function clearFamilySearchInterpretation() {
+  for (const id of ["home-search-interpretation", "search-interpretation"]) {
+    const root = qs(id);
+    if (!root) continue;
+    root.innerHTML = "";
+    root.classList.add("hidden");
+  }
+}
+
+async function runHomeSearch(value = null) {
+  const input = qs("home-search-query");
+  const query = String(value ?? input?.value ?? "").trim();
+  if (!query) {
+    showToast(t("home_search_required"));
+    return;
+  }
+  if (input) input.value = query;
+  const queryKey = query.toLocaleLowerCase();
+  const exactPerson = (state.namedPersons || []).find(
+    (person) => String(person.display_name || "").trim().toLocaleLowerCase() === queryKey
+  );
+  const mode = exactPerson ? "person" : "smart";
+  const media = inferFamilySearchMedia(query);
+  qs("search-mode").value = mode;
+  qs("search-query").value = exactPerson ? String(exactPerson.display_name || query) : query;
+  qs("search-tags").value = "";
+  qs("search-media").value = media;
+  renderFamilySearchInterpretation(query, mode, media);
+  setActiveTab("library");
+  await runSearch(1, false, true);
+}
+
 async function refreshDashboard() {
   try {
     const [health, metrics] = await Promise.all([api("/health"), api("/metrics")]);
@@ -1623,6 +1831,7 @@ async function refreshDashboard() {
 
 async function loadLibraryLatest(page = 1) {
   try {
+    clearFamilySearchInterpretation();
     const pageNum = Math.max(1, Number(page) || 1);
     const pageSize = state.libraryPager.pageSize || 120;
     const data = await api(`/assets?page=${pageNum}&page_size=${pageSize}`);
@@ -1679,7 +1888,8 @@ function normalizeSearch(mode, data) {
   return [];
 }
 
-async function runSearch(page = 1, fromPager = false) {
+async function runSearch(page = 1, fromPager = false, preserveInterpretation = false) {
+  if (!fromPager && !preserveInterpretation) clearFamilySearchInterpretation();
   const pageNum = Math.max(1, Number(page) || 1);
   const pageSize = state.libraryPager.pageSize || 120;
 
@@ -2882,6 +3092,7 @@ function initEvents() {
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", async () => {
       setActiveTab(el.dataset.tab);
+      if (el.dataset.tab === "home") await loadHome();
       if (el.dataset.tab === "tasks") await loadTasks();
       if (el.dataset.tab === "admin") await refreshAdminPanels();
       if (el.dataset.tab === "people") await loadPeople();
@@ -2899,6 +3110,7 @@ function initEvents() {
 
   qs("btn-refresh-all").addEventListener("click", async () => {
     await Promise.all([refreshDashboard(), loadTasks(), loadPeople(), refreshAdminPanels()]);
+    if (state.activeTab === "home") await loadHome();
     if (state.activeTab === "tags") {
       await loadTagsCatalog(state.tagsPager.page || 1);
       if (state.tagsAssetsPager.tagId) {
@@ -2937,6 +3149,49 @@ function initEvents() {
   });
   qs("search-query").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runSearch(1, false);
+  });
+
+  qs("btn-home-search").addEventListener("click", () => runHomeSearch());
+  qs("home-search-query").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runHomeSearch();
+  });
+  qs("home-search-suggestions").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-home-query]");
+    if (!button) return;
+    runHomeSearch(button.dataset.homeQuery || "");
+  });
+  qs("btn-home-view-library").addEventListener("click", async () => {
+    setActiveTab("library");
+    await loadLibraryLatest(1);
+  });
+  qs("btn-home-view-people").addEventListener("click", async () => {
+    setActiveTab("people");
+    await loadPeople();
+  });
+  qs("btn-home-view-stories").addEventListener("click", async () => {
+    setActiveTab("stories");
+    await loadStoryAlbums();
+  });
+  qs("home-recent-grid").addEventListener("click", async (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    state.inspectorOriginTab = "home";
+    setActiveTab("library");
+    await loadAssetInspector(Number(card.dataset.assetId));
+  });
+  qs("home-people-list").addEventListener("click", async (e) => {
+    const button = e.target.closest("button[data-action='home-open-person']");
+    const personId = Number(button?.dataset.personId || 0);
+    if (!personId) return;
+    setActiveTab("people");
+    await loadPeople();
+    await loadPersonAssets(personId, 1);
+  });
+  qs("home-story-list").addEventListener("click", async (e) => {
+    const button = e.target.closest("button[data-action='home-open-story']");
+    if (!button) return;
+    const story = (state.home.stories || []).find((row) => String(row.id || "") === String(button.dataset.storyId || ""));
+    if (story) await openStoryContext(story);
   });
 
   qs("library-grid").addEventListener("click", async (e) => {
@@ -2987,6 +3242,7 @@ function initEvents() {
     closeAssetInspector();
     if (returnTab !== "library") {
       setActiveTab(returnTab);
+      if (returnTab === "home") await loadHome();
       if (returnTab === "people") await loadPeople();
       if (returnTab === "tags") {
         await loadTagsCatalog(state.tagsPager.page || 1);
@@ -3365,14 +3621,17 @@ async function bootstrap() {
   setLanguage(langParam || storedLang || "en", false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && ["home", "library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"].includes(tab)) {
     setActiveTab(tab);
+  } else {
+    setActiveTab("home");
   }
   const q = params.get("q");
   if (q) {
     qs("search-query").value = q;
+    qs("home-search-query").value = q;
   }
-  await Promise.all([refreshDashboard(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
+  await Promise.all([refreshDashboard(), loadHome(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
   if (state.activeTab === "tags") {
     await loadTagsCatalog(1);
     if (state.tagsAssetsPager.tagId) {
@@ -3391,7 +3650,7 @@ async function bootstrap() {
     await loadGeoMap();
   }
   if (q) {
-    await runSearch(1, false);
+    await runHomeSearch(q);
   }
 
   window.setInterval(async () => {

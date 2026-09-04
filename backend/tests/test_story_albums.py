@@ -131,3 +131,29 @@ def test_story_albums_endpoint_rejects_invalid_filters(client):
 
     bad_media = client.get("/albums/stories?media=bad")
     assert bad_media.status_code == 400
+
+
+def test_caption_story_albums_ignore_low_confidence_fallback_tokens(client, temp_env_root):
+    prefix = uuid4().hex[:8]
+    with SessionLocal() as session:
+        assets = [
+            Asset(
+                path=str(Path(temp_env_root["originals"]) / f"{prefix}_weak_{index}.jpg"),
+                hash_sha256=_new_hash64(),
+                mime="image/jpeg",
+            )
+            for index in range(2)
+        ]
+        session.add_all(assets)
+        session.commit()
+        session.add_all(
+            Caption(asset_id=int(asset.id), text="Dry under muted plain texture.", model="http-qwen-vl")
+            for asset in assets
+        )
+        session.commit()
+
+    response = client.get("/albums/stories?story_type=caption&min_assets=2&caption_scan_limit=200")
+
+    assert response.status_code == 200
+    story_titles = {str(story["title"]).lower() for story in response.json()["stories"]}
+    assert story_titles.isdisjoint({"dry", "under", "muted", "plain", "texture"})

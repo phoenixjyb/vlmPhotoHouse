@@ -209,6 +209,7 @@ def test_caption_task_retries_once_for_invalid_bilingual_output():
     assert provider.generate_caption.call_count == 2
     retry_prompt = provider.generate_caption.call_args_list[1].kwargs['prompt']
     assert 'CORRECTION REQUIRED' in retry_prompt
+    assert 'Previous validation issues: format.' in retry_prompt
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
 
 

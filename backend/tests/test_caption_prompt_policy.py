@@ -88,12 +88,18 @@ def test_bilingual_policy_rejects_inferred_activity_and_missing_chinese():
 
 
 def test_retry_prompt_reasserts_complete_bilingual_contract():
-    retry_prompt = build_caption_retry_prompt(DEFAULT_DETAILED_CAPTION_PROMPT)
+    retry_prompt = build_caption_retry_prompt(
+        DEFAULT_DETAILED_CAPTION_PROMPT,
+        ['english_words=53', 'english_policy'],
+    )
 
     assert retry_prompt.startswith(DEFAULT_DETAILED_CAPTION_PROMPT)
     assert 'CORRECTION REQUIRED' in retry_prompt
     assert 'Include both paragraphs' in retry_prompt
     assert '60 to 120 factual English words' in retry_prompt
+    assert 'target 75 to 95 words' in retry_prompt
+    assert 'had only 53 words' in retry_prompt
+    assert 'Previous validation issues: english_words=53, english_policy.' in retry_prompt
 
 
 def test_person_terms_are_neutralized_in_both_languages():

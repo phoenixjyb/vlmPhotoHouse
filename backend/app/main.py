@@ -1914,7 +1914,15 @@ def albums_stories(
             seen: set[str] = set()
             for cand in candidates:
                 name = str((cand or {}).get('name') or '').strip().lower()
-                if len(name) < 2:
+                candidate_type = str((cand or {}).get('type') or '').strip().lower()
+                try:
+                    candidate_score = float((cand or {}).get('score') or 0.0)
+                except (TypeError, ValueError):
+                    candidate_score = 0.0
+                # Story topics must be stable family concepts. The tag extractor's
+                # low-confidence fallback tokens are useful for search, but single
+                # adjectives/prepositions make poor album titles.
+                if len(name) < 2 or candidate_type == 'caption-auto' or candidate_score < 0.5:
                     continue
                 if name in seen:
                     continue

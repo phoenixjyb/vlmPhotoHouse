@@ -388,7 +388,7 @@ class TaskExecutor:
         if 'ZH-CN: ...' in caption_prompt:
             policy_issues = bilingual_caption_issues(text)
             if policy_issues and prov is not None and caption_image is not None:
-                retry_prompt = build_caption_retry_prompt(caption_prompt)
+                retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues)
                 text = prov.generate_caption(caption_image, prompt=retry_prompt)
                 text = neutralize_person_terms(text)
                 try:

@@ -198,7 +198,7 @@ $promptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-promp
     [System.Text.UTF8Encoding]::new($false)
 )
 $retryPromptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-prompt-retry-{0}.txt" -f [Guid]::NewGuid().ToString('N'))
-$retryInstruction = 'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words, then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified Chinese rendering of the same visible facts. Include both paragraphs, remove speculative or sensitive wording, and return no other text.'
+$retryInstruction = 'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words and target 75 to 95 words so the result is safely inside the accepted range. Then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified Chinese rendering of the same visible facts. Include both paragraphs, remove speculative or sensitive wording, and return no other text.'
 [System.IO.File]::WriteAllText(
     $retryPromptFormPath,
     "$Prompt`n`n$retryInstruction",
