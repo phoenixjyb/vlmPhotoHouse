@@ -388,9 +388,9 @@ class TaskExecutor:
         if 'ZH-CN: ...' in caption_prompt:
             policy_issues = bilingual_caption_issues(text)
             try:
-                max_policy_retries = max(0, min(3, int(os.getenv('CAPTION_POLICY_MAX_RETRIES', '3') or '3')))
+                max_policy_retries = max(0, min(2, int(os.getenv('CAPTION_POLICY_MAX_RETRIES', '2') or '2')))
             except (TypeError, ValueError):
-                max_policy_retries = 3
+                max_policy_retries = 2
             policy_retry_count = 0
             while (
                 policy_issues

@@ -7,8 +7,9 @@ from pathlib import Path
 CAPTION_PROMPT_PATH = Path(__file__).resolve().parents[2] / 'config' / 'detailed-caption-prompt.txt'
 DEFAULT_DETAILED_CAPTION_PROMPT = CAPTION_PROMPT_PATH.read_text(encoding='utf-8').strip()
 CAPTION_RETRY_INSTRUCTION = (
-    'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words '
-    'and target 75 to 95 words so the result is safely inside the accepted range. '
+    'CORRECTION REQUIRED: Start the response with "EN:" and write a detailed, natural factual '
+    'English description. Aim for about 70 to 100 words when the visible details support it, but '
+    'prioritize factual completeness and natural wording over an exact word count. '
     'Then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified '
     'Chinese rendering of the same visible facts. Include both paragraphs, remove speculative or '
     'sensitive wording, and return no other text.'
@@ -49,20 +50,13 @@ def parse_bilingual_caption(text: str) -> tuple[str, str] | None:
     return match.group('english').strip(), match.group('chinese').strip()
 
 
-def bilingual_caption_issues(
-    text: str,
-    min_english_words: int = 60,
-    max_english_words: int = 120,
-) -> list[str]:
+def bilingual_caption_issues(text: str) -> list[str]:
     parts = parse_bilingual_caption(text)
     if parts is None:
         return ['format']
 
     english, chinese = parts
     issues: list[str] = []
-    english_words = len(english.split())
-    if not min_english_words <= english_words <= max_english_words:
-        issues.append(f'english_words={english_words}')
     if not re.search(r'[\u4e00-\u9fff]', chinese):
         issues.append('chinese_script')
     if ENGLISH_POLICY_RE.search(english):
@@ -79,22 +73,6 @@ def build_caption_retry_prompt(
 ) -> str:
     issue_list = [str(issue).strip() for issue in (issues or []) if str(issue).strip()]
     context = ''
-    word_issue = next((issue for issue in issue_list if issue.startswith('english_words=')), None)
-    if word_issue:
-        try:
-            word_count = int(word_issue.split('=', 1)[1])
-        except (TypeError, ValueError):
-            word_count = None
-        if word_count is not None and word_count < 60:
-            context = (
-                f' The previous English paragraph had only {word_count} words. Expand it with more '
-                'directly visible details, without adding guesses or facts that are not visible.'
-            )
-        elif word_count is not None and word_count > 120:
-            context = (
-                f' The previous English paragraph had {word_count} words. Tighten it while preserving '
-                'the directly visible facts and the matching Chinese rendering.'
-            )
     if 'english_policy' in issue_list:
         context += (
             ' The previous English paragraph used disallowed speculative, gendered, sensitive, or '

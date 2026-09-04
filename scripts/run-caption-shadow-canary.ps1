@@ -198,7 +198,7 @@ $promptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-promp
     [System.Text.UTF8Encoding]::new($false)
 )
 $retryPromptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-prompt-retry-{0}.txt" -f [Guid]::NewGuid().ToString('N'))
-$retryInstruction = 'CORRECTION REQUIRED: Start the response with "EN:", write 60 to 120 factual English words and target 75 to 95 words so the result is safely inside the accepted range. Then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified Chinese rendering of the same visible facts. Include both paragraphs and return no other text. Use only person, adult, or child for people. Describe visible poses and device details without saying or implying taking photos, capturing, recording, calling, or messaging. In Chinese, use neutral person terms and avoid speculative wording or claims of photographing or recording.'
+$retryInstruction = 'CORRECTION REQUIRED: Start the response with "EN:" and write a detailed, natural factual English description. Aim for about 70 to 100 words when the visible details support it, but prioritize factual completeness and natural wording over an exact word count. Then insert exactly one blank line and write "ZH-CN:" followed by a complete natural Simplified Chinese rendering of the same visible facts. Include both paragraphs and return no other text. Use only person, adult, or child for people. Describe visible poses and device details without saying or implying taking photos, capturing, recording, calling, or messaging. In Chinese, use neutral person terms and avoid speculative wording or claims of photographing or recording.'
 [System.IO.File]::WriteAllText(
     $retryPromptFormPath,
     "$Prompt`n`n$retryInstruction",
@@ -241,7 +241,7 @@ foreach ($sample in $samples) {
             default { 'image/jpeg' }
         }
         $totalHttpSeconds = 0.0
-        foreach ($activePromptFormPath in @($promptFormPath, $retryPromptFormPath, $retryPromptFormPath, $retryPromptFormPath)) {
+        foreach ($activePromptFormPath in @($promptFormPath, $retryPromptFormPath, $retryPromptFormPath)) {
             $record.attempt_count++
             $record.bilingual_format_ok = $false
             $record.chinese_script_ok = $false
@@ -300,8 +300,6 @@ foreach ($sample in $samples) {
             $qualityOk = (
                 [bool]$record.bilingual_format_ok -and
                 [bool]$record.chinese_script_ok -and
-                [int]$record.english_word_count -ge 60 -and
-                [int]$record.english_word_count -le 120 -and
                 @($record.policy_violation_terms).Count -eq 0 -and
                 @($record.chinese_policy_violation_terms).Count -eq 0
             )
@@ -332,8 +330,8 @@ $wordCounts = @($successful | ForEach-Object { [int]$_.word_count })
 $meanWords = if ($wordCounts.Count -gt 0) { ($wordCounts | Measure-Object -Average).Average } else { $null }
 $formatFailures = @($successful | Where-Object { -not [bool]$_.bilingual_format_ok }).Count
 $chineseScriptFailures = @($successful | Where-Object { -not [bool]$_.chinese_script_ok }).Count
-$lengthFailures = @($successful | Where-Object {
-    [int]$_.english_word_count -lt 60 -or [int]$_.english_word_count -gt 120
+$wordTargetMisses = @($successful | Where-Object {
+    [int]$_.english_word_count -lt 70 -or [int]$_.english_word_count -gt 100
 }).Count
 $policyViolationCount = @($successful | Where-Object { @($_.policy_violation_terms).Count -gt 0 }).Count
 $chinesePolicyViolationCount = @($successful | Where-Object {
@@ -373,7 +371,7 @@ $receipt = [ordered]@{
         mean_chinese_character_count = $meanChineseCharacters
         bilingual_format_failure_count = $formatFailures
         chinese_script_failure_count = $chineseScriptFailures
-        english_length_failure_count = $lengthFailures
+        english_word_target_miss_count = $wordTargetMisses
         policy_violation_count = $policyViolationCount
         chinese_policy_violation_count = $chinesePolicyViolationCount
         corrective_retry_count = $retryCount
@@ -395,13 +393,12 @@ if ($successful.Count -ne $results.Count) {
 if (
     $formatFailures -ne 0 -or
     $chineseScriptFailures -ne 0 -or
-    $lengthFailures -ne 0 -or
     $policyViolationCount -ne 0 -or
     $chinesePolicyViolationCount -ne 0
 ) {
     throw (
         "Shadow canary quality gate failed: bilingual_format=$formatFailures " +
-        "chinese_script=$chineseScriptFailures english_length=$lengthFailures " +
+        "chinese_script=$chineseScriptFailures " +
         "policy_violations=$policyViolationCount " +
         "chinese_policy_violations=$chinesePolicyViolationCount."
     )

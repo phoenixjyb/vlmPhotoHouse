@@ -168,7 +168,8 @@ def test_caption_task_integration():
         mock_provider.assert_called_once()
         mock_caption_provider.generate_caption.assert_called_once()
         _, caption_kwargs = mock_caption_provider.generate_caption.call_args
-        assert '60 to 120 English words' in caption_kwargs['prompt']
+        assert 'Aim for about 70 to 100 English words' in caption_kwargs['prompt']
+        assert 'over an exact word count' in caption_kwargs['prompt']
         assert 'ZH-CN: ...' in caption_kwargs['prompt']
         assert 'do not guess the brand, model' in caption_kwargs['prompt']
         assert 'Avoid unsupported inference' in caption_kwargs['prompt']
@@ -251,7 +252,7 @@ def test_caption_task_uses_second_correction_for_remaining_policy_issue():
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
 
 
-def test_caption_task_uses_third_correction_for_remaining_length_issue():
+def test_caption_task_accepts_short_bilingual_caption_without_length_retry():
     from app.tasks import TaskExecutor
     from app.db import Task, Caption, Asset
     from sqlalchemy.orm import Session
@@ -266,10 +267,10 @@ def test_caption_task_uses_third_correction_for_remaining_length_issue():
     session.get.return_value = asset
     session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     provider = Mock()
-    provider.generate_caption.side_effect = [
-        f'EN: {" ".join(["visible"] * count)}\n\nZH-CN: 一位成人站在可见的建筑旁。'
-        for count in (52, 55, 58, 60)
-    ]
+    provider.generate_caption.return_value = (
+        'EN: A child holds a blue toy beside a wooden table.\n\n'
+        'ZH-CN: 一名儿童在木桌旁拿着一个蓝色玩具。'
+    )
     provider.get_model_name.return_value = 'test-model'
 
     with patch('PIL.Image.open') as image_open, \
@@ -278,9 +279,7 @@ def test_caption_task_uses_third_correction_for_remaining_length_issue():
         result = TaskExecutor()._handle_caption(session, task)
 
     assert result is not None
-    assert provider.generate_caption.call_count == 4
-    final_retry_prompt = provider.generate_caption.call_args_list[3].kwargs['prompt']
-    assert 'Previous validation issues: english_words=58.' in final_retry_prompt
+    assert provider.generate_caption.call_count == 1
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
 
 
