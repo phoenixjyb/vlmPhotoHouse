@@ -251,6 +251,39 @@ def test_caption_task_uses_second_correction_for_remaining_policy_issue():
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
 
 
+def test_caption_task_uses_third_correction_for_remaining_length_issue():
+    from app.tasks import TaskExecutor
+    from app.db import Task, Caption, Asset
+    from sqlalchemy.orm import Session
+    from unittest.mock import Mock
+
+    session = Mock(spec=Session)
+    task = Mock(spec=Task)
+    asset = Mock(spec=Asset)
+    task.payload_json = {'asset_id': 1}
+    asset.path = '/fake/path/test_image.jpg'
+    asset.mime = 'image/jpeg'
+    session.get.return_value = asset
+    session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+    provider = Mock()
+    provider.generate_caption.side_effect = [
+        f'EN: {" ".join(["visible"] * count)}\n\nZH-CN: 一位成人站在可见的建筑旁。'
+        for count in (52, 55, 58, 60)
+    ]
+    provider.get_model_name.return_value = 'test-model'
+
+    with patch('PIL.Image.open') as image_open, \
+         patch('app.caption_service.get_caption_provider', return_value=provider):
+        image_open.return_value.convert.return_value = Image.new('RGB', (32, 32))
+        result = TaskExecutor()._handle_caption(session, task)
+
+    assert result is not None
+    assert provider.generate_caption.call_count == 4
+    final_retry_prompt = provider.generate_caption.call_args_list[3].kwargs['prompt']
+    assert 'Previous validation issues: english_words=58.' in final_retry_prompt
+    assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
+
+
 def test_caption_fallback_on_error():
     """Test that caption generation falls back to heuristic on error."""
     from app.tasks import TaskExecutor
