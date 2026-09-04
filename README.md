@@ -9,6 +9,7 @@ Local-first photo/video intelligence system with:
 - caption-derived canonical tagging (`<=8` content tags) with per-asset auto-tag block support
 - optional RAM++ image tagging path with tag provenance (`cap|img|cap+img|manual|rule`)
 - generated story albums from person/tag/location/caption themes
+- persistent album drafts with bilingual titles, themes, ordered assets, and a selected cover
 - non-destructive similarity reduction (keep best candidate, hide redundant assets)
 - bilingual web UI
 - SQLite-backed search and task orchestration

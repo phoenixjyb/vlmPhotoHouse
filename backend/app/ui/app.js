@@ -68,6 +68,11 @@ const state = {
     selectedStoryId: "",
     total: 0,
   },
+  albumDrafts: {
+    albums: [],
+    selectedAlbumId: null,
+    editorMode: "story",
+  },
   similarity: {
     minGroupSize: 2,
     maxDistance: 5,
@@ -341,6 +346,40 @@ const I18N = {
     story_open_context: "Open Context",
     story_context_opened: "Opened story context",
     story_context_unavailable: "Story context is unavailable",
+    album_drafts_eyebrow: "YOUR COLLECTIONS",
+    album_drafts_title: "Saved album drafts",
+    album_drafts_empty: "No album drafts yet. Start from a suggested story.",
+    album_composer_eyebrow: "ALBUM COMPOSER",
+    album_composer_title: "Create a keepsake",
+    album_use_story: "Use selected story",
+    album_title_en: "English title",
+    album_title_en_ph: "Our summer together",
+    album_title_zh: "Chinese title",
+    album_title_zh_ph: "一起过夏天",
+    album_theme: "Theme",
+    album_theme_custom: "Custom",
+    album_theme_birthday: "Birthday",
+    album_theme_trip: "Trip",
+    album_theme_growing_up: "Growing up",
+    album_theme_grandparents: "Grandparents",
+    album_theme_year_in_review: "Year in review",
+    album_theme_seasonal: "Seasonal",
+    album_sort: "Photo order",
+    album_sort_chronological: "Oldest to newest",
+    album_sort_newest: "Newest first",
+    album_sort_story: "Story order",
+    album_cover: "Cover photo",
+    album_save_draft: "Save album draft",
+    album_update_draft: "Update album draft",
+    album_composer_hint: "Choose a suggested story to start.",
+    album_composer_ready: "{count} photos ready for this draft.",
+    album_draft_assets: "{count} photos",
+    album_title_required: "Enter an English album title.",
+    album_story_required: "Choose a story with photos first.",
+    album_saved: "Album draft saved",
+    album_updated: "Album draft updated",
+    album_save_failed: "Album could not be saved: {error}",
+    album_load_failed: "Album drafts could not be loaded: {error}",
     similarity_title: "Similarity Reduction",
     similarity_min_group_size: "Min group",
     similarity_max_distance: "Max distance",
@@ -649,6 +688,40 @@ const I18N = {
     story_open_context: "打开上下文",
     story_context_opened: "已打开故事上下文",
     story_context_unavailable: "故事上下文不可用",
+    album_drafts_eyebrow: "我的收藏",
+    album_drafts_title: "已保存的相册草稿",
+    album_drafts_empty: "还没有相册草稿，可从推荐故事开始创建。",
+    album_composer_eyebrow: "相册编辑器",
+    album_composer_title: "制作一份家庭纪念",
+    album_use_story: "使用当前故事",
+    album_title_en: "英文标题",
+    album_title_en_ph: "Our summer together",
+    album_title_zh: "中文标题",
+    album_title_zh_ph: "一起过夏天",
+    album_theme: "主题",
+    album_theme_custom: "自定义",
+    album_theme_birthday: "生日",
+    album_theme_trip: "旅行",
+    album_theme_growing_up: "成长",
+    album_theme_grandparents: "祖孙时光",
+    album_theme_year_in_review: "年度回顾",
+    album_theme_seasonal: "四季回忆",
+    album_sort: "照片顺序",
+    album_sort_chronological: "从早到晚",
+    album_sort_newest: "最新优先",
+    album_sort_story: "故事顺序",
+    album_cover: "封面照片",
+    album_save_draft: "保存相册草稿",
+    album_update_draft: "更新相册草稿",
+    album_composer_hint: "请先选择一个推荐故事。",
+    album_composer_ready: "已有 {count} 张照片可加入草稿。",
+    album_draft_assets: "{count} 张照片",
+    album_title_required: "请输入英文相册标题。",
+    album_story_required: "请先选择一个包含照片的故事。",
+    album_saved: "相册草稿已保存",
+    album_updated: "相册草稿已更新",
+    album_save_failed: "相册保存失败：{error}",
+    album_load_failed: "相册草稿加载失败：{error}",
     similarity_title: "相似图收敛",
     similarity_min_group_size: "最小组大小",
     similarity_max_distance: "最大距离",
@@ -733,6 +806,18 @@ function storyTypeLabel(value) {
   if (value === "location") return t("story_type_location");
   if (value === "caption") return t("story_type_caption");
   return t("story_type_all");
+}
+
+function albumThemeLabel(value) {
+  const key = `album_theme_${String(value || "custom")}`;
+  return t(key);
+}
+
+function albumDisplayTitle(album) {
+  if (state.lang === "zh" && String(album?.title_zh || "").trim()) {
+    return String(album.title_zh).trim();
+  }
+  return String(album?.title || "").trim();
 }
 
 function similarityKindLabel(value) {
@@ -2168,11 +2253,159 @@ function getStoryById(storyId) {
   return stories.find((row) => String(row?.id || "") === String(storyId || "")) || null;
 }
 
+function getAlbumDraftById(albumId) {
+  const albums = Array.isArray(state.albumDrafts?.albums) ? state.albumDrafts.albums : [];
+  return albums.find((row) => Number(row?.id || 0) === Number(albumId || 0)) || null;
+}
+
+function setAlbumCoverOptions(items, selectedAssetId = null) {
+  const select = qs("album-cover-asset");
+  if (!select) return;
+  const rows = Array.isArray(items) ? items : [];
+  select.innerHTML = rows
+    .map((item) => `<option value="${Number(item.id) || 0}">#${Number(item.id) || 0} · ${esc(basename(item.path || ""))}</option>`)
+    .join("");
+  const preferred = Number(selectedAssetId || rows[0]?.id || 0);
+  if (preferred) select.value = String(preferred);
+  select.disabled = rows.length === 0;
+}
+
+function configureAlbumComposerFromStory(story) {
+  state.albumDrafts = { ...state.albumDrafts, selectedAlbumId: null, editorMode: "story" };
+  const items = Array.isArray(story?.items) ? story.items : [];
+  qs("album-title").value = String(story?.title || "").trim();
+  qs("album-title-zh").value = "";
+  qs("album-theme").value = "custom";
+  qs("album-sort-mode").value = "chronological";
+  qs("album-sort-mode").disabled = false;
+  qs("btn-save-album-draft").textContent = t("album_save_draft");
+  qs("album-composer-meta").textContent = items.length
+    ? t("album_composer_ready", { count: items.length })
+    : t("album_composer_hint");
+  setAlbumCoverOptions(items, items[0]?.id);
+  renderAlbumDrafts();
+}
+
+function openAlbumDraft(album) {
+  if (!album) return;
+  const items = Array.isArray(album.items) ? album.items : [];
+  state.albumDrafts = { ...state.albumDrafts, selectedAlbumId: Number(album.id), editorMode: "album" };
+  qs("album-title").value = String(album.title || "");
+  qs("album-title-zh").value = String(album.title_zh || "");
+  qs("album-theme").value = String(album.theme || "custom");
+  qs("album-sort-mode").value = "as_provided";
+  qs("album-sort-mode").disabled = true;
+  qs("btn-save-album-draft").textContent = t("album_update_draft");
+  qs("album-composer-meta").textContent = t("album_composer_ready", { count: items.length });
+  setAlbumCoverOptions(items, album.cover_asset_id);
+  qs("story-assets-meta").textContent = t("story_assets_meta", {
+    title: albumDisplayTitle(album),
+    shown: items.length,
+    total: Number(album.asset_count) || items.length,
+  });
+  renderAssetGrid(items, "story-assets-grid");
+  renderAlbumDrafts();
+}
+
+function renderAlbumDrafts() {
+  const root = qs("album-draft-list");
+  if (!root) return;
+  const albums = Array.isArray(state.albumDrafts?.albums) ? state.albumDrafts.albums : [];
+  if (!albums.length) {
+    root.innerHTML = `<p class="muted small">${esc(t("album_drafts_empty"))}</p>`;
+    return;
+  }
+  root.innerHTML = albums
+    .map((album) => {
+      const albumId = Number(album.id) || 0;
+      const coverId = Number(album.cover_asset_id) || 0;
+      const active = albumId === Number(state.albumDrafts.selectedAlbumId || 0) ? "active" : "";
+      const cover = coverId
+        ? `<img class="album-draft-cover" loading="lazy" src="/assets/${coverId}/thumbnail?size=256" alt="" />`
+        : `<span class="album-draft-cover-placeholder" aria-hidden="true">${esc(albumDisplayTitle(album).slice(0, 1) || "A")}</span>`;
+      return `
+        <button class="album-draft-row ${active}" type="button" data-action="album-open-draft" data-album-id="${albumId}">
+          ${cover}
+          <span class="album-draft-copy">
+            <p><strong>${esc(albumDisplayTitle(album))}</strong></p>
+            <p class="small muted">${esc(albumThemeLabel(album.theme))}</p>
+          </span>
+          <span class="album-draft-count">${esc(t("album_draft_assets", { count: Number(album.asset_count) || 0 }))}</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+async function loadAlbumDrafts() {
+  try {
+    const data = await api("/albums/drafts?page=1&page_size=50");
+    state.albumDrafts = {
+      ...state.albumDrafts,
+      albums: Array.isArray(data?.albums) ? data.albums : [],
+    };
+    renderAlbumDrafts();
+  } catch (e) {
+    showToast(t("album_load_failed", { error: e.message }));
+  }
+}
+
+async function saveAlbumDraft() {
+  const title = String(qs("album-title")?.value || "").trim();
+  if (!title) {
+    showToast(t("album_title_required"));
+    return;
+  }
+  const editingAlbum = getAlbumDraftById(state.albumDrafts.selectedAlbumId);
+  const story = getStoryById(state.stories.selectedStoryId);
+  const items = Array.isArray(editingAlbum?.items)
+    ? editingAlbum.items
+    : (Array.isArray(story?.items) ? story.items : []);
+  const assetIds = items.map((item) => Number(item.id)).filter(Boolean);
+  if (!assetIds.length) {
+    showToast(t("album_story_required"));
+    return;
+  }
+  const payload = {
+    title,
+    title_zh: String(qs("album-title-zh")?.value || "").trim() || null,
+    theme: String(qs("album-theme")?.value || "custom"),
+    asset_ids: assetIds,
+    cover_asset_id: Number(qs("album-cover-asset")?.value || assetIds[0]),
+  };
+  let saved;
+  try {
+    if (editingAlbum) {
+      saved = await api(`/albums/drafts/${Number(editingAlbum.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      saved = await api("/albums/drafts", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          sort_mode: String(qs("album-sort-mode")?.value || "chronological"),
+          source_kind: "story",
+          source_ref: String(story?.id || ""),
+        }),
+      });
+    }
+    await loadAlbumDrafts();
+    const album = getAlbumDraftById(saved?.album?.id) || saved?.album;
+    if (album) openAlbumDraft(album);
+    showToast(t(editingAlbum ? "album_updated" : "album_saved"));
+  } catch (e) {
+    showToast(t("album_save_failed", { error: e.message }));
+  }
+}
+
 function renderStoryAssets(story) {
   if (!story) {
     state.stories = { ...state.stories, selectedStoryId: "" };
     qs("story-assets-meta").textContent = t("story_assets_meta_default");
     renderAssetGrid([], "story-assets-grid");
+    configureAlbumComposerFromStory(null);
     return;
   }
   const items = Array.isArray(story.items) ? story.items : [];
@@ -2183,6 +2416,7 @@ function renderStoryAssets(story) {
     total: Number(story.count) || items.length,
   });
   renderAssetGrid(items, "story-assets-grid");
+  configureAlbumComposerFromStory(story);
 }
 
 async function openStoryContext(story) {
@@ -2269,6 +2503,7 @@ async function loadStoryAlbums() {
             <td>
               <button class="btn ghost" data-action="stories-view-assets" data-story-id="${esc(sid)}">${esc(t("story_view_assets"))}</button>
               <button class="btn ghost" data-action="stories-open-context" data-story-id="${esc(sid)}">${esc(t("story_open_context"))}</button>
+              <button class="btn ghost" data-action="stories-compose-album" data-story-id="${esc(sid)}">${esc(t("album_composer_title"))}</button>
             </td>
           </tr>
         `;
@@ -2277,6 +2512,7 @@ async function loadStoryAlbums() {
 
     const activeStory = getStoryById(state.stories.selectedStoryId) || stories[0] || null;
     renderStoryAssets(activeStory);
+    await loadAlbumDrafts();
   } catch (e) {
     showToast(t("story_load_failed", { error: e.message }));
   }
@@ -3482,6 +3718,21 @@ function initEvents() {
     if (e.key === "Enter") runTagAssetsJump();
   });
   qs("btn-refresh-stories").addEventListener("click", loadStoryAlbums);
+  qs("btn-refresh-album-drafts").addEventListener("click", loadAlbumDrafts);
+  qs("btn-save-album-draft").addEventListener("click", saveAlbumDraft);
+  qs("btn-album-use-story").addEventListener("click", () => {
+    const story = getStoryById(state.stories.selectedStoryId);
+    if (!story) {
+      showToast(t("album_story_required"));
+      return;
+    }
+    renderStoryAssets(story);
+  });
+  qs("album-draft-list").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-action='album-open-draft']");
+    if (!button) return;
+    openAlbumDraft(getAlbumDraftById(Number(button.dataset.albumId || 0)));
+  });
   qs("stories-filter-type").addEventListener("change", loadStoryAlbums);
   qs("stories-filter-media").addEventListener("change", loadStoryAlbums);
   qs("stories-min-assets").addEventListener("keydown", (e) => {
@@ -3559,6 +3810,11 @@ function initEvents() {
     }
     if (btn.dataset.action === "stories-open-context") {
       await openStoryContext(story);
+      return;
+    }
+    if (btn.dataset.action === "stories-compose-album") {
+      renderStoryAssets(story);
+      qs("album-title")?.focus();
     }
   });
 

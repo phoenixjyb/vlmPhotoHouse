@@ -431,6 +431,102 @@ button.home-story-row:hover {
   background: #f3faf7;
 }
 
+.album-drafts-panel {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.album-draft-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.album-draft-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.album-draft-row:hover,
+.album-draft-row.active {
+  border-color: rgba(15, 138, 102, 0.55);
+  background: #f5fbf8;
+}
+
+.album-draft-cover,
+.album-draft-cover-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: linear-gradient(135deg, #dff3ea, #fff0de);
+}
+
+.album-draft-cover-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--primary-strong);
+  font-weight: 800;
+}
+
+.album-draft-copy {
+  min-width: 0;
+}
+
+.album-draft-copy p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-draft-count {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.album-composer {
+  margin: 0.8rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid #cadfd5;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f8fcfa, #fffaf4);
+}
+
+.album-composer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.album-composer-grid label,
+.album-composer-grid input,
+.album-composer-grid select {
+  width: 100%;
+}
+
+.album-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+
+.album-cover-field.hidden {
+  display: none;
+}
+
 .home-person-row img,
 .home-story-row img {
   width: 58px;
@@ -1000,6 +1096,13 @@ textarea:focus {
   }
   .home-search-btn {
     width: 100%;
+  }
+  .album-composer-grid {
+    grid-template-columns: 1fr;
+  }
+  .album-composer-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
   .home-asset-grid {
     display: flex;

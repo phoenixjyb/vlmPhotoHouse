@@ -270,3 +270,59 @@ class TimeAlbumYear(BaseModel):
 
 class TimeAlbumsResponse(APIBase):
     years: List[TimeAlbumYear]
+
+
+class AlbumAssetOut(BaseModel):
+    id: int
+    path: str
+    mime: Optional[str] = None
+    taken_at: Optional[str] = None
+    position: int
+
+
+class AlbumDraftOut(BaseModel):
+    id: int
+    title: str
+    title_zh: Optional[str] = None
+    description: Optional[str] = None
+    theme: str
+    status: str
+    cover_asset_id: Optional[int] = None
+    source_kind: Optional[str] = None
+    source_ref: Optional[str] = None
+    asset_count: int
+    items: List[AlbumAssetOut]
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AlbumDraftListResponse(APIBase):
+    page: int
+    page_size: int
+    total: int
+    albums: List[AlbumDraftOut]
+
+
+class AlbumDraftResponse(APIBase):
+    album: AlbumDraftOut
+
+
+class AlbumDraftCreate(BaseModel):
+    title: str
+    title_zh: Optional[str] = None
+    description: Optional[str] = None
+    theme: str = 'custom'
+    asset_ids: List[int]
+    cover_asset_id: Optional[int] = None
+    sort_mode: str = 'chronological'
+    source_kind: Optional[str] = None
+    source_ref: Optional[str] = None
+
+
+class AlbumDraftUpdate(BaseModel):
+    title: Optional[str] = None
+    title_zh: Optional[str] = None
+    description: Optional[str] = None
+    theme: Optional[str] = None
+    asset_ids: Optional[List[int]] = None
+    cover_asset_id: Optional[int] = None

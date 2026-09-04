@@ -1717,10 +1717,12 @@ from .routers import people as people_router
 from .routers import voice as voice_router
 from .routers import voice_photo as voice_photo_router
 from .routers import ui as ui_router
+from .routers import albums as albums_router
 app.include_router(people_router.router, prefix='')
 app.include_router(voice_router.router, prefix='')
 app.include_router(voice_photo_router.router, prefix='')
 app.include_router(ui_router.router, prefix='')
+app.include_router(albums_router.router, prefix='')
 
 # --- Albums: Story generation (people/tags/location/caption)
 @app.get('/albums/stories')

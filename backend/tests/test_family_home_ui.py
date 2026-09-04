@@ -37,3 +37,20 @@ def test_family_home_copy_is_bilingual_and_responsive():
     assert 'search_mode_family: "家庭智能搜索"' in javascript
     assert ".home-search-row" in css
     assert "@media (max-width: 680px)" in css
+
+
+def test_album_composer_is_bilingual_and_uses_persistent_draft_api():
+    html = (UI_ROOT / "index.html").read_text(encoding="utf-8")
+    javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="album-draft-list"' in html
+    assert 'id="album-title"' in html
+    assert 'id="album-title-zh"' in html
+    assert 'id="album-theme"' in html
+    assert 'id="album-cover-asset"' in html
+    assert 'id="btn-save-album-draft"' in html
+    assert 'api("/albums/drafts?page=1&page_size=50")' in javascript
+    assert 'method: "POST"' in javascript
+    assert 'method: "PATCH"' in javascript
+    assert 'album_drafts_title: "Saved album drafts"' in javascript
+    assert 'album_drafts_title: "已保存的相册草稿"' in javascript

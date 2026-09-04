@@ -168,6 +168,11 @@ def ensure_db():
                 Base.metadata.tables['asset_tag_blocks'].create(bind=engine)  # type: ignore
             except Exception:
                 pass
+        # Persistent album drafts are additive and safe for legacy SQLite databases.
+        if not insp.has_table('albums'):
+            Base.metadata.tables['albums'].create(bind=engine)  # type: ignore
+        if not insp.has_table('album_assets'):
+            Base.metadata.tables['album_assets'].create(bind=engine)  # type: ignore
         _DB_READY = True
     except Exception as e:
         print(f"Database initialization error: {e}")

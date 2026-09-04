@@ -42,7 +42,7 @@ This guide is intentionally short for now and points to the current production U
 - `Library`: browse assets, open inspector, read/edit captions, add/remove tags, and delete photo/asset from inspector controls (with confirmation).
 - `People`: review faces, assign identities, and use `Stranger` for unknown faces.
 - `Tags`: browse global tag catalog and open related assets.
-- `Stories`: browse generated story albums by person/tag/location/caption themes.
+- `Stories`: browse generated story albums by person/tag/location/caption themes. Select a story, add English and Chinese titles, choose a theme, photo order, and cover, then save it as a persistent album draft. Open a saved draft to update its titles, theme, or cover.
 - `Similarity`: preview near-duplicates and hide/recover redundant items without deletion.
 - `Map`: view geo-tagged assets.
 - `Tasks`: monitor queue and system usage (CPU/RAM/GPU).

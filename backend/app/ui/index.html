@@ -408,10 +408,67 @@
                 <tbody id="stories-rows"></tbody>
               </table>
             </div>
+            <section class="album-drafts-panel" aria-labelledby="album-drafts-title">
+              <div class="home-section-heading compact">
+                <div>
+                  <p class="home-eyebrow" data-i18n="album_drafts_eyebrow">YOUR COLLECTIONS</p>
+                  <h3 id="album-drafts-title" data-i18n="album_drafts_title">Saved album drafts</h3>
+                </div>
+                <button id="btn-refresh-album-drafts" class="btn ghost" type="button" data-i18n="refresh">Refresh</button>
+              </div>
+              <div id="album-draft-list" class="album-draft-list"></div>
+            </section>
           </div>
           <div class="panel right-panel">
             <h2 data-i18n="story_assets_panel">Story Assets</h2>
             <p id="story-assets-meta" class="muted" data-i18n="story_assets_meta_default">Select a story to view related assets.</p>
+            <section class="album-composer" aria-labelledby="album-composer-title">
+              <div class="home-section-heading compact">
+                <div>
+                  <p class="home-eyebrow" data-i18n="album_composer_eyebrow">ALBUM COMPOSER</p>
+                  <h3 id="album-composer-title" data-i18n="album_composer_title">Create a keepsake</h3>
+                </div>
+                <button id="btn-album-use-story" class="btn ghost" type="button" data-i18n="album_use_story">Use selected story</button>
+              </div>
+              <div class="album-composer-grid">
+                <label>
+                  <span data-i18n="album_title_en">English title</span>
+                  <input id="album-title" type="text" maxlength="160" data-i18n-placeholder="album_title_en_ph" placeholder="Our summer together" />
+                </label>
+                <label>
+                  <span data-i18n="album_title_zh">Chinese title</span>
+                  <input id="album-title-zh" type="text" maxlength="160" data-i18n-placeholder="album_title_zh_ph" placeholder="一起过夏天" />
+                </label>
+                <label>
+                  <span data-i18n="album_theme">Theme</span>
+                  <select id="album-theme">
+                    <option value="custom" data-i18n="album_theme_custom">Custom</option>
+                    <option value="birthday" data-i18n="album_theme_birthday">Birthday</option>
+                    <option value="trip" data-i18n="album_theme_trip">Trip</option>
+                    <option value="growing_up" data-i18n="album_theme_growing_up">Growing up</option>
+                    <option value="grandparents" data-i18n="album_theme_grandparents">Grandparents</option>
+                    <option value="year_in_review" data-i18n="album_theme_year_in_review">Year in review</option>
+                    <option value="seasonal" data-i18n="album_theme_seasonal">Seasonal</option>
+                  </select>
+                </label>
+                <label>
+                  <span data-i18n="album_sort">Photo order</span>
+                  <select id="album-sort-mode">
+                    <option value="chronological" data-i18n="album_sort_chronological">Oldest to newest</option>
+                    <option value="newest" data-i18n="album_sort_newest">Newest first</option>
+                    <option value="as_provided" data-i18n="album_sort_story">Story order</option>
+                  </select>
+                </label>
+                <label class="album-cover-field">
+                  <span data-i18n="album_cover">Cover photo</span>
+                  <select id="album-cover-asset"></select>
+                </label>
+              </div>
+              <div class="album-composer-actions">
+                <button id="btn-save-album-draft" class="btn" type="button" data-i18n="album_save_draft">Save album draft</button>
+                <span id="album-composer-meta" class="muted small" data-i18n="album_composer_hint">Choose a suggested story to start.</span>
+              </div>
+            </section>
             <div id="story-assets-grid" class="asset-grid scroll-grid"></div>
           </div>
         </div>
