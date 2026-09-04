@@ -172,6 +172,12 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $receiptPath = Join-Path $OutputRoot "qwen3-vl-shadow-receipt-$stamp.json"
 $results = [System.Collections.Generic.List[object]]::new()
 $gpuBefore = Get-Rtx3090State
+$promptFormPath = Join-Path ([System.IO.Path]::GetTempPath()) ("photohouse-prompt-{0}.txt" -f [Guid]::NewGuid().ToString('N'))
+[System.IO.File]::WriteAllText(
+    $promptFormPath,
+    $Prompt,
+    [System.Text.UTF8Encoding]::new($false)
+)
 
 foreach ($sample in $samples) {
     $relative = $sample.FullName.Substring($InputRoot.TrimEnd('\').Length).TrimStart('\')
@@ -212,7 +218,7 @@ foreach ($sample in $samples) {
             --output $tempResponse `
             --write-out '%{http_code}|%{time_total}' `
             --form "file=@$($sample.FullName);type=$mime" `
-            --form-string "prompt=$Prompt" `
+            --form "prompt=<$promptFormPath" `
             "$CaptionServiceUrl/caption" 2>&1
         $curlExit = $LASTEXITCODE
         $parts = (($writeOut -join '') -split '\|', 2)
@@ -260,6 +266,7 @@ foreach ($sample in $samples) {
     $elapsedForDisplay = if ($null -ne $record.http_total_seconds) { [double]$record.http_total_seconds } else { 0.0 }
     Write-Host ("[{0}/{1}] {2} {3:N2}s {4} words  {5}" -f $results.Count, $samples.Count, $record.status, $elapsedForDisplay, $record.word_count, $relative)
 }
+Remove-Item -LiteralPath $promptFormPath -Force -ErrorAction SilentlyContinue
 
 $successful = @($results | Where-Object { $_.status -eq 'ok' })
 $latencies = @($successful | ForEach-Object { [double]$_.http_total_seconds } | Sort-Object)

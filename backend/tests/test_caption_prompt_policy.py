@@ -46,7 +46,8 @@ def test_windows_caption_scripts_load_the_canonical_prompt():
     assert 'policy_violation_count' in canary
     assert 'chinese_policy_violation_count' in canary
     assert '--globoff' in canary
-    assert '--form-string "prompt=$Prompt"' in canary
+    assert '[System.Text.UTF8Encoding]::new($false)' in canary
+    assert '--form "prompt=<$promptFormPath"' in canary
 
 
 def test_bilingual_word_cap_does_not_break_cross_language_alignment():
