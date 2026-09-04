@@ -19,6 +19,7 @@ from .caption_policy import (
     DEFAULT_DETAILED_CAPTION_PROMPT,
     bilingual_caption_issues,
     build_caption_retry_prompt,
+    neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
 )
@@ -356,6 +357,7 @@ class TaskExecutor:
             prov = get_caption_provider()
             caption_image = self._load_caption_image(asset)
             text = prov.generate_caption(caption_image, prompt=caption_prompt or None)
+            text = neutralize_person_terms(text)
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
@@ -388,6 +390,7 @@ class TaskExecutor:
             if policy_issues and prov is not None and caption_image is not None:
                 retry_prompt = build_caption_retry_prompt(caption_prompt)
                 text = prov.generate_caption(caption_image, prompt=retry_prompt)
+                text = neutralize_person_terms(text)
                 try:
                     if word_limit > 0:
                         text = self._truncate_caption_text(text, word_limit)

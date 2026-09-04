@@ -27,6 +27,18 @@ CHINESE_POLICY_RE = re.compile(
     r'似乎|好像|可能|看起来|大概|或许|推测|拍摄|拍照|录像|录制'
     r'|男人|女人|男子|女子|男孩|女孩|男性|女性|裸体|赤裸|尿布|内衣|没穿衣服'
 )
+ENGLISH_PERSON_TERM_RE = re.compile(r'\b(women|woman|men|man|girls|girl|boys|boy)\b', re.IGNORECASE)
+CHINESE_PERSON_TERM_RE = re.compile(r'男人|女人|男子|女子|男性|女性|男孩|女孩')
+ENGLISH_PERSON_REPLACEMENTS = {
+    'women': 'people',
+    'woman': 'person',
+    'men': 'people',
+    'man': 'person',
+    'girls': 'children',
+    'girl': 'child',
+    'boys': 'children',
+    'boy': 'child',
+}
 
 
 def parse_bilingual_caption(text: str) -> tuple[str, str] | None:
@@ -61,6 +73,19 @@ def bilingual_caption_issues(
 
 def build_caption_retry_prompt(prompt: str) -> str:
     return f'{str(prompt or "").strip()}\n\n{CAPTION_RETRY_INSTRUCTION}'.strip()
+
+
+def neutralize_person_terms(text: str) -> str:
+    def replace_english(match: re.Match[str]) -> str:
+        source = match.group(0)
+        replacement = ENGLISH_PERSON_REPLACEMENTS[source.lower()]
+        return replacement.capitalize() if source[0].isupper() else replacement
+
+    neutral = ENGLISH_PERSON_TERM_RE.sub(replace_english, str(text or ''))
+    return CHINESE_PERSON_TERM_RE.sub(
+        lambda match: '儿童' if match.group(0) in {'男孩', '女孩'} else '成人',
+        neutral,
+    )
 
 
 def truncate_caption_text(text: str, word_limit: int) -> str:

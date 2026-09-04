@@ -5,6 +5,7 @@ from app.caption_policy import (
     DEFAULT_DETAILED_CAPTION_PROMPT,
     bilingual_caption_issues,
     build_caption_retry_prompt,
+    neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
 )
@@ -50,6 +51,7 @@ def test_windows_caption_scripts_load_the_canonical_prompt():
     assert '[System.Text.UTF8Encoding]::new($false)' in canary
     assert '--form "prompt=<$activePromptFormPath"' in canary
     assert 'corrective_retry_count' in canary
+    assert 'neutralization_count' in canary
 
 
 def test_bilingual_word_cap_does_not_break_cross_language_alignment():
@@ -92,6 +94,14 @@ def test_retry_prompt_reasserts_complete_bilingual_contract():
     assert 'CORRECTION REQUIRED' in retry_prompt
     assert 'Include both paragraphs' in retry_prompt
     assert '60 to 120 factual English words' in retry_prompt
+
+
+def test_person_terms_are_neutralized_in_both_languages():
+    caption = 'EN: A man stands near two girls.\n\nZH-CN: 一名男子站在两个女孩旁边。'
+
+    result = neutralize_person_terms(caption)
+
+    assert result == 'EN: A person stands near two children.\n\nZH-CN: 一名成人站在两个儿童旁边。'
 
 
 def test_legacy_monolingual_word_cap_is_unchanged():

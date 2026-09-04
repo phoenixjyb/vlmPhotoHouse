@@ -42,6 +42,21 @@ function Get-BilingualCaptionParts {
     }
 }
 
+function ConvertTo-NeutralPersonTerms {
+    param([string]$Caption)
+
+    $neutral = [regex]::Replace([string]$Caption, '\bwomen\b', 'people', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bwoman\b', 'person', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bmen\b', 'people', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bman\b', 'person', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bgirls\b', 'children', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bgirl\b', 'child', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bboys\b', 'children', 'IgnoreCase')
+    $neutral = [regex]::Replace($neutral, '\bboy\b', 'child', 'IgnoreCase')
+    $neutral = $neutral -replace '男孩|女孩', '儿童'
+    return ($neutral -replace '男人|女人|男子|女子|男性|女性', '成人')
+}
+
 function Invoke-LocalJsonGet {
     param([string]$Url)
 
@@ -196,6 +211,7 @@ foreach ($sample in $samples) {
         sha256 = $null
         status = 'error'
         attempt_count = 0
+        neutralization_applied = $false
         http_code = $null
         http_total_seconds = $null
         generation_time_seconds = $null
@@ -254,7 +270,9 @@ foreach ($sample in $samples) {
             $record.generation_time_seconds = [double]$response.generation_time_seconds
             $record.provider = [string]$response.provider
             $record.model = [string]$response.model
-            $record.caption = [string]$response.caption
+            $rawCaption = [string]$response.caption
+            $record.caption = ConvertTo-NeutralPersonTerms -Caption $rawCaption
+            $record.neutralization_applied = ($record.caption -cne $rawCaption)
             $captionParts = Get-BilingualCaptionParts -Caption $record.caption
             if ($captionParts) {
                 $record.bilingual_format_ok = $true
@@ -319,6 +337,7 @@ $chinesePolicyViolationCount = @($successful | Where-Object {
 }).Count
 $chineseCounts = @($successful | ForEach-Object { [int]$_.chinese_character_count })
 $retryCount = @($results | Where-Object { [int]$_.attempt_count -gt 1 }).Count
+$neutralizationCount = @($results | Where-Object { [bool]$_.neutralization_applied }).Count
 $meanChineseCharacters = if ($chineseCounts.Count -gt 0) {
     ($chineseCounts | Measure-Object -Average).Average
 } else { $null }
@@ -354,6 +373,7 @@ $receipt = [ordered]@{
         policy_violation_count = $policyViolationCount
         chinese_policy_violation_count = $chinesePolicyViolationCount
         corrective_retry_count = $retryCount
+        neutralization_count = $neutralizationCount
     }
     results = $results
 }
