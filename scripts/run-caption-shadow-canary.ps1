@@ -241,7 +241,7 @@ foreach ($sample in $samples) {
             default { 'image/jpeg' }
         }
         $totalHttpSeconds = 0.0
-        foreach ($activePromptFormPath in @($promptFormPath, $retryPromptFormPath)) {
+        foreach ($activePromptFormPath in @($promptFormPath, $retryPromptFormPath, $retryPromptFormPath)) {
             $record.attempt_count++
             $record.bilingual_format_ok = $false
             $record.chinese_script_ok = $false

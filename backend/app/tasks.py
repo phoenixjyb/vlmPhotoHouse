@@ -387,9 +387,20 @@ class TaskExecutor:
         bilingual_output = parse_bilingual_caption(text)
         if 'ZH-CN: ...' in caption_prompt:
             policy_issues = bilingual_caption_issues(text)
-            if policy_issues and prov is not None and caption_image is not None:
+            try:
+                max_policy_retries = max(0, min(3, int(os.getenv('CAPTION_POLICY_MAX_RETRIES', '2') or '2')))
+            except (TypeError, ValueError):
+                max_policy_retries = 2
+            policy_retry_count = 0
+            while (
+                policy_issues
+                and prov is not None
+                and caption_image is not None
+                and policy_retry_count < max_policy_retries
+            ):
                 retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues)
                 text = prov.generate_caption(caption_image, prompt=retry_prompt)
+                policy_retry_count += 1
                 text = neutralize_person_terms(text)
                 try:
                     if word_limit > 0:
