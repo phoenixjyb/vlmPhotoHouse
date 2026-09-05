@@ -2,9 +2,13 @@ from pathlib import Path
 
 from app.caption_policy import (
     CAPTION_PROMPT_PATH,
+    CHINESE_POLICY_TERMS,
     DEFAULT_DETAILED_CAPTION_PROMPT,
+    bilingual_caption_issue_summary,
     bilingual_caption_issues,
+    bilingual_caption_policy_matches,
     build_caption_retry_prompt,
+    correct_chinese_policy_translation,
     neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
@@ -85,6 +89,32 @@ def test_bilingual_policy_rejects_inferred_activity_and_missing_chinese():
     assert 'english_policy' in issues
     assert 'chinese_policy' in issues
     assert bilingual_caption_issues('EN: English only.') == ['format']
+
+
+def test_policy_diagnostics_keep_only_matched_terms():
+    caption = 'EN: A person is possibly recording.\n\nZH-CN: 一位成人可能正在录像。'
+
+    assert bilingual_caption_policy_matches(caption) == {
+        'english_policy': ['possibly', 'recording'],
+        'chinese_policy': ['可能', '录像'],
+    }
+    assert bilingual_caption_issue_summary(caption) == (
+        'english_policy[possibly|recording], chinese_policy[可能|录像]'
+    )
+
+
+def test_chinese_only_correction_preserves_english_and_passes_reviewed_terms():
+    calls = []
+    caption = 'EN: A person holds a phone.\n\nZH-CN: 一位成人可能正在拍摄。'
+
+    def translate(english, avoid_terms):
+        calls.append((english, avoid_terms))
+        return 'ZH-CN: 一位成人手持一部手机。'
+
+    result = correct_chinese_policy_translation(caption, translate)
+
+    assert result == 'EN: A person holds a phone.\n\nZH-CN: 一位成人手持一部手机。'
+    assert calls == [('A person holds a phone.', list(CHINESE_POLICY_TERMS))]
 
 
 def test_retry_prompt_reasserts_complete_bilingual_contract():

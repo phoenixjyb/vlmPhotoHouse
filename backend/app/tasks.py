@@ -17,8 +17,10 @@ from . import metrics as metrics_mod
 from .gps_utils import probe_video_metadata
 from .caption_policy import (
     DEFAULT_DETAILED_CAPTION_PROMPT,
+    bilingual_caption_issue_summary,
     bilingual_caption_issues,
     build_caption_retry_prompt,
+    correct_chinese_policy_translation,
     neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
@@ -398,8 +400,21 @@ class TaskExecutor:
                 and caption_image is not None
                 and policy_retry_count < max_policy_retries
             ):
-                retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues, text)
-                text = prov.generate_caption(caption_image, prompt=retry_prompt)
+                can_translate_text = getattr(prov, 'supports_text_translation', False) is True
+                translated_correction = None
+                if policy_issues == ['chinese_policy'] and bilingual_output and can_translate_text:
+                    translated_correction = correct_chinese_policy_translation(
+                        text,
+                        lambda english, avoid_terms: prov.translate_caption(
+                            english,
+                            avoid_terms=avoid_terms,
+                        ),
+                    )
+                if translated_correction is not None:
+                    text = translated_correction
+                else:
+                    retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues, text)
+                    text = prov.generate_caption(caption_image, prompt=retry_prompt)
                 policy_retry_count += 1
                 text = neutralize_person_terms(text)
                 try:
@@ -411,7 +426,9 @@ class TaskExecutor:
                 policy_issues = bilingual_caption_issues(text)
             if policy_issues:
                 asset.caption_processed_at = datetime.utcnow()
-                asset.caption_error_last = 'caption policy validation failed: ' + ', '.join(policy_issues)
+                asset.caption_error_last = (
+                    'caption policy validation failed: ' + bilingual_caption_issue_summary(text)
+                )
                 session.commit()
                 raise ValueError(asset.caption_error_last)
         caption_model_version = None

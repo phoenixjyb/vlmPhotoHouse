@@ -14,6 +14,7 @@ from app.caption_service import (
     Qwen2VLCaptionProvider,
     BLIP2CaptionProvider,
 )
+from app.caption_policy import CHINESE_POLICY_TERMS
 
 
 def test_http_caption_provider_sends_prompt(monkeypatch, tmp_path):
@@ -62,6 +63,51 @@ def test_http_caption_provider_sends_prompt(monkeypatch, tmp_path):
     assert calls == [{
         'url': 'http://127.0.0.1:8102/caption',
         'data': {'prompt': prompt},
+    }]
+
+
+def test_http_caption_provider_translates_with_reviewed_terms(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        text = ''
+
+        def json(self):
+            return {'translation': 'ZH-CN: 一位成人手持一部手机。'}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url):
+            return FakeResponse()
+
+        def post(self, url, json):
+            calls.append({'url': url, 'json': json})
+            return FakeResponse()
+
+    monkeypatch.setattr('app.caption_service.httpx.Client', FakeClient)
+    provider = HTTPCaptionProvider('http://127.0.0.1:8102')
+
+    result = provider.translate_caption('A person holds a phone.', avoid_terms=['可能', '拍摄'])
+
+    assert result == '一位成人手持一部手机。'
+    assert calls == [{
+        'url': 'http://127.0.0.1:8102/translate',
+        'json': {
+            'text': 'A person holds a phone.',
+            'source_lang': 'en',
+            'target_lang': 'zh-CN',
+            'style': 'photo caption',
+            'avoid_terms': ['可能', '拍摄'],
+        },
     }]
 
 
@@ -250,6 +296,55 @@ def test_caption_task_uses_second_correction_for_remaining_policy_issue():
     assert '<rejected_caption>' in second_retry_prompt
     assert 'ZH-CN: 一位成人正在拍摄可见的建筑。' in second_retry_prompt
     assert session.add.call_args.args[0].model == 'test-model|bilingual-en-zh-cn'
+
+
+def test_caption_task_retranslates_chinese_without_repeating_visual_inference():
+    from app.tasks import TaskExecutor
+    from app.db import Task, Caption, Asset
+    from sqlalchemy.orm import Session
+    from unittest.mock import Mock
+
+    session = Mock(spec=Session)
+    task = Mock(spec=Task)
+    asset = Mock(spec=Asset)
+    task.payload_json = {'asset_id': 1}
+    asset.path = '/fake/path/test_image.jpg'
+    asset.mime = 'image/jpeg'
+    session.get.return_value = asset
+    session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+
+    class TranslationProvider:
+        supports_text_translation = True
+
+        def __init__(self):
+            self.generation_calls = 0
+            self.translation_calls = []
+
+        def generate_caption(self, image, prompt=None):
+            self.generation_calls += 1
+            return 'EN: A person holds a phone.\n\nZH-CN: 一位成人可能正在拍摄。'
+
+        def translate_caption(self, english, avoid_terms=None):
+            self.translation_calls.append((english, avoid_terms))
+            return '一位成人手持一部手机。'
+
+        def get_model_name(self):
+            return 'test-model'
+
+    provider = TranslationProvider()
+    with patch('PIL.Image.open') as image_open, \
+         patch('app.caption_service.get_caption_provider', return_value=provider):
+        image_open.return_value.convert.return_value = Image.new('RGB', (32, 32))
+        result = TaskExecutor()._handle_caption(session, task)
+
+    assert result is not None
+    assert provider.generation_calls == 1
+    assert provider.translation_calls == [
+        ('A person holds a phone.', list(CHINESE_POLICY_TERMS))
+    ]
+    assert session.add.call_args.args[0].text == (
+        'EN: A person holds a phone.\n\nZH-CN: 一位成人手持一部手机。'
+    )
 
 
 def test_caption_task_accepts_short_bilingual_caption_without_length_retry():

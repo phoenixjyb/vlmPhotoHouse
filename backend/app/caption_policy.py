@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Callable
 
 
 CAPTION_PROMPT_PATH = Path(__file__).resolve().parents[2] / 'config' / 'detailed-caption-prompt.txt'
@@ -25,10 +26,13 @@ ENGLISH_POLICY_RE = re.compile(
     r'|seem(s|ing)? to (capture|take|record|photograph|call|message)',
     flags=re.IGNORECASE,
 )
-CHINESE_POLICY_RE = re.compile(
-    r'似乎|好像|可能|看起来|大概|或许|推测|拍摄|拍照|录像|录制'
-    r'|男人|女人|男子|女子|男孩|女孩|男性|女性|裸体|赤裸|尿布|内衣|没穿衣服'
+CHINESE_POLICY_TERMS = (
+    '似乎', '好像', '可能', '看起来', '大概', '或许', '推测',
+    '拍摄', '拍照', '录像', '录制',
+    '男人', '女人', '男子', '女子', '男孩', '女孩', '男性', '女性',
+    '裸体', '赤裸', '尿布', '内衣', '没穿衣服',
 )
+CHINESE_POLICY_RE = re.compile('|'.join(re.escape(term) for term in CHINESE_POLICY_TERMS))
 ENGLISH_PERSON_TERM_RE = re.compile(r'\b(women|woman|men|man|girls|girl|boys|boy)\b', re.IGNORECASE)
 CHINESE_PERSON_TERM_RE = re.compile(r'男人|女人|男子|女子|男性|女性|男孩|女孩')
 ENGLISH_PERSON_REPLACEMENTS = {
@@ -64,6 +68,58 @@ def bilingual_caption_issues(text: str) -> list[str]:
     if CHINESE_POLICY_RE.search(chinese):
         issues.append('chinese_policy')
     return issues
+
+
+def bilingual_caption_policy_matches(text: str) -> dict[str, list[str]]:
+    """Return only the matched policy phrases, never the full private caption."""
+    parts = parse_bilingual_caption(text)
+    if parts is None:
+        return {}
+
+    english, chinese = parts
+    matches: dict[str, list[str]] = {}
+    english_matches = list(dict.fromkeys(
+        match.group(0).lower() for match in ENGLISH_POLICY_RE.finditer(english)
+    ))
+    chinese_matches = list(dict.fromkeys(
+        match.group(0) for match in CHINESE_POLICY_RE.finditer(chinese)
+    ))
+    if english_matches:
+        matches['english_policy'] = english_matches
+    if chinese_matches:
+        matches['chinese_policy'] = chinese_matches
+    return matches
+
+
+def bilingual_caption_issue_summary(text: str) -> str:
+    issues = bilingual_caption_issues(text)
+    matches = bilingual_caption_policy_matches(text)
+    details = []
+    for issue in issues:
+        issue_matches = matches.get(issue, [])
+        if issue_matches:
+            details.append(f"{issue}[{'|'.join(issue_matches)}]")
+        else:
+            details.append(issue)
+    return ', '.join(details)
+
+
+def correct_chinese_policy_translation(
+    text: str,
+    translator: Callable[[str, list[str]], str],
+) -> str | None:
+    """Rebuild a Chinese-only policy failure from its already accepted English facts."""
+    parts = parse_bilingual_caption(text)
+    if parts is None or bilingual_caption_issues(text) != ['chinese_policy']:
+        return None
+
+    english, _ = parts
+    chinese = str(translator(english, list(CHINESE_POLICY_TERMS)) or '').strip().strip('"').strip()
+    if chinese.upper().startswith('ZH-CN:'):
+        chinese = chinese[6:].strip()
+    if not chinese:
+        return None
+    return f'EN: {english}\n\nZH-CN: {chinese}'
 
 
 def build_caption_retry_prompt(
