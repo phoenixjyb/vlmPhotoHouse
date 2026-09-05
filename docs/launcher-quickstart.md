@@ -10,6 +10,9 @@ This guide summarizes the common commands and options for the tmux‑style Windo
   - ML (optional): `pip install -r backend/requirements-ml.txt`
     - Windows installs the CUDA ONNX Runtime wheel.
     - macOS/Linux installs the mutually exclusive CPU wheel.
+  - Immutable Windows production releases use the fully pinned
+    `backend/requirements-windows-production.txt` lock instead of combining
+    the core and optional files.
 - Keep the three stack repositories as siblings under one directory:
   - `<stack-root>\vlmPhotoHouse`
   - `<stack-root>\LVFace` (with `models/*.onnx` and its own `.venv`)
