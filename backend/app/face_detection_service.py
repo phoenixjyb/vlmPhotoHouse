@@ -17,6 +17,16 @@ class FaceDetectionProvider(Protocol):
     def detect(self, image: Image.Image) -> List[DetectedFace]: ...
 
 class StubDetectionProvider:
+    def __init__(self):
+        self.runtime_name = 'builtin'
+        self.runtime_version = None
+        self.requested_device = None
+        self.effective_device = 'stub'
+        self.available_execution_providers = ('StubDetectionProvider',)
+        self.execution_providers = ('StubDetectionProvider',)
+        self.effective_execution_provider = 'StubDetectionProvider'
+        self.accelerated = False
+
     def detect(self, image: Image.Image) -> List[DetectedFace]:
         # produce 1-3 random boxes
         w, h = image.size
@@ -36,12 +46,22 @@ class MTCNNDetectionProvider:
         except Exception as e:  # pragma: no cover
             raise RuntimeError("facenet-pytorch not installed; cannot use MTCNN for face detection") from e
         import torch  # type: ignore
+        self.runtime_name = 'torch'
+        self.runtime_version = str(torch.__version__)
+        self.requested_device = device
         if device == 'cuda' and torch.cuda.is_available():
             self.device = 'cuda'
         else:
             if device == 'cuda':
                 logging.getLogger('app').warning('CUDA requested for MTCNN but not available; using CPU')
             self.device = 'cpu'
+        self.effective_device = self.device
+        self.available_execution_providers = (
+            ('torch-cuda', 'torch-cpu') if torch.cuda.is_available() else ('torch-cpu',)
+        )
+        self.execution_providers = (f'torch-{self.device}',)
+        self.effective_execution_provider = self.execution_providers[0]
+        self.accelerated = self.device == 'cuda'
         self.mtcnn = MTCNN(keep_all=True, device=self.device)
     def detect(self, image: Image.Image) -> List[DetectedFace]:  # pragma: no cover heavy
         import numpy as np
@@ -70,10 +90,25 @@ class InsightFaceDetectionProvider:
 
         det_pack = os.getenv('INSIGHTFACE_DET_PACK', 'buffalo_l')
         det_size = int(os.getenv('INSIGHTFACE_DET_SIZE', '640') or '640')
+        self.runtime_name = 'onnxruntime'
+        self.runtime_version = str(ort.__version__)
+        self.requested_device = device
 
         providers = ['CPUExecutionProvider']
         ctx_id = -1
         if device.startswith('cuda'):
+            preload_dlls = getattr(ort, 'preload_dlls', None)
+            if callable(preload_dlls):
+                try:
+                    # On Windows this lets ORT reuse the CUDA/cuDNN DLLs bundled
+                    # with the compatible PyTorch wheel before a session exists.
+                    preload_dlls()
+                except Exception:
+                    logging.getLogger('app').warning(
+                        'Failed to preload CUDA libraries for InsightFace; '
+                        'provider discovery will determine whether GPU is usable',
+                        exc_info=True,
+                    )
             available = ort.get_available_providers()
             if 'CUDAExecutionProvider' in available:
                 providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
@@ -81,9 +116,37 @@ class InsightFaceDetectionProvider:
             else:
                 logging.getLogger('app').warning('CUDA requested for InsightFace but CUDAExecutionProvider unavailable; using CPU')
 
+        self.available_execution_providers = tuple(ort.get_available_providers())
         self.min_score = float(os.getenv('INSIGHTFACE_MIN_DET_SCORE', '0.35') or '0.35')
         self.app = FaceAnalysis(name=det_pack, allowed_modules=['detection'], providers=providers)
         self.app.prepare(ctx_id=ctx_id, det_size=(det_size, det_size))
+        self.execution_providers = self._session_execution_providers()
+        self.effective_execution_provider = (
+            self.execution_providers[0] if self.execution_providers else None
+        )
+        self.accelerated = (
+            self.effective_execution_provider == 'CUDAExecutionProvider'
+            if self.effective_execution_provider is not None
+            else None
+        )
+        self.effective_device = (
+            'cuda:0'
+            if self.accelerated is True
+            else 'cpu' if self.accelerated is False else None
+        )
+
+    def _session_execution_providers(self) -> Tuple[str, ...]:
+        """Return providers from the prepared SCRFD session, not configuration."""
+        discovered: List[str] = []
+        for model in getattr(self.app, 'models', {}).values():
+            session = getattr(model, 'session', None)
+            get_providers = getattr(session, 'get_providers', None)
+            if not callable(get_providers):
+                continue
+            for provider in get_providers():
+                if provider not in discovered:
+                    discovered.append(provider)
+        return tuple(discovered)
 
     def detect(self, image: Image.Image) -> List[DetectedFace]:  # pragma: no cover heavy
         import numpy as np
@@ -106,6 +169,26 @@ class InsightFaceDetectionProvider:
                 )
             out.append(DetectedFace(x1, y1, x2 - x1, y2 - y1, landmarks))
         return out
+
+
+def describe_detection_runtime(provider: FaceDetectionProvider) -> dict:
+    """Describe the detector runtime without triggering inference."""
+    execution_providers = tuple(getattr(provider, 'execution_providers', ()))
+    effective_provider = getattr(provider, 'effective_execution_provider', None)
+    if effective_provider is None and execution_providers:
+        effective_provider = execution_providers[0]
+    return {
+        'runtime': getattr(provider, 'runtime_name', None),
+        'runtime_version': getattr(provider, 'runtime_version', None),
+        'requested_device': getattr(provider, 'requested_device', None),
+        'effective_device': getattr(provider, 'effective_device', None),
+        'available_execution_providers': list(
+            getattr(provider, 'available_execution_providers', ())
+        ),
+        'execution_providers': list(execution_providers),
+        'effective_execution_provider': effective_provider,
+        'accelerated': getattr(provider, 'accelerated', None),
+    }
 
 @lru_cache()
 def get_face_detection_provider() -> FaceDetectionProvider:

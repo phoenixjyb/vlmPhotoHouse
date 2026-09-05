@@ -8,6 +8,8 @@ This guide summarizes the common commands and options for the tmux‑style Windo
 - Backend venv created at `.venv/` in repo root and dependencies installed:
   - Core: `pip install -r backend/requirements-core.txt`
   - ML (optional): `pip install -r backend/requirements-ml.txt`
+    - Windows installs the CUDA ONNX Runtime wheel.
+    - macOS/Linux installs the mutually exclusive CPU wheel.
 - Keep the three stack repositories as siblings under one directory:
   - `<stack-root>\vlmPhotoHouse`
   - `<stack-root>\LVFace` (with `models/*.onnx` and its own `.venv`)

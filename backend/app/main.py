@@ -256,6 +256,7 @@ def health(request: Request, db_s: Session = Depends(get_db)):
     # active face embedding provider (lazy; protected by try to avoid import failures on lightweight envs)
     face_embed_provider = None
     face_detect_provider = None
+    face_detect_runtime = None
     face_device = settings.embed_device
     try:
         from .face_embedding_service import get_face_embedding_provider
@@ -270,15 +271,13 @@ def health(request: Request, db_s: Session = Depends(get_db)):
         embed_dim = None
     # Detection provider info
     try:
-        from .face_detection_service import get_face_detection_provider
-        _det = get_face_detection_provider()
-        face_detect_provider = _det.__class__.__name__
-    except Exception:
-        face_detect_provider = 'unavailable'
-    try:
-        from .face_detection_service import get_face_detection_provider
+        from .face_detection_service import (
+            describe_detection_runtime,
+            get_face_detection_provider,
+        )
         dprov = get_face_detection_provider()
         face_detect_provider = dprov.__class__.__name__
+        face_detect_runtime = describe_detection_runtime(dprov)
     except Exception:
         face_detect_provider = 'unavailable'
     
@@ -311,6 +310,7 @@ def health(request: Request, db_s: Session = Depends(get_db)):
             'lvface_python_exe': settings.lvface_python_exe if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'lvface_model_name': settings.lvface_model_name if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'detect_provider': face_detect_provider,
+            'detect_runtime': face_detect_runtime,
             'device': face_device,
         },
         'caption': {

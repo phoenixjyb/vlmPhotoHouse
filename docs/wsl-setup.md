@@ -47,7 +47,9 @@ GPU (optional, recommended on RTX 3090):
 ```bash
 # Install CUDA-enabled torch for Linux (match the recommended index URL)
 pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision
-# ONNX Runtime GPU
+# requirements-ml installs the CPU wheel on Linux. Remove it before installing
+# the mutually exclusive CUDA wheel.
+pip uninstall -y onnxruntime
 pip install onnxruntime-gpu
 # If using Facenet
 pip install facenet-pytorch
