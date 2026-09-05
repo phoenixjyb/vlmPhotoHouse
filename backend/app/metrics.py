@@ -4,7 +4,7 @@ from typing import Optional
 registry = CollectorRegistry()
 
 # Counters
-tasks_processed = Counter('tasks_processed_total', 'Total tasks processed (terminal states done|failed|canceled|dead)', ['type', 'state'], registry=registry)
+tasks_processed = Counter('tasks_processed_total', 'Total tasks processed (terminal states finished|failed|canceled|dead)', ['type', 'state'], registry=registry)
 tasks_retried = Counter('tasks_retried_total', 'Total task retries attempted', ['type'], registry=registry)
 embeddings_generated = Counter('embeddings_generated_total', 'Total image embeddings generated', registry=registry)
 faces_detected = Counter('faces_detected_total', 'Total faces detected', registry=registry)

@@ -167,6 +167,7 @@ def reinit_executor_for_tests():
         executor.stop_workers()
     except Exception:
         pass
+    get_settings.cache_clear()  # type: ignore[attr-defined]
     settings = get_settings()
     # Rebind dependencies to the current DATABASE_URL and ensure schema
     ensure_db()
@@ -397,12 +398,19 @@ def metrics(db_s: Session = Depends(get_db)):
     index_dim = tasks_mod.EMBED_DIM if tasks_mod.INDEX_SINGLETON else None
     last_recluster = None
     # attempt to find last completed recluster summary
-    last_recluster_task = db_s.query(Task).filter(Task.type=='person_recluster', Task.state=='done').order_by(Task.id.desc()).first()
+    last_recluster_task = db_s.query(Task).filter(
+        Task.type == 'person_recluster',
+        Task.state.in_(['finished', 'done']),
+    ).order_by(Task.id.desc()).first()
     if last_recluster_task and last_recluster_task.payload_json and 'summary' in last_recluster_task.payload_json:
         last_recluster = last_recluster_task.payload_json.get('summary')
     # average task duration (completed tasks with both timestamps)
     durations = []
-    done_tasks = db_s.query(Task.started_at, Task.finished_at).filter(Task.state=='done', Task.started_at!=None, Task.finished_at!=None).limit(500).all()
+    done_tasks = db_s.query(Task.started_at, Task.finished_at).filter(
+        Task.state.in_(['finished', 'done']),
+        Task.started_at != None,
+        Task.finished_at != None,
+    ).limit(500).all()
     for st, ft in done_tasks:
         try:
             durations.append((ft - st).total_seconds())

@@ -107,9 +107,6 @@ class TaskExecutor:
             t.start()
             self._threads.append(t)
 
-    def stop_workers(self):
-        self._stop = True
-
     def _worker_loop(self, worker_id: int):
         base_idle = self.settings.worker_poll_interval
         while not self._stop:
@@ -182,6 +179,11 @@ class TaskExecutor:
                     self._handle_face_embed(session, task)
                 elif task.type == 'person_cluster':
                     self._handle_person_cluster(session, task)
+                elif task.type == 'person_recluster':
+                    result = self._handle_person_recluster(session, task)
+                    payload = dict(task.payload_json or {})
+                    payload['summary'] = result
+                    task.payload_json = payload
                 elif task.type == 'person_label_propagate':
                     self._handle_person_label_propagate(session, task)
                 elif task.type == 'dim_backfill':
@@ -200,32 +202,62 @@ class TaskExecutor:
                     self._handle_video_scene_detect(session, task)
                 elif task.type == 'video_segment_embed':
                     self._handle_video_segment_embed(session, task)
+                elif task.type == 'fail_transient':
+                    # Deterministic transient failure used by retry/dead-letter tests.
+                    raise OSError('Simulated transient failure')
                 else:
                     raise ValueError(f'Unsupported task type: {task.type}')
             except Exception as exc:
-                task.state = 'failed'
+                task.retry_count += 1
                 task.last_error = str(exc)[:4000]
+                if self._classify_permanent(exc):
+                    task.state = 'failed'
+                    task.finished_at = datetime.utcnow()
+                elif task.retry_count >= self.settings.max_task_retries:
+                    task.state = 'dead'
+                    task.finished_at = datetime.utcnow()
+                else:
+                    task.state = 'pending'
+                    task.scheduled_at = datetime.utcnow() + self._compute_backoff(
+                        task.retry_count
+                    )
                 session.commit()
+                try:
+                    metrics_mod.tasks_retried.labels(task.type).inc()
+                    if task.state in ('failed', 'dead'):
+                        metrics_mod.tasks_processed.labels(
+                            task.type, task.state
+                        ).inc()
+                except Exception:
+                    pass
                 return True
-            # success transition
-            task.state = 'finished'
-            task.finished_at = datetime.utcnow()
+            # Handlers may complete the task by canceling it. Only transition a
+            # still-running task to the canonical success state.
+            if task.state == 'running':
+                task.state = 'finished'
+                task.finished_at = datetime.utcnow()
             session.commit()
-            # metrics
             try:
-                metrics_mod.task_durations_seconds.labels(task.type).observe(time.time()-start_time)
+                metrics_mod.task_duration.labels(task.type).observe(
+                    time.time() - start_time
+                )
+                metrics_mod.tasks_processed.labels(
+                    task.type, task.state
+                ).inc()
             except Exception:
                 pass
             return True
         return False
 
     def stop_workers(self):
+        self._stop = True
         self._stop_event.set()
-        for t in self._workers:
+        for t in self._threads + self._workers:
             try:
                 t.join(timeout=1.0)
             except Exception:
                 pass
+        self._threads.clear()
         self._workers.clear()
 
     def _handle_embed(self, session: Session, task: Task):
@@ -1480,10 +1512,14 @@ class TaskExecutor:
         return not isinstance(exc, transient)
 
     def _compute_backoff(self, retry_count: int):
-        base = self.settings.retry_backoff_base_seconds
-        cap = self.settings.retry_backoff_cap_seconds
-        raw = base * (2 ** (max(0, retry_count-1)))
+        base = getattr(self.settings, 'retry_backoff_base_seconds', 2.0)
+        cap = getattr(self.settings, 'retry_backoff_cap_seconds', 300.0)
+        jitter_fraction = getattr(self.settings, 'retry_backoff_jitter', 0.25)
+        raw = base * (2 ** max(0, retry_count - 1))
         raw = min(raw, cap)
-        jitter = raw * random.uniform(0.2, 0.6)
-        from datetime import timedelta
-        return timedelta(seconds=raw + jitter)
+        jitter = (
+            raw * random.uniform(-jitter_fraction, jitter_fraction)
+            if raw > 0
+            else 0
+        )
+        return timedelta(seconds=max(0.0, raw + jitter))

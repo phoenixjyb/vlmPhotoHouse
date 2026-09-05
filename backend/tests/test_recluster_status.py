@@ -24,8 +24,8 @@ def test_recluster_status_flow():
             continue
     s3 = client.get('/persons/recluster/status').json()
     # Accept additional terminal states introduced (dead, canceled) and tolerate rare lingering running state in CI
-    assert s3['task']['state'] in ('done','failed','dead','canceled','running')
+    assert s3['task']['state'] in ('finished','failed','dead','canceled','running')
     # if done should have summary keys
-    if s3['task']['state'] == 'done':
+    if s3['task']['state'] == 'finished':
         summary = s3['task'].get('summary') or {}
         assert 'faces' in summary and 'persons' in summary

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 
@@ -14,6 +15,10 @@ def _migration_config(backend_root: Path, database_path: Path) -> Config:
         'sqlalchemy.url', f"sqlite:///{database_path.as_posix()}"
     )
     return config
+
+
+def _migration_head(config: Config) -> str:
+    return ScriptDirectory.from_config(config).get_current_head()
 
 
 def test_fresh_database_migrates_to_versioned_face_embedding_schema(
@@ -30,6 +35,8 @@ def test_fresh_database_migrates_to_versioned_face_embedding_schema(
     try:
         schema = inspect(engine)
         assert {
+            'album_assets',
+            'albums',
             'face_embedding_artifacts',
             'person_embedding_artifacts',
         } <= set(schema.get_table_names())
@@ -41,7 +48,7 @@ def test_fresh_database_migrates_to_versioned_face_embedding_schema(
             version = connection.execute(
                 text('SELECT version_num FROM alembic_version')
             ).scalar_one()
-        assert version == 'c4e7a2d9f1b3'
+        assert version == _migration_head(config)
     finally:
         engine.dispose()
 
@@ -73,6 +80,6 @@ def test_migration_handles_live_style_assignment_table_ahead_of_stamp(
             version = connection.execute(
                 text('SELECT version_num FROM alembic_version')
             ).scalar_one()
-        assert version == 'c4e7a2d9f1b3'
+        assert version == _migration_head(config)
     finally:
         engine.dispose()
