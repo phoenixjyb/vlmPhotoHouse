@@ -1272,21 +1272,18 @@ class TaskExecutor:
             return
         asset = session.get(Asset, asset_id)
         if not asset:
-            return
+            raise ValueError('asset missing')
         if asset.width and asset.height:
             return
         p = Path(asset.path)
         if not p.exists():
-            return
-        try:
-            with Image.open(p) as im:
-                upright = safe_exif_transpose(im)
-                w, h = upright.size
-            asset.width = w
-            asset.height = h
-            session.commit()
-        except Exception:
-            pass
+            raise FileNotFoundError(f'dimension source missing: {p}')
+        with Image.open(p) as im:
+            upright = safe_exif_transpose(im)
+            w, h = upright.size
+        asset.width = w
+        asset.height = h
+        session.commit()
 
     def _maybe_enqueue_dim_backfill(self, session: Session):
         now = time.time()
@@ -1300,8 +1297,16 @@ class TaskExecutor:
         ).first()
         if existing:
             return
-        # find assets missing dimensions
-        missing = session.query(Asset.id).filter(or_(Asset.width==None, Asset.height==None)).limit(50).all()
+        # Each asset gets one automatically-created task. The task's own retry
+        # policy handles transient failures; retaining terminal task history keeps
+        # missing or corrupt sources from being re-enqueued every scan forever.
+        attempted_asset_ids = select(
+            Task.payload_json['asset_id'].as_integer()
+        ).where(Task.type == 'dim_backfill')
+        missing = session.query(Asset.id).filter(
+            or_(Asset.width==None, Asset.height==None),
+            ~Asset.id.in_(attempted_asset_ids),
+        ).limit(50).all()
         if not missing:
             return
         # enqueue tasks
