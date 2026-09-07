@@ -12,7 +12,7 @@
     crossorigin=""
   />
 </head>
-<body>
+<body data-ui-mode="family">
   <div class="bg-orb bg-orb-a"></div>
   <div class="bg-orb bg-orb-b"></div>
   <div class="app-shell">
@@ -26,12 +26,13 @@
           <button class="btn ghost lang-btn" data-lang="en" type="button">EN</button>
           <button class="btn ghost lang-btn" data-lang="zh" type="button">中文</button>
         </div>
+        <button id="btn-ui-mode" class="btn ghost" type="button" aria-pressed="false">Advanced</button>
         <button id="btn-voice-chat" class="btn ghost" data-i18n="voice_chat">Voice Chat</button>
         <button id="btn-voice-chat-reset" class="btn ghost" data-i18n="voice_chat_reset">Delete Chat</button>
-        <button id="btn-voice-command" class="btn ghost" data-i18n="voice_command">Voice Command</button>
+        <button id="btn-voice-command" class="btn ghost advanced-only" data-i18n="voice_command">Voice Command</button>
         <span id="voice-status" class="small muted"></span>
-        <button id="btn-refresh-all" class="btn ghost" data-i18n="refresh">Refresh</button>
-        <a class="btn ghost" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
+        <button id="btn-refresh-all" class="btn ghost advanced-only" data-i18n="refresh">Refresh</button>
+        <a class="btn ghost advanced-only" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
       </div>
     </header>
 
@@ -43,7 +44,7 @@
       <div id="voice-history-list" class="voice-history-list"></div>
     </section>
 
-    <section class="status-cards">
+    <section class="status-cards advanced-only" aria-label="System status">
       <article class="stat-card">
         <p class="label" data-i18n="assets">Assets</p>
         <p id="stat-assets" class="value">-</p>
@@ -78,20 +79,20 @@
       </article>
     </section>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="home" data-i18n="tab_home">Home</button>
-      <button class="tab" data-tab="library" data-i18n="tab_library">Library</button>
-      <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
-      <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
-      <button class="tab" data-tab="stories" data-i18n="tab_stories">Stories</button>
-      <button class="tab" data-tab="similarity" data-i18n="tab_similarity">Similarity</button>
-      <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
-      <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
-      <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
+    <nav class="tabs" role="tablist" aria-label="Photo House sections">
+      <button id="tab-button-home" class="tab active" data-tab="home" data-i18n="tab_home" role="tab" aria-controls="tab-home" aria-selected="true" tabindex="0">Home</button>
+      <button id="tab-button-library" class="tab" data-tab="library" data-i18n="tab_library" role="tab" aria-controls="tab-library" aria-selected="false" tabindex="-1">Library</button>
+      <button id="tab-button-people" class="tab" data-tab="people" data-i18n="tab_people" role="tab" aria-controls="tab-people" aria-selected="false" tabindex="-1">People</button>
+      <button id="tab-button-tags" class="tab" data-tab="tags" data-i18n="tab_tags" role="tab" aria-controls="tab-tags" aria-selected="false" tabindex="-1">Tags</button>
+      <button id="tab-button-stories" class="tab" data-tab="stories" data-i18n="tab_stories" role="tab" aria-controls="tab-stories" aria-selected="false" tabindex="-1">Stories</button>
+      <button id="tab-button-similarity" class="tab advanced-only" data-tab="similarity" data-i18n="tab_similarity" role="tab" aria-controls="tab-similarity" aria-selected="false" tabindex="-1">Similarity</button>
+      <button id="tab-button-map" class="tab" data-tab="map" data-i18n="tab_map" role="tab" aria-controls="tab-map" aria-selected="false" tabindex="-1">Map</button>
+      <button id="tab-button-tasks" class="tab advanced-only" data-tab="tasks" data-i18n="tab_tasks" role="tab" aria-controls="tab-tasks" aria-selected="false" tabindex="-1">Tasks</button>
+      <button id="tab-button-admin" class="tab advanced-only" data-tab="admin" data-i18n="tab_admin" role="tab" aria-controls="tab-admin" aria-selected="false" tabindex="-1">Admin</button>
     </nav>
 
     <main>
-      <section id="tab-home" class="tab-panel active">
+      <section id="tab-home" class="tab-panel active" role="tabpanel" aria-labelledby="tab-button-home">
         <div class="home-hero">
           <p class="home-eyebrow" data-i18n="home_eyebrow">YOUR FAMILY LIBRARY</p>
           <h2 data-i18n="home_title">Find the moments that matter</h2>
@@ -145,7 +146,7 @@
         </div>
       </section>
 
-      <section id="tab-library" class="tab-panel">
+      <section id="tab-library" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-library">
         <div class="panel-grid">
           <div class="panel left-panel">
             <h2 data-i18n="search">Search</h2>
@@ -206,8 +207,8 @@
                 <div class="asset-header-actions">
                   <button id="btn-asset-back" class="btn ghost" data-i18n="back_to_results">Back</button>
                   <button id="btn-preview-fullscreen" class="btn ghost" data-i18n="fullscreen">Full Screen</button>
-                  <button id="btn-delete-photo" class="btn danger" data-i18n="delete_photo">Delete Photo</button>
-                  <button id="btn-delete-asset" class="btn danger" data-i18n="delete_asset">Delete Asset</button>
+                  <button id="btn-delete-photo" class="btn danger advanced-only" data-i18n="delete_photo">Delete Photo</button>
+                  <button id="btn-delete-asset" class="btn danger advanced-only" data-i18n="delete_asset">Delete Asset</button>
                 </div>
               </div>
               <div id="asset-preview" class="asset-preview"></div>
@@ -215,7 +216,7 @@
               <div class="section">
                 <h3 data-i18n="captions">Captions</h3>
                 <div class="controls">
-                  <button id="btn-caption-regenerate" class="btn" data-i18n="regenerate">Regenerate</button>
+                  <button id="btn-caption-regenerate" class="btn advanced-only" data-i18n="regenerate">Regenerate</button>
                 </div>
                 <div id="caption-list"></div>
               </div>
@@ -238,7 +239,7 @@
         </div>
       </section>
 
-      <section id="tab-people" class="tab-panel">
+      <section id="tab-people" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-people">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -279,7 +280,7 @@
         </div>
       </section>
 
-      <section id="tab-tags" class="tab-panel">
+      <section id="tab-tags" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-tags">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -365,7 +366,7 @@
         </div>
       </section>
 
-      <section id="tab-stories" class="tab-panel">
+      <section id="tab-stories" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-stories">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -474,7 +475,7 @@
         </div>
       </section>
 
-      <section id="tab-similarity" class="tab-panel">
+      <section id="tab-similarity" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-similarity">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -523,7 +524,7 @@
         </div>
       </section>
 
-      <section id="tab-map" class="tab-panel">
+      <section id="tab-map" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-map">
         <div class="panel">
           <div class="controls">
             <h2 data-i18n="geo_map">Geo Map</h2>
@@ -546,7 +547,7 @@
         </div>
       </section>
 
-      <section id="tab-tasks" class="tab-panel">
+      <section id="tab-tasks" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-tasks">
         <div class="panel">
           <div class="controls">
             <h2 data-i18n="task_queue">Task Queue</h2>
@@ -573,7 +574,7 @@
         </div>
       </section>
 
-      <section id="tab-admin" class="tab-panel">
+      <section id="tab-admin" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-admin">
         <div class="panel-grid">
           <div class="panel">
             <h2 data-i18n="health">Health</h2>

@@ -39,6 +39,45 @@ def test_family_home_copy_is_bilingual_and_responsive():
     assert "@media (max-width: 680px)" in css
 
 
+def test_family_mode_hides_operational_surfaces_until_requested():
+    html = (UI_ROOT / "index.html").read_text(encoding="utf-8")
+    javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
+    css = (UI_ROOT / "styles.css").read_text(encoding="utf-8")
+
+    assert '<body data-ui-mode="family">' in html
+    assert 'id="btn-ui-mode"' in html
+    assert 'class="status-cards advanced-only"' in html
+    assert 'data-tab="tasks" data-i18n="tab_tasks"' in html
+    assert 'data-tab="admin" data-i18n="tab_admin"' in html
+    assert 'body[data-ui-mode="family"] .advanced-only' in css
+    assert 'uiMode: "family"' in javascript
+    assert 'window.localStorage.setItem("vlm_ui_mode", state.uiMode)' in javascript
+    assert 'advanced_mode: "Advanced"' in javascript
+    assert 'advanced_mode: "高级模式"' in javascript
+
+
+def test_tabs_and_photo_cards_have_keyboard_semantics():
+    html = (UI_ROOT / "index.html").read_text(encoding="utf-8")
+    javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
+
+    assert 'class="tabs" role="tablist"' in html
+    assert 'data-tab="home" data-i18n="tab_home" role="tab"' in html
+    assert 'role="tabpanel" aria-labelledby="tab-button-home"' in html
+    assert 'el.setAttribute("aria-selected", String(active));' in javascript
+    assert '["ArrowLeft", "ArrowRight", "Home", "End"]' in javascript
+    assert 'role="button" tabindex="0" aria-label=' in javascript
+    assert '["Enter", " "]' in javascript
+
+
+def test_bootstrap_only_loads_the_active_surface():
+    javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
+
+    assert 'async function loadTab(tab)' in javascript
+    assert 'const initialLoads = [loadTab(state.activeTab)];' in javascript
+    assert 'if (state.uiMode === "advanced") initialLoads.push(refreshDashboard());' in javascript
+    assert 'refreshDashboard(), loadHome(), loadLibraryLatest(), loadPeople(), loadTasks()' not in javascript
+
+
 def test_album_composer_is_bilingual_and_uses_persistent_draft_api():
     html = (UI_ROOT / "index.html").read_text(encoding="utf-8")
     javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")

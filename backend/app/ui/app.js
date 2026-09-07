@@ -1,5 +1,6 @@
 const state = {
   activeTab: "home",
+  uiMode: "family",
   home: {
     recent: [],
     people: [],
@@ -90,6 +91,8 @@ const state = {
 };
 
 const qs = (id) => document.getElementById(id);
+const ADVANCED_TABS = new Set(["similarity", "tasks", "admin"]);
+const ALL_TABS = ["home", "library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"];
 
 const I18N = {
   en: {
@@ -128,6 +131,8 @@ const I18N = {
     voice_person_not_found: "No person matched {name}",
     refresh: "Refresh",
     api_docs: "API Docs",
+    advanced_mode: "Advanced",
+    family_mode: "Family View",
     assets: "Assets",
     captions: "Captions",
     faces: "Faces",
@@ -470,6 +475,8 @@ const I18N = {
     voice_person_not_found: "未找到人物 {name}",
     refresh: "刷新",
     api_docs: "API 文档",
+    advanced_mode: "高级模式",
+    family_mode: "家庭模式",
     assets: "资源",
     captions: "描述",
     faces: "人脸",
@@ -1072,6 +1079,31 @@ function applyI18n() {
   document.querySelectorAll(".lang-btn").forEach((el) => {
     el.classList.toggle("active", el.dataset.lang === state.lang);
   });
+  updateUiModeControls();
+}
+
+function updateUiModeControls() {
+  const button = qs("btn-ui-mode");
+  if (!button) return;
+  const advanced = state.uiMode === "advanced";
+  button.textContent = t(advanced ? "family_mode" : "advanced_mode");
+  button.setAttribute("aria-pressed", String(advanced));
+}
+
+function isTabAllowed(tab) {
+  return ALL_TABS.includes(tab) && (state.uiMode === "advanced" || !ADVANCED_TABS.has(tab));
+}
+
+function setUiMode(mode, persist = true) {
+  state.uiMode = mode === "advanced" ? "advanced" : "family";
+  document.body.dataset.uiMode = state.uiMode;
+  if (persist) {
+    window.localStorage.setItem("vlm_ui_mode", state.uiMode);
+  }
+  if (!isTabAllowed(state.activeTab)) {
+    setActiveTab("home");
+  }
+  updateUiModeControls();
 }
 
 function setLanguage(lang, persist = true) {
@@ -1708,15 +1740,41 @@ async function runVoiceConversationCapture() {
 }
 
 function setActiveTab(tab) {
+  if (!isTabAllowed(tab)) tab = "home";
   state.activeTab = tab;
   document.body.dataset.activeTab = tab;
   document.querySelectorAll(".tab").forEach((el) => {
-    el.classList.toggle("active", el.dataset.tab === tab);
+    const active = el.dataset.tab === tab;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", String(active));
+    el.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll(".tab-panel").forEach((el) => {
-    el.classList.toggle("active", el.id === `tab-${tab}`);
+    const active = el.id === `tab-${tab}`;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-hidden", String(!active));
   });
   tabToUrl(tab);
+}
+
+async function loadTab(tab) {
+  if (tab === "home") return loadHome();
+  if (tab === "library") return loadLibraryLatest(state.libraryPager.page || 1);
+  if (tab === "people") return loadPeople();
+  if (tab === "tags") {
+    await loadTagsCatalog(state.tagsPager.page || 1);
+    if (state.tagsAssetsPager.tagId) {
+      await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+    } else {
+      updateTagAssetsPagerUi();
+    }
+    return;
+  }
+  if (tab === "stories") return loadStoryAlbums();
+  if (tab === "similarity") return loadSimilarityPreview();
+  if (tab === "map") return loadGeoMap();
+  if (tab === "tasks") return loadTasks();
+  if (tab === "admin") return refreshAdminPanels();
 }
 
 function renderAssetGrid(items, containerId) {
@@ -1730,7 +1788,7 @@ function renderAssetGrid(items, containerId) {
       const id = Number(asset.id);
       const selected = state.selectedAsset && Number(state.selectedAsset.id) === id ? "selected" : "";
       return `
-        <article class="asset-card ${selected}" data-asset-id="${id}">
+        <article class="asset-card ${selected}" data-asset-id="${id}" role="button" tabindex="0" aria-label="${esc(basename(asset.path))}">
           <div class="thumb">
             <img loading="lazy" src="/assets/${id}/thumbnail?size=256"
                  alt="${esc(basename(asset.path))}"
@@ -3328,34 +3386,33 @@ function initEvents() {
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", async () => {
       setActiveTab(el.dataset.tab);
-      if (el.dataset.tab === "home") await loadHome();
-      if (el.dataset.tab === "tasks") await loadTasks();
-      if (el.dataset.tab === "admin") await refreshAdminPanels();
-      if (el.dataset.tab === "people") await loadPeople();
-      if (el.dataset.tab === "tags") {
-        await loadTagsCatalog(state.tagsPager.page || 1);
-        if (state.tagsAssetsPager.tagId) {
-          await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
-        }
-      }
-      if (el.dataset.tab === "stories") await loadStoryAlbums();
-      if (el.dataset.tab === "similarity") await loadSimilarityPreview();
-      if (el.dataset.tab === "map") await loadGeoMap();
+      await loadTab(state.activeTab);
+    });
+    el.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      const tabs = Array.from(document.querySelectorAll(".tab")).filter((tab) => isTabAllowed(tab.dataset.tab));
+      const current = tabs.indexOf(el);
+      if (current < 0 || !tabs.length) return;
+      event.preventDefault();
+      let next = current;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = tabs.length - 1;
+      if (event.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight") next = (current + 1) % tabs.length;
+      tabs[next].focus();
+      tabs[next].click();
     });
   });
 
+  qs("btn-ui-mode").addEventListener("click", async () => {
+    const nextMode = state.uiMode === "advanced" ? "family" : "advanced";
+    setUiMode(nextMode, true);
+    if (state.uiMode === "advanced") await refreshDashboard();
+    await loadTab(state.activeTab);
+  });
+
   qs("btn-refresh-all").addEventListener("click", async () => {
-    await Promise.all([refreshDashboard(), loadTasks(), loadPeople(), refreshAdminPanels()]);
-    if (state.activeTab === "home") await loadHome();
-    if (state.activeTab === "tags") {
-      await loadTagsCatalog(state.tagsPager.page || 1);
-      if (state.tagsAssetsPager.tagId) {
-        await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
-      }
-    }
-    if (state.activeTab === "stories") await loadStoryAlbums();
-    if (state.activeTab === "similarity") await loadSimilarityPreview();
-    if (state.activeTab === "map") await loadGeoMap();
+    await Promise.all([refreshDashboard(), loadTab(state.activeTab)]);
     showToast(t("refreshed"));
   });
   const voiceBtn = qs("btn-voice-command");
@@ -3414,6 +3471,15 @@ function initEvents() {
     state.inspectorOriginTab = "home";
     setActiveTab("library");
     await loadAssetInspector(Number(card.dataset.assetId));
+  });
+  document.querySelectorAll(".asset-grid").forEach((grid) => {
+    grid.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      const card = event.target.closest(".asset-card");
+      if (!card) return;
+      event.preventDefault();
+      card.click();
+    });
   });
   qs("home-people-list").addEventListener("click", async (e) => {
     const button = e.target.closest("button[data-action='home-open-person']");
@@ -3875,9 +3941,11 @@ async function bootstrap() {
   const langParam = params.get("lang");
   const storedLang = window.localStorage.getItem("vlm_ui_lang");
   setLanguage(langParam || storedLang || "en", false);
+  const requestedMode = params.get("mode") || window.localStorage.getItem("vlm_ui_mode") || "family";
+  setUiMode(requestedMode, false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["home", "library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && isTabAllowed(tab)) {
     setActiveTab(tab);
   } else {
     setActiveTab("home");
@@ -3887,30 +3955,15 @@ async function bootstrap() {
     qs("search-query").value = q;
     qs("home-search-query").value = q;
   }
-  await Promise.all([refreshDashboard(), loadHome(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
-  if (state.activeTab === "tags") {
-    await loadTagsCatalog(1);
-    if (state.tagsAssetsPager.tagId) {
-      await loadTagAssets(state.tagsAssetsPager.tagId, 1);
-    } else {
-      updateTagAssetsPagerUi();
-    }
-  }
-  if (state.activeTab === "stories") {
-    await loadStoryAlbums();
-  }
-  if (state.activeTab === "similarity") {
-    await loadSimilarityPreview();
-  }
-  if (state.activeTab === "map") {
-    await loadGeoMap();
-  }
+  const initialLoads = [loadTab(state.activeTab)];
+  if (state.uiMode === "advanced") initialLoads.push(refreshDashboard());
+  await Promise.all(initialLoads);
   if (q) {
     await runHomeSearch(q);
   }
 
   window.setInterval(async () => {
-    await refreshDashboard();
+    if (state.uiMode === "advanced") await refreshDashboard();
     if (state.activeTab === "tasks") await loadTasks();
   }, 10000);
 }

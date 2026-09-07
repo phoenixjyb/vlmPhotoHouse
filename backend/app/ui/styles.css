@@ -1049,6 +1049,10 @@ textarea:focus {
   background: #0d1e18;
 }
 
+body[data-ui-mode="family"] .advanced-only {
+  display: none !important;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
