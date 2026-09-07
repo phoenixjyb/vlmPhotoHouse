@@ -347,6 +347,59 @@ def test_caption_task_retranslates_chinese_without_repeating_visual_inference():
     )
 
 
+def test_caption_task_switches_to_visual_retry_after_translation_stays_invalid():
+    from app.tasks import TaskExecutor
+    from app.db import Task, Caption, Asset
+    from sqlalchemy.orm import Session
+    from unittest.mock import Mock
+
+    session = Mock(spec=Session)
+    task = Mock(spec=Task)
+    asset = Mock(spec=Asset)
+    task.payload_json = {'asset_id': 1}
+    asset.path = '/fake/path/test_image.jpg'
+    asset.mime = 'image/jpeg'
+    session.get.return_value = asset
+    session.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+
+    class TranslationThenVisualProvider:
+        supports_text_translation = True
+
+        def __init__(self):
+            self.generation_prompts = []
+            self.translation_calls = []
+
+        def generate_caption(self, image, prompt=None):
+            self.generation_prompts.append(prompt)
+            if len(self.generation_prompts) == 1:
+                return 'EN: A person holds a phone.\n\nZH-CN: 一位成人可能正在拍摄。'
+            return 'EN: A person holds a phone.\n\nZH-CN: 一位成人手持一部手机。'
+
+        def translate_caption(self, english, avoid_terms=None):
+            self.translation_calls.append((english, avoid_terms))
+            return '一位成人正在拍摄。'
+
+        def get_model_name(self):
+            return 'test-model'
+
+    provider = TranslationThenVisualProvider()
+    with patch('PIL.Image.open') as image_open, \
+         patch('app.caption_service.get_caption_provider', return_value=provider):
+        image_open.return_value.convert.return_value = Image.new('RGB', (32, 32))
+        result = TaskExecutor()._handle_caption(session, task)
+
+    assert result is not None
+    assert provider.translation_calls == [
+        ('A person holds a phone.', list(CHINESE_POLICY_TERMS))
+    ]
+    assert len(provider.generation_prompts) == 2
+    assert 'Previous validation issues: chinese_policy.' in provider.generation_prompts[1]
+    assert '<rejected_caption>' in provider.generation_prompts[1]
+    assert session.add.call_args.args[0].text == (
+        'EN: A person holds a phone.\n\nZH-CN: 一位成人手持一部手机。'
+    )
+
+
 def test_caption_task_accepts_short_bilingual_caption_without_length_retry():
     from app.tasks import TaskExecutor
     from app.db import Task, Caption, Asset

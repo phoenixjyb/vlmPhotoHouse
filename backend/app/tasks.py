@@ -434,7 +434,16 @@ class TaskExecutor:
             ):
                 can_translate_text = getattr(prov, 'supports_text_translation', False) is True
                 translated_correction = None
-                if policy_issues == ['chinese_policy'] and bilingual_output and can_translate_text:
+                # Use the cheaper text-only correction once. Repeating the same
+                # deterministic translation request after it still violates policy
+                # produces the same rejected output, so let the next bounded retry use
+                # the visual corrective prompt instead.
+                if (
+                    policy_retry_count == 0
+                    and policy_issues == ['chinese_policy']
+                    and bilingual_output
+                    and can_translate_text
+                ):
                     translated_correction = correct_chinese_policy_translation(
                         text,
                         lambda english, avoid_terms: prov.translate_caption(
