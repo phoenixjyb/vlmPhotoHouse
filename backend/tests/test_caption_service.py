@@ -1,12 +1,14 @@
 """Tests for caption service integration."""
 
 import pytest
+import httpx
 from PIL import Image
 import numpy as np
 from unittest.mock import patch, MagicMock
 
 from app.caption_service import (
     _build_caption_provider,
+    CaptionServiceTransientError,
     get_caption_provider,
     HTTPCaptionProvider,
     StubCaptionProvider,
@@ -64,6 +66,50 @@ def test_http_caption_provider_sends_prompt(monkeypatch, tmp_path):
         'url': 'http://127.0.0.1:8102/caption',
         'data': {'prompt': prompt},
     }]
+
+
+@pytest.mark.parametrize('failure_kind', ['timeout', 'server_error'])
+def test_http_caption_provider_marks_transport_and_server_failures_transient(
+    monkeypatch,
+    tmp_path,
+    failure_kind,
+):
+    class FakeResponse:
+        status_code = 503
+        text = 'temporarily unavailable'
+
+        def json(self):
+            return {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url):
+            return FakeResponse()
+
+        def post(self, url, files, data=None):
+            if failure_kind == 'timeout':
+                raise httpx.ReadTimeout(
+                    'caption request timed out',
+                    request=httpx.Request('POST', url),
+                )
+            return FakeResponse()
+
+    monkeypatch.setattr('app.caption_service.httpx.Client', FakeClient)
+    monkeypatch.setattr('app.caption_service._caption_tmp_dir', lambda: str(tmp_path))
+    monkeypatch.setenv('CAPTION_HTTP_RETRIES', '1')
+
+    provider = HTTPCaptionProvider('http://127.0.0.1:8102')
+
+    with pytest.raises(CaptionServiceTransientError):
+        provider.generate_caption(Image.new('RGB', (32, 32)))
 
 
 def test_http_caption_provider_translates_with_reviewed_terms(monkeypatch):

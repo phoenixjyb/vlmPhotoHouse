@@ -27,6 +27,11 @@ class CaptionProvider(Protocol):
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str: ...
     def get_model_name(self) -> str: ...
 
+
+class CaptionServiceTransientError(ConnectionError):
+    """A retryable caption-service transport or server failure."""
+
+
 class HTTPCaptionProvider:
     """HTTP-based caption provider that calls remote caption service."""
 
@@ -84,7 +89,8 @@ class HTTPCaptionProvider:
                 detail = response.text
                 is_server_error = response.status_code >= 500
                 is_oom = ("out of memory" in detail.lower()) or ("cuda out of memory" in detail.lower())
-                err = RuntimeError(f"Caption service error: {response.status_code} - {detail}")
+                error_type = CaptionServiceTransientError if is_server_error else RuntimeError
+                err = error_type(f"Caption service error: {response.status_code} - {detail}")
                 last_err = err
 
                 if is_server_error and attempt < max_retries:
@@ -103,7 +109,7 @@ class HTTPCaptionProvider:
                 
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to caption service: {e}")
-            raise RuntimeError(f"Caption service connection failed: {e}") from e
+            raise CaptionServiceTransientError(f"Caption service connection failed: {e}") from e
         except Exception as e:
             logger.error(f"Caption generation error: {e}")
             raise
@@ -134,7 +140,8 @@ class HTTPCaptionProvider:
             with httpx.Client(timeout=request_timeout, trust_env=False) as client:
                 response = client.post(f"{self.service_url}/translate", json=payload)
             if response.status_code != 200:
-                raise RuntimeError(f"Caption translation error: {response.status_code} - {response.text}")
+                error_type = CaptionServiceTransientError if response.status_code >= 500 else RuntimeError
+                raise error_type(f"Caption translation error: {response.status_code} - {response.text}")
             translated = str(response.json().get('translation') or '').strip().strip('"').strip()
             if translated.upper().startswith('ZH-CN:'):
                 translated = translated[6:].strip()
@@ -142,7 +149,7 @@ class HTTPCaptionProvider:
                 raise RuntimeError('Caption service returned empty translation')
             return translated
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Caption translation connection failed: {exc}") from exc
+            raise CaptionServiceTransientError(f"Caption translation connection failed: {exc}") from exc
 
 class StubCaptionProvider:
     """Stub caption provider that generates heuristic captions."""

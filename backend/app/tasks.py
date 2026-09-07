@@ -406,8 +406,10 @@ class TaskExecutor:
                     session.commit()
                 except Exception:
                     session.rollback()
-                # Do not generate stub captions by default; keep asset eligible for future backfill.
-                return None
+                # Do not report success when the real provider failed. Propagate the
+                # original exception so TaskExecutor can apply its retry/dead-letter
+                # policy while keeping the asset eligible for future backfill.
+                raise
             base = os.path.splitext(Path(asset.path).name)[0]
             toks = [t for t in base.replace('-',' ').replace('_',' ').split() if t]
             text = 'Photo' if not toks else ' '.join(toks[:8])

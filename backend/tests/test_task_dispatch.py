@@ -5,7 +5,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import Base, Task
+from PIL import Image
+
+from app.caption_service import CaptionServiceTransientError
+from app.db import Asset, Base, Caption, Task
 from app.tasks import TaskExecutor
 
 
@@ -90,3 +93,79 @@ def test_unknown_task_type_fails_closed():
         assert task is not None
         assert task.state == 'failed'
         assert task.last_error == 'Unsupported task type: future_task'
+
+
+def test_caption_transport_failure_retries_then_dead_letters_without_false_success(
+    monkeypatch,
+):
+    executor, session_factory = _executor_with_memory_database()
+    executor.settings = SimpleNamespace(
+        max_task_retries=2,
+        retry_backoff_base_seconds=0,
+        retry_backoff_cap_seconds=0,
+        retry_backoff_jitter=0,
+    )
+
+    class FailingProvider:
+        def generate_caption(self, image, prompt=None):
+            raise CaptionServiceTransientError('caption service unavailable')
+
+        def get_model_name(self):
+            return 'unreachable-caption-service'
+
+    monkeypatch.setenv('CAPTION_ENABLE_STUB_FALLBACK', 'false')
+    monkeypatch.setattr(
+        'app.caption_service.get_caption_provider',
+        lambda: FailingProvider(),
+    )
+    monkeypatch.setattr(
+        executor,
+        '_load_caption_image',
+        lambda asset: Image.new('RGB', (32, 32)),
+    )
+
+    with session_factory() as session:
+        asset = Asset(
+            path='/library/unavailable-caption.jpg',
+            hash_sha256='a' * 64,
+            mime='image/jpeg',
+        )
+        session.add(asset)
+        session.flush()
+        task = Task(
+            type='caption',
+            state='pending',
+            priority=1,
+            scheduled_at=datetime.utcnow(),
+            payload_json={'asset_id': asset.id},
+        )
+        session.add(task)
+        session.commit()
+        asset_id = asset.id
+        task_id = task.id
+
+    assert executor.run_once()
+
+    with session_factory() as session:
+        task = session.get(Task, task_id)
+        asset = session.get(Asset, asset_id)
+        assert task is not None
+        assert asset is not None
+        assert task.state == 'pending'
+        assert task.retry_count == 1
+        assert task.last_error == 'caption service unavailable'
+        assert task.finished_at is None
+        assert asset.caption_processed is False
+        assert asset.caption_error_last == 'caption service unavailable'
+        assert session.query(Caption).filter(Caption.asset_id == asset_id).count() == 0
+
+    assert executor.run_once()
+
+    with session_factory() as session:
+        task = session.get(Task, task_id)
+        assert task is not None
+        assert task.state == 'dead'
+        assert task.retry_count == 2
+        assert task.last_error == 'caption service unavailable'
+        assert task.finished_at is not None
+        assert session.query(Caption).filter(Caption.asset_id == asset_id).count() == 0
