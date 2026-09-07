@@ -39,6 +39,7 @@ function New-PhotoHouseRuntimeContext {
         DerivedPath = Join-Path $DataRoot 'derived'
         TempPath = Join-Path $DataRoot 'tmp'
         HfHome = Join-Path $DataRoot 'hf_home'
+        InsightFaceRoot = Join-Path $DataRoot 'models\insightface'
         LogRoot = Join-Path $DataRoot 'logs\photohouse'
     }
 }
@@ -58,6 +59,7 @@ function Get-PhotoHouseMissingPaths {
         [pscustomobject]@{ Name = 'Repo-root Python'; Path = $Context.PythonExe; Required = $true },
         [pscustomobject]@{ Name = 'LVFace repository'; Path = $Context.LvfaceDir; Required = [bool]$RequireModels },
         [pscustomobject]@{ Name = 'LVFace Python'; Path = $Context.LvfacePythonExe; Required = [bool]$RequireModels },
+        [pscustomobject]@{ Name = 'InsightFace detection model'; Path = (Join-Path $Context.InsightFaceRoot 'models\buffalo_l\det_10g.onnx'); Required = [bool]$RequireModels },
         [pscustomobject]@{ Name = 'Caption repository'; Path = $Context.CaptionDir; Required = [bool]$RequireModels },
         [pscustomobject]@{ Name = 'Caption Python'; Path = $Context.CaptionPythonExe; Required = [bool]$RequireModels },
         [pscustomobject]@{ Name = 'Originals directory'; Path = $Context.OriginalsPath; Required = [bool]$RequireOriginals }
@@ -86,6 +88,7 @@ function Show-PhotoHouseRuntimeContext {
     Write-Host "  Python:         $($Context.PythonExe)" -ForegroundColor Gray
     Write-Host "  LVFace:         $($Context.LvfaceDir)" -ForegroundColor Gray
     Write-Host "  Caption models: $($Context.CaptionDir)" -ForegroundColor Gray
+    Write-Host "  InsightFace:    $($Context.InsightFaceRoot)" -ForegroundColor Gray
     Write-Host "  Data root:      $($Context.DataRoot)" -ForegroundColor Gray
     Write-Host "  Originals:      $($Context.OriginalsPath)" -ForegroundColor Gray
     Write-Host "  Database:       $($Context.DatabasePath)" -ForegroundColor Gray
@@ -113,6 +116,7 @@ function Initialize-PhotoHouseRuntimeEnvironment {
     $env:AUTO_MIGRATE = if ($AutoMigrate) { 'true' } else { 'false' }
     $env:FACE_EMBED_PROVIDER = 'lvface'
     $env:FACE_DETECT_PROVIDER = 'scrfd'
+    $env:INSIGHTFACE_ROOT = $Context.InsightFaceRoot
     $env:FACE_EMBED_DIM = '128'
     $env:LVFACE_EXTERNAL_DIR = $Context.LvfaceDir
     $env:LVFACE_PYTHON_EXE = $Context.LvfacePythonExe
@@ -143,6 +147,7 @@ function Initialize-PhotoHouseRuntimeEnvironment {
         $Context.DerivedPath,
         $Context.TempPath,
         $Context.HfHome,
+        $Context.InsightFaceRoot,
         $Context.LogRoot
     )) {
         New-Item -ItemType Directory -Path $path -Force | Out-Null

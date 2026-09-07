@@ -90,9 +90,14 @@ class InsightFaceDetectionProvider:
 
         det_pack = os.getenv('INSIGHTFACE_DET_PACK', 'buffalo_l')
         det_size = int(os.getenv('INSIGHTFACE_DET_SIZE', '640') or '640')
+        model_root = os.path.abspath(os.path.expandvars(os.path.expanduser(
+            os.getenv('INSIGHTFACE_ROOT', '~/.insightface')
+        )))
         self.runtime_name = 'onnxruntime'
         self.runtime_version = str(ort.__version__)
         self.requested_device = device
+        self.model_root = model_root
+        self.model_pack = det_pack
 
         providers = ['CPUExecutionProvider']
         ctx_id = -1
@@ -118,7 +123,12 @@ class InsightFaceDetectionProvider:
 
         self.available_execution_providers = tuple(ort.get_available_providers())
         self.min_score = float(os.getenv('INSIGHTFACE_MIN_DET_SCORE', '0.35') or '0.35')
-        self.app = FaceAnalysis(name=det_pack, allowed_modules=['detection'], providers=providers)
+        self.app = FaceAnalysis(
+            name=det_pack,
+            root=model_root,
+            allowed_modules=['detection'],
+            providers=providers,
+        )
         self.app.prepare(ctx_id=ctx_id, det_size=(det_size, det_size))
         self.execution_providers = self._session_execution_providers()
         self.effective_execution_provider = (
@@ -188,6 +198,8 @@ def describe_detection_runtime(provider: FaceDetectionProvider) -> dict:
         'execution_providers': list(execution_providers),
         'effective_execution_provider': effective_provider,
         'accelerated': getattr(provider, 'accelerated', None),
+        'model_root': getattr(provider, 'model_root', None),
+        'model_pack': getattr(provider, 'model_pack', None),
     }
 
 @lru_cache()

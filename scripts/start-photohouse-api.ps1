@@ -119,11 +119,29 @@ $leaveRunning = $false
 function Test-PhotoHouseReadyHealth {
     param([object]$Health)
 
+    if ($null -eq $Health) {
+        return $false
+    }
+    $healthProperties = @($Health.PSObject.Properties.Name)
+    if ($healthProperties -notcontains 'face' -or $null -eq $Health.face) {
+        return $false
+    }
+    $faceProperties = @($Health.face.PSObject.Properties.Name)
+    if (
+        $faceProperties -notcontains 'detect_provider' -or
+        $faceProperties -notcontains 'detect_runtime' -or
+        $null -eq $Health.face.detect_runtime
+    ) {
+        return $false
+    }
+
     return (
-        $null -ne $Health -and
         [bool]$Health.ok -and
         [bool]$Health.db_ok -and
-        [bool]$Health.worker_enabled -eq (-not [bool]$DisableInlineWorker)
+        [bool]$Health.worker_enabled -eq (-not [bool]$DisableInlineWorker) -and
+        [string]$Health.face.detect_provider -eq 'InsightFaceDetectionProvider' -and
+        [string]$Health.face.detect_runtime.effective_execution_provider -eq 'CUDAExecutionProvider' -and
+        [bool]$Health.face.detect_runtime.accelerated
     )
 }
 
@@ -150,6 +168,9 @@ try {
         }
         if ([bool]$existingHealth.worker_enabled -ne (-not [bool]$DisableInlineWorker)) {
             throw "PhotoHouse responded on port $ApiPort with a different inline-worker mode."
+        }
+        if (-not (Test-PhotoHouseReadyHealth -Health $existingHealth)) {
+            throw 'PhotoHouse responded on the API port without the required InsightFace CUDA detector.'
         }
         Write-PhotoHouseLog -Path $controlLog -Message "PhotoHouse API already healthy on 127.0.0.1:$ApiPort; startup skipped."
         return

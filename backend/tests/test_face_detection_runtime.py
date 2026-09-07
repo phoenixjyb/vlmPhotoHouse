@@ -16,9 +16,10 @@ def _install_fake_runtime(monkeypatch, available, session_providers):
             return list(session_providers)
 
     class FakeFaceAnalysis:
-        def __init__(self, name, allowed_modules, providers):
+        def __init__(self, name, root, allowed_modules, providers):
             state['face_analysis'] = {
                 'name': name,
+                'root': root,
                 'allowed_modules': allowed_modules,
                 'providers': providers,
             }
@@ -49,12 +50,15 @@ def _install_fake_runtime(monkeypatch, available, session_providers):
     return state
 
 
-def test_insightface_reports_prepared_cuda_session(monkeypatch):
+def test_insightface_reports_prepared_cuda_session(monkeypatch, tmp_path):
     state = _install_fake_runtime(
         monkeypatch,
         available=('CUDAExecutionProvider', 'CPUExecutionProvider'),
         session_providers=('CUDAExecutionProvider', 'CPUExecutionProvider'),
     )
+
+    model_root = tmp_path / 'shared-insightface'
+    monkeypatch.setenv('INSIGHTFACE_ROOT', str(model_root))
 
     provider = InsightFaceDetectionProvider('cuda:0')
 
@@ -63,7 +67,10 @@ def test_insightface_reports_prepared_cuda_session(monkeypatch):
         'CUDAExecutionProvider',
         'CPUExecutionProvider',
     ]
+    assert state['face_analysis']['root'] == str(model_root.resolve())
     assert state['prepare'] == {'ctx_id': 0, 'det_size': (640, 640)}
+    assert provider.model_root == str(model_root.resolve())
+    assert provider.model_pack == 'buffalo_l'
     assert provider.effective_execution_provider == 'CUDAExecutionProvider'
     assert provider.effective_device == 'cuda:0'
     assert provider.accelerated is True
@@ -96,3 +103,5 @@ def test_stub_runtime_description_is_explicit():
     assert runtime['effective_device'] == 'stub'
     assert runtime['effective_execution_provider'] == 'StubDetectionProvider'
     assert runtime['accelerated'] is False
+    assert runtime['model_root'] is None
+    assert runtime['model_pack'] is None
