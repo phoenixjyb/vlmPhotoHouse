@@ -128,6 +128,8 @@ function Test-PhotoHouseReadyHealth {
     }
     $faceProperties = @($Health.face.PSObject.Properties.Name)
     if (
+        $faceProperties -notcontains 'embed_provider' -or
+        $faceProperties -notcontains 'embed_dim' -or
         $faceProperties -notcontains 'detect_provider' -or
         $faceProperties -notcontains 'detect_runtime' -or
         $null -eq $Health.face.detect_runtime
@@ -139,6 +141,8 @@ function Test-PhotoHouseReadyHealth {
         [bool]$Health.ok -and
         [bool]$Health.db_ok -and
         [bool]$Health.worker_enabled -eq (-not [bool]$DisableInlineWorker) -and
+        [string]$Health.face.embed_provider -eq 'LVFaceSubprocessProvider' -and
+        [int]$Health.face.embed_dim -eq 128 -and
         [string]$Health.face.detect_provider -eq 'InsightFaceDetectionProvider' -and
         [string]$Health.face.detect_runtime.effective_execution_provider -eq 'CUDAExecutionProvider' -and
         [bool]$Health.face.detect_runtime.accelerated

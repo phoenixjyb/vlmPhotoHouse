@@ -1,5 +1,6 @@
 import sys
 import types
+from pathlib import Path
 
 from app.face_detection_service import (
     InsightFaceDetectionProvider,
@@ -105,3 +106,18 @@ def test_stub_runtime_description_is_explicit():
     assert runtime['accelerated'] is False
     assert runtime['model_root'] is None
     assert runtime['model_pack'] is None
+
+
+def test_windows_launcher_requires_real_face_detection_and_embedding():
+    launcher = (
+        Path(__file__).resolve().parents[2]
+        / 'scripts'
+        / 'start-photohouse-api.ps1'
+    ).read_text(encoding='utf-8')
+
+    assert "embed_provider -eq 'LVFaceSubprocessProvider'" in launcher
+    assert 'embed_dim -eq 128' in launcher
+    assert "detect_provider -eq 'InsightFaceDetectionProvider'" in launcher
+    assert (
+        "effective_execution_provider -eq 'CUDAExecutionProvider'" in launcher
+    )

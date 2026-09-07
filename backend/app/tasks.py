@@ -678,17 +678,23 @@ class TaskExecutor:
                 except Exception:
                     pass
             except Exception:
-                # Do not inject fake face boxes by default; this pollutes face_detections.
-                # Optional legacy behavior can be enabled via FACE_DETECT_CENTER_FALLBACK=true.
-                dets = []
+                # Do not turn detector failures into successful zero-face tasks. The task
+                # executor must see the exception so normal retry/dead-letter handling can
+                # preserve the distinction between "no face found" and "detector failed".
+                # Optional legacy behavior can still be enabled explicitly.
                 if os.getenv('FACE_DETECT_CENTER_FALLBACK', 'false').lower() in ('1', 'true', 'yes'):
+                    dets = []
                     from PIL import Image as _Im
                     with _Im.open(src) as im_det:
                         w,h = safe_exif_transpose(im_det).size
                     size = min(w,h)*0.4
                     dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size,'landmarks':None})())
                 else:
-                    logger.warning(f"Face detection failed for asset_id={asset.id}; skipping fallback box insertion", exc_info=True)
+                    logger.exception(
+                        "Face detection failed for asset_id=%s; task will retry",
+                        asset.id,
+                    )
+                    raise
             detector_model = type(provider).__name__ if 'provider' in locals() else None
             known_faces = [
                 ((float(f.bbox_x), float(f.bbox_y), float(f.bbox_w), float(f.bbox_h)), f)
