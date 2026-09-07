@@ -1305,6 +1305,8 @@ class TaskExecutor:
         ).where(Task.type == 'dim_backfill')
         missing = session.query(Asset.id).filter(
             or_(Asset.width==None, Asset.height==None),
+            Asset.status == 'active',
+            Asset.mime.like('image/%'),
             ~Asset.id.in_(attempted_asset_ids),
         ).limit(50).all()
         if not missing:

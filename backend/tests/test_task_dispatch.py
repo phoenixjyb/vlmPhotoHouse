@@ -187,7 +187,18 @@ def test_dim_backfill_does_not_reenqueue_previously_attempted_assets():
             hash_sha256='c' * 64,
             mime='image/jpeg',
         )
-        session.add_all([attempted, fresh])
+        video = Asset(
+            path='/library/clip.mp4',
+            hash_sha256='e' * 64,
+            mime='video/mp4',
+        )
+        suppressed = Asset(
+            path='/library/suppressed.jpg',
+            hash_sha256='f' * 64,
+            mime='image/jpeg',
+            status='suppressed',
+        )
+        session.add_all([attempted, fresh, video, suppressed])
         session.flush()
         session.add(
             Task(
