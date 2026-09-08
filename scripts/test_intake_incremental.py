@@ -160,6 +160,17 @@ class IntakeTests(unittest.TestCase):
                     self.assertEqual(again['new_assets'], 0)
                     self.assertEqual(again['skipped'], 2)
                     self.assertEqual(session.scalar(select(func.count()).select_from(Asset)), 2)
+                    deferred_image = self.root / 'deferred.jpg'
+                    Image.new('RGB', (8, 8), (50, 20, 30)).save(deferred_image)
+                    deferred_video = self.media('deferred.mp4', b'other video fixture')
+                    deferred = ingest_paths(session, [str(deferred_image), str(deferred_video)], enqueue_embeddings=False)
+                    self.assertEqual(deferred['new_assets'], 2)
+                    self.assertEqual(session.scalar(select(func.count()).select_from(Task)), 14)
+                    queued_types = set(session.scalars(select(Task.type).where(Task.id > 8)).all())
+                    self.assertNotIn('embed', queued_types)
+                    self.assertNotIn('video_embed', queued_types)
+                    self.assertIn('caption', queued_types)
+                    self.assertIn('face', queued_types)
             finally:
                 engine.dispose()
                 get_settings.cache_clear()

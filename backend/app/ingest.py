@@ -53,7 +53,7 @@ def read_exif(path: Path) -> dict:
         pass
     return out
 
-def ingest_paths(session: Session, roots: List[str]) -> dict:
+def ingest_paths(session: Session, roots: List[str], *, enqueue_embeddings: bool = True) -> dict:
     new_assets = 0
     skipped = 0
     start = time.time()
@@ -136,6 +136,8 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
                     if getattr(settings, 'video_scene_detect', False):
                         tasks_to_create.append(Task(type='video_scene_detect', priority=80, payload_json={'asset_id': asset.id}))
             for t in tasks_to_create:
+                if not enqueue_embeddings and t.type in {'embed', 'video_embed'}:
+                    continue
                 session.add(t)
             new_assets +=1
         session.commit()

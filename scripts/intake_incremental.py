@@ -17,6 +17,8 @@ import sqlite3
 import stat
 import sys
 import time
+import urllib.request
+import urllib.parse
 
 IMAGES = {'.jpg', '.jpeg', '.png', '.heic', '.webp'}
 VIDEOS = {'.mp4', '.mov', '.mkv', '.avi', '.m4v'}
@@ -190,15 +192,25 @@ def quarantine(plan, destination, log):
     return moved
 
 
-def ingest_selected(plan, log):
+def ingest_selected(plan, log, *, defer_embeddings=False, api_url='http://127.0.0.1:8002'):
     # Use the project's importer and schema, not hand-written database inserts.
     root, database = Path(plan['root']), Path(plan['database'])
     os.environ['DATABASE_URL'] = 'sqlite:///' + database.as_posix()
     os.environ['VIDEO_ENABLED'] = 'true'
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, select
     from sqlalchemy.orm import sessionmaker
     from app.ingest import ingest_paths
+    from app.db import Asset
+    if plan['unique'] and not defer_embeddings:
+        parsed = urllib.parse.urlparse(api_url)
+        if parsed.hostname not in {'127.0.0.1', 'localhost', '::1'} or parsed.scheme != 'http':
+            raise ValueError('Use a loopback PhotoHouse API')
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(api_url.rstrip('/') + '/embedding/backend', timeout=30) as response:
+            backend = json.load(response)
+        if any(str(backend.get(field, 'stub')).startswith('stub') for field in ('image_model', 'text_model')):
+            raise ValueError('Live similarity embedding provider is a stub; use --defer-embeddings or configure a real provider first')
     engine = create_engine(os.environ['DATABASE_URL'], connect_args={'timeout': 30})
     sessions = sessionmaker(bind=engine)
     counts = Counter()
@@ -208,10 +220,14 @@ def ingest_selected(plan, log):
             if signature(path) != item['signature']:
                 raise ValueError('File changed since audit; deferred')
             with sessions() as session:
-                result = ingest_paths(session, [str(path)])
+                result = ingest_paths(session, [str(path)], enqueue_embeddings=not defer_embeddings)
+                asset_id = session.scalar(select(Asset.id).where(Asset.path == str(path)))
             counts['new_assets'] += result['new_assets']
             counts['skipped'] += result['skipped']
-            emit(log, {'event': 'ingested', 'path': str(path), **result})
+            if defer_embeddings:
+                counts['embedding_jobs_deferred'] += result['new_assets']
+            emit(log, {'event': 'ingested', 'path': str(path), 'asset_id': asset_id,
+                       'similarity_embedding_deferred': defer_embeddings, **result})
         except Exception as exc:
             counts['errors'] += 1
             emit(log, {'event': 'ingest-error', 'path': str(path), 'error': str(exc)})
@@ -229,6 +245,8 @@ def main():
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--quarantine', type=Path)
     parser.add_argument('--receipt', type=Path)
+    parser.add_argument('--defer-embeddings', action='store_true', help='Do not enqueue general image/video embeddings; caption and face tasks remain enabled')
+    parser.add_argument('--api-url', default='http://127.0.0.1:8002')
     args = parser.parse_args()
     if not args.apply:
         plan = audit(args.root, args.database, args.settle_seconds)
@@ -243,7 +261,7 @@ def main():
         raise ValueError('Plan root/database mismatch')
     with args.receipt.open('x', encoding='utf-8') as log:
         moved = quarantine(plan, args.quarantine, log)
-        result = ingest_selected(plan, log)
+        result = ingest_selected(plan, log, defer_embeddings=args.defer_embeddings, api_url=args.api_url)
         emit(log, {'event': 'complete', 'moved': moved, **result})
         print(json.dumps({'phase': 'complete', 'moved': moved, **result}), flush=True)
 
