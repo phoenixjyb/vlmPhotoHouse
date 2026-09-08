@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import threading
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, text, update
+from sqlalchemy import select, or_, text, update, text as sql_text
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
 from .config import get_settings
@@ -371,6 +371,7 @@ class TaskExecutor:
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         force = bool(payload.get('force', False))
+        replace_generated = bool(payload.get('replace_generated', False))
         profile = (payload.get('profile') or os.getenv('CAPTION_PROFILE','balanced')).lower()
         max_variants = int(os.getenv('CAPTION_MAX_VARIANTS','3') or '3')
         word_limit = int(os.getenv('CAPTION_WORD_LIMIT','120') or '120')
@@ -378,8 +379,12 @@ class TaskExecutor:
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
+        if replace_generated and asset.status != 'active':
+            raise ValueError('Caption refresh requires an active asset')
         existing = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
-        if existing and not force and len(existing) >= max_variants:
+        if replace_generated and any(c.user_edited for c in existing):
+            return next(c for c in existing if c.user_edited)
+        if existing and not force and not replace_generated and len(existing) >= max_variants:
             return existing[-1]
         text = ''
         model_name = 'unknown'
@@ -478,8 +483,26 @@ class TaskExecutor:
         if bilingual_output and 'zh-cn' not in model_name.lower():
             model_name = f'{model_name}|bilingual-en-zh-cn'
             caption_model_version = 'bilingual-v1'
+        if replace_generated:
+            if not model_name.startswith('qwen3-vl-http') or bilingual_caption_issues(text):
+                raise ValueError('Caption refresh requires validated bilingual Qwen3 output')
+            # End the inference-time read transaction, then serialize the write
+            # against edits made while the model was generating its response.
+            session.rollback()
+            session.execute(sql_text('BEGIN IMMEDIATE'))
+            asset = session.get(Asset, asset_id, populate_existing=True)
+            if not asset or asset.status != 'active':
+                session.rollback()
+                raise ValueError('Asset changed during caption refresh')
+            existing = session.query(Caption).filter(Caption.asset_id==asset_id).populate_existing().all()
+            edited = next((c for c in existing if c.user_edited), None)
+            if edited is not None:
+                session.rollback()
+                return edited
+            for previous in existing:
+                previous.superseded = True
         # Replace oldest non user_edited if at capacity
-        if existing and len(existing) >= max_variants:
+        if existing and len(existing) >= max_variants and not replace_generated:
             target = next((c for c in existing if not c.user_edited), None)
             if target is None:
                 return existing[-1]
@@ -554,6 +577,8 @@ class TaskExecutor:
             session.commit()
         except Exception:
             session.rollback()
+            if replace_generated:
+                raise
         return cap
 
     def _handle_image_tag(self, session: Session, task: Task):
