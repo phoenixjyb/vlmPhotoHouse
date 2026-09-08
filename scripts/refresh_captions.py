@@ -21,7 +21,9 @@ import urllib.request
 
 
 def fingerprint(captions):
-    return hashlib.sha256(json.dumps(sorted(captions), ensure_ascii=True).encode()).hexdigest()
+    # sqlite3 returns 0/1 whereas the ORM returns False/True for these columns.
+    canonical = [(c[0], c[1], c[2], int(c[3]), int(c[4])) for c in captions]
+    return hashlib.sha256(json.dumps(sorted(canonical), ensure_ascii=True).encode()).hexdigest()
 
 
 def reason_for(captions):

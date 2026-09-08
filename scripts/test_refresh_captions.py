@@ -32,6 +32,10 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(fingerprint(rows), fingerprint(rows[::-1]))
         self.assertNotEqual(fingerprint(rows), fingerprint([(1, 'edited', 'old', False, False)]))
 
+    def test_sqlite_and_orm_booleans_have_identical_fingerprints(self):
+        self.assertEqual(fingerprint([(1, 'a', 'old', 0, 1)]),
+                         fingerprint([(1, 'a', 'old', False, True)]))
+
 
 @unittest.skipUnless(importlib.util.find_spec('sqlalchemy'), 'Windows runtime dependencies required')
 class RefreshPersistenceTests(unittest.TestCase):
