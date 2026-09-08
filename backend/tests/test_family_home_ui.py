@@ -31,8 +31,8 @@ def test_family_home_copy_is_bilingual_and_responsive():
     javascript = (UI_ROOT / "app.js").read_text(encoding="utf-8")
     css = (UI_ROOT / "styles.css").read_text(encoding="utf-8")
 
-    assert 'home_title: "Find the moments that matter"' in javascript
-    assert 'home_title: "找到真正重要的时刻"' in javascript
+    assert 'home_title: "Ordinary days. Extraordinary memories."' in javascript
+    assert 'home_title: "平凡的日子，珍贵的回忆。"' in javascript
     assert 'search_mode_family: "Smart family search"' in javascript
     assert 'search_mode_family: "家庭智能搜索"' in javascript
     assert ".home-search-row" in css

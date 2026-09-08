@@ -1,6 +1,8 @@
 const state = {
   activeTab: "home",
   uiMode: "family",
+  gridItems: new Map(),
+  viewer: { items: [], index: 0, timer: null, request: 0, returnFocus: null, origin: "home" },
   home: {
     recent: [],
     people: [],
@@ -96,8 +98,27 @@ const ALL_TABS = ["home", "library", "people", "tags", "stories", "similarity", 
 
 const I18N = {
   en: {
-    app_title: "VLM Photo House",
-    subtitle: "A private home for your family memories.",
+    app_title: "PhotoHouse",
+    subtitle: "Your family's story, all together.",
+    quick_search: "Find a memory",
+    skip_content: "Skip to memories",
+    keepsake_note: "The little things. The big feelings.",
+    family_footer: "A little closer, every time you look back.",
+    watch_memories: "Watch memories",
+    play_slideshow: "Play slideshow",
+    pause_slideshow: "Pause slideshow",
+    photo_details: "Photo details",
+    previous_photo: "Previous photo",
+    next_photo: "Next photo",
+    viewer_position: "{current} of {total}",
+    memory_undated: "A moment to keep",
+    memory_video: "Video",
+    loading_memories: "Gathering your memories…",
+    retry_loading: "Try again",
+    partial_home: "Some memories couldn't load. Your photos are still safe.",
+    viewer_no_caption: "A moment that speaks for itself.",
+    viewer_caption_error: "The description couldn't load. Reopen this photo to try again.",
+    viewer_photo_error: "This photo couldn't load. Use the arrows to keep browsing.",
     voice_chat: "Voice Chat",
     voice_chat_reset: "Delete Chat",
     voice_command: "Voice Command",
@@ -142,19 +163,19 @@ const I18N = {
     tasks_pending: "Tasks Pending",
     health: "Health",
     tab_home: "Home",
-    tab_library: "Library",
+    tab_library: "All photos",
     tab_people: "People",
     tab_tags: "Tags",
-    tab_stories: "Stories",
+    tab_stories: "Albums",
     tab_similarity: "Similarity",
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
-    home_eyebrow: "YOUR FAMILY LIBRARY",
-    home_title: "Find the moments that matter",
-    home_intro: "Search naturally by person, activity, place, or memory.",
+    home_eyebrow: "WELCOME TO YOUR FAMILY ALBUM",
+    home_title: "Ordinary days. Extraordinary memories.",
+    home_intro: "The places you've been. The people you love. A lifetime of little moments, waiting to be found again.",
     family_search: "Family search",
-    home_search_ph: "Try: Jane playing outside",
+    home_search_ph: "Try ‘birthday’, ‘by the sea’, or a name…",
     find_memories: "Find Memories",
     home_suggestion_play: "Playing outside",
     home_suggestion_birthday: "Birthday moments",
@@ -162,9 +183,9 @@ const I18N = {
     home_recent_eyebrow: "LATEST ADDITIONS",
     home_recent_title: "Recent moments",
     home_people_eyebrow: "FAMILY",
-    home_people_title: "People you know",
+    home_people_title: "Your favourite people",
     home_albums_eyebrow: "READY TO EXPLORE",
-    home_albums_title: "Suggested albums",
+    home_albums_title: "Stories worth revisiting",
     home_person_photos: "{count} photos",
     home_story_assets: "{count} memories",
     home_empty_recent: "No recent photos are available yet.",
@@ -440,8 +461,27 @@ const I18N = {
     pager_status: "Page {page}/{pages} | showing {shown}/{total}",
   },
   zh: {
-    app_title: "VLM 照片屋",
-    subtitle: "属于家人的私密回忆空间。",
+    app_title: "照片屋",
+    subtitle: "把一家人的故事，好好珍藏。",
+    quick_search: "寻找回忆",
+    skip_content: "跳至回忆",
+    keepsake_note: "小小的日常，满满的爱。",
+    family_footer: "每一次回望，都让我们更亲近。",
+    watch_memories: "播放回忆",
+    play_slideshow: "自动播放",
+    pause_slideshow: "暂停播放",
+    photo_details: "照片详情",
+    previous_photo: "上一张照片",
+    next_photo: "下一张照片",
+    viewer_position: "第 {current} 张，共 {total} 张",
+    memory_undated: "值得珍藏的一刻",
+    memory_video: "视频",
+    loading_memories: "正在整理你的回忆…",
+    retry_loading: "重试",
+    partial_home: "部分内容暂时未能加载，照片仍然安全保存。",
+    viewer_no_caption: "有些美好，无需言语。",
+    viewer_caption_error: "暂时无法加载描述，请重新打开这张照片再试。",
+    viewer_photo_error: "这张照片暂时无法加载，可用箭头继续浏览。",
     voice_chat: "语音对话",
     voice_chat_reset: "删除对话",
     voice_command: "语音命令",
@@ -486,19 +526,19 @@ const I18N = {
     tasks_pending: "待处理任务",
     health: "健康状态",
     tab_home: "首页",
-    tab_library: "资源库",
+    tab_library: "所有照片",
     tab_people: "人物",
     tab_tags: "标签",
-    tab_stories: "故事",
+    tab_stories: "相册",
     tab_similarity: "相似图",
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
-    home_eyebrow: "家庭影像库",
-    home_title: "找到真正重要的时刻",
-    home_intro: "用人物、活动、地点或回忆自然地搜索。",
+    home_eyebrow: "欢迎回到我们的家庭相册",
+    home_title: "平凡的日子，珍贵的回忆。",
+    home_intro: "走过的地方，深爱的人。把生活里点滴的美好，重新捧在手心。",
     family_search: "家庭搜索",
-    home_search_ph: "例如：Jane 在户外玩耍",
+    home_search_ph: "试试「生日」「海边」或家人的名字…",
     find_memories: "寻找回忆",
     home_suggestion_play: "户外玩耍",
     home_suggestion_birthday: "生日时刻",
@@ -506,9 +546,9 @@ const I18N = {
     home_recent_eyebrow: "最近加入",
     home_recent_title: "最近时刻",
     home_people_eyebrow: "家人",
-    home_people_title: "熟悉的人",
+    home_people_title: "最亲爱的人",
     home_albums_eyebrow: "值得探索",
-    home_albums_title: "推荐相册",
+    home_albums_title: "值得重温的故事",
     home_person_photos: "{count} 张照片",
     home_story_assets: "{count} 个回忆",
     home_empty_recent: "暂时没有可显示的最近照片。",
@@ -1759,7 +1799,10 @@ function setActiveTab(tab) {
 
 async function loadTab(tab) {
   if (tab === "home") return loadHome();
-  if (tab === "library") return loadLibraryLatest(state.libraryPager.page || 1);
+  if (tab === "library") {
+    if (!state.libraryViewItems.length) return refreshLibraryCurrentView();
+    return;
+  }
   if (tab === "people") return loadPeople();
   if (tab === "tags") {
     await loadTagsCatalog(state.tagsPager.page || 1);
@@ -1779,6 +1822,7 @@ async function loadTab(tab) {
 
 function renderAssetGrid(items, containerId) {
   const root = qs(containerId);
+  state.gridItems.set(containerId, items);
   if (containerId === "library-grid") {
     state.libraryViewItems = Array.isArray(items) ? items : [];
   }
@@ -1792,10 +1836,12 @@ function renderAssetGrid(items, containerId) {
           <div class="thumb">
             <img loading="lazy" src="/assets/${id}/thumbnail?size=256"
                  alt="${esc(basename(asset.path))}"
-                 onerror="this.remove(); this.parentElement.querySelector('.fallback').style.display='grid';" />
+                 onerror="this.parentElement.querySelector('.fallback').style.display='grid'; this.remove();" />
             <span class="fallback" style="display:none;">${esc(t("no_thumbnail"))}</span>
+            ${isVideoAsset(asset) ? `<span class="media-badge">▷ ${esc(t("memory_video"))}</span>` : ""}
           </div>
           <div class="asset-meta">
+            <p class="memory-date">${esc(memoryDate(asset))}</p>
             <p class="id">#${id}</p>
             <p class="name" title="${esc(asset.path)}">${esc(basename(asset.path))}</p>
           </div>
@@ -1803,6 +1849,26 @@ function renderAssetGrid(items, containerId) {
       `;
     })
     .join("");
+}
+
+function memoryDate(asset) {
+  if (!asset?.taken_at) return t("memory_undated");
+  const date = new Date(asset.taken_at);
+  if (Number.isNaN(date.getTime())) return t("memory_undated");
+  return new Intl.DateTimeFormat(state.lang === "zh" ? "zh-CN" : "en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+  }).format(date);
+}
+
+function renderFeaturedPhotos() {
+  const photos = state.home.recent.filter((asset) => !isVideoAsset(asset)).slice(0, 2);
+  qs("home-featured-photos").innerHTML = photos.length ? photos.map((asset) => `
+    <button class="keepsake-photo" type="button" data-featured-id="${Number(asset.id)}" aria-label="${esc(memoryDate(asset))}">
+      <img src="/assets/${Number(asset.id)}/thumbnail?size=256" alt="${esc(basename(asset.path))}" onerror="this.style.display='none';this.nextElementSibling.hidden=false;" />
+      <span class="home-cover-placeholder" aria-hidden="true" hidden>♡</span>
+      <span class="keepsake-date">${esc(memoryDate(asset))}</span>
+    </button>`).join("") : `<div class="empty-keepsake">${esc(t("keepsake_note"))}</div>`;
+  qs("btn-home-slideshow").disabled = state.home.recent.length === 0;
 }
 
 function renderHomePeople() {
@@ -1840,12 +1906,19 @@ function renderHomeStories() {
     root.innerHTML = `<p class="muted">${esc(t("home_empty_stories"))}</p>`;
     return;
   }
-  root.innerHTML = stories
+  // Keep the welcome page short, with one doorway into each kind of album.
+  const seenTypes = new Set();
+  const featured = stories.filter((story) => {
+    if (seenTypes.has(story.type)) return false;
+    seenTypes.add(story.type);
+    return true;
+  }).slice(0, 4);
+  root.innerHTML = featured
     .map((story) => {
       const firstAsset = (story.items || [])[0] || null;
       const image = firstAsset?.id
-        ? `<img loading="lazy" src="/assets/${Number(firstAsset.id)}/thumbnail?size=256" alt="" />`
-        : "";
+        ? `<img loading="lazy" src="/assets/${Number(firstAsset.id)}/thumbnail?size=256" alt="" onerror="this.style.display='none';this.nextElementSibling.hidden=false;" /><span class="home-cover-placeholder" aria-hidden="true" hidden>♡</span>`
+        : '<span class="home-cover-placeholder" aria-hidden="true">♡</span>';
       return `
         <button class="home-story-row" type="button" data-action="home-open-story" data-story-id="${esc(story.id || "")}">
           ${image}
@@ -1873,24 +1946,44 @@ function renderHome() {
   }
   renderHomePeople();
   renderHomeStories();
+  renderFeaturedPhotos();
 }
 
 async function loadHome() {
-  try {
-    const [recent, people, stories] = await Promise.all([
-      api("/assets?page=1&page_size=8"),
-      api("/persons?page=1&page_size=6&include_faces=true&named_only=true&sort_by=face_count&order=desc"),
-      api("/albums/stories?media=all&story_type=all&min_assets=3&max_stories_per_type=2&story_asset_limit=4&caption_scan_limit=400"),
-    ]);
-    state.home = {
-      recent: Array.isArray(recent?.assets) ? recent.assets : [],
-      people: Array.isArray(people?.persons) ? people.persons : [],
-      stories: Array.isArray(stories?.stories) ? stories.stories : [],
-    };
-    renderHome();
-  } catch (e) {
-    showToast(t("home_load_failed", { error: e.message }));
-  }
+  if (loadHome.pending) return loadHome.pending;
+  const status = qs("home-load-status");
+  status.textContent = t("loading_memories");
+  status.classList.remove("hidden");
+  qs("tab-home").setAttribute("aria-busy", "true");
+  loadHome.pending = (async () => {
+    const sections = [
+      ["recent", "assets", api("/assets?page=1&page_size=8")],
+      ["people", "persons", api("/persons?page=1&page_size=6&include_faces=true&named_only=true&sort_by=face_count&order=desc")],
+      ["stories", "stories", api("/albums/stories?media=all&story_type=all&min_assets=3&max_stories_per_type=2&story_asset_limit=4&caption_scan_limit=400")],
+    ];
+    const results = await Promise.allSettled(sections.map(async ([key, field, request]) => {
+      const result = await request;
+      state.home[key] = Array.isArray(result?.[field]) ? result[field] : [];
+      // A slower album query must not hold back ready-to-view photos.
+      if (key === "recent") {
+        if (state.home.recent.length) renderAssetGrid(state.home.recent, "home-recent-grid");
+        else qs("home-recent-grid").innerHTML = `<p class="muted">${esc(t("home_empty_recent"))}</p>`;
+        renderFeaturedPhotos();
+      }
+      if (key === "people") renderHomePeople();
+      if (key === "stories") renderHomeStories();
+    }));
+    const failed = results.some((result) => result.status === "rejected");
+    status.classList.toggle("hidden", !failed);
+    if (failed) {
+      status.innerHTML = `<span>${esc(t("partial_home"))}</span><button class="btn ghost" type="button" id="btn-home-retry">${esc(t("retry_loading"))}</button>`;
+      qs("btn-home-retry").addEventListener("click", loadHome);
+    }
+  })().finally(() => {
+    qs("tab-home").setAttribute("aria-busy", "false");
+    loadHome.pending = null;
+  });
+  return loadHome.pending;
 }
 
 function inferFamilySearchMedia(query) {
@@ -2696,6 +2789,7 @@ async function restoreSimilarityReduction() {
 }
 
 function closeAssetInspector() {
+  document.body.dataset.inspecting = "false";
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
   qs("asset-empty").classList.remove("hidden");
@@ -2711,24 +2805,110 @@ function openPreviewModal() {
     showToast(t("no_asset_selected"));
     return;
   }
-  const asset = state.selectedAsset;
-  const body = qs("preview-modal-body");
-  if (isVideoAsset(asset)) {
-    body.innerHTML = `<video controls autoplay preload="metadata" src="/assets/${asset.id}/media"></video>`;
-  } else {
-    body.innerHTML = `<img src="/assets/${asset.id}/media" alt="${esc(basename(asset.path))}" />`;
-  }
+  const items = state.libraryViewItems.some((asset) => Number(asset.id) === Number(state.selectedAsset.id))
+    ? state.libraryViewItems : [state.selectedAsset];
+  openMemoryViewer(state.selectedAsset.id, items);
+}
+
+function openMemoryViewer(assetId, items) {
+  const index = items.findIndex((asset) => Number(asset.id) === Number(assetId));
+  if (index < 0) return;
+  stopSlideshow();
+  Object.assign(state.viewer, { items, index, returnFocus: document.activeElement, origin: state.activeTab });
   qs("preview-modal").classList.remove("hidden");
+  document.body.classList.add("viewer-open");
+  document.querySelector(".app-shell").inert = true;
+  renderMemoryViewer();
+  qs("btn-preview-close").focus();
+}
+
+function stopSlideshow() {
+  window.clearInterval(state.viewer.timer);
+  state.viewer.timer = null;
+  qs("btn-preview-play").textContent = t("play_slideshow");
+  qs("btn-preview-play").setAttribute("aria-pressed", "false");
+}
+
+function toggleSlideshow() {
+  if (state.viewer.timer) { stopSlideshow(); return; }
+  if (state.viewer.items.length < 2) return;
+  if (state.viewer.index === state.viewer.items.length - 1) state.viewer.index = 0;
+  renderMemoryViewer();
+  qs("btn-preview-play").textContent = t("pause_slideshow");
+  qs("btn-preview-play").setAttribute("aria-pressed", "true");
+  state.viewer.timer = window.setInterval(() => {
+    if (document.hidden || state.viewer.index >= state.viewer.items.length - 1) {
+      stopSlideshow(); return;
+    }
+    // Let a video play under the viewer's controls before advancing.
+    const video = qs("preview-modal-body").querySelector("video");
+    if (video && !video.paused && !video.ended) return;
+    moveMemoryViewer(1, false);
+  }, 6000);
+}
+
+function moveMemoryViewer(direction, manual = true) {
+  if (manual) stopSlideshow();
+  const next = state.viewer.index + direction;
+  if (next < 0 || next >= state.viewer.items.length) return;
+  state.viewer.index = next;
+  renderMemoryViewer();
+}
+
+async function renderMemoryViewer() {
+  const viewer = state.viewer;
+  const asset = viewer.items[viewer.index];
+  if (!asset) return;
+  const request = ++viewer.request;
+  qs("preview-title").textContent = memoryDate(asset);
+  qs("preview-position").textContent = t("viewer_position", { current: viewer.index + 1, total: viewer.items.length });
+  qs("btn-preview-prev").disabled = viewer.index === 0;
+  qs("btn-preview-next").disabled = viewer.index === viewer.items.length - 1;
+  qs("btn-preview-play").disabled = viewer.items.length < 2;
+  qs("btn-preview-prev").setAttribute("aria-label", t("previous_photo"));
+  qs("btn-preview-next").setAttribute("aria-label", t("next_photo"));
+  qs("preview-caption").setAttribute("aria-label", state.lang === "zh" ? "照片描述" : "Photo description");
+  qs("preview-filmstrip").setAttribute("aria-label", state.lang === "zh" ? "当前视图中的照片" : "Photos in this view");
+  const body = qs("preview-modal-body");
+  body.innerHTML = isVideoAsset(asset)
+    ? `<video controls playsinline preload="metadata" src="/assets/${Number(asset.id)}/media"></video>`
+    : `<img src="/assets/${Number(asset.id)}/thumbnail?size=1024" alt="${esc(basename(asset.path))}" />`;
+  body.firstElementChild.addEventListener("error", () => {
+    if (viewer.request === request) body.innerHTML = `<p class="viewer-photo-error">${esc(t("viewer_photo_error"))}</p>`;
+  });
+  // Window the strip so opening a 120-photo search doesn't fetch 120 thumbnails.
+  const start = Math.max(0, viewer.index - 5);
+  const end = Math.min(viewer.items.length, start + 11);
+  qs("preview-filmstrip").innerHTML = viewer.items.slice(start, end).map((item, offset) => `
+    <button type="button" data-viewer-index="${start + offset}" aria-label="${esc(t("viewer_position", { current: start + offset + 1, total: viewer.items.length }))}" aria-current="${start + offset === viewer.index}">
+      <img loading="lazy" src="/assets/${Number(item.id)}/thumbnail?size=256" alt="" />
+    </button>`).join("");
+  qs("preview-filmstrip").querySelector('[aria-current="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  qs("preview-caption").textContent = "";
+  try {
+    const result = await api(`/assets/${Number(asset.id)}/captions`);
+    if (request !== viewer.request) return;
+    const captions = result.captions || [];
+    const caption = captions.filter((item) => item.user_edited).at(-1) || captions.at(-1);
+    qs("preview-caption").textContent = caption?.text || t("viewer_no_caption");
+  } catch (_) {
+    if (request === viewer.request) qs("preview-caption").textContent = t("viewer_caption_error");
+  }
 }
 
 function closePreviewModal() {
   const modal = qs("preview-modal");
-  if (!modal) return;
+  if (!modal || modal.classList.contains("hidden")) return;
+  stopSlideshow();
+  state.viewer.request++;
+  document.querySelector(".app-shell").inert = false;
+  document.body.classList.remove("viewer-open");
   modal.classList.add("hidden");
   const body = qs("preview-modal-body");
   if (body) {
     body.innerHTML = "";
   }
+  if (state.viewer.returnFocus?.isConnected) state.viewer.returnFocus.focus();
 }
 
 async function loadAssetInspector(assetId) {
@@ -2747,6 +2927,7 @@ async function loadAssetInspector(assetId) {
     }
   }
   if (!asset) return;
+  document.body.dataset.inspecting = "true";
   state.selectedAsset = asset;
   if (state.libraryViewItems.length) {
     renderAssetGrid(state.libraryViewItems, "library-grid");
@@ -3373,6 +3554,76 @@ async function openAssetFromFaceAssetId(assetId) {
 }
 
 function initEvents() {
+  function focusMemorySearch() {
+    setActiveTab("home");
+    loadHome();
+    qs("home-search-query").focus();
+    qs("home-search-query").scrollIntoView({ block: "center", behavior: "auto" });
+  }
+  qs("btn-quick-search").addEventListener("click", focusMemorySearch);
+  qs("home-featured-photos").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-featured-id]");
+    if (button) openMemoryViewer(button.dataset.featuredId, state.home.recent);
+  });
+  qs("btn-home-slideshow").addEventListener("click", () => {
+    if (!state.home.recent.length) return;
+    openMemoryViewer(state.home.recent[0].id, state.home.recent);
+    toggleSlideshow();
+  });
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest(".asset-card");
+    if (!card || state.uiMode !== "family") return;
+    const grid = card.closest(".asset-grid");
+    const items = state.gridItems.get(grid?.id);
+    if (!items?.length) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    card.focus();
+    openMemoryViewer(card.dataset.assetId, items);
+  }, true);
+  qs("btn-preview-prev").addEventListener("click", () => moveMemoryViewer(-1));
+  qs("btn-preview-next").addEventListener("click", () => moveMemoryViewer(1));
+  qs("btn-preview-play").addEventListener("click", toggleSlideshow);
+  qs("preview-filmstrip").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-viewer-index]");
+    if (!button) return;
+    stopSlideshow();
+    state.viewer.index = Number(button.dataset.viewerIndex);
+    renderMemoryViewer();
+    qs("btn-preview-close").focus();
+  });
+  qs("btn-preview-details").addEventListener("click", async () => {
+    const asset = state.viewer.items[state.viewer.index];
+    const origin = state.viewer.origin;
+    closePreviewModal();
+    setActiveTab("library");
+    state.inspectorOriginTab = origin;
+    state.assetMap.set(Number(asset.id), asset);
+    await loadAssetInspector(asset.id);
+    qs("btn-asset-back").focus();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopSlideshow();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (!qs("preview-modal").classList.contains("hidden")) {
+      if (event.target.closest("video, #preview-caption") && event.key !== "Tab") return;
+      if (event.key === "ArrowLeft") { event.preventDefault(); moveMemoryViewer(-1); }
+      if (event.key === "ArrowRight") { event.preventDefault(); moveMemoryViewer(1); }
+      if (event.key === "Tab") {
+        const controls = Array.from(qs("preview-modal").querySelectorAll('button:not(:disabled), video[controls], [tabindex="0"]'))
+          .filter((element) => element.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+    if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey &&
+        !event.target.closest('input, textarea, select, [contenteditable="true"]')) {
+      event.preventDefault(); focusMemorySearch();
+    }
+  });
   document.querySelectorAll(".lang-btn").forEach((el) => {
     el.addEventListener("click", () => {
       const lang = el.dataset.lang === "zh" ? "zh" : "en";
@@ -3385,6 +3636,7 @@ function initEvents() {
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", async () => {
+      if (el.dataset.tab === "library" && document.body.dataset.inspecting === "true") closeAssetInspector();
       setActiveTab(el.dataset.tab);
       await loadTab(state.activeTab);
     });
@@ -3412,7 +3664,7 @@ function initEvents() {
   });
 
   qs("btn-refresh-all").addEventListener("click", async () => {
-    await Promise.all([refreshDashboard(), loadTab(state.activeTab)]);
+    await Promise.all([refreshDashboard(), state.activeTab === "library" ? refreshLibraryCurrentView() : loadTab(state.activeTab)]);
     showToast(t("refreshed"));
   });
   const voiceBtn = qs("btn-voice-command");
@@ -3451,7 +3703,7 @@ function initEvents() {
   qs("home-search-suggestions").addEventListener("click", (e) => {
     const button = e.target.closest("button[data-home-query]");
     if (!button) return;
-    runHomeSearch(button.dataset.homeQuery || "");
+    runHomeSearch((state.lang === "zh" ? button.dataset.homeQueryZh : button.dataset.homeQuery) || button.dataset.homeQuery || "");
   });
   qs("btn-home-view-library").addEventListener("click", async () => {
     setActiveTab("library");
