@@ -189,6 +189,8 @@ def quarantine(plan, destination, log):
         os.rename(source, target)  # Same-volume move; never a delete/copy fallback.
         emit(log, {'event': 'moved', **event})
         moved += 1
+        if moved % 25 == 0 or moved == len(plan['duplicates']):
+            print(json.dumps({'phase': 'quarantine', 'moved': moved, 'total': len(plan['duplicates'])}), flush=True)
     return moved
 
 
