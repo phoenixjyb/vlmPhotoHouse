@@ -173,7 +173,7 @@ let browser;
   await auth(page);
   checkpoint('Expired session cookie clears and returning login succeeds');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge; synthetic SQLite/JPEG only'},null,2));
+  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   if(hold){hold=null;}

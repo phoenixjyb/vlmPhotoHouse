@@ -8,7 +8,8 @@ from pathlib import Path
 import sys
 
 from test_library_reads import LibraryReadTests
-from app.access.media import MediaRuntime
+from app.access.runtime import RuntimeConfiguration
+from fastapi.testclient import TestClient
 
 fixture = LibraryReadTests()
 LibraryReadTests.setUpClass()
@@ -27,7 +28,10 @@ try:
         image.save(derived / f'thumbnails/256/{asset_id}.jpg')
         image.save(originals / f'{asset_id}.jpg')
         fixture.mutate('UPDATE assets SET path=? WHERE id=?',(str(originals / f'{asset_id}.jpg'),asset_id))
-    fixture.client.app.state.media_runtime=MediaRuntime((originals,),derived)
+    fixture.client=TestClient(RuntimeConfiguration(fixture.path.resolve(), 'https://photohouse.test',
+        (originals,), derived).build_app(clock=lambda:fixture.now),
+        base_url='https://photohouse.test',client=('192.0.2.20',23456))
+    fixture.addCleanup(fixture.client.close)
     print(json.dumps({'ready':True}),flush=True)
     for line in sys.stdin:
         message=json.loads(line)
