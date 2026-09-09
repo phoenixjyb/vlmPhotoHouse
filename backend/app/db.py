@@ -9,8 +9,8 @@ class Base(DeclarativeBase):
 class Asset(Base):
     __tablename__ = 'assets'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    path: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    path: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     perceptual_hash: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     mime: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -31,7 +31,8 @@ class Asset(Base):
     file_size: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     imported_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
-    status: Mapped[str] = mapped_column(String(16), default='active', index=True)
+    # The original SQLite schema permits NULL; visibility treats it as legacy-active.
+    status: Mapped[Optional[str]] = mapped_column(String(16), default='active', nullable=True, index=True)
     # Caption processing status fields (added via migration 9b1e7d2a5c6f)
     caption_processed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     caption_variant_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -42,6 +43,9 @@ class Asset(Base):
     embeddings = relationship('Embedding', back_populates='asset', cascade='all, delete-orphan')
     captions = relationship('Caption', back_populates='asset', cascade='all, delete-orphan')
     faces = relationship('FaceDetection', back_populates='asset', cascade='all, delete-orphan')
+
+Index('ix_assets_path', Asset.path)
+Index('ix_assets_hash', Asset.hash_sha256)
 
 class Embedding(Base):
     __tablename__ = 'embeddings'

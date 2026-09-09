@@ -84,3 +84,7 @@ Live backup/restore, Windows filesystem/runtime behavior, TLS/proxy setup, clien
 compatibility, standalone-service authorization, recovery flows and authorized
 worker/voice processing remain separate gates. No Windows/Mac mini, real DB/media,
 model loading, deployment, listener, mobile edits, push or merge occurred.
+
+Continuation: [slice 6](LEGACY_READ_SCHEMA.md) repairs the structural legacy gaps
+with an additive revision and preservation tests. The drift findings above describe
+the earlier `f4c1a8d2e703` checkpoint and remain covered as historical evidence.

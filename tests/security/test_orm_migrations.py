@@ -19,7 +19,7 @@ from app.db import Base
 from app.access.metadata import migration_metadata
 
 PRE_ACCESS = 'd2b7e4f6a901'
-ACCESS_HEAD = 'f4c1a8d2e703'
+ACCESS_HEAD = 'a5d2e8f4b610'
 ACCESS_TABLES = {'access_accounts', 'access_sessions', 'access_operators', 'access_libraries',
     'access_memberships', 'access_invitations', 'access_asset_libraries', 'access_audit',
     'access_admission_key', 'access_attempts', 'access_kdf_slot'}
@@ -182,7 +182,8 @@ class OrmMigrationTests(unittest.TestCase):
                 connection.rollback()
 
     def test_legacy_schema_drift_is_reported_separately_from_access_parity(self):
-        self.upgrade()
+        # Preserve the finding at the old head; the new additive revision repairs it.
+        self.upgrade('f4c1a8d2e703')
         missing = set(Base.metadata.tables) - set(inspect(self.engine).get_table_names())
         self.assertEqual(missing, {'tags', 'asset_tags', 'asset_tag_blocks', 'video_segments'})
         columns = {c['name'] for c in inspect(self.engine).get_columns('assets')}
