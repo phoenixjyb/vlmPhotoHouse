@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "database": null,
+  "web_origin": null,
+  "original_roots": [],
+  "derived_root": null,
+  "bind_host": null,
+  "port": null,
+  "tls_certificate": null,
+  "tls_private_key": null
+}
