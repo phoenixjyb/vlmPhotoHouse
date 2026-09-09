@@ -44,7 +44,7 @@ class RefreshPersistenceTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {'VLM_DATA_ROOT': self.tmp.name,
             'DERIVED_PATH': str(Path(self.tmp.name)/'derived'), 'CAPTION_AUTO_TAG_ENABLE': 'false',
             'CAPTION_WORD_LIMIT': '0', 'CAPTION_POLICY_MAX_RETRIES': '0',
-            'CAPTION_ENABLE_STUB_FALLBACK': 'false'})
+            'CAPTION_ENABLE_STUB_FALLBACK': 'false', 'CAPTION_INFANT_CARE_ASSET_IDS': ''})
         self.env.start()
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'backend'))
         from sqlalchemy import create_engine
@@ -134,6 +134,40 @@ class RefreshPersistenceTests(unittest.TestCase):
                 self.executor._handle_caption(self.session, self.task)
         self.assertEqual(self.session.query(self.Caption).count(), 4)
         self.assertTrue(all(not c.superseded for c in self.session.query(self.Caption)))
+
+    def test_owner_reviewed_baby_care_caption_preserves_history(self):
+        caption = 'EN: A baby wears a diaper on a blanket.\n\nZH-CN: 一个婴儿穿着尿布躺在毯子上。'
+        self.provider.generate_caption.return_value = caption
+        with patch.dict(os.environ, {'CAPTION_INFANT_CARE_ASSET_IDS': str(self.aid)}):
+            result = self.executor._handle_caption(self.session, self.task)
+        self.assertEqual(result.text, caption)
+        self.assertEqual(result.model_version, 'bilingual-v1-infant-care-v1')
+        caps = self.session.query(self.Caption).order_by(self.Caption.id).all()
+        self.assertEqual([c.text for c in caps[:4]], [f'Old one-liner {i}.' for i in range(4)])
+        self.assertTrue(all(c.superseded for c in caps[:4]))
+        self.assertIn('Owner-reviewed baby-care exception', self.provider.generate_caption.call_args.kwargs['prompt'])
+
+    def test_task_payload_cannot_enable_baby_care_exception(self):
+        self.provider.generate_caption.return_value = 'EN: A baby wears a diaper.\n\nZH-CN: 一个婴儿穿着尿布。'
+        self.task.payload_json = dict(self.task.payload_json, allow_infant_care=True)
+        with self.assertRaisesRegex(ValueError, 'caption policy validation failed'):
+            self.executor._handle_caption(self.session, self.task)
+        self.assertTrue(all(not c.superseded for c in self.session.query(self.Caption)))
+
+    def test_other_asset_allowlist_does_not_enable_baby_care_exception(self):
+        self.provider.generate_caption.return_value = 'EN: A baby with no clothing lies on a blanket.\n\nZH-CN: 一个没穿衣服的婴儿躺在毯子上。'
+        with patch.dict(os.environ, {'CAPTION_INFANT_CARE_ASSET_IDS': str(self.aid + 1)}):
+            with self.assertRaisesRegex(ValueError, 'caption policy validation failed'):
+                self.executor._handle_caption(self.session, self.task)
+        self.assertTrue(all(not c.superseded for c in self.session.query(self.Caption)))
+
+    def test_approved_absent_clothing_caption_is_saved(self):
+        caption = 'EN: A baby with no clothing lies on a blanket.\n\nZH-CN: 一个没穿衣服的婴儿躺在毯子上。'
+        self.provider.generate_caption.return_value = caption
+        with patch.dict(os.environ, {'CAPTION_INFANT_CARE_ASSET_IDS': str(self.aid)}):
+            result = self.executor._handle_caption(self.session, self.task)
+        self.assertEqual(result.text, caption)
+        self.assertFalse(result.superseded)
 
 
 if __name__ == '__main__':

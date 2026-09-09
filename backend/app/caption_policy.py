@@ -33,6 +33,15 @@ CHINESE_POLICY_TERMS = (
     '裸体', '赤裸', '尿布', '内衣', '没穿衣服',
 )
 CHINESE_POLICY_RE = re.compile('|'.join(re.escape(term) for term in CHINESE_POLICY_TERMS))
+INFANT_CARE_ENGLISH_TERMS = frozenset({'diaper', 'no clothing', 'without clothing'})
+INFANT_CARE_CHINESE_TERMS = frozenset({'尿布', '没穿衣服'})
+INFANT_CARE_INSTRUCTION = (
+    'Owner-reviewed baby-care exception for this image only: neutral, factual mentions of '
+    'a diaper or no clothing (尿布、没穿衣服) are permitted when directly visible. '
+    'This overrides only the blanket restriction on those baby-care terms. '
+    'Use brief, matter-of-fact family-photo wording, without intimate anatomical detail '
+    'or sexual framing. All other factuality, neutrality and bilingual rules still apply.'
+)
 ENGLISH_PERSON_TERM_RE = re.compile(r'\b(women|woman|men|man|girls|girl|boys|boy)\b', re.IGNORECASE)
 CHINESE_PERSON_TERM_RE = re.compile(r'男人|女人|男子|女子|男性|女性|男孩|女孩')
 ENGLISH_PERSON_REPLACEMENTS = {
@@ -54,7 +63,27 @@ def parse_bilingual_caption(text: str) -> tuple[str, str] | None:
     return match.group('english').strip(), match.group('chinese').strip()
 
 
-def bilingual_caption_issues(text: str) -> list[str]:
+def infant_care_allowed(asset_id: int, configured_ids: str = '') -> bool:
+    """Only an operator's explicit asset allowlist enables this wording exception.
+
+    Never infer approval from model output or a client-supplied task flag. An empty
+    or malformed configuration grants no exception; IDs are not committed here.
+    """
+    if type(asset_id) is not int or not 1 <= asset_id <= 2**63 - 1:
+        return False
+    if not isinstance(configured_ids, str) or len(configured_ids) > 4096:
+        return False
+    parts = [part.strip() for part in configured_ids.split(',')]
+    if any(not re.fullmatch(r'[1-9][0-9]{0,18}', part) or int(part) > 2**63 - 1 for part in parts):
+        return False
+    return asset_id in {int(part) for part in parts}
+
+
+def infant_care_caption_prompt(prompt: str) -> str:
+    return f'{prompt.strip()}\n\n{INFANT_CARE_INSTRUCTION}'
+
+
+def bilingual_caption_issues(text: str, *, allow_infant_care: bool = False) -> list[str]:
     parts = parse_bilingual_caption(text)
     if parts is None:
         return ['format']
@@ -63,14 +92,15 @@ def bilingual_caption_issues(text: str) -> list[str]:
     issues: list[str] = []
     if not re.search(r'[\u4e00-\u9fff]', chinese):
         issues.append('chinese_script')
-    if ENGLISH_POLICY_RE.search(english):
+    matches = bilingual_caption_policy_matches(text, allow_infant_care=allow_infant_care)
+    if matches.get('english_policy'):
         issues.append('english_policy')
-    if CHINESE_POLICY_RE.search(chinese):
+    if matches.get('chinese_policy'):
         issues.append('chinese_policy')
     return issues
 
 
-def bilingual_caption_policy_matches(text: str) -> dict[str, list[str]]:
+def bilingual_caption_policy_matches(text: str, *, allow_infant_care: bool = False) -> dict[str, list[str]]:
     """Return only the matched policy phrases, never the full private caption."""
     parts = parse_bilingual_caption(text)
     if parts is None:
@@ -80,9 +110,11 @@ def bilingual_caption_policy_matches(text: str) -> dict[str, list[str]]:
     matches: dict[str, list[str]] = {}
     english_matches = list(dict.fromkeys(
         match.group(0).lower() for match in ENGLISH_POLICY_RE.finditer(english)
+        if not (allow_infant_care is True and match.group(0).lower() in INFANT_CARE_ENGLISH_TERMS)
     ))
     chinese_matches = list(dict.fromkeys(
         match.group(0) for match in CHINESE_POLICY_RE.finditer(chinese)
+        if not (allow_infant_care is True and match.group(0) in INFANT_CARE_CHINESE_TERMS)
     ))
     if english_matches:
         matches['english_policy'] = english_matches
@@ -91,9 +123,9 @@ def bilingual_caption_policy_matches(text: str) -> dict[str, list[str]]:
     return matches
 
 
-def bilingual_caption_issue_summary(text: str) -> str:
-    issues = bilingual_caption_issues(text)
-    matches = bilingual_caption_policy_matches(text)
+def bilingual_caption_issue_summary(text: str, *, allow_infant_care: bool = False) -> str:
+    issues = bilingual_caption_issues(text, allow_infant_care=allow_infant_care)
+    matches = bilingual_caption_policy_matches(text, allow_infant_care=allow_infant_care)
     details = []
     for issue in issues:
         issue_matches = matches.get(issue, [])
@@ -107,14 +139,17 @@ def bilingual_caption_issue_summary(text: str) -> str:
 def correct_chinese_policy_translation(
     text: str,
     translator: Callable[[str, list[str]], str],
+    *, allow_infant_care: bool = False,
 ) -> str | None:
     """Rebuild a Chinese-only policy failure from its already accepted English facts."""
     parts = parse_bilingual_caption(text)
-    if parts is None or bilingual_caption_issues(text) != ['chinese_policy']:
+    if parts is None or bilingual_caption_issues(text, allow_infant_care=allow_infant_care) != ['chinese_policy']:
         return None
 
     english, _ = parts
-    chinese = str(translator(english, list(CHINESE_POLICY_TERMS)) or '').strip().strip('"').strip()
+    avoid_terms = [term for term in CHINESE_POLICY_TERMS
+                   if not (allow_infant_care is True and term in INFANT_CARE_CHINESE_TERMS)]
+    chinese = str(translator(english, avoid_terms) or '').strip().strip('"').strip()
     if chinese.upper().startswith('ZH-CN:'):
         chinese = chinese[6:].strip()
     if not chinese:
