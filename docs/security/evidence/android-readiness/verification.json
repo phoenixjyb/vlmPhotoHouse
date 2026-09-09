@@ -1,0 +1,18 @@
+{
+  "source_ancestry_checks": 3,
+  "source_ancestry": "pass",
+  "shared_contract_replay_cases": 38,
+  "shared_contract_replay": "pass",
+  "probe_exit_code": 1,
+  "probe_finding": "valid_caption_response_exceeds_android_json_limit",
+  "probe_is_deployment_acceptance": false,
+  "python_source_parse": "pass",
+  "decision_inputs": "unset_and_not_authorized",
+  "markdown_documents_rendered": 3,
+  "rendered_tables": 2,
+  "local_links": "pass",
+  "android_tls_suite_rerun": false,
+  "full_security_suite_rerun": false,
+  "private_hosts_probed": false,
+  "remote_pr_ci_status_rechecked": false
+}

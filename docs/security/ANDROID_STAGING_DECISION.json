@@ -1,0 +1,61 @@
+{
+  "task": "PH-BACKEND-ANDROID-READINESS-01",
+  "artifact_kind": "proposal_not_launch_configuration",
+  "verdict": "NO_GO_REAL_PHONE",
+  "deployed": "unknown",
+  "candidate_backend_commit": "1e394f789ff1f7cef6d9930bb541186684f5a9a0",
+  "approved_backend_commit": null,
+  "required_schema_revision": "b6e3f9a5c721",
+  "contract_version": "1.0.0-fixture.1",
+  "proposal": {
+    "host_role": "existing_windows_photohouse_host_separate_staging",
+    "host_selection": "proposed_not_operator_confirmed",
+    "network": "explicit_private_or_vpn_interface_only",
+    "tls": "direct_tls_system_trusted_chain",
+    "proxy_headers": false,
+    "workers": 1,
+    "loop": "asyncio",
+    "http": "h11",
+    "websockets": false,
+    "reload": false,
+    "access_log": false,
+    "limit_concurrency": 16,
+    "timeout_keep_alive_seconds": 5,
+    "initial_data": "synthetic_only_separate_database_and_media",
+    "initial_viewer_original_access": false
+  },
+  "private_inputs_unset": {
+    "host_identity": null,
+    "https_origin": null,
+    "bind_interface": null,
+    "port": null,
+    "staging_root": null,
+    "database": null,
+    "original_roots": null,
+    "derived_root": null,
+    "certificate_reference": null,
+    "tls_key_reference": null,
+    "runtime_lock": null,
+    "service_identity": null,
+    "owner_reference": null,
+    "viewer_reference": null,
+    "library_reference": null
+  },
+  "authority": {
+    "local_review_and_synthetic_no_listener_checks": true,
+    "host_access": false,
+    "deployment_authorized": false,
+    "real_database_media_or_credentials": false,
+    "phone_installation": false,
+    "push_or_merge": false
+  },
+  "unmet_gates": [
+    "caption_utf8_response_budget_exceeds_android_limit",
+    "reviewed_explicit_launcher_and_operator_tool",
+    "reviewed_cpu_windows_environment",
+    "private_target_origin_certificate_and_audience",
+    "host_and_ingress_identity",
+    "backup_migration_provisioning_and_rollback_rehearsal",
+    "configured_apk_and_authorized_physical_phone_acceptance"
+  ]
+}

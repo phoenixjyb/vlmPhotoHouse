@@ -1,5 +1,10 @@
 # Explicit existing-database runtime adapter — slice 10
 
+Historical checkpoint: current pinned runtime at `1e394f7` requires revision
+`b6e3f9a5c721` and the provisioning receipt table. The older revision below is
+retained as slice 10 evidence. See [Android staging readiness](ANDROID_STAGING_PROPOSAL.md)
+for the current source/deployment distinction and unverified host gates.
+
 Local synthetic checkpoint following `b448424`, 2026-09-09. The default
 `app.main:app` remains closed. This slice supplies a deliberately constructed
 adapter, not environment discovery or a deployment configuration.
