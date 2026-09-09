@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+import threading
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -125,6 +126,32 @@ def byte_range(value, length):
     return lower, upper
 
 
+class _FileLease:
+    """Own a worker-opened descriptor even if its awaiting request is cancelled."""
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.closed = False
+        self.handle = None
+
+    def accept(self, result):
+        # The worker publishes ownership before returning across the await. A
+        # cancelled request has already closed this lease, so late results close
+        # in the worker rather than being abandoned with an unobserved future.
+        with self.lock:
+            if self.closed:
+                result[0].close()
+            else:
+                self.handle = result[0]
+        return result
+
+    def close(self):
+        with self.lock:
+            self.closed = True
+            handle, self.handle = self.handle, None
+        if handle is not None:
+            handle.close()
+
+
 class AuthorizedMediaResponse(Response):
     def __init__(self, request, token, library, object_id, variant, size, download):
         super().__init__()
@@ -133,6 +160,7 @@ class AuthorizedMediaResponse(Response):
 
     async def __call__(self, scope, receive, send):
         opened = None
+        lease = _FileLease()
         try:
             try:
                 access = _runtime(self.request, allow_query=True)
@@ -141,8 +169,10 @@ class AuthorizedMediaResponse(Response):
                     raise TransportError(503, 'Access unavailable')
                 # Deferred until response execution: an earlier route check is never
                 # retained as permission to open a file after logout or revocation.
-                opened, info, extension = await run_in_threadpool(media.open_file, access, self.token,
-                    self.library, self.object_id, self.variant, self.size)
+                def open_for_response():
+                    return lease.accept(media.open_file(access, self.token, self.library,
+                        self.object_id, self.variant, self.size))
+                opened, info, extension = await run_in_threadpool(open_for_response)
                 length = info.st_size
                 # Metadata is not a content hash: advertise only a weak validator.
                 # Conditional resume conservatively returns the complete response.
@@ -193,8 +223,7 @@ class AuthorizedMediaResponse(Response):
                 response = JSONResponse({'detail': 'Access unavailable'}, status_code=503, headers=PRIVACY_HEADERS)
             await response(scope, receive, send)
         finally:
-            if opened is not None:
-                opened.close()
+            lease.close()
 
 
 def media_response(request, object_id, variant):

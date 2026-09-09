@@ -472,6 +472,47 @@ class ClosedApplicationTests(unittest.TestCase):
         self.assertEqual(len(opened), 4)
         self.assertTrue(all(handle.closed for handle in opened))
 
+    def test_cancellation_while_opening_does_not_abandon_an_open_descriptor(self):
+        import asyncio
+        import threading
+        started, release, returned = threading.Event(), threading.Event(), threading.Event()
+        handles=[]
+        actual=MediaRuntime.open_file
+        def paused(media,*args):
+            result=actual(media,*args)
+            handles.append(result[0]);started.set()
+            release.wait(3);returned.set()
+            return result
+        request=Request({'type':'http','asgi':{'spec_version':'2.4'},'scheme':'https','method':'GET',
+            'path':'/assets/101/media','query_string':b'library=family-a',
+            'headers':[(b'host',b'photohouse.test')],'app':self.app})
+        response=AuthorizedMediaResponse(request,self.member_token,'family-a',101,'original',256,False)
+        async def run():
+            async def send(message):
+                raise AssertionError('Cancelled request must not send data')
+            async def receive():return {'type':'http.disconnect'}
+            task=asyncio.create_task(response(request.scope,receive,send))
+            try:
+                for _ in range(200):
+                    if started.is_set():break
+                    await asyncio.sleep(.005)
+                self.assertTrue(started.is_set())
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):await task
+            finally:
+                release.set()
+            for _ in range(200):
+                if returned.is_set():break
+                await asyncio.sleep(.005)
+            await asyncio.sleep(.05)
+            self.assertTrue(returned.is_set())
+            self.assertTrue(handles[0].closed)
+        try:
+            with patch.object(MediaRuntime,'open_file',autospec=True,side_effect=paused):asyncio.run(run())
+        finally:
+            release.set()
+            for handle in handles:handle.close()
+
     def test_query_credentials_duplicates_unknown_size_and_origin_rejected(self):
         for query in ('', '?library=family-a&token=secret', '?library=family-a&library=family-b',
                       '?library=family-a&size=../256', '?library=family-a&size=2048'):
