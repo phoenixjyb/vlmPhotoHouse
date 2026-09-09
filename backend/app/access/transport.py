@@ -52,7 +52,7 @@ class AccessRuntime:
             if action in {'login', 'register'}:
                 with Admission(service).attempt(source, args[0]):
                     return getattr(service, action)(*args, **kwargs)
-            if action not in {'profile', 'logout', 'accept_invitation', 'invite', 'cancel_invitation'}:
+            if action not in {'profile', 'logout', 'accept_invitation', 'invite', 'cancel_invitation', 'list_memberships', 'revoke_membership'}:
                 raise AccessDenied('Access denied')
             return getattr(service, action)(*args, **kwargs)
 

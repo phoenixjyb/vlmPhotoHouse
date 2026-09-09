@@ -40,6 +40,8 @@ try:
                 fixture.mutate("UPDATE access_memberships SET status='revoked' WHERE account_id=?",(fixture.member_id,))
             elif scenario=='restore-member':
                 fixture.mutate("UPDATE access_memberships SET status='approved' WHERE account_id=?",(fixture.member_id,))
+            elif scenario=='change-joined-membership':
+                fixture.mutate("UPDATE access_memberships SET revision=revision+1 WHERE account_id IN (SELECT id FROM access_accounts WHERE phone_login='+12025550103')")
             elif scenario=='expire-sessions':
                 fixture.mutate('UPDATE access_sessions SET expires_at=0')
             elif scenario=='caption-html':

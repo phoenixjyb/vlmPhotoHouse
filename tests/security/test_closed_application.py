@@ -54,7 +54,7 @@ class ImportIsolationTests(unittest.TestCase):
                 main = importlib.import_module(prefix + '.main')
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
-                self.assertEqual(len(main.app.routes), 21)
+                self.assertEqual(len(main.app.routes), 23)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)
@@ -163,7 +163,7 @@ class ClosedApplicationTests(unittest.TestCase):
         actual = [(method, route.path) for route in self.app.routes for method in route.methods]
         self.assertEqual(len(actual), len(set(actual)))
         self.assertEqual(set(actual), expected)
-        self.assertEqual(len(actual), 21)
+        self.assertEqual(len(actual), 23)
         for method, path in actual:
             sample = re.sub(r'\{[^}]+\}', '1', path)
             self.assertTrue(ClosedBoundary.allowed(method, sample))

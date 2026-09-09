@@ -1,0 +1,21 @@
+{
+  "checks": [
+    "Public sign-in shell has CSP and no anonymous photos",
+    "Phone/password login uses HttpOnly cookie and scoped gallery",
+    "Captions render as text and viewer cannot download originals",
+    "Delayed closed viewer cannot overwrite a newer asset",
+    "English/Chinese gallery fits a narrow mobile viewport",
+    "Owner manually creates phone-bound invitation; registration joins as viewer",
+    "Owner revocation requires fresh review and stops the member next read",
+    "Cancelled invitation cannot register or disclose photos",
+    "Delayed gallery response cannot cross a library switch",
+    "Logout revokes cookie and discards delayed private responses",
+    "Failed logout keeps photos hidden and supports explicit retry",
+    "Membership revocation removes available libraries and photos",
+    "Expired session cookie clears and returning login succeeds"
+  ],
+  "externalRequests": [],
+  "pageErrors": [],
+  "browser": "151.0.7922.34",
+  "evidence": "Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge; synthetic SQLite/JPEG only"
+}

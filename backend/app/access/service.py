@@ -255,6 +255,28 @@ class AccessService:
                  owner['account_id'], target_account, library_id))
             self._audit(owner['account_id'], 'membership.' + status, library_id, target_account)
 
+    def list_memberships(self, owner_token: str, library_id: str, *, page=1, page_size=50):
+        if type(page) is not int or not 1 <= page <= 100000 or type(page_size) is not int or not 1 <= page_size <= 100:
+            raise ValueError('Invalid pagination')
+        with self._transaction():
+            self._require(owner_token, library_id, 'library.members.manage')
+            total = self.db.execute('SELECT count(*) FROM access_memberships WHERE library_id=?', (library_id,)).fetchone()[0]
+            rows = self.db.execute('''SELECT m.account_id,a.phone_login,m.status,m.role,m.revision,m.expires_at,
+                (m.status='approved' AND a.state='active' AND (m.expires_at IS NULL OR m.expires_at>?)) AS available
+                FROM access_memberships m JOIN access_accounts a ON a.id=m.account_id
+                WHERE m.library_id=? ORDER BY a.phone_login,m.account_id LIMIT ? OFFSET ?''',
+                (self._now(), library_id, page_size, (page-1)*page_size))
+            items = [dict(zip(('account_id','phone_login','status','role','revision','expires_at','available'), row)) for row in rows]
+            for item in items:
+                item['available'] = bool(item['available'])
+                item['revision'] = str(item['revision'])  # Lossless compare-and-swap in web clients.
+            return {'library_id': library_id, 'page': page, 'page_size': page_size, 'total': total, 'items': items}
+
+    def revoke_membership(self, owner_token: str, library_id: str, target_account: str, *, expected_revision: int):
+        # Fixed operation: caller cannot smuggle an approval, role, expiry or original grant.
+        self.decide_membership(owner_token, library_id, target_account,
+                               expected_revision=expected_revision, status='revoked')
+
     def logout(self, token: str):
         try:
             digest = session_digest(token)

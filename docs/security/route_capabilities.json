@@ -31,6 +31,10 @@
       "expression": "router = APIRouter(route_class=MediaRoute)"
     },
     {
+      "source": "backend/app/access/members.py",
+      "expression": "router = APIRouter(route_class=MemberRoute)"
+    },
+    {
       "source": "backend/app/access/transport.py",
       "expression": "router = APIRouter(route_class=AccessRoute)"
     },
@@ -105,6 +109,10 @@
     {
       "source": "backend/app/main.py",
       "expression": "app.include_router(media_router)"
+    },
+    {
+      "source": "backend/app/main.py",
+      "expression": "app.include_router(member_router)"
     },
     {
       "source": "backend/app/main.py",
@@ -297,6 +305,8 @@
     {"source": "backend/app/access/media.py", "owner": "router", "method": "HEAD", "path": "/faces/{face_id}/crop", "handler": "crop", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."},
     {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets", "handler": "gallery", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"},
     {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/detail/{asset_id}", "handler": "detail", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"},
-    {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/{asset_id}/captions", "handler": "captions", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"}
+    {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/{asset_id}/captions", "handler": "captions", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"},
+    {"source": "backend/app/access/members.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/members", "handler": "members", "surface": "photohouse", "capabilities": ["library.members.manage"], "scope": "Current owner in the selected library; member list is scoped before count/paging; target revocation uses displayed revision", "current_control": "Shared current-session owner policy, bounded readback and atomic revision-bound revocation; cookie Origin/CSRF; owner transfer and grants unavailable", "gap": "Local synthetic tests only; no production adapter, migration or live acceptance"},
+    {"source": "backend/app/access/members.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/members/{account_id}/revoke", "handler": "revoke", "surface": "photohouse", "capabilities": ["library.members.manage"], "scope": "Current owner in the selected library; member list is scoped before count/paging; target revocation uses displayed revision", "current_control": "Shared current-session owner policy, bounded readback and atomic revision-bound revocation; cookie Origin/CSRF; owner transfer and grants unavailable", "gap": "Local synthetic tests only; no production adapter, migration or live acceptance"}
   ]
 }
