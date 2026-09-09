@@ -1,3 +1,1 @@
-from .logging import configure_logging
-
-configure_logging()
+"""PhotoHouse package. Runtime setup must be explicit, never an import side effect."""

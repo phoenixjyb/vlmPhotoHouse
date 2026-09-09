@@ -163,7 +163,7 @@ def main() -> int:
     if errors:
         return 1
     print(f"Inventory complete: {len(discovered['routes'])} method/path entries. "
-          "Legacy authorization remains OPEN; account router is unmounted.")
+          "Active app closed by default; retired and standalone gaps remain inventoried.")
     return 0
 
 

@@ -90,7 +90,7 @@ app.add_middleware(AuthMiddleware)
 
     def test_originals_are_separate_from_browse_and_health_is_operator_only(self):
         routes = { (r["method"], r["path"]): r for r in self.inventory["routes"]
-                   if r["source"] == "backend/app/main.py" }
+                   if r["source"] == "backend/app/legacy_main.py" }
         self.assertEqual(routes["GET", "/assets/{asset_id}/media"]["capabilities"],
                          ["library.read", "media.original.read"])
         self.assertEqual(routes["GET", "/health"]["capabilities"], ["system.read"])

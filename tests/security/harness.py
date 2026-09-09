@@ -1,4 +1,4 @@
-"""Execute selected, unchanged source handlers against in-memory test doubles.
+"""Audit retired, unguarded source handlers against in-memory test doubles.
 
 No app.main/config/dependencies imports, lifespan, ORM, model or outbound HTTP.
 FastAPI routing and Starlette file/Range handling are real, via in-process ASGI.
@@ -96,7 +96,7 @@ class Harness:
                          Optional=Optional, Any=Any, os=os, time=time, uuid=uuid, re=re)
         self.ns = namespace
         # Evaluate only the original FastAPI constructor, not any module startup.
-        tree = ast.parse((ROOT / "backend/app/main.py").read_text())
+        tree = ast.parse((ROOT / "backend/app/legacy_main.py").read_text())
         constructor = next(n for n in tree.body if isinstance(n, ast.Assign)
                            and any(isinstance(t, ast.Name) and t.id == "app" for t in n.targets))
         exec(compile(ast.Module(body=[constructor], type_ignores=[]), "synthetic-app", "exec"), namespace)
@@ -145,7 +145,7 @@ class Harness:
             title_zh=None, description=None, theme="custom", cover_asset_id=202, source_kind=None,
             source_ref=None, created_at=None, updated_at=None,
             items=[SimpleNamespace(id=1, position=0, asset=asset)])]
-        load_functions("backend/app/main.py", ["_visible_assets_filter", "get_asset_media",
+        load_functions("backend/app/legacy_main.py", ["_visible_assets_filter", "get_asset_media",
             "get_asset_thumbnail", "get_asset_detail", "list_assets", "search", "list_captions",
             "trigger_ingest", "delete_single_asset"], namespace)
         load_functions("backend/app/routers/people.py", ["get_face_crop"], namespace)
@@ -239,7 +239,7 @@ def main() -> int:
     for finding in findings:
         print(json.dumps(finding))
     failures = sum(not f["secure"] for f in findings)
-    print(f"DENIAL GATE: {failures}/{len(findings)} FAIL (synthetic extracted handlers, not full-app acceptance)")
+    print(f"RETIRED HANDLER DENIAL GATE: {failures}/{len(findings)} FAIL (historical failure ledger; active entry point tested separately)")
     return 1 if failures else 0
 
 

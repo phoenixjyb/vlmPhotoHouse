@@ -1,15 +1,16 @@
 """Characterization tests, not positive security acceptance. See denial CLI.
 
-These assert today's insecure behavior so accidental harness failures (e.g. 422
-or 500) cannot masquerade as demonstrated leaks. Remove/replace each assertion
-with full-stack denial tests when that path gains real authorization.
+These assert the retired implementations remain insecure so accidental harness failures (e.g. 422
+or 500) cannot masquerade as demonstrated leaks. Active app.main denial and authorized-read tests live in test_closed_application.
+Never mount these retired handlers; this suite is a regression ledger, not
+proof of a bypass in the new closed entry point.
 """
 import unittest
 from harness import Harness, run_probes
 
 
-class CurrentGapTests(unittest.TestCase):
-    def test_denial_matrix_reports_every_current_failure_without_skips(self):
+class RetiredGapTests(unittest.TestCase):
+    def test_denial_matrix_preserves_every_historical_failure_without_skips(self):
         findings = run_probes()
         self.assertEqual(len(findings), 84)
         for finding in findings:

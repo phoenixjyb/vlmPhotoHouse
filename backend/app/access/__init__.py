@@ -1,1 +1,1 @@
-"""Shared invitation access and dormant HTTP adapter; not mounted in app.main."""
+"""Shared invitation/session policy and media authorization for the closed app."""

@@ -449,13 +449,12 @@ class TransportTests(unittest.TestCase):
             self.assertNotIn(self.member_token, response.text)
             self.assertNotIn('access-control-allow-origin', response.headers)
 
-    def test_runtime_router_matches_inventory_and_is_not_mounted_in_main(self):
+    def test_runtime_account_router_matches_inventory(self):
         inventory = json.loads((ROOT / 'docs/security/route_capabilities.json').read_text())
         expected = {(r['method'], r['path']) for r in inventory['routes'] if r['source'] == 'backend/app/access/transport.py'}
         actual = {(method, route.path) for route in self.app.routes for method in route.methods}
         self.assertEqual(actual, expected)
         self.assertEqual(len(actual), 7)
-        self.assertNotIn('access.transport', (ROOT / 'backend/app/main.py').read_text())
 
 
 if __name__ == '__main__':

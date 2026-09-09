@@ -1,5 +1,9 @@
 # Account admission and session transport — slice 3
 
+Continuation: [slice 4 — closed application and authorized media](CLOSED_APPLICATION.md).
+The status below records slice 3 at `03ec1ba`; slice 4 mounts the adapter in the new
+closed entry point and separately tests active routes and retired failures.
+
 Status: **verified local account adapter; unmounted in `app.main`. Legacy photo
 authorization is still open. This branch is not ready for deployment.**
 

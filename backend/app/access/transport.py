@@ -1,7 +1,7 @@
-"""Shared account router for web and native clients; NOT mounted in the live app.
+"""Shared account router for web and native clients in the closed application.
 
 No settings/database factory, app construction, startup, providers or model imports.
-Integration must supply app.state.access_runtime and close legacy bypasses first.
+Integration must explicitly supply app.state.access_runtime.
 This router alone provides no protection to routes outside it.
 """
 from dataclasses import dataclass
@@ -69,7 +69,7 @@ def _single(request, name):
     return values[0] if values else None
 
 
-def _runtime(request):
+def _runtime(request, *, allow_query=False):
     runtime = getattr(request.app.state, 'access_runtime', None)
     if not isinstance(runtime, AccessRuntime):
         raise TransportError(503, 'Access unavailable')
@@ -83,7 +83,7 @@ def _runtime(request):
         raise TransportError(403, 'Access denied')
     # No query strings on account endpoints: no tokens, passwords or phone labels
     # in URLs, and no ignored credential/redirect parameters.
-    if request.scope.get('query_string'):
+    if request.scope.get('query_string') and not allow_query:
         raise TransportError(400, 'Invalid request')
     return runtime
 
@@ -107,9 +107,9 @@ def csrf_token(token):
     return hmac.new(token.encode('ascii'), b'PhotoHouse web CSRF v1', hashlib.sha256).hexdigest()
 
 
-def credentials_from_request(request):
+def credentials_from_request(request, *, allow_query=False):
     """Parse transport credentials, NOT an authorization grant. Always call policy."""
-    runtime = _runtime(request)
+    runtime = _runtime(request, allow_query=allow_query)
     authorization, cookie = _single(request, 'authorization'), _cookie(request)
     if authorization is not None and cookie is not None:
         raise TransportError(401, 'Access denied')
@@ -168,11 +168,13 @@ async def _body(request, fields):
 
 
 class AccessRoute(APIRoute):
+    allow_query = False
+
     def get_route_handler(self):
         handler = super().get_route_handler()
         async def guarded(request):
             try:
-                _runtime(request)
+                _runtime(request, allow_query=self.allow_query)
                 response = await handler(request)
             except TransportError as exc:
                 response = JSONResponse({'detail': exc.message}, status_code=exc.status)
