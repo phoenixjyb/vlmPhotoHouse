@@ -1,0 +1,1 @@
+Inventory complete: 152 method/path entries. Active app closed by default; retired and standalone gaps remain inventoried.

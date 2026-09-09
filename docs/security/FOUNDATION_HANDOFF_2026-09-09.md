@@ -1,5 +1,10 @@
 # PhotoHouse backend-security foundation handoff — 2026-09-09
 
+**Historical 14:00 checkpoint.** Following the user's renewed request, the
+[slice 15 continuation](OFFLINE_PROVISIONING_APPLY.md) adds a verified offline apply
+service and receipt migration. Its evidence supersedes the test totals and "no
+apply path" status below; earlier implementation history remains intact.
+
 Local work window ends at **14:00 Asia/Shanghai (06:00 UTC)**. Implementation is
 complete; the remaining window is final artifact/preservation review. This record
 is source/test evidence, not a deployment or a claim about current live services.

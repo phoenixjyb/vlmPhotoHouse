@@ -77,4 +77,8 @@ def migration_metadata(legacy_metadata):
     Table('access_kdf_slot', metadata,
         Column('id', Integer, primary_key=True, nullable=True),
         Column('claim', Text, nullable=False), CheckConstraint('id=1'))
+    Table('access_provisioning_receipts', metadata,
+        Column('plan_id', Text, primary_key=True, nullable=False),
+        Column('plan_digest', Text, nullable=False, unique=True),
+        Column('receipt', Text, nullable=False))
     return metadata

@@ -19,10 +19,10 @@ from app.db import Base
 from app.access.metadata import migration_metadata
 
 PRE_ACCESS = 'd2b7e4f6a901'
-ACCESS_HEAD = 'a5d2e8f4b610'
+ACCESS_HEAD = 'b6e3f9a5c721'
 ACCESS_TABLES = {'access_accounts', 'access_sessions', 'access_operators', 'access_libraries',
     'access_memberships', 'access_invitations', 'access_asset_libraries', 'access_audit',
-    'access_admission_key', 'access_attempts', 'access_kdf_slot'}
+    'access_admission_key', 'access_attempts', 'access_kdf_slot', 'access_provisioning_receipts'}
 
 
 def config():

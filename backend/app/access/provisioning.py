@@ -31,11 +31,9 @@ def _library(value):
     return value
 
 
-class ProvisioningPlanner:
+class _PlanState:
     def __init__(self, connection, *, clock):
         self.access = AccessService(connection, clock=clock)
-        if connection.execute('PRAGMA query_only').fetchone()[0] != 1:
-            raise PlanRejected('Planning requires a read-only connection')
 
     def _mac(self, purpose, value):
         row = self.access.db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone()
@@ -116,8 +114,10 @@ class ProvisioningPlanner:
         return self._plan('assign_unmapped_assets',{'library_id':_library(library_id),
             'operator_account_id':operator_account_id,'asset_ids':[str(item) for item in sorted(asset_ids)]})
 
-    def validate(self, envelope):
-        """Read-only freshness/integrity check; success grants no apply authority."""
+    def _validate_in_transaction(self, envelope):
+        """Caller owns the snapshot or write reservation for all checks and effects."""
+        if not self.access.db.in_transaction:
+            raise PlanRejected('Validation requires a transaction')
         try:
             if not isinstance(envelope,dict) or set(envelope)!={'plan','seal'} or len(_json(envelope))>2_000_000:
                 raise PlanRejected('Invalid plan')
@@ -126,17 +126,28 @@ class ProvisioningPlanner:
                 raise PlanRejected('Invalid plan')
             if not isinstance(seal,str) or not re.fullmatch('[0-9a-f]{64}',seal):
                 raise PlanRejected('Invalid plan')
-            with self.access._transaction():
-                now=self.access._now()
-                if (plan['version']!=1 or type(plan['created_at']) is not int or type(plan['expires_at']) is not int
-                        or not plan['created_at']<=now<plan['expires_at'] or plan['expires_at']-plan['created_at']!=LIFETIME
-                        or not hmac.compare_digest(seal,self._mac('sealed-review',plan))
-                        or plan['database_binding']!=self._mac('database-binding',1)):
-                    raise PlanRejected('Invalid or expired plan')
-                if plan['expected']!=self._state(plan['operation'],plan['target']):
-                    raise PlanRejected('Plan state changed; review again')
+            now=self.access._now()
+            if (plan['version']!=1 or type(plan['created_at']) is not int or type(plan['expires_at']) is not int
+                    or not plan['created_at']<=now<plan['expires_at'] or plan['expires_at']-plan['created_at']!=LIFETIME
+                    or not hmac.compare_digest(seal,self._mac('sealed-review',plan))
+                    or plan['database_binding']!=self._mac('database-binding',1)):
+                raise PlanRejected('Invalid or expired plan')
+            if plan['expected']!=self._state(plan['operation'],plan['target']):
+                raise PlanRejected('Plan state changed; review again')
             return {'valid':True,'operation':plan['operation'],'plan_id':plan['plan_id'],'applied':False}
         except PlanRejected:
             raise
         except (KeyError,TypeError,ValueError,OverflowError,RecursionError,UnicodeError):
             raise PlanRejected('Invalid plan') from None
+
+
+class ProvisioningPlanner(_PlanState):
+    def __init__(self, connection, *, clock):
+        super().__init__(connection, clock=clock)
+        if connection.execute('PRAGMA query_only').fetchone()[0] != 1:
+            raise PlanRejected('Planning requires a read-only connection')
+
+    def validate(self, envelope):
+        """Read-only freshness/integrity check; success grants no apply authority."""
+        with self.access._transaction():
+            return self._validate_in_transaction(envelope)

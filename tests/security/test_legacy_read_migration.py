@@ -18,7 +18,7 @@ from app.access.metadata import migration_metadata
 from test_orm_migrations import config
 
 PRE_REPAIR = 'f4c1a8d2e703'
-HEAD = 'a5d2e8f4b610'
+HEAD = 'b6e3f9a5c721'
 
 
 class LegacyReadMigrationTests(unittest.TestCase):

@@ -1,5 +1,10 @@
 # Read-only offline provisioning plans — slice 12
 
+Historical planner checkpoint. The subsequent locally verified
+[offline apply service](OFFLINE_PROVISIONING_APPLY.md) implements the transactional
+apply/receipt slice. The planner itself remains read-only; no live provisioning or
+deployment has occurred.
+
 Local synthetic checkpoint after `0cb58cf`, 2026-09-09. This is a review artifact
 API with **no apply operation, HTTP route or command that changes access**.
 
