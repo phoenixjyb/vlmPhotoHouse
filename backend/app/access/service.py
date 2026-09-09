@@ -221,11 +221,16 @@ class AccessService:
     def profile(self, token: str):
         with self._transaction():
             session = self._session(token)
-            rows = self.db.execute('''SELECT library_id,status,role,revision,expires_at,originals
-                FROM access_memberships WHERE account_id=? ORDER BY library_id''', (session['account_id'],))
+            rows = self.db.execute('''SELECT m.library_id,m.status,m.role,m.revision,m.expires_at,m.originals,
+                (m.status='approved' AND l.state='active' AND (m.expires_at IS NULL OR m.expires_at>?)) AS available
+                FROM access_memberships m JOIN access_libraries l ON l.id=m.library_id
+                WHERE m.account_id=? ORDER BY m.library_id''', (self._now(), session['account_id']))
+            memberships = [dict(zip(('library_id','status','role','revision','expires_at','originals','available'), r))
+                           for r in rows]
+            for member in memberships:
+                member['available'] = bool(member['available'])
             return {'account_id': session['account_id'], 'phone_login': session['phone_login'],
-                    'memberships': [dict(zip(('library_id','status','role','revision','expires_at','originals'), r))
-                                    for r in rows]}
+                    'memberships': memberships}
 
     def decide_membership(self, owner_token: str, library_id: str, target_account: str, *,
                           expected_revision: int, status: str, originals=False, expires_at=None):

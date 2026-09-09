@@ -191,6 +191,10 @@ class AccessRoute(APIRoute):
                 # Do not delegate connection/provider errors containing private
                 # parameters to main.py's legacy str(exception) response handler.
                 response = JSONResponse({'detail': 'Access unavailable'}, status_code=503)
+            if response.status_code == 401 and request.url.path == '/auth/session':
+                # A stale HttpOnly cookie must not trap the browser in a failed
+                # session/login loop. Clearing it grants no new access.
+                response.delete_cookie(COOKIE, path='/', secure=True, httponly=True, samesite='strict')
             for key, value in PRIVACY_HEADERS.items():
                 response.headers[key] = value
             return response

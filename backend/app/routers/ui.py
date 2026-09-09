@@ -1,12 +1,11 @@
 from pathlib import Path
-from urllib.parse import urlencode
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
 router = APIRouter()
 
-UI_DIR = Path(__file__).resolve().parents[1] / "ui"
+UI_DIR = Path(__file__).resolve().parents[1] / "ui" / "access"
 INDEX_FILE = UI_DIR / "index.html"
 APP_FILE = UI_DIR / "app.js"
 STYLE_FILE = UI_DIR / "styles.css"
@@ -14,6 +13,10 @@ NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
     "Expires": "0",
+    "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; worker-src 'none'",
+    "X-Frame-Options": "DENY",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
 
 
@@ -42,13 +45,11 @@ async def ui_css():
 
 
 @router.get("/ui/search")
-async def ui_search(q: str | None = Query(None)):
-    query = {"tab": "library"}
-    if q:
-        query["q"] = q
-    return RedirectResponse(url=f"/ui?{urlencode(query)}")
+async def ui_search():
+    # Legacy deep links reach the safe shell without copying private query text.
+    return RedirectResponse(url="/ui")
 
 
 @router.get("/ui/admin")
 async def ui_admin():
-    return RedirectResponse(url="/ui?tab=admin")
+    return RedirectResponse(url="/ui")

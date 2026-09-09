@@ -198,6 +198,19 @@ class ClosedApplicationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/ui/styles.css').status_code, 200)
         self.assertEqual(self.client.get('/ui/../assets', follow_redirects=False).status_code, 401)
 
+    def test_safe_ui_has_strict_csp_and_legacy_deep_links_drop_private_query(self):
+        response = self.client.get('/ui')
+        self.assertIn("default-src 'none'", response.headers['content-security-policy'])
+        self.assertIn("frame-ancestors 'none'", response.headers['content-security-policy'])
+        self.assertEqual(response.headers['x-frame-options'], 'DENY')
+        self.assertNotIn('unpkg', response.text)
+        self.assertNotIn('voice-toggle', response.text)
+        for path in ('/ui/search?q=private-synthetic', '/ui/admin?token=private-synthetic'):
+            response = self.client.get(path, follow_redirects=False)
+            self.assertEqual(response.headers['location'], '/ui')
+            self.assertNotIn('private-synthetic', response.text)
+        self.assertEqual(self.client.get('/ui/access/index.html').status_code, 403)
+
     def test_unreviewed_route_and_shadowed_login_handler_are_denied(self):
         effects = []
         async def accidental_endpoint(request):

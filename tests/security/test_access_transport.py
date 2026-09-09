@@ -273,6 +273,30 @@ class TransportTests(unittest.TestCase):
         self.assertIn('Max-Age=0', response.headers['set-cookie'])
         self.assertEqual(self.client.get('/auth/session').status_code, 401)
 
+    def test_expired_web_session_clears_cookie_before_retrying_login(self):
+        response = self.login('web', headers={'Origin': ORIGIN})
+        self.assertEqual(response.status_code, 200)
+        self.mutate('UPDATE access_sessions SET expires_at=0')
+        response = self.client.get('/auth/session')
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Max-Age=0', response.headers['set-cookie'])
+        self.assertIn('HttpOnly', response.headers['set-cookie'])
+        self.assertFalse(self.client.cookies)
+        self.assertEqual(self.login('web', headers={'Origin': ORIGIN}).status_code, 200)
+
+    def test_profile_available_uses_server_time_and_library_state(self):
+        def available():
+            return self.client.get('/auth/session', headers=self.bearer()).json()['memberships'][0]['available']
+        self.assertTrue(available())
+        self.mutate("UPDATE access_libraries SET state='closed'")
+        self.assertFalse(available())
+        self.mutate("UPDATE access_libraries SET state='active'")
+        self.mutate('UPDATE access_memberships SET expires_at=? WHERE account_id=?', (NOW,self.member_id))
+        self.assertFalse(available())
+        self.mutate('UPDATE access_memberships SET expires_at=NULL WHERE account_id=?', (self.member_id,))
+        self.mutate("UPDATE access_memberships SET status='revoked' WHERE account_id=?", (self.member_id,))
+        self.assertFalse(available())
+
     def test_web_login_csrf_native_origin_and_session_overwrite_rejected(self):
         self.assertEqual(self.login('web').status_code, 403)
         self.assertEqual(self.login('native', headers={'Origin': ORIGIN}).status_code, 403)

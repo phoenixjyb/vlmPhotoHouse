@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>PhotoHouse · Family library</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+  <script src="/ui/app.js" defer></script>
+</head>
+<body>
+  <header class="masthead"><a class="brand" href="/ui"><span class="brand-mark" aria-hidden="true">PH</span><span>PhotoHouse<small data-i18n="tagline">A place for our memories</small></span></a>
+    <button id="language" class="quiet" type="button">中文</button></header>
+  <main>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <section id="auth" class="welcome" hidden>
+      <div class="welcome-copy"><p class="eyebrow" data-i18n="eyebrow">YOUR FAMILY, TOGETHER</p><h1 data-i18n="welcome">The moments<br>we keep close.</h1><p data-i18n="intro">A private home for family photos. Sign in, or join with the invitation your library owner sent you.</p><div class="paper-stack" aria-hidden="true"><div>OUR EVERYDAY<br><strong>memories</strong></div></div></div>
+      <div class="auth-card"><div class="tabs"><button id="login-tab" type="button" aria-pressed="true" data-i18n="signIn">Sign in</button><button id="register-tab" type="button" aria-pressed="false" data-i18n="join">Join with an invitation</button></div>
+        <form id="auth-form">
+          <label for="phone" data-i18n="phone">Phone number</label><input id="phone" type="tel" inputmode="tel" autocomplete="username" maxlength="40" placeholder="+86 …" required><small data-i18n="phoneHelp">Include the country code. Your phone number is your sign-in name.</small>
+          <label for="password" data-i18n="password">Password</label><input id="password" type="password" autocomplete="current-password" maxlength="128" required>
+          <div id="registration-fields" hidden><small data-i18n="passwordHelp">Choose a passphrase of 15–128 characters.</small><label for="code" data-i18n="invitation">Invitation code</label><input id="code" type="text" autocomplete="off" maxlength="80" spellcheck="false"><small data-i18n="inviteHelp">Use the code sent for this phone number. An accepted invitation opens that library.</small></div>
+          <button id="auth-submit" class="primary" type="submit" data-i18n="signIn">Sign in</button>
+        </form>
+        <p class="fine" data-i18n="help">Need an invitation or help signing in? Contact your library owner.</p>
+      </div>
+    </section>
+    <section id="library" hidden>
+      <div class="library-heading"><div><p class="eyebrow" data-i18n="yourLibrary">YOUR FAMILY LIBRARY</p><h1 data-i18n="gallery">Little moments. Lasting memories.</h1></div><button id="logout" class="quiet" type="button" data-i18n="signOut">Sign out</button></div>
+      <div class="toolbar"><label for="library-select" data-i18n="libraryLabel">Library</label><select id="library-select"></select><button id="refresh" class="quiet" type="button" data-i18n="refresh">Refresh</button><span id="account-label" class="muted"></span></div>
+      <p id="empty" class="empty" hidden></p><div id="grid" class="grid"></div>
+      <nav id="pagination" class="pagination" aria-label="Gallery pages" hidden><button id="previous" class="quiet" type="button" data-i18n="previous">Previous</button><span id="page-label"></span><button id="next" class="quiet" type="button" data-i18n="next">Next</button></nav>
+      <details id="accept-panel" class="access-panel"><summary data-i18n="anotherInvite">Have an invitation to another library?</summary><form id="accept-form"><label for="accept-code" data-i18n="invitation">Invitation code</label><input id="accept-code" maxlength="80" autocomplete="off" spellcheck="false" required><button class="primary" type="submit" data-i18n="accept">Accept invitation</button></form></details>
+      <details id="owner-panel" class="access-panel" hidden><summary data-i18n="inviteSomeone">Invite someone to this library</summary><p data-i18n="ownerHelp">Create a code for their phone number, then send it privately. They join as a viewer. Original downloads are not included.</p><form id="invite-form"><label for="invite-phone" data-i18n="phone">Phone number</label><input id="invite-phone" type="tel" maxlength="40" placeholder="+86 …" autocomplete="off" required><button class="primary" type="submit" data-i18n="createInvite">Create invitation</button></form><div id="invitation-result" hidden><label for="created-code" data-i18n="sendCode">Send this code privately. It expires in 24 hours.</label><input id="created-code" readonly autocomplete="off"><button id="cancel-invite" class="quiet" type="button" data-i18n="cancelInvite">Cancel this invitation</button></div></details>
+    </section>
+  </main>
+  <dialog id="viewer"><button id="close-viewer" class="quiet close" type="button" data-i18n="close">Close</button><div id="viewer-media"></div><h2 id="viewer-title"></h2><div id="captions"></div><a id="original" class="quiet" hidden data-i18n="download">Download original</a><p class="fine" data-i18n="captionNote">Generated descriptions may be inaccurate. Original downloads require separate permission.</p></dialog>
+  <footer data-i18n="footer">PhotoHouse · Shared by invitation</footer>
+</body>
+</html>

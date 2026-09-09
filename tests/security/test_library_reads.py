@@ -68,7 +68,7 @@ class LibraryReadTests(unittest.TestCase):
         self.now = NOW
         self.trace = []
         runtime = AccessRuntime(self.connection, 'https://photohouse.test', clock=lambda:self.now)
-        self.client = TestClient(create_app(access_runtime=runtime), base_url='https://photohouse.test')
+        self.client = TestClient(create_app(access_runtime=runtime), base_url='https://photohouse.test', client=('192.0.2.20', 23456))
         self.addCleanup(self.client.close)
         for target in ('socket.socket.bind','socket.socket.connect','subprocess.Popen','os.system'):
             guard = patch(target,side_effect=AssertionError('External I/O forbidden'))
@@ -98,8 +98,8 @@ class LibraryReadTests(unittest.TestCase):
         result = response.json()
         self.assertEqual((result['total'],result['page'],result['page_size']),(2,1,1))
         self.assertFalse(result['originals_allowed'])
-        self.assertEqual([r['id'] for r in result['items']],[102])
-        self.assertEqual([r['id'] for r in self.get('/assets?library=family-a&page_size=1&page=2').json()['items']],[101])
+        self.assertEqual([r['id'] for r in result['items']],['102'])
+        self.assertEqual([r['id'] for r in self.get('/assets?library=family-a&page_size=1&page=2').json()['items']],['101'])
         self.assertEqual(self.get('/assets?library=family-a&page=100').json()['items'],[])
         for forbidden in ('path','hash','gps','model','error','private-'):
             self.assertNotIn(forbidden,response.text)
@@ -109,7 +109,7 @@ class LibraryReadTests(unittest.TestCase):
     def test_detail_and_current_captions_are_parent_scoped_and_redacted(self):
         detail = self.get('/assets/detail/101?library=family-a')
         self.assertEqual(detail.status_code,200)
-        self.assertEqual(detail.json()['asset']['id'],101)
+        self.assertEqual(detail.json()['asset']['id'],'101')
         captions = self.get('/assets/101/captions?library=family-a')
         self.assertEqual(captions.status_code,200)
         self.assertEqual([r['text'] for r in captions.json()['items']],['caption-101'])
@@ -180,6 +180,15 @@ class LibraryReadTests(unittest.TestCase):
         self.assertTrue(result['has_more'])
         self.assertEqual(len(result['items']),20)
         self.assertTrue(all(len(r['text'])==8192 and r['truncated'] and r['user_edited'] for r in result['items']))
+
+    def test_large_sqlite_ids_are_lossless_decimal_strings_for_javascript(self):
+        large = 9223372036854775807
+        self.mutate("INSERT INTO assets(id,path,hash_sha256,status) VALUES (?, 'synthetic/large.jpg','large','active')", (large,))
+        self.mutate('INSERT INTO access_asset_libraries VALUES (?,?)', (large,'family-a'))
+        result = self.get('/assets?library=family-a').json()
+        self.assertIn(str(large), [item['id'] for item in result['items']])
+        self.assertEqual(self.get(f'/assets/detail/{large}?library=family-a').json()['asset']['id'], str(large))
+        self.assertEqual(self.get(f'/assets/{large}/captions?library=family-a').json()['asset_id'], str(large))
 
     def test_owner_role_does_not_imply_original_grant(self):
         self.assertFalse(self.get('/assets?library=family-a',self.owner_token).json()['originals_allowed'])

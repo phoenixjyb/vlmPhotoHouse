@@ -25,7 +25,7 @@ FIELDS = 'a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at'
 
 def _asset(row, library_id):
     asset_id, mime, width, height, duration, taken_at = row
-    return {'id': asset_id, 'kind': 'video' if (mime or '').startswith('video/') else
+    return {'id': str(asset_id), 'kind': 'video' if (mime or '').startswith('video/') else
             'image' if (mime or '').startswith('image/') else 'other',
             'width': width, 'height': height, 'duration_sec': duration, 'taken_at': taken_at,
             'thumbnail_url': f'/assets/{asset_id}/thumbnail?' + urlencode({'library': library_id})}
@@ -74,8 +74,8 @@ class LibraryReads:
                 WHERE scope.library_id=? AND a.id=? AND (a.status IS NULL OR a.status='active')
                 AND c.superseded=0 ORDER BY c.user_edited DESC,c.id DESC LIMIT 21''',
                 (library_id, asset_id)).fetchall()
-            return {'library_id': library_id, 'asset_id': asset_id, 'has_more': len(rows) > 20,
-                    'items': [{'id': r[0], 'text': r[1], 'truncated': r[2] > 8192,
+            return {'library_id': library_id, 'asset_id': str(asset_id), 'has_more': len(rows) > 20,
+                    'items': [{'id': str(r[0]), 'text': r[1], 'truncated': r[2] > 8192,
                                'user_edited': bool(r[3]), 'created_at': r[4], 'updated_at': r[5]}
                               for r in rows[:20]]}
 
