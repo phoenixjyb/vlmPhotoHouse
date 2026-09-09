@@ -14,9 +14,18 @@
     "service.invoke": "Internal authenticated service identity, bounded resource admission and authorized job context. Not a public/mobile API.",
     "voice.read": "library.read plus voice use grant and resource/privacy admission; scope every intent/result before providers, not caller client_id.",
     "voice.conversation": "voice.read plus server-owned account/library/session conversation mapping; caller-supplied provider IDs are not authority.",
-    "voice.command.dispatch": "Dispatch-specific requirements: reads need voice.read; status needs system.read; mutations need their domain capability plus mandatory principal/session/library/argument-bound single-use confirmation. Disable mutations in v1."
+    "voice.command.dispatch": "Dispatch-specific requirements: reads need voice.read; status needs system.read; mutations need their domain capability plus mandatory principal/session/library/argument-bound single-use confirmation. Disable mutations in v1.",
+    "account.login": "Phone/password authentication after durable source/account/global admission. No photo grant; current membership is checked separately.",
+    "account.register.invited": "Valid single-use owner-issued phone-bound invitation plus password, after shared login/registration admission. No first-signup owner.",
+    "account.self": "Current active account/session for own profile; logout is idempotent even after expiry. Cookie mutations require same-origin CSRF; native bearer is explicit.",
+    "account.invitation.accept": "Current active account/session plus matching unused owner invitation. Cannot reset a password or override newer membership decisions.",
+    "library.members.manage": "Current approved owner membership in the selected active library, distinct from system operator and original-byte permissions."
   },
   "topology": [
+    {
+      "source": "backend/app/access/transport.py",
+      "expression": "router = APIRouter(route_class=AccessRoute)"
+    },
     {
       "source": "backend/app/lvface_http_service.py",
       "expression": "app = FastAPI(title='LVFace Embedding Service', version='1.0.0')"
@@ -96,9 +105,24 @@
     {
       "source": "rampp/service.py",
       "expression": "app = FastAPI(title='RAM++ Tag Service', version='0.1.0')"
+    },
+    {
+      "source": "tests/security/test_access_transport.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)"
+    },
+    {
+      "source": "tests/security/test_access_transport.py",
+      "expression": "app.include_router(router)"
     }
   ],
   "routes": [
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/invitations/accept", "handler": "accept_invitation", "surface": "account-router-unmounted", "capabilities": ["account.invitation.accept"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Current session/phone, invitation and membership revision checked atomically; cookie Origin and CSRF required.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/login", "handler": "login", "surface": "account-router-unmounted", "capabilities": ["account.login"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Durable pre-KDF admission; actual password check; HTTPS and explicit native/web transport; web login requires configured Origin.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/logout", "handler": "logout", "surface": "account-router-unmounted", "capabilities": ["account.self"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Strict transport parsing; cookie Origin and session-bound CSRF; durable idempotent session revocation and cookie deletion.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/register", "handler": "register", "surface": "account-router-unmounted", "capabilities": ["account.register.invited"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Same admission plus atomic owner-invitation redemption; viewer only; existing accounts cannot replace passwords.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "GET", "path": "/auth/session", "handler": "session", "surface": "account-router-unmounted", "capabilities": ["account.self"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Strict cookie/bearer parser; current session/account from SQLite; private no-store profile, no library data.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/invitations", "handler": "invite", "surface": "account-router-unmounted", "capabilities": ["library.members.manage"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Current library owner policy, phone binding, single-use expiring code; cookie Origin and CSRF required.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
+    {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/invitations/cancel", "handler": "cancel_invitation", "surface": "account-router-unmounted", "capabilities": ["library.members.manage"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Current selected-library owner policy; library-scoped cancellation; cookie Origin and CSRF required.", "gap": "Dormant router tested only in an isolated in-process app. Not mounted in app.main and does not protect any legacy endpoint. Full-app/ORM/proxy/TLS integration remains unverified."},
     {"source": "backend/app/lvface_http_service.py", "owner": "app", "method": "GET", "path": "/", "handler": "root", "surface": "lvface-standalone", "capabilities": ["system.read"], "scope": "System operator; diagnostics can reveal global counts, task payloads, errors, paths and provider configuration; minimize/redact.", "current_control": "none: no inbound principal or membership check", "gap": "OPEN: capability is proposed, not enforced"},
     {"source": "backend/app/lvface_http_service.py", "owner": "app", "method": "OPTIONS", "path": "/*", "handler": "<middleware:cors-preflight>", "surface": "lvface-standalone", "capabilities": ["service.invoke"], "scope": "Only non-data CORS negotiation may be anonymous under a reviewed origin/method policy; actual embed requests require service.invoke.", "current_control": "wildcard CORS preflight; not identity or library authorization", "gap": "OPEN: capability is proposed, not enforced"},
     {"source": "backend/app/lvface_http_service.py", "owner": "app", "method": "GET", "path": "/docs", "handler": "<framework:swagger_ui>", "surface": "lvface-standalone", "capabilities": ["system.read"], "scope": "System operator; diagnostics can reveal global counts, task payloads, errors, paths and provider configuration; minimize/redact.", "current_control": "none: no inbound principal or membership check", "gap": "OPEN: capability is proposed, not enforced"},

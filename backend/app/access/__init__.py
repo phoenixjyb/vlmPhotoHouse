@@ -1,1 +1,1 @@
-"""First-party invitation access foundation; not yet wired into HTTP or workers."""
+"""Shared invitation access and dormant HTTP adapter; not mounted in app.main."""

@@ -1,5 +1,9 @@
 # Manual invitations and phone/password accounts — slice 2
 
+Continuation: [slice 3 — durable admission and shared account transport](ACCOUNT_TRANSPORT.md).
+The account router is implemented and synthetically tested there, but remains
+unmounted; the gaps below are retained as this slice's historical evidence.
+
 Status: **local domain implementation and synthetic tests; HTTP/worker enforcement
 is not integrated and the application is not safe to deploy as authenticated.**
 

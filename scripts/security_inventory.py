@@ -162,7 +162,8 @@ def main() -> int:
         print(error)
     if errors:
         return 1
-    print(f"Inventory complete: {len(discovered['routes'])} method/path entries. Authorization NOT implemented.")
+    print(f"Inventory complete: {len(discovered['routes'])} method/path entries. "
+          "Legacy authorization remains OPEN; account router is unmounted.")
     return 0
 
 
