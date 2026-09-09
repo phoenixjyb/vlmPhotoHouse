@@ -21,6 +21,7 @@ from .caption_policy import (
     bilingual_caption_issues,
     build_caption_retry_prompt,
     correct_chinese_policy_translation,
+    factual_rewrite_caption_prompt,
     infant_care_allowed,
     infant_care_caption_prompt,
     neutralize_person_terms,
@@ -393,6 +394,9 @@ class TaskExecutor:
         )
         if allow_infant_care:
             caption_prompt = infant_care_caption_prompt(caption_prompt)
+        factual_rewrite = payload.get('caption_review') == 'factual_rewrite'
+        if factual_rewrite:
+            caption_prompt = factual_rewrite_caption_prompt(caption_prompt)
         text = ''
         model_name = 'unknown'
         err = None
@@ -495,6 +499,8 @@ class TaskExecutor:
             caption_model_version = 'bilingual-v1'
         if bilingual_output and allow_infant_care:
             caption_model_version = 'bilingual-v1-infant-care-v1'
+        if bilingual_output and factual_rewrite:
+            caption_model_version = (caption_model_version or 'bilingual-v1') + '-factual-review-v1'
         if replace_generated:
             if not model_name.startswith('qwen3-vl-http') or bilingual_caption_issues(
                 text, allow_infant_care=allow_infant_care,

@@ -9,6 +9,7 @@ from app.caption_policy import (
     bilingual_caption_policy_matches,
     build_caption_retry_prompt,
     correct_chinese_policy_translation,
+    factual_rewrite_caption_prompt,
     infant_care_allowed,
     infant_care_caption_prompt,
     neutralize_person_terms,
@@ -18,6 +19,16 @@ from app.caption_policy import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_factual_rewrite_preserves_contract_and_omits_uncertain_claims():
+    prompt = factual_rewrite_caption_prompt(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert prompt.startswith(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert 'VISIBLE-FACTS REVIEW' in prompt
+    assert 'Omit uncertain details entirely' in prompt
+    assert 'Do not turn an uncertain claim into a confident assertion' in prompt
+    assert 'EN: ...' in prompt and 'ZH-CN: ...' in prompt
+    assert bilingual_caption_issues('EN: A person is possibly recording.\n\nZH-CN: 一位成人可能正在拍摄。') == ['english_policy', 'chinese_policy']
 
 
 def test_default_prompt_comes_from_canonical_bilingual_policy():

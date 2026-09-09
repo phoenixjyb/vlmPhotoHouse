@@ -42,6 +42,17 @@ INFANT_CARE_INSTRUCTION = (
     'Use brief, matter-of-fact family-photo wording, without intimate anatomical detail '
     'or sexual framing. All other factuality, neutrality and bilingual rules still apply.'
 )
+FACTUAL_REWRITE_INSTRUCTION = (
+    'VISIBLE-FACTS REVIEW: Re-examine the image and write a fresh caption using only '
+    'directly visible objects, positions, colors, materials, clothing and surroundings. '
+    'Omit uncertain details entirely instead of hedging with likely, possibly, perhaps, '
+    'maybe, 可能 or 似乎. Do not turn an uncertain claim into a confident assertion. '
+    'Describe a device and its position without inferring photography, filming, calls '
+    'or messaging; do not use 拍摄、拍照、录像、录制. Do not infer intentions, relationships '
+    'or events outside the frame. A shorter factual description is preferable to invented '
+    'detail. Return the same visible facts in EN and ZH-CN paragraphs using the required '
+    'bilingual format. All existing privacy and neutrality rules still apply.'
+)
 ENGLISH_PERSON_TERM_RE = re.compile(r'\b(women|woman|men|man|girls|girl|boys|boy)\b', re.IGNORECASE)
 CHINESE_PERSON_TERM_RE = re.compile(r'男人|女人|男子|女子|男性|女性|男孩|女孩')
 ENGLISH_PERSON_REPLACEMENTS = {
@@ -81,6 +92,11 @@ def infant_care_allowed(asset_id: int, configured_ids: str = '') -> bool:
 
 def infant_care_caption_prompt(prompt: str) -> str:
     return f'{prompt.strip()}\n\n{INFANT_CARE_INSTRUCTION}'
+
+
+def factual_rewrite_caption_prompt(prompt: str) -> str:
+    """A fixed, stricter retry mode; this never relaxes output validation."""
+    return f'{prompt.strip()}\n\n{FACTUAL_REWRITE_INSTRUCTION}'
 
 
 def bilingual_caption_issues(text: str, *, allow_infant_care: bool = False) -> list[str]:
