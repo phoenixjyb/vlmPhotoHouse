@@ -14,20 +14,10 @@ param(
     [ValidateRange(1, 365)]
     [int]$LogRetention = 14,
     [ValidateRange(64, 1024)]
-    [int]$MaxNewTokens = 256,
+    [int]$MaxNewTokens = 512,
     [ValidateRange(448, 4096)]
     [int]$MaxImageEdge = 1536,
-    [string]$Prompt = (
-        'Write a factual, search-friendly description of this photo in 80 to 120 words. ' +
-        'Use only directly visible evidence. Describe the main subjects, actions, setting, important objects, ' +
-        'clothing, colors, lighting, composition, and clearly readable text. Do not identify people or infer ' +
-        'relationships, protected or sensitive traits, events, occasions, locations, landmarks, or organizations. ' +
-        'Name a brand, model, place, landmark, or organization only when its exact name or logo is clearly legible ' +
-        'and unambiguous; otherwise use a generic description. Transcribe text only when confident and call it ' +
-        'partial or unclear instead of guessing. For phones or devices, describe visible color, case, controls, ' +
-        'screen content, and use, but do not guess the brand or model. Avoid speculative words such as likely, ' +
-        'probably, suggests, or appears to be. Return one coherent paragraph without hidden context.'
-    ),
+    [string]$Prompt = '',
     [switch]$Detached,
     [switch]$PreflightOnly
 )
@@ -37,6 +27,13 @@ Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stackRoot = Split-Path -Parent $repoRoot
+$promptPath = Join-Path $repoRoot 'config\detailed-caption-prompt.txt'
+if ([string]::IsNullOrWhiteSpace($Prompt)) {
+    if (-not (Test-Path -LiteralPath $promptPath -PathType Leaf)) {
+        throw "Detailed caption prompt not found: $promptPath"
+    }
+    $Prompt = (Get-Content -LiteralPath $promptPath -Raw -Encoding UTF8).Trim()
+}
 if ([string]::IsNullOrWhiteSpace($CaptionDir)) {
     $CaptionDir = Join-Path $stackRoot 'vlmCaptionModels'
 }

@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import threading
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, text, update
+from sqlalchemy import select, or_, text, update, text as sql_text
 from .db import Task, Asset, Embedding, Caption, FaceDetection, Person
 from .vector_index import InMemoryVectorIndex, FaissVectorIndex, EmbeddingService
 from .config import get_settings
@@ -15,6 +15,16 @@ import imagehash
 from datetime import datetime, timedelta
 from . import metrics as metrics_mod
 from .gps_utils import probe_video_metadata
+from .caption_policy import (
+    DEFAULT_DETAILED_CAPTION_PROMPT,
+    bilingual_caption_issue_summary,
+    bilingual_caption_issues,
+    build_caption_retry_prompt,
+    correct_chinese_policy_translation,
+    neutralize_person_terms,
+    parse_bilingual_caption,
+    truncate_caption_text,
+)
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,18 +42,6 @@ DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_RO
 ( DERIVED_DIR / 'person_embeddings').mkdir(parents=True, exist_ok=True)
 THUMB_SIZES = [256, 1024]
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
-
-DEFAULT_DETAILED_CAPTION_PROMPT = (
-    "Write a factual, search-friendly description of this photo in 80 to 120 words. "
-    "Use only directly visible evidence. Describe the main subjects, actions, setting, important objects, "
-    "clothing, colors, lighting, composition, and clearly readable text. Do not identify people or infer "
-    "relationships, protected or sensitive traits, events, occasions, locations, landmarks, or organizations. "
-    "Name a brand, model, place, landmark, or organization only when its exact name or logo is clearly legible "
-    "and unambiguous; otherwise use a generic description. Transcribe text only when confident and call it "
-    "partial or unclear instead of guessing. For phones or devices, describe visible color, case, controls, "
-    "screen content, and use, but do not guess the brand or model. Avoid speculative words such as likely, "
-    "probably, suggests, or appears to be. Return one coherent paragraph without hidden context."
-)
 
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
@@ -108,9 +106,6 @@ class TaskExecutor:
             t = threading.Thread(target=self._worker_loop, args=(wid,), daemon=True, name=f"worker-{wid}")
             t.start()
             self._threads.append(t)
-
-    def stop_workers(self):
-        self._stop = True
 
     def _worker_loop(self, worker_id: int):
         base_idle = self.settings.worker_poll_interval
@@ -184,6 +179,11 @@ class TaskExecutor:
                     self._handle_face_embed(session, task)
                 elif task.type == 'person_cluster':
                     self._handle_person_cluster(session, task)
+                elif task.type == 'person_recluster':
+                    result = self._handle_person_recluster(session, task)
+                    payload = dict(task.payload_json or {})
+                    payload['summary'] = result
+                    task.payload_json = payload
                 elif task.type == 'person_label_propagate':
                     self._handle_person_label_propagate(session, task)
                 elif task.type == 'dim_backfill':
@@ -202,32 +202,62 @@ class TaskExecutor:
                     self._handle_video_scene_detect(session, task)
                 elif task.type == 'video_segment_embed':
                     self._handle_video_segment_embed(session, task)
+                elif task.type == 'fail_transient':
+                    # Deterministic transient failure used by retry/dead-letter tests.
+                    raise OSError('Simulated transient failure')
                 else:
                     raise ValueError(f'Unsupported task type: {task.type}')
             except Exception as exc:
-                task.state = 'failed'
+                task.retry_count += 1
                 task.last_error = str(exc)[:4000]
+                if self._classify_permanent(exc):
+                    task.state = 'failed'
+                    task.finished_at = datetime.utcnow()
+                elif task.retry_count >= self.settings.max_task_retries:
+                    task.state = 'dead'
+                    task.finished_at = datetime.utcnow()
+                else:
+                    task.state = 'pending'
+                    task.scheduled_at = datetime.utcnow() + self._compute_backoff(
+                        task.retry_count
+                    )
                 session.commit()
+                try:
+                    metrics_mod.tasks_retried.labels(task.type).inc()
+                    if task.state in ('failed', 'dead'):
+                        metrics_mod.tasks_processed.labels(
+                            task.type, task.state
+                        ).inc()
+                except Exception:
+                    pass
                 return True
-            # success transition
-            task.state = 'finished'
-            task.finished_at = datetime.utcnow()
+            # Handlers may complete the task by canceling it. Only transition a
+            # still-running task to the canonical success state.
+            if task.state == 'running':
+                task.state = 'finished'
+                task.finished_at = datetime.utcnow()
             session.commit()
-            # metrics
             try:
-                metrics_mod.task_durations_seconds.labels(task.type).observe(time.time()-start_time)
+                metrics_mod.task_duration.labels(task.type).observe(
+                    time.time() - start_time
+                )
+                metrics_mod.tasks_processed.labels(
+                    task.type, task.state
+                ).inc()
             except Exception:
                 pass
             return True
         return False
 
     def stop_workers(self):
+        self._stop = True
         self._stop_event.set()
-        for t in self._workers:
+        for t in self._threads + self._workers:
             try:
                 t.join(timeout=1.0)
             except Exception:
                 pass
+        self._threads.clear()
         self._workers.clear()
 
     def _handle_embed(self, session: Session, task: Task):
@@ -341,6 +371,7 @@ class TaskExecutor:
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         force = bool(payload.get('force', False))
+        replace_generated = bool(payload.get('replace_generated', False))
         profile = (payload.get('profile') or os.getenv('CAPTION_PROFILE','balanced')).lower()
         max_variants = int(os.getenv('CAPTION_MAX_VARIANTS','3') or '3')
         word_limit = int(os.getenv('CAPTION_WORD_LIMIT','120') or '120')
@@ -348,17 +379,24 @@ class TaskExecutor:
         asset = session.get(Asset, asset_id)
         if not asset:
             raise ValueError('asset missing')
+        if replace_generated and asset.status != 'active':
+            raise ValueError('Caption refresh requires an active asset')
         existing = session.query(Caption).filter(Caption.asset_id==asset_id).order_by(Caption.created_at.asc()).all()
-        if existing and not force and len(existing) >= max_variants:
+        if replace_generated and any(c.user_edited for c in existing):
+            return next(c for c in existing if c.user_edited)
+        if existing and not force and not replace_generated and len(existing) >= max_variants:
             return existing[-1]
         text = ''
         model_name = 'unknown'
         err = None
+        prov = None
+        caption_image = None
         try:
             from .caption_service import get_caption_provider
             prov = get_caption_provider()
             caption_image = self._load_caption_image(asset)
             text = prov.generate_caption(caption_image, prompt=caption_prompt or None)
+            text = neutralize_person_terms(text)
             model_name = prov.get_model_name()
         except Exception as e:  # fallback heuristics
             err = str(e)
@@ -373,8 +411,10 @@ class TaskExecutor:
                     session.commit()
                 except Exception:
                     session.rollback()
-                # Do not generate stub captions by default; keep asset eligible for future backfill.
-                return None
+                # Do not report success when the real provider failed. Propagate the
+                # original exception so TaskExecutor can apply its retry/dead-letter
+                # policy while keeping the asset eligible for future backfill.
+                raise
             base = os.path.splitext(Path(asset.path).name)[0]
             toks = [t for t in base.replace('-',' ').replace('_',' ').split() if t]
             text = 'Photo' if not toks else ' '.join(toks[:8])
@@ -385,13 +425,90 @@ class TaskExecutor:
                 text = self._truncate_caption_text(text, word_limit)
         except Exception:
             pass
+        bilingual_output = parse_bilingual_caption(text)
+        if 'ZH-CN: ...' in caption_prompt:
+            policy_issues = bilingual_caption_issues(text)
+            try:
+                max_policy_retries = max(0, min(2, int(os.getenv('CAPTION_POLICY_MAX_RETRIES', '2') or '2')))
+            except (TypeError, ValueError):
+                max_policy_retries = 2
+            policy_retry_count = 0
+            while (
+                policy_issues
+                and prov is not None
+                and caption_image is not None
+                and policy_retry_count < max_policy_retries
+            ):
+                can_translate_text = getattr(prov, 'supports_text_translation', False) is True
+                translated_correction = None
+                # Use the cheaper text-only correction once. Repeating the same
+                # deterministic translation request after it still violates policy
+                # produces the same rejected output, so let the next bounded retry use
+                # the visual corrective prompt instead.
+                if (
+                    policy_retry_count == 0
+                    and policy_issues == ['chinese_policy']
+                    and bilingual_output
+                    and can_translate_text
+                ):
+                    translated_correction = correct_chinese_policy_translation(
+                        text,
+                        lambda english, avoid_terms: prov.translate_caption(
+                            english,
+                            avoid_terms=avoid_terms,
+                        ),
+                    )
+                if translated_correction is not None:
+                    text = translated_correction
+                else:
+                    retry_prompt = build_caption_retry_prompt(caption_prompt, policy_issues, text)
+                    text = prov.generate_caption(caption_image, prompt=retry_prompt)
+                policy_retry_count += 1
+                text = neutralize_person_terms(text)
+                try:
+                    if word_limit > 0:
+                        text = self._truncate_caption_text(text, word_limit)
+                except Exception:
+                    pass
+                bilingual_output = parse_bilingual_caption(text)
+                policy_issues = bilingual_caption_issues(text)
+            if policy_issues:
+                asset.caption_processed_at = datetime.utcnow()
+                asset.caption_error_last = (
+                    'caption policy validation failed: ' + bilingual_caption_issue_summary(text)
+                )
+                session.commit()
+                raise ValueError(asset.caption_error_last)
+        caption_model_version = None
+        if bilingual_output and 'zh-cn' not in model_name.lower():
+            model_name = f'{model_name}|bilingual-en-zh-cn'
+            caption_model_version = 'bilingual-v1'
+        if replace_generated:
+            if not model_name.startswith('qwen3-vl-http') or bilingual_caption_issues(text):
+                raise ValueError('Caption refresh requires validated bilingual Qwen3 output')
+            # End the inference-time read transaction, then serialize the write
+            # against edits made while the model was generating its response.
+            session.rollback()
+            session.execute(sql_text('BEGIN IMMEDIATE'))
+            asset = session.get(Asset, asset_id, populate_existing=True)
+            if not asset or asset.status != 'active':
+                session.rollback()
+                raise ValueError('Asset changed during caption refresh')
+            existing = session.query(Caption).filter(Caption.asset_id==asset_id).populate_existing().all()
+            edited = next((c for c in existing if c.user_edited), None)
+            if edited is not None:
+                session.rollback()
+                return edited
+            for previous in existing:
+                previous.superseded = True
         # Replace oldest non user_edited if at capacity
-        if existing and len(existing) >= max_variants:
+        if existing and len(existing) >= max_variants and not replace_generated:
             target = next((c for c in existing if not c.user_edited), None)
             if target is None:
                 return existing[-1]
             target.text = text
             target.model = model_name
+            target.model_version = caption_model_version
             session.commit()
             return target
         # Infer quality tier
@@ -404,7 +521,14 @@ class TaskExecutor:
             qtier = 'balanced'
         elif 'vit' in model_name.lower() or 'mini' in model_name.lower():
             qtier = 'fast'
-        cap = Caption(asset_id=asset_id, text=text, model=model_name, user_edited=False, quality_tier=qtier, model_version=None)
+        cap = Caption(
+            asset_id=asset_id,
+            text=text,
+            model=model_name,
+            user_edited=False,
+            quality_tier=qtier,
+            model_version=caption_model_version,
+        )
         session.add(cap)
         session.flush()
         # Optionally derive lightweight keyword tags from generated caption text.
@@ -453,6 +577,8 @@ class TaskExecutor:
             session.commit()
         except Exception:
             session.rollback()
+            if replace_generated:
+                raise
         return cap
 
     def _handle_image_tag(self, session: Session, task: Task):
@@ -529,31 +655,7 @@ class TaskExecutor:
 
     @staticmethod
     def _truncate_caption_text(text: str, word_limit: int) -> str:
-        if word_limit <= 0:
-            return text
-        words = [w for w in str(text or '').split() if w]
-        if len(words) <= word_limit:
-            return str(text or '')
-
-        # Prefer ending on sentence punctuation; if needed, look slightly beyond the limit.
-        sentence_end_re = re.compile(r'[.!?。！？][\'")\]]*$')
-
-        def _join(n: int) -> str:
-            return ' '.join(words[:max(1, n)]).strip()
-
-        # 1) Find last sentence boundary within the limit.
-        for i in range(word_limit, 0, -1):
-            if sentence_end_re.search(words[i - 1]):
-                return _join(i)
-
-        # 2) If none within limit, allow a small forward window to finish sentence.
-        forward_limit = min(len(words), word_limit + 24)
-        for i in range(word_limit + 1, forward_limit + 1):
-            if sentence_end_re.search(words[i - 1]):
-                return _join(i)
-
-        # 3) Fallback to hard cap.
-        return _join(word_limit)
+        return truncate_caption_text(text, word_limit)
 
     def _handle_face(self, session: Session, task: Task):
         payload = task.payload_json or {}
@@ -612,17 +714,23 @@ class TaskExecutor:
                 except Exception:
                     pass
             except Exception:
-                # Do not inject fake face boxes by default; this pollutes face_detections.
-                # Optional legacy behavior can be enabled via FACE_DETECT_CENTER_FALLBACK=true.
-                dets = []
+                # Do not turn detector failures into successful zero-face tasks. The task
+                # executor must see the exception so normal retry/dead-letter handling can
+                # preserve the distinction between "no face found" and "detector failed".
+                # Optional legacy behavior can still be enabled explicitly.
                 if os.getenv('FACE_DETECT_CENTER_FALLBACK', 'false').lower() in ('1', 'true', 'yes'):
+                    dets = []
                     from PIL import Image as _Im
                     with _Im.open(src) as im_det:
                         w,h = safe_exif_transpose(im_det).size
                     size = min(w,h)*0.4
                     dets.append(type('DF',(),{'x':(w-size)/2,'y':(h-size)/2,'w':size,'h':size,'landmarks':None})())
                 else:
-                    logger.warning(f"Face detection failed for asset_id={asset.id}; skipping fallback box insertion", exc_info=True)
+                    logger.exception(
+                        "Face detection failed for asset_id=%s; task will retry",
+                        asset.id,
+                    )
+                    raise
             detector_model = type(provider).__name__ if 'provider' in locals() else None
             known_faces = [
                 ((float(f.bbox_x), float(f.bbox_y), float(f.bbox_w), float(f.bbox_h)), f)
@@ -1189,21 +1297,18 @@ class TaskExecutor:
             return
         asset = session.get(Asset, asset_id)
         if not asset:
-            return
+            raise ValueError('asset missing')
         if asset.width and asset.height:
             return
         p = Path(asset.path)
         if not p.exists():
-            return
-        try:
-            with Image.open(p) as im:
-                upright = safe_exif_transpose(im)
-                w, h = upright.size
-            asset.width = w
-            asset.height = h
-            session.commit()
-        except Exception:
-            pass
+            raise FileNotFoundError(f'dimension source missing: {p}')
+        with Image.open(p) as im:
+            upright = safe_exif_transpose(im)
+            w, h = upright.size
+        asset.width = w
+        asset.height = h
+        session.commit()
 
     def _maybe_enqueue_dim_backfill(self, session: Session):
         now = time.time()
@@ -1217,8 +1322,18 @@ class TaskExecutor:
         ).first()
         if existing:
             return
-        # find assets missing dimensions
-        missing = session.query(Asset.id).filter(or_(Asset.width==None, Asset.height==None)).limit(50).all()
+        # Each asset gets one automatically-created task. The task's own retry
+        # policy handles transient failures; retaining terminal task history keeps
+        # missing or corrupt sources from being re-enqueued every scan forever.
+        attempted_asset_ids = select(
+            Task.payload_json['asset_id'].as_integer()
+        ).where(Task.type == 'dim_backfill')
+        missing = session.query(Asset.id).filter(
+            or_(Asset.width==None, Asset.height==None),
+            Asset.status == 'active',
+            Asset.mime.like('image/%'),
+            ~Asset.id.in_(attempted_asset_ids),
+        ).limit(50).all()
         if not missing:
             return
         # enqueue tasks
@@ -1446,10 +1561,14 @@ class TaskExecutor:
         return not isinstance(exc, transient)
 
     def _compute_backoff(self, retry_count: int):
-        base = self.settings.retry_backoff_base_seconds
-        cap = self.settings.retry_backoff_cap_seconds
-        raw = base * (2 ** (max(0, retry_count-1)))
+        base = getattr(self.settings, 'retry_backoff_base_seconds', 2.0)
+        cap = getattr(self.settings, 'retry_backoff_cap_seconds', 300.0)
+        jitter_fraction = getattr(self.settings, 'retry_backoff_jitter', 0.25)
+        raw = base * (2 ** max(0, retry_count - 1))
         raw = min(raw, cap)
-        jitter = raw * random.uniform(0.2, 0.6)
-        from datetime import timedelta
-        return timedelta(seconds=raw + jitter)
+        jitter = (
+            raw * random.uniform(-jitter_fraction, jitter_fraction)
+            if raw > 0
+            else 0
+        )
+        return timedelta(seconds=max(0.0, raw + jitter))

@@ -121,15 +121,7 @@ except Exception as e:
     print(f"Error: {{e}}", file=sys.stderr)
     import traceback
     traceback.print_exc(file=sys.stderr)
-    # Fallback: create a dummy embedding for testing
-    import numpy as np
-    import json
-    embedding = np.random.randn({self.target_dim}).astype('float32')
-    norm = np.linalg.norm(embedding)
-    if norm > 0:
-        embedding = embedding / norm
-    print(json.dumps(embedding.tolist()))
-    print("Used dummy embedding due to error", file=sys.stderr)
+    raise
 """
             else:
                 model_abs = str((self.lvface_dir / "models" / self.model_name).resolve())
@@ -184,7 +176,27 @@ print(json.dumps(embedding.tolist()))
                 raise RuntimeError(f"LVFace inference failed: {result.stderr}")
             
             # Parse result
-            embedding = np.array(json.loads(result.stdout.strip()), dtype=np.float32)
+            try:
+                embedding = np.array(
+                    json.loads(result.stdout.strip()), dtype=np.float32
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "LVFace inference returned invalid JSON output"
+                ) from exc
+            if embedding.ndim != 1 or embedding.shape[0] != self.target_dim:
+                raise RuntimeError(
+                    "LVFace inference returned an invalid embedding shape: "
+                    f"expected ({self.target_dim},), got {embedding.shape}"
+                )
+            if not np.isfinite(embedding).all():
+                raise RuntimeError("LVFace inference returned non-finite values")
+            norm = float(np.linalg.norm(embedding))
+            if norm <= 0.0 or not np.isclose(norm, 1.0, atol=1e-3):
+                raise RuntimeError(
+                    "LVFace inference returned a non-normalized embedding: "
+                    f"norm={norm}"
+                )
             return embedding
             
         finally:

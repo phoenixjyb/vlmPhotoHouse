@@ -14,12 +14,16 @@ from .image_utils import safe_exif_transpose
 SUPPORTED_IMAGE_EXT = {'.jpg','.jpeg','.png','.heic','.webp'}
 
 def sha256_file(path: Path, buf_size: int = 1024*1024) -> str:
+    before = path.stat()
     h = hashlib.sha256()
     with path.open('rb') as f:
         while True:
             chunk = f.read(buf_size)
             if not chunk: break
             h.update(chunk)
+    after = path.stat()
+    if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+        raise RuntimeError(f'File changed while hashing: {path}')
     return h.hexdigest()
 
 def extract_exif_datetime(tags) -> Optional[datetime]:
@@ -49,7 +53,7 @@ def read_exif(path: Path) -> dict:
         pass
     return out
 
-def ingest_paths(session: Session, roots: List[str]) -> dict:
+def ingest_paths(session: Session, roots: List[str], *, enqueue_embeddings: bool = True) -> dict:
     new_assets = 0
     skipped = 0
     start = time.time()
@@ -63,7 +67,10 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
         except Exception:
             pass
     for root in roots:
-        for p in Path(root).rglob('*'):
+        root_path = Path(root)
+        # Explicit files support bounded intake without rescanning a live folder.
+        candidates = [root_path] if root_path.is_file() else root_path.rglob('*')
+        for p in candidates:
             if not p.is_file():
                 continue
             if p.suffix.lower() not in allowed_ext:
@@ -129,6 +136,8 @@ def ingest_paths(session: Session, roots: List[str]) -> dict:
                     if getattr(settings, 'video_scene_detect', False):
                         tasks_to_create.append(Task(type='video_scene_detect', priority=80, payload_json={'asset_id': asset.id}))
             for t in tasks_to_create:
+                if not enqueue_embeddings and t.type in {'embed', 'video_embed'}:
+                    continue
                 session.add(t)
             new_assets +=1
         session.commit()

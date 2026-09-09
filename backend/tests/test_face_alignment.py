@@ -137,3 +137,47 @@ def test_face_task_persists_landmarks_and_writes_separate_aligned_crop(
     assert aligned_crop.exists()
     with Image.open(aligned_crop) as aligned:
         assert aligned.size == (112, 112)
+
+
+def test_face_task_propagates_detection_failure_by_default(
+    temp_env_root, monkeypatch
+):
+    import uuid
+
+    import app.face_detection_service as detection_module
+    import app.main as app_main
+    import app.tasks as tasks_module
+    from app.db import Asset, FaceDetection, Task
+
+    derived_root = Path(temp_env_root['derived'])
+    monkeypatch.setattr(tasks_module, 'DERIVED_DIR', derived_root)
+    monkeypatch.delenv('FACE_DETECT_CENTER_FALLBACK', raising=False)
+
+    class FailingDetector:
+        def detect(self, _image):
+            raise RuntimeError('detector unavailable')
+
+    monkeypatch.setattr(
+        detection_module,
+        'get_face_detection_provider',
+        lambda: FailingDetector(),
+    )
+
+    image_path = Path(temp_env_root['originals']) / 'detection-failure.jpg'
+    Image.new('RGB', (160, 160), color=(90, 110, 130)).save(image_path)
+
+    with app_main.SessionLocal() as session:
+        asset = Asset(path=str(image_path), hash_sha256=uuid.uuid4().hex)
+        session.add(asset)
+        session.flush()
+        task = Task(type='face', payload_json={'asset_id': asset.id})
+
+        with pytest.raises(RuntimeError, match='detector unavailable'):
+            app_main.executor._handle_face(session, task)
+
+        assert (
+            session.query(FaceDetection)
+            .filter(FaceDetection.asset_id == asset.id)
+            .count()
+            == 0
+        )

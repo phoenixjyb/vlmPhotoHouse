@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-i18n="app_title">VLM Photo House</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260228c" />
+  <title data-i18n="app_title">PhotoHouse</title>
+  <link rel="stylesheet" href="/ui/styles.css?v=20260908-warm" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -12,30 +12,36 @@
     crossorigin=""
   />
 </head>
-<body>
+<body data-ui-mode="family">
+  <a class="skip-link" href="#main-content" data-i18n="skip_content">Skip to memories</a>
   <div class="bg-orb bg-orb-a"></div>
   <div class="bg-orb bg-orb-b"></div>
   <div class="app-shell">
     <header class="topbar">
-      <div>
-        <h1 data-i18n="app_title">VLM Photo House</h1>
-        <p class="subtitle" data-i18n="subtitle">Faces, captions, videos, and search in one control surface.</p>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M6 19 20 7l14 12v15H6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M20 29s-8-4.5-8-9a4.4 4.4 0 0 1 8-2.5 4.4 4.4 0 0 1 8 2.5c0 4.5-8 9-8 9Z" fill="currentColor"/></svg></span>
+        <div>
+          <h1 data-i18n="app_title">PhotoHouse</h1>
+          <p class="subtitle" data-i18n="subtitle">Your family's story, all together.</p>
+        </div>
       </div>
       <div class="top-actions">
+        <button id="btn-quick-search" class="btn ghost quick-search" type="button" data-i18n="quick_search">Find a memory</button>
         <div id="lang-switch" class="lang-switch">
           <button class="btn ghost lang-btn" data-lang="en" type="button">EN</button>
           <button class="btn ghost lang-btn" data-lang="zh" type="button">中文</button>
         </div>
-        <button id="btn-voice-chat" class="btn ghost" data-i18n="voice_chat">Voice Chat</button>
-        <button id="btn-voice-chat-reset" class="btn ghost" data-i18n="voice_chat_reset">Delete Chat</button>
-        <button id="btn-voice-command" class="btn ghost" data-i18n="voice_command">Voice Command</button>
+        <button id="btn-ui-mode" class="btn ghost" type="button" aria-pressed="false">Advanced</button>
+        <button id="btn-voice-chat" class="btn ghost advanced-only" data-i18n="voice_chat">Voice Chat</button>
+        <button id="btn-voice-chat-reset" class="btn ghost advanced-only" data-i18n="voice_chat_reset">Delete Chat</button>
+        <button id="btn-voice-command" class="btn ghost advanced-only" data-i18n="voice_command">Voice Command</button>
         <span id="voice-status" class="small muted"></span>
-        <button id="btn-refresh-all" class="btn ghost" data-i18n="refresh">Refresh</button>
-        <a class="btn ghost" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
+        <button id="btn-refresh-all" class="btn ghost advanced-only" data-i18n="refresh">Refresh</button>
+        <a class="btn ghost advanced-only" href="/docs" target="_blank" rel="noopener" data-i18n="api_docs">API Docs</a>
       </div>
     </header>
 
-    <section id="voice-history-panel" class="voice-history-panel">
+    <section id="voice-history-panel" class="voice-history-panel advanced-only">
       <div class="voice-history-header">
         <strong data-i18n="voice_history">Voice History</strong>
         <button id="btn-voice-history-clear" class="btn ghost" data-i18n="voice_history_clear">Clear</button>
@@ -43,7 +49,7 @@
       <div id="voice-history-list" class="voice-history-list"></div>
     </section>
 
-    <section class="status-cards">
+    <section class="status-cards advanced-only" aria-label="System status">
       <article class="stat-card">
         <p class="label" data-i18n="assets">Assets</p>
         <p id="stat-assets" class="value">-</p>
@@ -78,19 +84,84 @@
       </article>
     </section>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="library" data-i18n="tab_library">Library</button>
-      <button class="tab" data-tab="people" data-i18n="tab_people">People</button>
-      <button class="tab" data-tab="tags" data-i18n="tab_tags">Tags</button>
-      <button class="tab" data-tab="stories" data-i18n="tab_stories">Stories</button>
-      <button class="tab" data-tab="similarity" data-i18n="tab_similarity">Similarity</button>
-      <button class="tab" data-tab="map" data-i18n="tab_map">Map</button>
-      <button class="tab" data-tab="tasks" data-i18n="tab_tasks">Tasks</button>
-      <button class="tab" data-tab="admin" data-i18n="tab_admin">Admin</button>
+    <nav class="tabs" role="tablist" aria-label="Photo House sections">
+      <button id="tab-button-home" class="tab active" data-tab="home" data-i18n="tab_home" role="tab" aria-controls="tab-home" aria-selected="true" tabindex="0">Home</button>
+      <button id="tab-button-library" class="tab" data-tab="library" data-i18n="tab_library" role="tab" aria-controls="tab-library" aria-selected="false" tabindex="-1">All photos</button>
+      <button id="tab-button-people" class="tab" data-tab="people" data-i18n="tab_people" role="tab" aria-controls="tab-people" aria-selected="false" tabindex="-1">People</button>
+      <button id="tab-button-tags" class="tab" data-tab="tags" data-i18n="tab_tags" role="tab" aria-controls="tab-tags" aria-selected="false" tabindex="-1">Tags</button>
+      <button id="tab-button-stories" class="tab" data-tab="stories" data-i18n="tab_stories" role="tab" aria-controls="tab-stories" aria-selected="false" tabindex="-1">Albums</button>
+      <button id="tab-button-similarity" class="tab advanced-only" data-tab="similarity" data-i18n="tab_similarity" role="tab" aria-controls="tab-similarity" aria-selected="false" tabindex="-1">Similarity</button>
+      <button id="tab-button-map" class="tab" data-tab="map" data-i18n="tab_map" role="tab" aria-controls="tab-map" aria-selected="false" tabindex="-1">Map</button>
+      <button id="tab-button-tasks" class="tab advanced-only" data-tab="tasks" data-i18n="tab_tasks" role="tab" aria-controls="tab-tasks" aria-selected="false" tabindex="-1">Tasks</button>
+      <button id="tab-button-admin" class="tab advanced-only" data-tab="admin" data-i18n="tab_admin" role="tab" aria-controls="tab-admin" aria-selected="false" tabindex="-1">Admin</button>
     </nav>
 
-    <main>
-      <section id="tab-library" class="tab-panel active">
+    <main id="main-content" tabindex="-1">
+      <section id="tab-home" class="tab-panel active" role="tabpanel" aria-labelledby="tab-button-home">
+        <div class="home-hero">
+          <div class="home-hero-copy">
+          <p class="home-eyebrow" data-i18n="home_eyebrow">WELCOME TO YOUR FAMILY ALBUM</p>
+          <h2 data-i18n="home_title">Ordinary days. Extraordinary memories.</h2>
+          <p class="home-intro" data-i18n="home_intro">The places you've been. The people you love. A lifetime of little moments, waiting to be found again.</p>
+          <div class="home-search-row">
+            <label class="grow">
+              <span class="sr-only" data-i18n="family_search">Family search</span>
+              <input id="home-search-query" type="search" data-i18n-placeholder="home_search_ph" placeholder="Try ‘birthday’, ‘by the sea’, or a name…" />
+            </label>
+            <button id="btn-home-search" class="btn home-search-btn" type="button" data-i18n="find_memories">Find Memories</button>
+          </div>
+          <div id="home-search-suggestions" class="home-suggestions" aria-label="Search suggestions">
+            <button class="home-suggestion" type="button" data-home-query="playing outside" data-home-query-zh="户外玩耍" data-i18n="home_suggestion_play">Playing outside</button>
+            <button class="home-suggestion" type="button" data-home-query="birthday" data-home-query-zh="生日" data-i18n="home_suggestion_birthday">Birthday moments</button>
+            <button class="home-suggestion" type="button" data-home-query="family trip" data-home-query-zh="家庭旅行" data-i18n="home_suggestion_trip">Family trips</button>
+          </div>
+          <div id="home-search-interpretation" class="home-search-interpretation hidden" aria-live="polite"></div>
+          </div>
+          <div class="home-keepsake">
+            <div id="home-featured-photos" class="home-featured-photos"></div>
+            <p class="keepsake-note" data-i18n="keepsake_note">The little things. The big feelings.</p>
+          </div>
+        </div>
+        <div id="home-load-status" class="home-load-status hidden" role="status"></div>
+
+        <div class="home-section-heading">
+          <div>
+            <p class="home-eyebrow" data-i18n="home_recent_eyebrow">LATEST ADDITIONS</p>
+            <h2 data-i18n="home_recent_title">Recent moments</h2>
+          </div>
+          <div class="home-heading-actions">
+            <button id="btn-home-slideshow" class="btn ghost" type="button" data-i18n="watch_memories" disabled>Watch memories</button>
+            <button id="btn-home-view-library" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+          </div>
+        </div>
+        <div id="home-recent-grid" class="asset-grid home-asset-grid"></div>
+
+        <div class="home-columns">
+          <section class="panel home-panel">
+            <div class="home-section-heading compact">
+              <div>
+                <p class="home-eyebrow" data-i18n="home_people_eyebrow">FAMILY</p>
+                <h2 data-i18n="home_people_title">Your favourite people</h2>
+              </div>
+              <button id="btn-home-view-people" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+            </div>
+            <div id="home-people-list" class="home-people-list"></div>
+          </section>
+
+          <section class="panel home-panel">
+            <div class="home-section-heading compact">
+              <div>
+                <p class="home-eyebrow" data-i18n="home_albums_eyebrow">READY TO EXPLORE</p>
+                <h2 data-i18n="home_albums_title">Stories worth revisiting</h2>
+              </div>
+              <button id="btn-home-view-stories" class="btn ghost" type="button" data-i18n="view_all">View all</button>
+            </div>
+            <div id="home-story-list" class="home-story-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="tab-library" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-library">
         <div class="panel-grid">
           <div class="panel left-panel">
             <h2 data-i18n="search">Search</h2>
@@ -100,7 +171,7 @@
                 <select id="search-mode">
                   <option value="path" data-i18n="mode_path">Path</option>
                   <option value="caption" data-i18n="mode_caption">Caption</option>
-                  <option value="smart" data-i18n="mode_smart">Smart</option>
+                  <option value="smart" data-i18n="mode_smart" selected>Smart</option>
                   <option value="person" data-i18n="mode_person">Person Name</option>
                 </select>
               </label>
@@ -127,6 +198,7 @@
               <button id="btn-search" class="btn" data-i18n="run_search">Run Search</button>
               <button id="btn-library-load" class="btn ghost" data-i18n="browse_latest">Browse Latest</button>
             </div>
+            <div id="search-interpretation" class="home-search-interpretation hidden" aria-live="polite"></div>
 
             <h3 data-i18n="results">Results</h3>
             <p id="library-result-meta" class="muted"></p>
@@ -150,8 +222,8 @@
                 <div class="asset-header-actions">
                   <button id="btn-asset-back" class="btn ghost" data-i18n="back_to_results">Back</button>
                   <button id="btn-preview-fullscreen" class="btn ghost" data-i18n="fullscreen">Full Screen</button>
-                  <button id="btn-delete-photo" class="btn danger" data-i18n="delete_photo">Delete Photo</button>
-                  <button id="btn-delete-asset" class="btn danger" data-i18n="delete_asset">Delete Asset</button>
+                  <button id="btn-delete-photo" class="btn danger advanced-only" data-i18n="delete_photo">Delete Photo</button>
+                  <button id="btn-delete-asset" class="btn danger advanced-only" data-i18n="delete_asset">Delete Asset</button>
                 </div>
               </div>
               <div id="asset-preview" class="asset-preview"></div>
@@ -159,7 +231,7 @@
               <div class="section">
                 <h3 data-i18n="captions">Captions</h3>
                 <div class="controls">
-                  <button id="btn-caption-regenerate" class="btn" data-i18n="regenerate">Regenerate</button>
+                  <button id="btn-caption-regenerate" class="btn advanced-only" data-i18n="regenerate">Regenerate</button>
                 </div>
                 <div id="caption-list"></div>
               </div>
@@ -182,7 +254,7 @@
         </div>
       </section>
 
-      <section id="tab-people" class="tab-panel">
+      <section id="tab-people" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-people">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -223,7 +295,7 @@
         </div>
       </section>
 
-      <section id="tab-tags" class="tab-panel">
+      <section id="tab-tags" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-tags">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -309,7 +381,7 @@
         </div>
       </section>
 
-      <section id="tab-stories" class="tab-panel">
+      <section id="tab-stories" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-stories">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -354,14 +426,71 @@
             </div>
           </div>
           <div class="panel right-panel">
+            <section class="album-drafts-panel" aria-labelledby="album-drafts-title">
+              <div class="home-section-heading compact">
+                <div>
+                  <p class="home-eyebrow" data-i18n="album_drafts_eyebrow">YOUR COLLECTIONS</p>
+                  <h3 id="album-drafts-title" data-i18n="album_drafts_title">Saved album drafts</h3>
+                </div>
+                <button id="btn-refresh-album-drafts" class="btn ghost" type="button" data-i18n="refresh">Refresh</button>
+              </div>
+              <div id="album-draft-list" class="album-draft-list"></div>
+            </section>
             <h2 data-i18n="story_assets_panel">Story Assets</h2>
             <p id="story-assets-meta" class="muted" data-i18n="story_assets_meta_default">Select a story to view related assets.</p>
+            <section class="album-composer" aria-labelledby="album-composer-title">
+              <div class="home-section-heading compact">
+                <div>
+                  <p class="home-eyebrow" data-i18n="album_composer_eyebrow">ALBUM COMPOSER</p>
+                  <h3 id="album-composer-title" data-i18n="album_composer_title">Create a keepsake</h3>
+                </div>
+                <button id="btn-album-use-story" class="btn ghost" type="button" data-i18n="album_use_story">Use selected story</button>
+              </div>
+              <div class="album-composer-grid">
+                <label>
+                  <span data-i18n="album_title_en">English title</span>
+                  <input id="album-title" type="text" maxlength="160" data-i18n-placeholder="album_title_en_ph" placeholder="Our summer together" />
+                </label>
+                <label>
+                  <span data-i18n="album_title_zh">Chinese title</span>
+                  <input id="album-title-zh" type="text" maxlength="160" data-i18n-placeholder="album_title_zh_ph" placeholder="一起过夏天" />
+                </label>
+                <label>
+                  <span data-i18n="album_theme">Theme</span>
+                  <select id="album-theme">
+                    <option value="custom" data-i18n="album_theme_custom">Custom</option>
+                    <option value="birthday" data-i18n="album_theme_birthday">Birthday</option>
+                    <option value="trip" data-i18n="album_theme_trip">Trip</option>
+                    <option value="growing_up" data-i18n="album_theme_growing_up">Growing up</option>
+                    <option value="grandparents" data-i18n="album_theme_grandparents">Grandparents</option>
+                    <option value="year_in_review" data-i18n="album_theme_year_in_review">Year in review</option>
+                    <option value="seasonal" data-i18n="album_theme_seasonal">Seasonal</option>
+                  </select>
+                </label>
+                <label>
+                  <span data-i18n="album_sort">Photo order</span>
+                  <select id="album-sort-mode">
+                    <option value="chronological" data-i18n="album_sort_chronological">Oldest to newest</option>
+                    <option value="newest" data-i18n="album_sort_newest">Newest first</option>
+                    <option value="as_provided" data-i18n="album_sort_story">Story order</option>
+                  </select>
+                </label>
+                <label class="album-cover-field">
+                  <span data-i18n="album_cover">Cover photo</span>
+                  <select id="album-cover-asset"></select>
+                </label>
+              </div>
+              <div class="album-composer-actions">
+                <button id="btn-save-album-draft" class="btn" type="button" data-i18n="album_save_draft">Save album draft</button>
+                <span id="album-composer-meta" class="muted small" data-i18n="album_composer_hint">Choose a suggested story to start.</span>
+              </div>
+            </section>
             <div id="story-assets-grid" class="asset-grid scroll-grid"></div>
           </div>
         </div>
       </section>
 
-      <section id="tab-similarity" class="tab-panel">
+      <section id="tab-similarity" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-similarity">
         <div class="panel-grid">
           <div class="panel left-panel">
             <div class="controls">
@@ -410,7 +539,7 @@
         </div>
       </section>
 
-      <section id="tab-map" class="tab-panel">
+      <section id="tab-map" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-map">
         <div class="panel">
           <div class="controls">
             <h2 data-i18n="geo_map">Geo Map</h2>
@@ -433,7 +562,7 @@
         </div>
       </section>
 
-      <section id="tab-tasks" class="tab-panel">
+      <section id="tab-tasks" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-tasks">
         <div class="panel">
           <div class="controls">
             <h2 data-i18n="task_queue">Task Queue</h2>
@@ -460,7 +589,7 @@
         </div>
       </section>
 
-      <section id="tab-admin" class="tab-panel">
+      <section id="tab-admin" class="tab-panel advanced-only" role="tabpanel" aria-labelledby="tab-button-admin">
         <div class="panel-grid">
           <div class="panel">
             <h2 data-i18n="health">Health</h2>
@@ -489,18 +618,32 @@
         </div>
       </section>
     </main>
+    <footer class="family-footer"><span aria-hidden="true">♡</span> <span data-i18n="family_footer">A little closer, every time you look back.</span></footer>
   </div>
 
-  <div id="toast" class="toast"></div>
-  <div id="preview-modal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-label="Asset Preview">
-    <button id="btn-preview-close" class="preview-close" type="button" data-i18n="close_preview">Close</button>
-    <div id="preview-modal-body" class="preview-modal-body"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="preview-modal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="viewer-toolbar">
+      <div><p id="preview-title" class="viewer-title"></p><p id="preview-position" class="small muted" aria-live="polite"></p></div>
+      <div class="viewer-actions">
+        <button id="btn-preview-play" class="preview-close" type="button" data-i18n="play_slideshow">Play slideshow</button>
+        <button id="btn-preview-details" class="preview-close" type="button" data-i18n="photo_details">Photo details</button>
+        <button id="btn-preview-close" class="preview-close" type="button" data-i18n="close_preview">Close</button>
+      </div>
+    </div>
+    <div class="viewer-stage">
+      <button id="btn-preview-prev" class="viewer-arrow" type="button" aria-label="Previous photo">&#8592;</button>
+      <div id="preview-modal-body" class="preview-modal-body"></div>
+      <button id="btn-preview-next" class="viewer-arrow" type="button" aria-label="Next photo">&#8594;</button>
+    </div>
+    <div id="preview-caption" class="viewer-caption" tabindex="0" role="region" aria-label="Photo description"></div>
+    <div id="preview-filmstrip" class="viewer-filmstrip" aria-label="Photos in this view"></div>
   </div>
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260302a" defer></script>
+  <script src="/ui/app.js?v=20260908-warm" defer></script>
 </body>
 </html>

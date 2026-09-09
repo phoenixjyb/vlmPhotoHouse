@@ -50,7 +50,7 @@ def test_recluster_progress_and_cancel(monkeypatch):
     while time.time() < deadline:
         executor.run_once()
         t = client.get(f'/tasks/{task_id}').json()['task']
-        if t['state'] in ('done','failed','canceled','dead'):
+        if t['state'] in ('finished','failed','canceled','dead'):
             final = t
             break
         # If task still pending or running keep looping; brief sleep to reduce busy wait
@@ -58,7 +58,7 @@ def test_recluster_progress_and_cancel(monkeypatch):
     if final is None:
         # fetch latest state once more before asserting
         t = client.get(f'/tasks/{task_id}').json()['task']
-        if t['state'] in ('done','failed','canceled','dead'):
+        if t['state'] in ('finished','failed','canceled','dead'):
             final = t
         elif t['state'] == 'running' and t.get('progress_current') is not None:
             final = t
@@ -67,7 +67,7 @@ def test_recluster_progress_and_cancel(monkeypatch):
             final = t
     assert final is not None
     # If task reached an active/terminal execution state we expect progress fields
-    if final['state'] in ('running','done','failed','canceled','dead'):
+    if final['state'] in ('running','finished','failed','canceled','dead'):
         assert final['progress_current'] is not None
         assert final['progress_total'] is not None
     else:

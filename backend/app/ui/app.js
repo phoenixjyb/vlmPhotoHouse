@@ -1,5 +1,13 @@
 const state = {
-  activeTab: "library",
+  activeTab: "home",
+  uiMode: "family",
+  gridItems: new Map(),
+  viewer: { items: [], index: 0, timer: null, request: 0, returnFocus: null, origin: "home" },
+  home: {
+    recent: [],
+    people: [],
+    stories: [],
+  },
   selectedAsset: null,
   persons: [],
   namedPersons: [],
@@ -63,6 +71,11 @@ const state = {
     selectedStoryId: "",
     total: 0,
   },
+  albumDrafts: {
+    albums: [],
+    selectedAlbumId: null,
+    editorMode: "story",
+  },
   similarity: {
     minGroupSize: 2,
     maxDistance: 5,
@@ -80,11 +93,32 @@ const state = {
 };
 
 const qs = (id) => document.getElementById(id);
+const ADVANCED_TABS = new Set(["similarity", "tasks", "admin"]);
+const ALL_TABS = ["home", "library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"];
 
 const I18N = {
   en: {
-    app_title: "VLM Photo House",
-    subtitle: "Faces, captions, videos, and search in one control surface.",
+    app_title: "PhotoHouse",
+    subtitle: "Your family's story, all together.",
+    quick_search: "Find a memory",
+    skip_content: "Skip to memories",
+    keepsake_note: "The little things. The big feelings.",
+    family_footer: "A little closer, every time you look back.",
+    watch_memories: "Watch memories",
+    play_slideshow: "Play slideshow",
+    pause_slideshow: "Pause slideshow",
+    photo_details: "Photo details",
+    previous_photo: "Previous photo",
+    next_photo: "Next photo",
+    viewer_position: "{current} of {total}",
+    memory_undated: "A moment to keep",
+    memory_video: "Video",
+    loading_memories: "Gathering your memories…",
+    retry_loading: "Try again",
+    partial_home: "Some memories couldn't load. Your photos are still safe.",
+    viewer_no_caption: "A moment that speaks for itself.",
+    viewer_caption_error: "The description couldn't load. Reopen this photo to try again.",
+    viewer_photo_error: "This photo couldn't load. Use the arrows to keep browsing.",
     voice_chat: "Voice Chat",
     voice_chat_reset: "Delete Chat",
     voice_command: "Voice Command",
@@ -118,6 +152,8 @@ const I18N = {
     voice_person_not_found: "No person matched {name}",
     refresh: "Refresh",
     api_docs: "API Docs",
+    advanced_mode: "Advanced",
+    family_mode: "Family View",
     assets: "Assets",
     captions: "Captions",
     faces: "Faces",
@@ -126,14 +162,42 @@ const I18N = {
     tagged_assets: "Tagged Assets",
     tasks_pending: "Tasks Pending",
     health: "Health",
-    tab_library: "Library",
+    tab_home: "Home",
+    tab_library: "All photos",
     tab_people: "People",
     tab_tags: "Tags",
-    tab_stories: "Stories",
+    tab_stories: "Albums",
     tab_similarity: "Similarity",
     tab_map: "Map",
     tab_tasks: "Tasks",
     tab_admin: "Admin",
+    home_eyebrow: "WELCOME TO YOUR FAMILY ALBUM",
+    home_title: "Ordinary days. Extraordinary memories.",
+    home_intro: "The places you've been. The people you love. A lifetime of little moments, waiting to be found again.",
+    family_search: "Family search",
+    home_search_ph: "Try ‘birthday’, ‘by the sea’, or a name…",
+    find_memories: "Find Memories",
+    home_suggestion_play: "Playing outside",
+    home_suggestion_birthday: "Birthday moments",
+    home_suggestion_trip: "Family trips",
+    home_recent_eyebrow: "LATEST ADDITIONS",
+    home_recent_title: "Recent moments",
+    home_people_eyebrow: "FAMILY",
+    home_people_title: "Your favourite people",
+    home_albums_eyebrow: "READY TO EXPLORE",
+    home_albums_title: "Stories worth revisiting",
+    home_person_photos: "{count} photos",
+    home_story_assets: "{count} memories",
+    home_empty_recent: "No recent photos are available yet.",
+    home_empty_people: "Name a few people to see family shortcuts here.",
+    home_empty_stories: "Suggested albums will appear as captions and tags become available.",
+    home_load_failed: "Home could not be refreshed: {error}",
+    home_search_required: "Describe the memory you want to find.",
+    search_filter_query: "Memory",
+    search_filter_mode: "Search",
+    search_filter_media: "Media",
+    search_mode_family: "Smart family search",
+    view_all: "View all",
     search: "Search",
     mode: "Mode",
     mode_path: "Path",
@@ -308,6 +372,40 @@ const I18N = {
     story_open_context: "Open Context",
     story_context_opened: "Opened story context",
     story_context_unavailable: "Story context is unavailable",
+    album_drafts_eyebrow: "YOUR COLLECTIONS",
+    album_drafts_title: "Saved album drafts",
+    album_drafts_empty: "No album drafts yet. Start from a suggested story.",
+    album_composer_eyebrow: "ALBUM COMPOSER",
+    album_composer_title: "Create a keepsake",
+    album_use_story: "Use selected story",
+    album_title_en: "English title",
+    album_title_en_ph: "Our summer together",
+    album_title_zh: "Chinese title",
+    album_title_zh_ph: "一起过夏天",
+    album_theme: "Theme",
+    album_theme_custom: "Custom",
+    album_theme_birthday: "Birthday",
+    album_theme_trip: "Trip",
+    album_theme_growing_up: "Growing up",
+    album_theme_grandparents: "Grandparents",
+    album_theme_year_in_review: "Year in review",
+    album_theme_seasonal: "Seasonal",
+    album_sort: "Photo order",
+    album_sort_chronological: "Oldest to newest",
+    album_sort_newest: "Newest first",
+    album_sort_story: "Story order",
+    album_cover: "Cover photo",
+    album_save_draft: "Save album draft",
+    album_update_draft: "Update album draft",
+    album_composer_hint: "Choose a suggested story to start.",
+    album_composer_ready: "{count} photos ready for this draft.",
+    album_draft_assets: "{count} photos",
+    album_title_required: "Enter an English album title.",
+    album_story_required: "Choose a story with photos first.",
+    album_saved: "Album draft saved",
+    album_updated: "Album draft updated",
+    album_save_failed: "Album could not be saved: {error}",
+    album_load_failed: "Album drafts could not be loaded: {error}",
     similarity_title: "Similarity Reduction",
     similarity_min_group_size: "Min group",
     similarity_max_distance: "Max distance",
@@ -363,8 +461,27 @@ const I18N = {
     pager_status: "Page {page}/{pages} | showing {shown}/{total}",
   },
   zh: {
-    app_title: "VLM 照片屋",
-    subtitle: "在人脸、字幕、视频和搜索之间统一管理。",
+    app_title: "照片屋",
+    subtitle: "把一家人的故事，好好珍藏。",
+    quick_search: "寻找回忆",
+    skip_content: "跳至回忆",
+    keepsake_note: "小小的日常，满满的爱。",
+    family_footer: "每一次回望，都让我们更亲近。",
+    watch_memories: "播放回忆",
+    play_slideshow: "自动播放",
+    pause_slideshow: "暂停播放",
+    photo_details: "照片详情",
+    previous_photo: "上一张照片",
+    next_photo: "下一张照片",
+    viewer_position: "第 {current} 张，共 {total} 张",
+    memory_undated: "值得珍藏的一刻",
+    memory_video: "视频",
+    loading_memories: "正在整理你的回忆…",
+    retry_loading: "重试",
+    partial_home: "部分内容暂时未能加载，照片仍然安全保存。",
+    viewer_no_caption: "有些美好，无需言语。",
+    viewer_caption_error: "暂时无法加载描述，请重新打开这张照片再试。",
+    viewer_photo_error: "这张照片暂时无法加载，可用箭头继续浏览。",
     voice_chat: "语音对话",
     voice_chat_reset: "删除对话",
     voice_command: "语音命令",
@@ -398,6 +515,8 @@ const I18N = {
     voice_person_not_found: "未找到人物 {name}",
     refresh: "刷新",
     api_docs: "API 文档",
+    advanced_mode: "高级模式",
+    family_mode: "家庭模式",
     assets: "资源",
     captions: "描述",
     faces: "人脸",
@@ -406,14 +525,42 @@ const I18N = {
     tagged_assets: "已标注资源",
     tasks_pending: "待处理任务",
     health: "健康状态",
-    tab_library: "资源库",
+    tab_home: "首页",
+    tab_library: "所有照片",
     tab_people: "人物",
     tab_tags: "标签",
-    tab_stories: "故事",
+    tab_stories: "相册",
     tab_similarity: "相似图",
     tab_map: "地图",
     tab_tasks: "任务",
     tab_admin: "管理",
+    home_eyebrow: "欢迎回到我们的家庭相册",
+    home_title: "平凡的日子，珍贵的回忆。",
+    home_intro: "走过的地方，深爱的人。把生活里点滴的美好，重新捧在手心。",
+    family_search: "家庭搜索",
+    home_search_ph: "试试「生日」「海边」或家人的名字…",
+    find_memories: "寻找回忆",
+    home_suggestion_play: "户外玩耍",
+    home_suggestion_birthday: "生日时刻",
+    home_suggestion_trip: "家庭旅行",
+    home_recent_eyebrow: "最近加入",
+    home_recent_title: "最近时刻",
+    home_people_eyebrow: "家人",
+    home_people_title: "最亲爱的人",
+    home_albums_eyebrow: "值得探索",
+    home_albums_title: "值得重温的故事",
+    home_person_photos: "{count} 张照片",
+    home_story_assets: "{count} 个回忆",
+    home_empty_recent: "暂时没有可显示的最近照片。",
+    home_empty_people: "为几个人命名后，这里会出现家人快捷入口。",
+    home_empty_stories: "随着描述和标签增加，这里会出现推荐相册。",
+    home_load_failed: "首页刷新失败：{error}",
+    home_search_required: "请描述你想寻找的回忆。",
+    search_filter_query: "回忆",
+    search_filter_mode: "搜索",
+    search_filter_media: "媒体",
+    search_mode_family: "家庭智能搜索",
+    view_all: "查看全部",
     search: "搜索",
     mode: "模式",
     mode_path: "路径",
@@ -588,6 +735,40 @@ const I18N = {
     story_open_context: "打开上下文",
     story_context_opened: "已打开故事上下文",
     story_context_unavailable: "故事上下文不可用",
+    album_drafts_eyebrow: "我的收藏",
+    album_drafts_title: "已保存的相册草稿",
+    album_drafts_empty: "还没有相册草稿，可从推荐故事开始创建。",
+    album_composer_eyebrow: "相册编辑器",
+    album_composer_title: "制作一份家庭纪念",
+    album_use_story: "使用当前故事",
+    album_title_en: "英文标题",
+    album_title_en_ph: "Our summer together",
+    album_title_zh: "中文标题",
+    album_title_zh_ph: "一起过夏天",
+    album_theme: "主题",
+    album_theme_custom: "自定义",
+    album_theme_birthday: "生日",
+    album_theme_trip: "旅行",
+    album_theme_growing_up: "成长",
+    album_theme_grandparents: "祖孙时光",
+    album_theme_year_in_review: "年度回顾",
+    album_theme_seasonal: "四季回忆",
+    album_sort: "照片顺序",
+    album_sort_chronological: "从早到晚",
+    album_sort_newest: "最新优先",
+    album_sort_story: "故事顺序",
+    album_cover: "封面照片",
+    album_save_draft: "保存相册草稿",
+    album_update_draft: "更新相册草稿",
+    album_composer_hint: "请先选择一个推荐故事。",
+    album_composer_ready: "已有 {count} 张照片可加入草稿。",
+    album_draft_assets: "{count} 张照片",
+    album_title_required: "请输入英文相册标题。",
+    album_story_required: "请先选择一个包含照片的故事。",
+    album_saved: "相册草稿已保存",
+    album_updated: "相册草稿已更新",
+    album_save_failed: "相册保存失败：{error}",
+    album_load_failed: "相册草稿加载失败：{error}",
     similarity_title: "相似图收敛",
     similarity_min_group_size: "最小组大小",
     similarity_max_distance: "最大距离",
@@ -672,6 +853,18 @@ function storyTypeLabel(value) {
   if (value === "location") return t("story_type_location");
   if (value === "caption") return t("story_type_caption");
   return t("story_type_all");
+}
+
+function albumThemeLabel(value) {
+  const key = `album_theme_${String(value || "custom")}`;
+  return t(key);
+}
+
+function albumDisplayTitle(album) {
+  if (state.lang === "zh" && String(album?.title_zh || "").trim()) {
+    return String(album.title_zh).trim();
+  }
+  return String(album?.title || "").trim();
 }
 
 function similarityKindLabel(value) {
@@ -926,6 +1119,31 @@ function applyI18n() {
   document.querySelectorAll(".lang-btn").forEach((el) => {
     el.classList.toggle("active", el.dataset.lang === state.lang);
   });
+  updateUiModeControls();
+}
+
+function updateUiModeControls() {
+  const button = qs("btn-ui-mode");
+  if (!button) return;
+  const advanced = state.uiMode === "advanced";
+  button.textContent = t(advanced ? "family_mode" : "advanced_mode");
+  button.setAttribute("aria-pressed", String(advanced));
+}
+
+function isTabAllowed(tab) {
+  return ALL_TABS.includes(tab) && (state.uiMode === "advanced" || !ADVANCED_TABS.has(tab));
+}
+
+function setUiMode(mode, persist = true) {
+  state.uiMode = mode === "advanced" ? "advanced" : "family";
+  document.body.dataset.uiMode = state.uiMode;
+  if (persist) {
+    window.localStorage.setItem("vlm_ui_mode", state.uiMode);
+  }
+  if (!isTabAllowed(state.activeTab)) {
+    setActiveTab("home");
+  }
+  updateUiModeControls();
 }
 
 function setLanguage(lang, persist = true) {
@@ -939,6 +1157,9 @@ function setLanguage(lang, persist = true) {
 }
 
 function renderCurrentViewText() {
+  if (state.activeTab === "home") {
+    renderHome();
+  }
   if (state.libraryViewItems.length) {
     renderAssetGrid(state.libraryViewItems, "library-grid");
   }
@@ -1559,18 +1780,49 @@ async function runVoiceConversationCapture() {
 }
 
 function setActiveTab(tab) {
+  if (!isTabAllowed(tab)) tab = "home";
   state.activeTab = tab;
+  document.body.dataset.activeTab = tab;
   document.querySelectorAll(".tab").forEach((el) => {
-    el.classList.toggle("active", el.dataset.tab === tab);
+    const active = el.dataset.tab === tab;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-selected", String(active));
+    el.tabIndex = active ? 0 : -1;
   });
   document.querySelectorAll(".tab-panel").forEach((el) => {
-    el.classList.toggle("active", el.id === `tab-${tab}`);
+    const active = el.id === `tab-${tab}`;
+    el.classList.toggle("active", active);
+    el.setAttribute("aria-hidden", String(!active));
   });
   tabToUrl(tab);
 }
 
+async function loadTab(tab) {
+  if (tab === "home") return loadHome();
+  if (tab === "library") {
+    if (!state.libraryViewItems.length) return refreshLibraryCurrentView();
+    return;
+  }
+  if (tab === "people") return loadPeople();
+  if (tab === "tags") {
+    await loadTagsCatalog(state.tagsPager.page || 1);
+    if (state.tagsAssetsPager.tagId) {
+      await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
+    } else {
+      updateTagAssetsPagerUi();
+    }
+    return;
+  }
+  if (tab === "stories") return loadStoryAlbums();
+  if (tab === "similarity") return loadSimilarityPreview();
+  if (tab === "map") return loadGeoMap();
+  if (tab === "tasks") return loadTasks();
+  if (tab === "admin") return refreshAdminPanels();
+}
+
 function renderAssetGrid(items, containerId) {
   const root = qs(containerId);
+  state.gridItems.set(containerId, items);
   if (containerId === "library-grid") {
     state.libraryViewItems = Array.isArray(items) ? items : [];
   }
@@ -1580,14 +1832,16 @@ function renderAssetGrid(items, containerId) {
       const id = Number(asset.id);
       const selected = state.selectedAsset && Number(state.selectedAsset.id) === id ? "selected" : "";
       return `
-        <article class="asset-card ${selected}" data-asset-id="${id}">
+        <article class="asset-card ${selected}" data-asset-id="${id}" role="button" tabindex="0" aria-label="${esc(basename(asset.path))}">
           <div class="thumb">
             <img loading="lazy" src="/assets/${id}/thumbnail?size=256"
                  alt="${esc(basename(asset.path))}"
-                 onerror="this.remove(); this.parentElement.querySelector('.fallback').style.display='grid';" />
+                 onerror="this.parentElement.querySelector('.fallback').style.display='grid'; this.remove();" />
             <span class="fallback" style="display:none;">${esc(t("no_thumbnail"))}</span>
+            ${isVideoAsset(asset) ? `<span class="media-badge">▷ ${esc(t("memory_video"))}</span>` : ""}
           </div>
           <div class="asset-meta">
+            <p class="memory-date">${esc(memoryDate(asset))}</p>
             <p class="id">#${id}</p>
             <p class="name" title="${esc(asset.path)}">${esc(basename(asset.path))}</p>
           </div>
@@ -1595,6 +1849,196 @@ function renderAssetGrid(items, containerId) {
       `;
     })
     .join("");
+}
+
+function memoryDate(asset) {
+  if (!asset?.taken_at) return t("memory_undated");
+  const date = new Date(asset.taken_at);
+  if (Number.isNaN(date.getTime())) return t("memory_undated");
+  return new Intl.DateTimeFormat(state.lang === "zh" ? "zh-CN" : "en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+  }).format(date);
+}
+
+function renderFeaturedPhotos() {
+  const photos = state.home.recent.filter((asset) => !isVideoAsset(asset)).slice(0, 2);
+  qs("home-featured-photos").innerHTML = photos.length ? photos.map((asset) => `
+    <button class="keepsake-photo" type="button" data-featured-id="${Number(asset.id)}" aria-label="${esc(memoryDate(asset))}">
+      <img src="/assets/${Number(asset.id)}/thumbnail?size=256" alt="${esc(basename(asset.path))}" onerror="this.style.display='none';this.nextElementSibling.hidden=false;" />
+      <span class="home-cover-placeholder" aria-hidden="true" hidden>♡</span>
+      <span class="keepsake-date">${esc(memoryDate(asset))}</span>
+    </button>`).join("") : `<div class="empty-keepsake">${esc(t("keepsake_note"))}</div>`;
+  qs("btn-home-slideshow").disabled = state.home.recent.length === 0;
+}
+
+function renderHomePeople() {
+  const root = qs("home-people-list");
+  if (!root) return;
+  const people = Array.isArray(state.home.people) ? state.home.people : [];
+  if (!people.length) {
+    root.innerHTML = `<p class="muted">${esc(t("home_empty_people"))}</p>`;
+    return;
+  }
+  root.innerHTML = people
+    .map((person) => {
+      const faceId = Number((person.sample_faces || [])[0] || 0);
+      const image = faceId
+        ? `<img loading="lazy" src="/faces/${faceId}/crop?size=256" alt="" />`
+        : `<span class="home-person-placeholder" aria-hidden="true">${esc(String(person.display_name || "?").slice(0, 1))}</span>`;
+      return `
+        <button class="home-person-row" type="button" data-action="home-open-person" data-person-id="${Number(person.id) || 0}">
+          ${image}
+          <span class="home-row-copy">
+            <p><strong>${esc(person.display_name || t("person_fallback", { id: person.id }))}</strong></p>
+            <p class="small muted">${esc(t("home_person_photos", { count: Number(person.face_count) || 0 }))}</p>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderHomeStories() {
+  const root = qs("home-story-list");
+  if (!root) return;
+  const stories = Array.isArray(state.home.stories) ? state.home.stories : [];
+  if (!stories.length) {
+    root.innerHTML = `<p class="muted">${esc(t("home_empty_stories"))}</p>`;
+    return;
+  }
+  // Keep the welcome page short, with one doorway into each kind of album.
+  const seenTypes = new Set();
+  const featured = stories.filter((story) => {
+    if (seenTypes.has(story.type)) return false;
+    seenTypes.add(story.type);
+    return true;
+  }).slice(0, 4);
+  root.innerHTML = featured
+    .map((story) => {
+      const firstAsset = (story.items || [])[0] || null;
+      const image = firstAsset?.id
+        ? `<img loading="lazy" src="/assets/${Number(firstAsset.id)}/thumbnail?size=256" alt="" onerror="this.style.display='none';this.nextElementSibling.hidden=false;" /><span class="home-cover-placeholder" aria-hidden="true" hidden>♡</span>`
+        : '<span class="home-cover-placeholder" aria-hidden="true">♡</span>';
+      return `
+        <button class="home-story-row" type="button" data-action="home-open-story" data-story-id="${esc(story.id || "")}">
+          ${image}
+          <span class="home-row-copy">
+            <p><strong>${esc(story.title || story.id || "")}</strong></p>
+            <p class="small muted">${esc(storyTypeLabel(story.type))} · ${esc(
+              t("home_story_assets", { count: Number(story.count) || 0 })
+            )}</p>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderHome() {
+  const recent = Array.isArray(state.home.recent) ? state.home.recent : [];
+  const recentRoot = qs("home-recent-grid");
+  if (recentRoot) {
+    if (recent.length) {
+      renderAssetGrid(recent, "home-recent-grid");
+    } else {
+      recentRoot.innerHTML = `<p class="muted">${esc(t("home_empty_recent"))}</p>`;
+    }
+  }
+  renderHomePeople();
+  renderHomeStories();
+  renderFeaturedPhotos();
+}
+
+async function loadHome() {
+  if (loadHome.pending) return loadHome.pending;
+  const status = qs("home-load-status");
+  status.textContent = t("loading_memories");
+  status.classList.remove("hidden");
+  qs("tab-home").setAttribute("aria-busy", "true");
+  loadHome.pending = (async () => {
+    const sections = [
+      ["recent", "assets", api("/assets?page=1&page_size=8")],
+      ["people", "persons", api("/persons?page=1&page_size=6&include_faces=true&named_only=true&sort_by=face_count&order=desc")],
+      ["stories", "stories", api("/albums/stories?media=all&story_type=all&min_assets=3&max_stories_per_type=2&story_asset_limit=4&caption_scan_limit=400")],
+    ];
+    const results = await Promise.allSettled(sections.map(async ([key, field, request]) => {
+      const result = await request;
+      state.home[key] = Array.isArray(result?.[field]) ? result[field] : [];
+      // A slower album query must not hold back ready-to-view photos.
+      if (key === "recent") {
+        if (state.home.recent.length) renderAssetGrid(state.home.recent, "home-recent-grid");
+        else qs("home-recent-grid").innerHTML = `<p class="muted">${esc(t("home_empty_recent"))}</p>`;
+        renderFeaturedPhotos();
+      }
+      if (key === "people") renderHomePeople();
+      if (key === "stories") renderHomeStories();
+    }));
+    const failed = results.some((result) => result.status === "rejected");
+    status.classList.toggle("hidden", !failed);
+    if (failed) {
+      status.innerHTML = `<span>${esc(t("partial_home"))}</span><button class="btn ghost" type="button" id="btn-home-retry">${esc(t("retry_loading"))}</button>`;
+      qs("btn-home-retry").addEventListener("click", loadHome);
+    }
+  })().finally(() => {
+    qs("tab-home").setAttribute("aria-busy", "false");
+    loadHome.pending = null;
+  });
+  return loadHome.pending;
+}
+
+function inferFamilySearchMedia(query) {
+  const value = String(query || "").toLowerCase();
+  if (/\b(video|videos|movie|movies)\b|视频|录像|影片/.test(value)) return "video";
+  if (/\b(photo|photos|picture|pictures|image|images)\b|照片|图片|相片/.test(value)) return "image";
+  return "all";
+}
+
+function renderFamilySearchInterpretation(query, mode, media) {
+  const chips = [
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_query"))}</strong>${esc(query)}</span>`,
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_mode"))}</strong>${esc(
+      mode === "person" ? modeLabel("person") : t("search_mode_family")
+    )}</span>`,
+    `<span class="home-filter-chip"><strong>${esc(t("search_filter_media"))}</strong>${esc(mediaLabel(media))}</span>`,
+  ].join("");
+  for (const id of ["home-search-interpretation", "search-interpretation"]) {
+    const root = qs(id);
+    if (!root) continue;
+    root.innerHTML = chips;
+    root.classList.remove("hidden");
+  }
+}
+
+function clearFamilySearchInterpretation() {
+  for (const id of ["home-search-interpretation", "search-interpretation"]) {
+    const root = qs(id);
+    if (!root) continue;
+    root.innerHTML = "";
+    root.classList.add("hidden");
+  }
+}
+
+async function runHomeSearch(value = null) {
+  const input = qs("home-search-query");
+  const query = String(value ?? input?.value ?? "").trim();
+  if (!query) {
+    showToast(t("home_search_required"));
+    return;
+  }
+  if (input) input.value = query;
+  const queryKey = query.toLocaleLowerCase();
+  const exactPerson = (state.namedPersons || []).find(
+    (person) => String(person.display_name || "").trim().toLocaleLowerCase() === queryKey
+  );
+  const mode = exactPerson ? "person" : "smart";
+  const media = inferFamilySearchMedia(query);
+  qs("search-mode").value = mode;
+  qs("search-query").value = exactPerson ? String(exactPerson.display_name || query) : query;
+  qs("search-tags").value = "";
+  qs("search-media").value = media;
+  renderFamilySearchInterpretation(query, mode, media);
+  setActiveTab("library");
+  await runSearch(1, false, true);
 }
 
 async function refreshDashboard() {
@@ -1623,6 +2067,7 @@ async function refreshDashboard() {
 
 async function loadLibraryLatest(page = 1) {
   try {
+    clearFamilySearchInterpretation();
     const pageNum = Math.max(1, Number(page) || 1);
     const pageSize = state.libraryPager.pageSize || 120;
     const data = await api(`/assets?page=${pageNum}&page_size=${pageSize}`);
@@ -1679,7 +2124,8 @@ function normalizeSearch(mode, data) {
   return [];
 }
 
-async function runSearch(page = 1, fromPager = false) {
+async function runSearch(page = 1, fromPager = false, preserveInterpretation = false) {
+  if (!fromPager && !preserveInterpretation) clearFamilySearchInterpretation();
   const pageNum = Math.max(1, Number(page) || 1);
   const pageSize = state.libraryPager.pageSize || 120;
 
@@ -1958,11 +2404,159 @@ function getStoryById(storyId) {
   return stories.find((row) => String(row?.id || "") === String(storyId || "")) || null;
 }
 
+function getAlbumDraftById(albumId) {
+  const albums = Array.isArray(state.albumDrafts?.albums) ? state.albumDrafts.albums : [];
+  return albums.find((row) => Number(row?.id || 0) === Number(albumId || 0)) || null;
+}
+
+function setAlbumCoverOptions(items, selectedAssetId = null) {
+  const select = qs("album-cover-asset");
+  if (!select) return;
+  const rows = Array.isArray(items) ? items : [];
+  select.innerHTML = rows
+    .map((item) => `<option value="${Number(item.id) || 0}">#${Number(item.id) || 0} · ${esc(basename(item.path || ""))}</option>`)
+    .join("");
+  const preferred = Number(selectedAssetId || rows[0]?.id || 0);
+  if (preferred) select.value = String(preferred);
+  select.disabled = rows.length === 0;
+}
+
+function configureAlbumComposerFromStory(story) {
+  state.albumDrafts = { ...state.albumDrafts, selectedAlbumId: null, editorMode: "story" };
+  const items = Array.isArray(story?.items) ? story.items : [];
+  qs("album-title").value = String(story?.title || "").trim();
+  qs("album-title-zh").value = "";
+  qs("album-theme").value = "custom";
+  qs("album-sort-mode").value = "chronological";
+  qs("album-sort-mode").disabled = false;
+  qs("btn-save-album-draft").textContent = t("album_save_draft");
+  qs("album-composer-meta").textContent = items.length
+    ? t("album_composer_ready", { count: items.length })
+    : t("album_composer_hint");
+  setAlbumCoverOptions(items, items[0]?.id);
+  renderAlbumDrafts();
+}
+
+function openAlbumDraft(album) {
+  if (!album) return;
+  const items = Array.isArray(album.items) ? album.items : [];
+  state.albumDrafts = { ...state.albumDrafts, selectedAlbumId: Number(album.id), editorMode: "album" };
+  qs("album-title").value = String(album.title || "");
+  qs("album-title-zh").value = String(album.title_zh || "");
+  qs("album-theme").value = String(album.theme || "custom");
+  qs("album-sort-mode").value = "as_provided";
+  qs("album-sort-mode").disabled = true;
+  qs("btn-save-album-draft").textContent = t("album_update_draft");
+  qs("album-composer-meta").textContent = t("album_composer_ready", { count: items.length });
+  setAlbumCoverOptions(items, album.cover_asset_id);
+  qs("story-assets-meta").textContent = t("story_assets_meta", {
+    title: albumDisplayTitle(album),
+    shown: items.length,
+    total: Number(album.asset_count) || items.length,
+  });
+  renderAssetGrid(items, "story-assets-grid");
+  renderAlbumDrafts();
+}
+
+function renderAlbumDrafts() {
+  const root = qs("album-draft-list");
+  if (!root) return;
+  const albums = Array.isArray(state.albumDrafts?.albums) ? state.albumDrafts.albums : [];
+  if (!albums.length) {
+    root.innerHTML = `<p class="muted small">${esc(t("album_drafts_empty"))}</p>`;
+    return;
+  }
+  root.innerHTML = albums
+    .map((album) => {
+      const albumId = Number(album.id) || 0;
+      const coverId = Number(album.cover_asset_id) || 0;
+      const active = albumId === Number(state.albumDrafts.selectedAlbumId || 0) ? "active" : "";
+      const cover = coverId
+        ? `<img class="album-draft-cover" loading="lazy" src="/assets/${coverId}/thumbnail?size=256" alt="" />`
+        : `<span class="album-draft-cover-placeholder" aria-hidden="true">${esc(albumDisplayTitle(album).slice(0, 1) || "A")}</span>`;
+      return `
+        <button class="album-draft-row ${active}" type="button" data-action="album-open-draft" data-album-id="${albumId}">
+          ${cover}
+          <span class="album-draft-copy">
+            <p><strong>${esc(albumDisplayTitle(album))}</strong></p>
+            <p class="small muted">${esc(albumThemeLabel(album.theme))}</p>
+          </span>
+          <span class="album-draft-count">${esc(t("album_draft_assets", { count: Number(album.asset_count) || 0 }))}</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+async function loadAlbumDrafts() {
+  try {
+    const data = await api("/albums/drafts?page=1&page_size=50");
+    state.albumDrafts = {
+      ...state.albumDrafts,
+      albums: Array.isArray(data?.albums) ? data.albums : [],
+    };
+    renderAlbumDrafts();
+  } catch (e) {
+    showToast(t("album_load_failed", { error: e.message }));
+  }
+}
+
+async function saveAlbumDraft() {
+  const title = String(qs("album-title")?.value || "").trim();
+  if (!title) {
+    showToast(t("album_title_required"));
+    return;
+  }
+  const editingAlbum = getAlbumDraftById(state.albumDrafts.selectedAlbumId);
+  const story = getStoryById(state.stories.selectedStoryId);
+  const items = Array.isArray(editingAlbum?.items)
+    ? editingAlbum.items
+    : (Array.isArray(story?.items) ? story.items : []);
+  const assetIds = items.map((item) => Number(item.id)).filter(Boolean);
+  if (!assetIds.length) {
+    showToast(t("album_story_required"));
+    return;
+  }
+  const payload = {
+    title,
+    title_zh: String(qs("album-title-zh")?.value || "").trim() || null,
+    theme: String(qs("album-theme")?.value || "custom"),
+    asset_ids: assetIds,
+    cover_asset_id: Number(qs("album-cover-asset")?.value || assetIds[0]),
+  };
+  let saved;
+  try {
+    if (editingAlbum) {
+      saved = await api(`/albums/drafts/${Number(editingAlbum.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      saved = await api("/albums/drafts", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          sort_mode: String(qs("album-sort-mode")?.value || "chronological"),
+          source_kind: "story",
+          source_ref: String(story?.id || ""),
+        }),
+      });
+    }
+    await loadAlbumDrafts();
+    const album = getAlbumDraftById(saved?.album?.id) || saved?.album;
+    if (album) openAlbumDraft(album);
+    showToast(t(editingAlbum ? "album_updated" : "album_saved"));
+  } catch (e) {
+    showToast(t("album_save_failed", { error: e.message }));
+  }
+}
+
 function renderStoryAssets(story) {
   if (!story) {
     state.stories = { ...state.stories, selectedStoryId: "" };
     qs("story-assets-meta").textContent = t("story_assets_meta_default");
     renderAssetGrid([], "story-assets-grid");
+    configureAlbumComposerFromStory(null);
     return;
   }
   const items = Array.isArray(story.items) ? story.items : [];
@@ -1973,6 +2567,7 @@ function renderStoryAssets(story) {
     total: Number(story.count) || items.length,
   });
   renderAssetGrid(items, "story-assets-grid");
+  configureAlbumComposerFromStory(story);
 }
 
 async function openStoryContext(story) {
@@ -2059,6 +2654,7 @@ async function loadStoryAlbums() {
             <td>
               <button class="btn ghost" data-action="stories-view-assets" data-story-id="${esc(sid)}">${esc(t("story_view_assets"))}</button>
               <button class="btn ghost" data-action="stories-open-context" data-story-id="${esc(sid)}">${esc(t("story_open_context"))}</button>
+              <button class="btn ghost" data-action="stories-compose-album" data-story-id="${esc(sid)}">${esc(t("album_composer_title"))}</button>
             </td>
           </tr>
         `;
@@ -2067,6 +2663,7 @@ async function loadStoryAlbums() {
 
     const activeStory = getStoryById(state.stories.selectedStoryId) || stories[0] || null;
     renderStoryAssets(activeStory);
+    await loadAlbumDrafts();
   } catch (e) {
     showToast(t("story_load_failed", { error: e.message }));
   }
@@ -2192,6 +2789,7 @@ async function restoreSimilarityReduction() {
 }
 
 function closeAssetInspector() {
+  document.body.dataset.inspecting = "false";
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
   qs("asset-empty").classList.remove("hidden");
@@ -2207,24 +2805,110 @@ function openPreviewModal() {
     showToast(t("no_asset_selected"));
     return;
   }
-  const asset = state.selectedAsset;
-  const body = qs("preview-modal-body");
-  if (isVideoAsset(asset)) {
-    body.innerHTML = `<video controls autoplay preload="metadata" src="/assets/${asset.id}/media"></video>`;
-  } else {
-    body.innerHTML = `<img src="/assets/${asset.id}/media" alt="${esc(basename(asset.path))}" />`;
-  }
+  const items = state.libraryViewItems.some((asset) => Number(asset.id) === Number(state.selectedAsset.id))
+    ? state.libraryViewItems : [state.selectedAsset];
+  openMemoryViewer(state.selectedAsset.id, items);
+}
+
+function openMemoryViewer(assetId, items) {
+  const index = items.findIndex((asset) => Number(asset.id) === Number(assetId));
+  if (index < 0) return;
+  stopSlideshow();
+  Object.assign(state.viewer, { items, index, returnFocus: document.activeElement, origin: state.activeTab });
   qs("preview-modal").classList.remove("hidden");
+  document.body.classList.add("viewer-open");
+  document.querySelector(".app-shell").inert = true;
+  renderMemoryViewer();
+  qs("btn-preview-close").focus();
+}
+
+function stopSlideshow() {
+  window.clearInterval(state.viewer.timer);
+  state.viewer.timer = null;
+  qs("btn-preview-play").textContent = t("play_slideshow");
+  qs("btn-preview-play").setAttribute("aria-pressed", "false");
+}
+
+function toggleSlideshow() {
+  if (state.viewer.timer) { stopSlideshow(); return; }
+  if (state.viewer.items.length < 2) return;
+  if (state.viewer.index === state.viewer.items.length - 1) state.viewer.index = 0;
+  renderMemoryViewer();
+  qs("btn-preview-play").textContent = t("pause_slideshow");
+  qs("btn-preview-play").setAttribute("aria-pressed", "true");
+  state.viewer.timer = window.setInterval(() => {
+    if (document.hidden || state.viewer.index >= state.viewer.items.length - 1) {
+      stopSlideshow(); return;
+    }
+    // Let a video play under the viewer's controls before advancing.
+    const video = qs("preview-modal-body").querySelector("video");
+    if (video && !video.paused && !video.ended) return;
+    moveMemoryViewer(1, false);
+  }, 6000);
+}
+
+function moveMemoryViewer(direction, manual = true) {
+  if (manual) stopSlideshow();
+  const next = state.viewer.index + direction;
+  if (next < 0 || next >= state.viewer.items.length) return;
+  state.viewer.index = next;
+  renderMemoryViewer();
+}
+
+async function renderMemoryViewer() {
+  const viewer = state.viewer;
+  const asset = viewer.items[viewer.index];
+  if (!asset) return;
+  const request = ++viewer.request;
+  qs("preview-title").textContent = memoryDate(asset);
+  qs("preview-position").textContent = t("viewer_position", { current: viewer.index + 1, total: viewer.items.length });
+  qs("btn-preview-prev").disabled = viewer.index === 0;
+  qs("btn-preview-next").disabled = viewer.index === viewer.items.length - 1;
+  qs("btn-preview-play").disabled = viewer.items.length < 2;
+  qs("btn-preview-prev").setAttribute("aria-label", t("previous_photo"));
+  qs("btn-preview-next").setAttribute("aria-label", t("next_photo"));
+  qs("preview-caption").setAttribute("aria-label", state.lang === "zh" ? "照片描述" : "Photo description");
+  qs("preview-filmstrip").setAttribute("aria-label", state.lang === "zh" ? "当前视图中的照片" : "Photos in this view");
+  const body = qs("preview-modal-body");
+  body.innerHTML = isVideoAsset(asset)
+    ? `<video controls playsinline preload="metadata" src="/assets/${Number(asset.id)}/media"></video>`
+    : `<img src="/assets/${Number(asset.id)}/thumbnail?size=1024" alt="${esc(basename(asset.path))}" />`;
+  body.firstElementChild.addEventListener("error", () => {
+    if (viewer.request === request) body.innerHTML = `<p class="viewer-photo-error">${esc(t("viewer_photo_error"))}</p>`;
+  });
+  // Window the strip so opening a 120-photo search doesn't fetch 120 thumbnails.
+  const start = Math.max(0, viewer.index - 5);
+  const end = Math.min(viewer.items.length, start + 11);
+  qs("preview-filmstrip").innerHTML = viewer.items.slice(start, end).map((item, offset) => `
+    <button type="button" data-viewer-index="${start + offset}" aria-label="${esc(t("viewer_position", { current: start + offset + 1, total: viewer.items.length }))}" aria-current="${start + offset === viewer.index}">
+      <img loading="lazy" src="/assets/${Number(item.id)}/thumbnail?size=256" alt="" />
+    </button>`).join("");
+  qs("preview-filmstrip").querySelector('[aria-current="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  qs("preview-caption").textContent = "";
+  try {
+    const result = await api(`/assets/${Number(asset.id)}/captions`);
+    if (request !== viewer.request) return;
+    const captions = result.captions || [];
+    const caption = captions.filter((item) => item.user_edited).at(-1) || captions.at(-1);
+    qs("preview-caption").textContent = caption?.text || t("viewer_no_caption");
+  } catch (_) {
+    if (request === viewer.request) qs("preview-caption").textContent = t("viewer_caption_error");
+  }
 }
 
 function closePreviewModal() {
   const modal = qs("preview-modal");
-  if (!modal) return;
+  if (!modal || modal.classList.contains("hidden")) return;
+  stopSlideshow();
+  state.viewer.request++;
+  document.querySelector(".app-shell").inert = false;
+  document.body.classList.remove("viewer-open");
   modal.classList.add("hidden");
   const body = qs("preview-modal-body");
   if (body) {
     body.innerHTML = "";
   }
+  if (state.viewer.returnFocus?.isConnected) state.viewer.returnFocus.focus();
 }
 
 async function loadAssetInspector(assetId) {
@@ -2243,6 +2927,7 @@ async function loadAssetInspector(assetId) {
     }
   }
   if (!asset) return;
+  document.body.dataset.inspecting = "true";
   state.selectedAsset = asset;
   if (state.libraryViewItems.length) {
     renderAssetGrid(state.libraryViewItems, "library-grid");
@@ -2869,6 +3554,76 @@ async function openAssetFromFaceAssetId(assetId) {
 }
 
 function initEvents() {
+  function focusMemorySearch() {
+    setActiveTab("home");
+    loadHome();
+    qs("home-search-query").focus();
+    qs("home-search-query").scrollIntoView({ block: "center", behavior: "auto" });
+  }
+  qs("btn-quick-search").addEventListener("click", focusMemorySearch);
+  qs("home-featured-photos").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-featured-id]");
+    if (button) openMemoryViewer(button.dataset.featuredId, state.home.recent);
+  });
+  qs("btn-home-slideshow").addEventListener("click", () => {
+    if (!state.home.recent.length) return;
+    openMemoryViewer(state.home.recent[0].id, state.home.recent);
+    toggleSlideshow();
+  });
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest(".asset-card");
+    if (!card || state.uiMode !== "family") return;
+    const grid = card.closest(".asset-grid");
+    const items = state.gridItems.get(grid?.id);
+    if (!items?.length) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    card.focus();
+    openMemoryViewer(card.dataset.assetId, items);
+  }, true);
+  qs("btn-preview-prev").addEventListener("click", () => moveMemoryViewer(-1));
+  qs("btn-preview-next").addEventListener("click", () => moveMemoryViewer(1));
+  qs("btn-preview-play").addEventListener("click", toggleSlideshow);
+  qs("preview-filmstrip").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-viewer-index]");
+    if (!button) return;
+    stopSlideshow();
+    state.viewer.index = Number(button.dataset.viewerIndex);
+    renderMemoryViewer();
+    qs("btn-preview-close").focus();
+  });
+  qs("btn-preview-details").addEventListener("click", async () => {
+    const asset = state.viewer.items[state.viewer.index];
+    const origin = state.viewer.origin;
+    closePreviewModal();
+    setActiveTab("library");
+    state.inspectorOriginTab = origin;
+    state.assetMap.set(Number(asset.id), asset);
+    await loadAssetInspector(asset.id);
+    qs("btn-asset-back").focus();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopSlideshow();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (!qs("preview-modal").classList.contains("hidden")) {
+      if (event.target.closest("video, #preview-caption") && event.key !== "Tab") return;
+      if (event.key === "ArrowLeft") { event.preventDefault(); moveMemoryViewer(-1); }
+      if (event.key === "ArrowRight") { event.preventDefault(); moveMemoryViewer(1); }
+      if (event.key === "Tab") {
+        const controls = Array.from(qs("preview-modal").querySelectorAll('button:not(:disabled), video[controls], [tabindex="0"]'))
+          .filter((element) => element.getClientRects().length);
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+      return;
+    }
+    if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey &&
+        !event.target.closest('input, textarea, select, [contenteditable="true"]')) {
+      event.preventDefault(); focusMemorySearch();
+    }
+  });
   document.querySelectorAll(".lang-btn").forEach((el) => {
     el.addEventListener("click", () => {
       const lang = el.dataset.lang === "zh" ? "zh" : "en";
@@ -2881,33 +3636,35 @@ function initEvents() {
 
   document.querySelectorAll(".tab").forEach((el) => {
     el.addEventListener("click", async () => {
+      if (el.dataset.tab === "library" && document.body.dataset.inspecting === "true") closeAssetInspector();
       setActiveTab(el.dataset.tab);
-      if (el.dataset.tab === "tasks") await loadTasks();
-      if (el.dataset.tab === "admin") await refreshAdminPanels();
-      if (el.dataset.tab === "people") await loadPeople();
-      if (el.dataset.tab === "tags") {
-        await loadTagsCatalog(state.tagsPager.page || 1);
-        if (state.tagsAssetsPager.tagId) {
-          await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
-        }
-      }
-      if (el.dataset.tab === "stories") await loadStoryAlbums();
-      if (el.dataset.tab === "similarity") await loadSimilarityPreview();
-      if (el.dataset.tab === "map") await loadGeoMap();
+      await loadTab(state.activeTab);
+    });
+    el.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      const tabs = Array.from(document.querySelectorAll(".tab")).filter((tab) => isTabAllowed(tab.dataset.tab));
+      const current = tabs.indexOf(el);
+      if (current < 0 || !tabs.length) return;
+      event.preventDefault();
+      let next = current;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = tabs.length - 1;
+      if (event.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight") next = (current + 1) % tabs.length;
+      tabs[next].focus();
+      tabs[next].click();
     });
   });
 
+  qs("btn-ui-mode").addEventListener("click", async () => {
+    const nextMode = state.uiMode === "advanced" ? "family" : "advanced";
+    setUiMode(nextMode, true);
+    if (state.uiMode === "advanced") await refreshDashboard();
+    await loadTab(state.activeTab);
+  });
+
   qs("btn-refresh-all").addEventListener("click", async () => {
-    await Promise.all([refreshDashboard(), loadTasks(), loadPeople(), refreshAdminPanels()]);
-    if (state.activeTab === "tags") {
-      await loadTagsCatalog(state.tagsPager.page || 1);
-      if (state.tagsAssetsPager.tagId) {
-        await loadTagAssets(state.tagsAssetsPager.tagId, state.tagsAssetsPager.page || 1);
-      }
-    }
-    if (state.activeTab === "stories") await loadStoryAlbums();
-    if (state.activeTab === "similarity") await loadSimilarityPreview();
-    if (state.activeTab === "map") await loadGeoMap();
+    await Promise.all([refreshDashboard(), state.activeTab === "library" ? refreshLibraryCurrentView() : loadTab(state.activeTab)]);
     showToast(t("refreshed"));
   });
   const voiceBtn = qs("btn-voice-command");
@@ -2937,6 +3694,58 @@ function initEvents() {
   });
   qs("search-query").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runSearch(1, false);
+  });
+
+  qs("btn-home-search").addEventListener("click", () => runHomeSearch());
+  qs("home-search-query").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runHomeSearch();
+  });
+  qs("home-search-suggestions").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-home-query]");
+    if (!button) return;
+    runHomeSearch((state.lang === "zh" ? button.dataset.homeQueryZh : button.dataset.homeQuery) || button.dataset.homeQuery || "");
+  });
+  qs("btn-home-view-library").addEventListener("click", async () => {
+    setActiveTab("library");
+    await loadLibraryLatest(1);
+  });
+  qs("btn-home-view-people").addEventListener("click", async () => {
+    setActiveTab("people");
+    await loadPeople();
+  });
+  qs("btn-home-view-stories").addEventListener("click", async () => {
+    setActiveTab("stories");
+    await loadStoryAlbums();
+  });
+  qs("home-recent-grid").addEventListener("click", async (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    state.inspectorOriginTab = "home";
+    setActiveTab("library");
+    await loadAssetInspector(Number(card.dataset.assetId));
+  });
+  document.querySelectorAll(".asset-grid").forEach((grid) => {
+    grid.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      const card = event.target.closest(".asset-card");
+      if (!card) return;
+      event.preventDefault();
+      card.click();
+    });
+  });
+  qs("home-people-list").addEventListener("click", async (e) => {
+    const button = e.target.closest("button[data-action='home-open-person']");
+    const personId = Number(button?.dataset.personId || 0);
+    if (!personId) return;
+    setActiveTab("people");
+    await loadPeople();
+    await loadPersonAssets(personId, 1);
+  });
+  qs("home-story-list").addEventListener("click", async (e) => {
+    const button = e.target.closest("button[data-action='home-open-story']");
+    if (!button) return;
+    const story = (state.home.stories || []).find((row) => String(row.id || "") === String(button.dataset.storyId || ""));
+    if (story) await openStoryContext(story);
   });
 
   qs("library-grid").addEventListener("click", async (e) => {
@@ -2987,6 +3796,7 @@ function initEvents() {
     closeAssetInspector();
     if (returnTab !== "library") {
       setActiveTab(returnTab);
+      if (returnTab === "home") await loadHome();
       if (returnTab === "people") await loadPeople();
       if (returnTab === "tags") {
         await loadTagsCatalog(state.tagsPager.page || 1);
@@ -3226,6 +4036,21 @@ function initEvents() {
     if (e.key === "Enter") runTagAssetsJump();
   });
   qs("btn-refresh-stories").addEventListener("click", loadStoryAlbums);
+  qs("btn-refresh-album-drafts").addEventListener("click", loadAlbumDrafts);
+  qs("btn-save-album-draft").addEventListener("click", saveAlbumDraft);
+  qs("btn-album-use-story").addEventListener("click", () => {
+    const story = getStoryById(state.stories.selectedStoryId);
+    if (!story) {
+      showToast(t("album_story_required"));
+      return;
+    }
+    renderStoryAssets(story);
+  });
+  qs("album-draft-list").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-action='album-open-draft']");
+    if (!button) return;
+    openAlbumDraft(getAlbumDraftById(Number(button.dataset.albumId || 0)));
+  });
   qs("stories-filter-type").addEventListener("change", loadStoryAlbums);
   qs("stories-filter-media").addEventListener("change", loadStoryAlbums);
   qs("stories-min-assets").addEventListener("keydown", (e) => {
@@ -3303,6 +4128,11 @@ function initEvents() {
     }
     if (btn.dataset.action === "stories-open-context") {
       await openStoryContext(story);
+      return;
+    }
+    if (btn.dataset.action === "stories-compose-album") {
+      renderStoryAssets(story);
+      qs("album-title")?.focus();
     }
   });
 
@@ -3363,39 +4193,29 @@ async function bootstrap() {
   const langParam = params.get("lang");
   const storedLang = window.localStorage.getItem("vlm_ui_lang");
   setLanguage(langParam || storedLang || "en", false);
+  const requestedMode = params.get("mode") || window.localStorage.getItem("vlm_ui_mode") || "family";
+  setUiMode(requestedMode, false);
   initEvents();
   const tab = params.get("tab");
-  if (tab && ["library", "people", "tags", "stories", "similarity", "map", "tasks", "admin"].includes(tab)) {
+  if (tab && isTabAllowed(tab)) {
     setActiveTab(tab);
+  } else {
+    setActiveTab("home");
   }
   const q = params.get("q");
   if (q) {
     qs("search-query").value = q;
+    qs("home-search-query").value = q;
   }
-  await Promise.all([refreshDashboard(), loadLibraryLatest(), loadPeople(), loadTasks(), refreshAdminPanels()]);
-  if (state.activeTab === "tags") {
-    await loadTagsCatalog(1);
-    if (state.tagsAssetsPager.tagId) {
-      await loadTagAssets(state.tagsAssetsPager.tagId, 1);
-    } else {
-      updateTagAssetsPagerUi();
-    }
-  }
-  if (state.activeTab === "stories") {
-    await loadStoryAlbums();
-  }
-  if (state.activeTab === "similarity") {
-    await loadSimilarityPreview();
-  }
-  if (state.activeTab === "map") {
-    await loadGeoMap();
-  }
+  const initialLoads = [loadTab(state.activeTab)];
+  if (state.uiMode === "advanced") initialLoads.push(refreshDashboard());
+  await Promise.all(initialLoads);
   if (q) {
-    await runSearch(1, false);
+    await runHomeSearch(q);
   }
 
   window.setInterval(async () => {
-    await refreshDashboard();
+    if (state.uiMode === "advanced") await refreshDashboard();
     if (state.activeTab === "tasks") await loadTasks();
   }, 10000);
 }

@@ -14,7 +14,10 @@ facenet-pytorch
 faiss-cpu>=1.11.0.post1
 transformers>=4.55.0
 huggingface-hub>=0.34.4
-onnxruntime>=1.22.1  # for LVFaceEmbeddingProvider (use onnxruntime-gpu if CUDA desired)
+# The CPU and GPU wheels install the same Python package and must not coexist.
+# Windows is the production GPU host; macOS/Linux development defaults to CPU.
+onnxruntime-gpu==1.22.0; sys_platform == "win32"
+onnxruntime>=1.22.1; sys_platform != "win32"
 onnx>=1.18.0  # needed only to generate dummy/testing ONNX models (not required at runtime if you already have a model file)
 scikit-image>=0.24.0
 safetensors>=0.4.8

@@ -27,8 +27,15 @@ class CaptionProvider(Protocol):
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str: ...
     def get_model_name(self) -> str: ...
 
+
+class CaptionServiceTransientError(ConnectionError):
+    """A retryable caption-service transport or server failure."""
+
+
 class HTTPCaptionProvider:
     """HTTP-based caption provider that calls remote caption service."""
+
+    supports_text_translation = True
     
     def __init__(self, service_url: str = "http://127.0.0.1:8102"):
         self.service_url = service_url.rstrip('/')
@@ -82,7 +89,8 @@ class HTTPCaptionProvider:
                 detail = response.text
                 is_server_error = response.status_code >= 500
                 is_oom = ("out of memory" in detail.lower()) or ("cuda out of memory" in detail.lower())
-                err = RuntimeError(f"Caption service error: {response.status_code} - {detail}")
+                error_type = CaptionServiceTransientError if is_server_error else RuntimeError
+                err = error_type(f"Caption service error: {response.status_code} - {detail}")
                 last_err = err
 
                 if is_server_error and attempt < max_retries:
@@ -101,7 +109,7 @@ class HTTPCaptionProvider:
                 
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to caption service: {e}")
-            raise RuntimeError(f"Caption service connection failed: {e}") from e
+            raise CaptionServiceTransientError(f"Caption service connection failed: {e}") from e
         except Exception as e:
             logger.error(f"Caption generation error: {e}")
             raise
@@ -114,6 +122,34 @@ class HTTPCaptionProvider:
     
     def get_model_name(self) -> str:
         return self.model_name
+
+    def translate_caption(self, english: str, avoid_terms: list[str] | None = None) -> str:
+        """Translate an accepted English caption without rerunning visual inference."""
+        request_timeout = max(5.0, float(os.getenv("CAPTION_HTTP_TIMEOUT_SEC", "180") or "180"))
+        payload = {
+            'text': str(english or '').strip(),
+            'source_lang': 'en',
+            'target_lang': 'zh-CN',
+            'style': 'photo caption',
+            'avoid_terms': list(avoid_terms or []),
+        }
+        if not payload['text']:
+            raise ValueError('English caption is required for translation')
+
+        try:
+            with httpx.Client(timeout=request_timeout, trust_env=False) as client:
+                response = client.post(f"{self.service_url}/translate", json=payload)
+            if response.status_code != 200:
+                error_type = CaptionServiceTransientError if response.status_code >= 500 else RuntimeError
+                raise error_type(f"Caption translation error: {response.status_code} - {response.text}")
+            translated = str(response.json().get('translation') or '').strip().strip('"').strip()
+            if translated.upper().startswith('ZH-CN:'):
+                translated = translated[6:].strip()
+            if not translated:
+                raise RuntimeError('Caption service returned empty translation')
+            return translated
+        except httpx.RequestError as exc:
+            raise CaptionServiceTransientError(f"Caption translation connection failed: {exc}") from exc
 
 class StubCaptionProvider:
     """Stub caption provider that generates heuristic captions."""

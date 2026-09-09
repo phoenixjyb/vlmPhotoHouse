@@ -646,7 +646,7 @@ def cancel_task(task_id: int, db_s: Session = Depends(get_db)):
     t = db_s.get(Task, task_id)
     if not t:
         raise HTTPException(status_code=404, detail='task not found')
-    if t.state in ('done','failed'):
+    if t.state in ('finished', 'done', 'failed', 'dead', 'canceled'):
         return {'api_version': schemas.API_VERSION, 'task_id': t.id, 'state': t.state}
     t.cancel_requested = True
     # Optionally transition pending running tasks; executor will honor later when progress added

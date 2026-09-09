@@ -35,7 +35,7 @@ def test_cancel_long_running_recluster(client: TestClient, monkeypatch):
 
     with SessionLocal() as s:
         t = s.get(Task, rid)
-        # Accept either canceled or done (if very fast), but prefer canceled path
-        assert t.state in ('canceled','done')
+        # Accept either canceled or finished (if very fast), but prefer cancellation.
+        assert t.state in ('canceled', 'finished')
         if t.state == 'canceled':
             assert t.cancel_requested is True

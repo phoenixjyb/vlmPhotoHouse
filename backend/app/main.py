@@ -167,6 +167,7 @@ def reinit_executor_for_tests():
         executor.stop_workers()
     except Exception:
         pass
+    get_settings.cache_clear()  # type: ignore[attr-defined]
     settings = get_settings()
     # Rebind dependencies to the current DATABASE_URL and ensure schema
     ensure_db()
@@ -256,6 +257,7 @@ def health(request: Request, db_s: Session = Depends(get_db)):
     # active face embedding provider (lazy; protected by try to avoid import failures on lightweight envs)
     face_embed_provider = None
     face_detect_provider = None
+    face_detect_runtime = None
     face_device = settings.embed_device
     try:
         from .face_embedding_service import get_face_embedding_provider
@@ -270,15 +272,13 @@ def health(request: Request, db_s: Session = Depends(get_db)):
         embed_dim = None
     # Detection provider info
     try:
-        from .face_detection_service import get_face_detection_provider
-        _det = get_face_detection_provider()
-        face_detect_provider = _det.__class__.__name__
-    except Exception:
-        face_detect_provider = 'unavailable'
-    try:
-        from .face_detection_service import get_face_detection_provider
+        from .face_detection_service import (
+            describe_detection_runtime,
+            get_face_detection_provider,
+        )
         dprov = get_face_detection_provider()
         face_detect_provider = dprov.__class__.__name__
+        face_detect_runtime = describe_detection_runtime(dprov)
     except Exception:
         face_detect_provider = 'unavailable'
     
@@ -311,6 +311,7 @@ def health(request: Request, db_s: Session = Depends(get_db)):
             'lvface_python_exe': settings.lvface_python_exe if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'lvface_model_name': settings.lvface_model_name if face_embed_provider and 'lvface' in face_embed_provider.lower() else None,
             'detect_provider': face_detect_provider,
+            'detect_runtime': face_detect_runtime,
             'device': face_device,
         },
         'caption': {
@@ -397,12 +398,19 @@ def metrics(db_s: Session = Depends(get_db)):
     index_dim = tasks_mod.EMBED_DIM if tasks_mod.INDEX_SINGLETON else None
     last_recluster = None
     # attempt to find last completed recluster summary
-    last_recluster_task = db_s.query(Task).filter(Task.type=='person_recluster', Task.state=='done').order_by(Task.id.desc()).first()
+    last_recluster_task = db_s.query(Task).filter(
+        Task.type == 'person_recluster',
+        Task.state.in_(['finished', 'done']),
+    ).order_by(Task.id.desc()).first()
     if last_recluster_task and last_recluster_task.payload_json and 'summary' in last_recluster_task.payload_json:
         last_recluster = last_recluster_task.payload_json.get('summary')
     # average task duration (completed tasks with both timestamps)
     durations = []
-    done_tasks = db_s.query(Task.started_at, Task.finished_at).filter(Task.state=='done', Task.started_at!=None, Task.finished_at!=None).limit(500).all()
+    done_tasks = db_s.query(Task.started_at, Task.finished_at).filter(
+        Task.state.in_(['finished', 'done']),
+        Task.started_at != None,
+        Task.finished_at != None,
+    ).limit(500).all()
     for st, ft in done_tasks:
         try:
             durations.append((ft - st).total_seconds())
@@ -1717,10 +1725,12 @@ from .routers import people as people_router
 from .routers import voice as voice_router
 from .routers import voice_photo as voice_photo_router
 from .routers import ui as ui_router
+from .routers import albums as albums_router
 app.include_router(people_router.router, prefix='')
 app.include_router(voice_router.router, prefix='')
 app.include_router(voice_photo_router.router, prefix='')
 app.include_router(ui_router.router, prefix='')
+app.include_router(albums_router.router, prefix='')
 
 # --- Albums: Story generation (people/tags/location/caption)
 @app.get('/albums/stories')
@@ -1914,7 +1924,15 @@ def albums_stories(
             seen: set[str] = set()
             for cand in candidates:
                 name = str((cand or {}).get('name') or '').strip().lower()
-                if len(name) < 2:
+                candidate_type = str((cand or {}).get('type') or '').strip().lower()
+                try:
+                    candidate_score = float((cand or {}).get('score') or 0.0)
+                except (TypeError, ValueError):
+                    candidate_score = 0.0
+                # Story topics must be stable family concepts. The tag extractor's
+                # low-confidence fallback tokens are useful for search, but single
+                # adjectives/prepositions make poor album titles.
+                if len(name) < 2 or candidate_type == 'caption-auto' or candidate_score < 0.5:
                     continue
                 if name in seen:
                     continue

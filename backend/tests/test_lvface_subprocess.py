@@ -1,8 +1,79 @@
 """Test for LVFace subprocess provider."""
 import os
+import subprocess
+from types import SimpleNamespace
+
 import pytest
 from PIL import Image
 import numpy as np
+
+
+def _fake_lvface_install(tmp_path):
+    lvface_dir = tmp_path / 'LVFace'
+    model_dir = lvface_dir / 'models'
+    model_dir.mkdir(parents=True)
+    (model_dir / 'model.onnx').write_bytes(b'model')
+    (lvface_dir / 'inference.py').write_text('# fake', encoding='utf-8')
+    python_exe = lvface_dir / 'python.exe'
+    python_exe.write_bytes(b'python')
+    return lvface_dir, python_exe
+
+
+def test_legacy_inference_never_generates_dummy_embedding(
+    tmp_path, monkeypatch
+):
+    from app.lvface_subprocess import LVFaceSubprocessProvider
+
+    lvface_dir, python_exe = _fake_lvface_install(tmp_path)
+    observed = {}
+
+    def fake_run(args, **_kwargs):
+        observed['command'] = args[2]
+        return SimpleNamespace(
+            returncode=1,
+            stdout='',
+            stderr='real inference failed',
+        )
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+    provider = LVFaceSubprocessProvider(
+        str(lvface_dir), 'model.onnx', 128, python_exe=str(python_exe)
+    )
+
+    with pytest.raises(RuntimeError, match='LVFace inference failed'):
+        provider.embed_face(Image.new('RGB', (112, 112)))
+
+    assert 'np.random.randn' not in observed['command']
+    assert 'Used dummy embedding' not in observed['command']
+
+
+@pytest.mark.parametrize(
+    ('stdout', 'message'),
+    [
+        ('not-json', 'invalid JSON'),
+        ('[0.0, 1.0]', 'invalid embedding shape'),
+        ('[' + ','.join(['0.0'] * 128) + ']', 'non-normalized embedding'),
+    ],
+)
+def test_subprocess_output_is_validated(
+    tmp_path, monkeypatch, stdout, message
+):
+    from app.lvface_subprocess import LVFaceSubprocessProvider
+
+    lvface_dir, python_exe = _fake_lvface_install(tmp_path)
+    monkeypatch.setattr(
+        subprocess,
+        'run',
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0, stdout=stdout, stderr=''
+        ),
+    )
+    provider = LVFaceSubprocessProvider(
+        str(lvface_dir), 'model.onnx', 128, python_exe=str(python_exe)
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        provider.embed_face(Image.new('RGB', (112, 112)))
 
 @pytest.mark.skipif(not os.getenv('LVFACE_EXTERNAL_DIR'), 
                    reason='Set LVFACE_EXTERNAL_DIR to test subprocess provider')

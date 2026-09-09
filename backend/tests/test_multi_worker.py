@@ -48,7 +48,7 @@ def test_multi_worker_embed_parallel(override_settings, temp_env_root):
     while time.time() < deadline and not done:
         with SessionLocal() as s:
             last_rows = s.query(Task.id, Task.state).filter(Task.id.in_(target_ids)).all()
-        done = all(state == 'done' for _, state in last_rows)
+        done = all(state == 'finished' for _, state in last_rows)
         if not done:
             time.sleep(0.03)
 

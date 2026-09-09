@@ -222,3 +222,51 @@ class AssetTagBlock(Base):
     tag_id: Mapped[int] = mapped_column(ForeignKey('tags.id', ondelete='CASCADE'), index=True, nullable=False)
     created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
     Index('idx_asset_tag_block_unique', asset_id, tag_id, unique=True)
+
+
+class Album(Base):
+    __tablename__ = 'albums'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    title_zh: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    theme: Mapped[str] = mapped_column(String(32), nullable=False, default='custom', index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default='draft', index=True)
+    cover_asset_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('assets.id', ondelete='SET NULL'), nullable=True, index=True
+    )
+    source_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    source_ref: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[DateTime]] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    items = relationship(
+        'AlbumAsset',
+        back_populates='album',
+        cascade='all, delete-orphan',
+        order_by='AlbumAsset.position',
+    )
+
+
+class AlbumAsset(Base):
+    __tablename__ = 'album_assets'
+    __table_args__ = (
+        UniqueConstraint('album_id', 'asset_id', name='uq_album_asset'),
+        UniqueConstraint('album_id', 'position', name='uq_album_asset_position'),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    album_id: Mapped[int] = mapped_column(
+        ForeignKey('albums.id', ondelete='CASCADE'), nullable=False, index=True
+    )
+    asset_id: Mapped[int] = mapped_column(
+        ForeignKey('assets.id', ondelete='CASCADE'), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime, server_default=func.now())
+
+    album = relationship('Album', back_populates='items')
+    asset = relationship('Asset')
