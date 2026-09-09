@@ -1,5 +1,8 @@
 # PhotoHouse backend-security foundation handoff — 2026-09-09
 
+Latest continuation: [slice 16 offline restore quarantine](OFFLINE_RECOVERY.md).
+Earlier checkpoints below retain their original evidence and limitations.
+
 **Historical 14:00 checkpoint.** Following the user's renewed request, the
 [slice 15 continuation](OFFLINE_PROVISIONING_APPLY.md) adds a verified offline apply
 service and receipt migration. Its evidence supersedes the test totals and "no

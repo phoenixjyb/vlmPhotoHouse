@@ -1,5 +1,9 @@
 # Offline provisioning apply — slice 15
 
+Continuation: [slice 16 offline restore quarantine](OFFLINE_RECOVERY.md) invalidates
+restored plans/sessions/invitations and leaves accounts and libraries closed.
+The slice 15 implementation and evidence below remain the historical checkpoint.
+
 This continues the completed 14:00 checkpoint following the user's renewed request.
 The offline service now applies a reviewed owner or asset plan atomically. It has
 **no HTTP route, automatic startup hook or command-line entry point**. All executed

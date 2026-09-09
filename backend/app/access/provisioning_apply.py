@@ -79,6 +79,14 @@ def review_backup(*, database, backup, envelope, reviewed_plan_digest,
     restore procedure. This rehearsal verifies SQLite content, not disaster recovery.
     Returns a local in-process review; do not deserialize reviews from untrusted input.
     """
+    return _review_backup(database=database, backup=backup, envelope=envelope,
+        reviewed_plan_digest=reviewed_plan_digest, authority_reference=authority_reference,
+        restore_reference=restore_reference, clock=clock, state_type=_PlanState)
+
+
+def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
+                   authority_reference, restore_reference, clock, state_type):
+    """Shared internal backup verification; public callers fix the plan validator."""
     authority_reference = _reference(authority_reference)
     restore_reference = _reference(restore_reference)
     digest = plan_digest(envelope)
@@ -91,7 +99,7 @@ def review_backup(*, database, backup, envelope, reviewed_plan_digest,
     if target_id == backup_id:
         raise PlanRejected('A separate backup is required')
     with ExistingDatabase(database, read_only=True)() as db:
-        state = _PlanState(db, clock=clock)
+        state = state_type(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
             snapshot = _snapshot(db)
