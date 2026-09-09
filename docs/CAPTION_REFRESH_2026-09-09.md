@@ -1,5 +1,10 @@
 # Caption refresh — 9 September 2026
 
+Follow-up: the user subsequently approved the PhotoHouse service upgrade and
+restart. The blocker below is now resolved by the live `f2bb0a0` caption server;
+see [service cutover evidence](SERVICES_CUTOVER_2026-09-09.md). The remainder of
+this document preserves the pre-cutover implementation and canary snapshot.
+
 ## Requested outcome and phased plan
 
 The user approved progressing from the coverage audit and explicitly requested
