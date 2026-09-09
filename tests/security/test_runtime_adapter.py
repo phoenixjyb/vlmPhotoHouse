@@ -37,6 +37,7 @@ class RuntimeAdapterTests(unittest.TestCase):
         self.settings=RuntimeConfiguration(self.path,'https://photohouse.test',(self.originals,),self.derived)
         self.app=self.settings.build_app(clock=lambda:NOW)
         self.client=TestClient(self.app,base_url='https://photohouse.test',client=('192.0.2.40',23456))
+        self.client.headers['Sec-Fetch-Site'] = 'same-origin'
         self.addCleanup(self.client.close)
         for target in ('socket.socket.connect','socket.socket.bind','subprocess.Popen','os.system'):
             guard=patch(target,side_effect=AssertionError('External I/O forbidden'))

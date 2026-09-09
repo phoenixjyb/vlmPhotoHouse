@@ -1,6 +1,6 @@
 """First-party phone-as-username/password and manually delivered invitations.
 
-Dormant until HTTP/worker integration is reviewed. No SMS, WeChat, OAuth server,
+Shared by reviewed HTTP adapters. No SMS, WeChat, OAuth server,
 email delivery, model, filesystem media access, settings or database-opening API.
 The connection must be to the existing PhotoHouse SQLite database. HTTP admission,
 TLS, cookies/CSRF and password recovery are separate, mandatory delivery gates.

@@ -28,7 +28,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const PASSWORD='Synthetic family passphrase!';
 const MEMBER='+12025550102';
 let hold=null,abortLogout=false;
-const external=[],errors=[],checks=[];
+const external=[],errors=[],checks=[];let syntheticFetchMetadata=0;
 function checkpoint(name){checks.push(name);console.log('PASS '+name);}
 function delayNext(predicate){
   let release,arrived;
@@ -43,6 +43,14 @@ async function context(browser){
     if(url.origin!=='https://photohouse.test'){external.push(url.origin);await route.abort();return;}
     if(abortLogout&&url.pathname==='/auth/logout'){abortLogout=false;await route.abort();return;}
     const headers=await request.allHeaders();
+    // DevTools request interception here omits network-generated Fetch Metadata.
+    // Model it explicitly from the requesting frame for the ASGI contract. This
+    // is a test assumption, not proof of actual browser/proxy header emission.
+    if(!headers['sec-fetch-site']) {
+      let frameOrigin='';try{frameOrigin=new URL(request.frame().url()).origin;}catch{}
+      headers['sec-fetch-site']=frameOrigin===url.origin?'same-origin':'none';
+      syntheticFetchMetadata++;
+    }
     delete headers['content-length']; // TestClient recalculates bytes forwarded on the pipe.
     const response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
@@ -85,6 +93,22 @@ let browser;
   await page.locator('.asset img').first().evaluate(img=>img.decode());
   await page.screenshot({path:path.join(artifacts,'gallery-desktop.png'),fullPage:true});
   checkpoint('Phone/password login uses HttpOnly cookie and scoped gallery');
+  let legacyProbeStatus=null;
+  await memberContext.route('https://sibling.photohouse.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><img id="probe" src="https://photohouse.test/assets/101/thumbnail?library=family-a">'}));
+  const legacyMediaRoute=async route=>{
+    const headers=await route.request().allHeaders();delete headers['sec-fetch-site'];delete headers.origin;
+    const response=await rpc({method:'GET',path:'/assets/101/thumbnail?library=family-a',headers});
+    legacyProbeStatus=response.status;
+    const output={...response.headers};delete output['content-length'];
+    await route.fulfill({status:response.status,headers:output,body:Buffer.from(response.body,'base64')});
+  };
+  await memberContext.route('https://photohouse.test/assets/101/thumbnail?library=family-a',legacyMediaRoute);
+  const sibling=await memberContext.newPage();await sibling.goto('https://sibling.photohouse.test/');
+  await sibling.waitForFunction(()=>document.getElementById('probe').complete);
+  assert.equal(legacyProbeStatus,403);
+  assert.equal(await sibling.locator('#probe').evaluate(img=>img.naturalWidth),0);
+  await sibling.close();await memberContext.unroute('https://photohouse.test/assets/101/thumbnail?library=family-a',legacyMediaRoute);
+  checkpoint('Server denies sibling cookie embedding when same-origin signals are absent');
   await mutate('caption-html');
   await page.locator('.asset').filter({hasText:'101'}).click();
   await page.locator('#captions p').waitFor();
@@ -173,7 +197,7 @@ let browser;
   await auth(page);
   checkpoint('Expired session cookie clears and returning login succeeds');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
+  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   if(hold){hold=null;}

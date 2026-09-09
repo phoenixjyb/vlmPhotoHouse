@@ -123,6 +123,7 @@ class ClosedApplicationTests(unittest.TestCase):
         self.media = MediaRuntime((self.originals,), self.derived)
         self.app = create_app(access_runtime=self.access, media_runtime=self.media)
         self.client = TestClient(self.app, base_url='https://photohouse.test', client=('192.0.2.10', 23456))
+        self.client.headers['Sec-Fetch-Site'] = 'same-origin'
         self.addCleanup(self.client.close)
         for target in ('socket.socket.bind', 'socket.socket.connect', 'socket.socket.connect_ex', 'subprocess.Popen', 'os.system'):
             guard = patch(target, side_effect=AssertionError('External I/O forbidden'))
@@ -148,6 +149,7 @@ class ClosedApplicationTests(unittest.TestCase):
 
     def assert_private(self, response):
         self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertEqual(response.headers['cross-origin-resource-policy'], 'same-origin')
         self.assertNotIn(str(self.root), response.text if not response.headers.get('content-type', '').startswith(('image/', 'video/')) else '')
 
     def test_default_app_and_lifespan_remain_closed_without_storage(self):
@@ -210,6 +212,33 @@ class ClosedApplicationTests(unittest.TestCase):
             self.assertEqual(response.headers['location'], '/ui')
             self.assertNotIn('private-synthetic', response.text)
         self.assertEqual(self.client.get('/ui/access/index.html').status_code, 403)
+
+    def test_head_denials_have_no_asgi_body_even_before_an_http_server(self):
+        import asyncio
+        for path in ('/unfinished', '/assets/101/media'):
+            messages = []
+            async def send(message):
+                messages.append(message)
+            async def receive():
+                return {'type': 'http.request', 'body': b'', 'more_body': False}
+            scope = {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.4'},
+                'http_version': '1.1', 'method': 'HEAD', 'scheme': 'https', 'path': path,
+                'raw_path': path.encode(), 'query_string': b'library=family-a',
+                'headers': [(b'host', b'photohouse.test')], 'client': ('192.0.2.1', 1234),
+                'server': ('photohouse.test', 443), 'root_path': ''}
+            asyncio.run(self.app(scope, receive, send))
+            self.assertIn(messages[0]['status'], (401,403))
+            self.assertEqual(b''.join(m.get('body',b'') for m in messages), b'')
+            self.assertIn((b'cross-origin-resource-policy', b'same-origin'), messages[0]['headers'])
+
+    def test_oversized_query_is_rejected_before_sql_or_media_lookup(self):
+        with patch.object(AccessRuntime, 'call', side_effect=AssertionError('Query reached domain')), \
+             patch.object(MediaRuntime, 'open_file', side_effect=AssertionError('Query reached media')):
+            for path in ('/assets/101/media', '/assets/101/thumbnail', '/faces/301/crop',
+                         '/assets', '/assets/101/captions', '/libraries/family-a/members'):
+                response = self.client.get(path + '?library=family-a&unknown=' + 'x'*1100, headers=self.headers())
+                self.assertEqual(response.status_code,400)
+                self.assert_private(response)
 
     def test_unreviewed_route_and_shadowed_login_handler_are_denied(self):
         effects = []

@@ -24,7 +24,8 @@ from .service import AccessDenied, AccessService, Conflict
 COOKIE = '__Host-ph_session'
 MAX_BODY = 2048
 PRIVACY_HEADERS = {'Cache-Control': 'no-store', 'Pragma': 'no-cache',
-                   'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff'}
+                   'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
+                   'Cross-Origin-Resource-Policy': 'same-origin'}
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,9 @@ def _single(request, name):
 
 
 def _runtime(request, *, allow_query=False):
+    query = request.scope.get('query_string', b'')
+    if (query and not allow_query) or len(query) > 1024:
+        raise TransportError(400, 'Invalid request')
     runtime = getattr(request.app.state, 'access_runtime', None)
     if not isinstance(runtime, AccessRuntime):
         raise TransportError(503, 'Access unavailable')
@@ -83,8 +87,6 @@ def _runtime(request, *, allow_query=False):
         raise TransportError(403, 'Access denied')
     # No query strings on account endpoints: no tokens, passwords or phone labels
     # in URLs, and no ignored credential/redirect parameters.
-    if request.scope.get('query_string') and not allow_query:
-        raise TransportError(400, 'Invalid request')
     return runtime
 
 
@@ -118,6 +120,12 @@ def credentials_from_request(request, *, allow_query=False):
             raise TransportError(401, 'Access denied')
         token, mode = authorization[7:], 'native'
     elif cookie is not None:
+        # Browser cookies require a positive same-origin signal. Missing Fetch
+        # Metadata is not permission for sibling-site image embedding. Native
+        # clients use their explicit bearer transport and do not need this signal.
+        if (_single(request, 'sec-fetch-site') != 'same-origin'
+                and _single(request, 'origin') != runtime.web_origin):
+            raise TransportError(403, 'Access denied')
         token, mode = cookie, 'web'
     else:
         raise TransportError(401, 'Access denied')

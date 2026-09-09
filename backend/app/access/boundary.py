@@ -59,18 +59,20 @@ class ClosedBoundary:
             await send({'type': 'websocket.close', 'code': 1008})
             return
         if scope['type'] == 'http':
-            if not self.allowed(scope['method'], scope['path']) or not self.reviewed_match(scope):
-                response = JSONResponse({'detail': 'Access denied'}, status_code=403,
-                                        headers=PRIVACY_HEADERS)
-                await response(scope, receive, send)
-                return
             async def private_send(message):
                 if message['type'] == 'http.response.start':
                     message = dict(message)
                     privacy = {key.lower().encode(): value.encode() for key, value in PRIVACY_HEADERS.items()}
                     message['headers'] = [(k, v) for k, v in message.get('headers', []) if k.lower() not in privacy]
                     message['headers'].extend(privacy.items())
+                elif message['type'] == 'http.response.body' and scope['method'] == 'HEAD':
+                    message = dict(message, body=b'')
                 await send(message)
+            if not self.allowed(scope['method'], scope['path']) or not self.reviewed_match(scope):
+                response = JSONResponse({'detail': 'Access denied'}, status_code=403,
+                                        headers=PRIVACY_HEADERS)
+                await response(scope, receive, private_send)
+                return
             await self.app(scope, receive, private_send)
             return
         await self.app(scope, receive, send)

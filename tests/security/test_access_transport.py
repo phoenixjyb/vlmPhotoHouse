@@ -206,6 +206,7 @@ class TransportTests(unittest.TestCase):
         app.include_router(router)
         self.app = app
         self.client = TestClient(app, base_url=ORIGIN, client=('192.0.2.10', 12345))
+        self.client.headers['Sec-Fetch-Site'] = 'same-origin'
         self.addCleanup(self.client.close)
         for target in ('socket.socket.bind', 'socket.socket.connect', 'subprocess.Popen', 'os.system'):
             guard = patch(target, side_effect=AssertionError('External I/O forbidden'))
@@ -272,6 +273,17 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('Max-Age=0', response.headers['set-cookie'])
         self.assertEqual(self.client.get('/auth/session').status_code, 401)
+
+    def test_cookie_reads_need_positive_same_origin_signal_but_native_does_not(self):
+        self.client.cookies.set(COOKIE, self.member_token)
+        del self.client.headers['Sec-Fetch-Site']
+        for headers in ({}, {'Sec-Fetch-Site':'none'}, {'Sec-Fetch-Site':'same-site'},
+                        {'Referer':'https://sibling.photohouse.test/'}):
+            self.assertEqual(self.client.get('/auth/session',headers=headers).status_code,403)
+        self.assertEqual(self.client.get('/auth/session',headers={'Origin':ORIGIN}).status_code,200)
+        self.assertEqual(self.client.get('/auth/session',headers={'Sec-Fetch-Site':'same-origin'}).status_code,200)
+        self.client.cookies.clear()
+        self.assertEqual(self.client.get('/auth/session',headers=self.bearer()).status_code,200)
 
     def test_expired_web_session_clears_cookie_before_retrying_login(self):
         response = self.login('web', headers={'Origin': ORIGIN})

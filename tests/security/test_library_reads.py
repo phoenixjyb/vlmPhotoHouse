@@ -69,6 +69,7 @@ class LibraryReadTests(unittest.TestCase):
         self.trace = []
         runtime = AccessRuntime(self.connection, 'https://photohouse.test', clock=lambda:self.now)
         self.client = TestClient(create_app(access_runtime=runtime), base_url='https://photohouse.test', client=('192.0.2.20', 23456))
+        self.client.headers['Sec-Fetch-Site'] = 'same-origin'
         self.addCleanup(self.client.close)
         for target in ('socket.socket.bind','socket.socket.connect','subprocess.Popen','os.system'):
             guard = patch(target,side_effect=AssertionError('External I/O forbidden'))
