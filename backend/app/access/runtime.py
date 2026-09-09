@@ -31,10 +31,13 @@ class RuntimeUnavailable(RuntimeError):
 class ExistingDatabase:
     path: Path
     timeout: float = 3.0
+    read_only: bool = False
 
     def __post_init__(self):
         if not isinstance(self.path, Path) or not self.path.is_absolute():
             raise ValueError('An explicit absolute database Path is required')
+        if type(self.read_only) is not bool:
+            raise ValueError('Explicit read-only flag required')
         if type(self.timeout) not in (int, float) or not 0 < self.timeout <= 10:
             raise ValueError('Database timeout must be between zero and ten seconds')
 
@@ -47,12 +50,14 @@ class ExistingDatabase:
             before = self.path.lstat()
             if not stat.S_ISREG(before.st_mode) or self.path.resolve(strict=True) != self.path:
                 raise RuntimeUnavailable('Access unavailable')
-            connection = sqlite3.connect(self.path.as_uri() + '?mode=rw', uri=True, timeout=self.timeout)
+            connection = sqlite3.connect(self.path.as_uri() + ('?mode=ro' if self.read_only else '?mode=rw'), uri=True, timeout=self.timeout)
             after = self.path.lstat()
             if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
                 raise RuntimeUnavailable('Access unavailable')
             connection.execute('PRAGMA foreign_keys=ON')
             connection.execute('PRAGMA trusted_schema=OFF')
+            if self.read_only:
+                connection.execute('PRAGMA query_only=ON')
             if connection.execute('PRAGMA foreign_keys').fetchone()[0] != 1:
                 raise RuntimeUnavailable('Access unavailable')
             versions = connection.execute('SELECT version_num FROM alembic_version').fetchall()

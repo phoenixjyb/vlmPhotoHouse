@@ -1,0 +1,22 @@
+{
+  "plan": {
+    "version": 1,
+    "operation": "bootstrap_owner",
+    "plan_id": "45e27128-90e4-4c4c-a2fc-3b115645b5e2",
+    "created_at": 2000000000,
+    "expires_at": 2000000900,
+    "target": {
+      "phone_login": "+12025550103",
+      "library_id": "new-family"
+    },
+    "database_binding": "3cdbf171ca833e780e18e6795e44f7990956f768ecf7a2a5ae0b282d98caf03a",
+    "expected": {
+      "new_owner": true,
+      "new_operator": true,
+      "new_library": true,
+      "originals_granted": false,
+      "legacy_assets_assigned": 0
+    }
+  },
+  "seal": "0055d79fdb1afe12ce894b8abd23cae3f427eb877d1508ea22e9c1b4ef187e44"
+}
