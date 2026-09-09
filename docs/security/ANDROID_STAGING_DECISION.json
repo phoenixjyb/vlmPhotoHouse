@@ -3,7 +3,10 @@
   "artifact_kind": "proposal_not_launch_configuration",
   "verdict": "NO_GO_REAL_PHONE",
   "deployed": "unknown",
-  "candidate_backend_commit": "1e394f789ff1f7cef6d9930bb541186684f5a9a0",
+  "candidate_backend_commit": "0cf5058acdb25224b26847fb55670307f8113181",
+  "consumer_pinned_backend_commit": "1e394f789ff1f7cef6d9930bb541186684f5a9a0",
+  "caption_budget_fixed_in_candidate": true,
+  "consumer_repin_completed": false,
   "approved_backend_commit": null,
   "required_schema_revision": "b6e3f9a5c721",
   "contract_version": "1.0.0-fixture.1",
@@ -50,7 +53,7 @@
     "push_or_merge": false
   },
   "unmet_gates": [
-    "caption_utf8_response_budget_exceeds_android_limit",
+    "android_review_repin_and_baseline_replay_for_caption_budget_fix",
     "reviewed_explicit_launcher_and_operator_tool",
     "reviewed_cpu_windows_environment",
     "private_target_origin_certificate_and_audience",

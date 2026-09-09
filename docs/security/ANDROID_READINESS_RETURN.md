@@ -3,7 +3,8 @@
 **Status: review/proposal complete; NO-GO for real-phone credentials.**
 
 - Deployed: **unknown**, no live host checked; this session performed no deployment.
-- Candidate backend: `1e394f789ff1f7cef6d9930bb541186684f5a9a0`.
+- Candidate backend: **`0cf5058acdb25224b26847fb55670307f8113181`**.
+  Android's frozen consumer still pins `1e394f789ff1f7cef6d9930bb541186684f5a9a0`.
   Actual deployed/approved release: **unknown/unset**.
 - HTTPS origin/certificate/network: **not established**. Do not configure a private
   origin or enable real credentials from this report. Private configuration remains
@@ -12,14 +13,19 @@
   Owner/library/mappings, backups and restored-access state: unverified.
 - Audience: propose synthetic owner/viewer and generated media for first isolated
   staging; no real owner, phone login, invitation or library has been selected.
-- Local evidence: ten backend/eight contract checksums and 38 ASGI response cases
-  pass; connected APK hash matches the handoff. Earlier JVM/TLS/emulator/CI reports
-  are retained evidence, not new runs or current remote-status verification.
-- **New compatibility blocker:** valid backend captions can be **657749 bytes**;
-  Android JSON limit is **524288 bytes**. Probe exits 1 and records the finding.
-  Keep the client limit; coordinate a bounded server response-budget fix/regression
-  and repin any changed backend source before claiming unrestricted compatibility.
-- Authorized next work here: local caption-budget/launcher/operator-package review
+- Local evidence: **201 backend security tests and 14 actual Kotlin adapter cases
+  pass** for the caption-budget follow-up, with no sockets. The former 657749-byte
+  caption case is now 493328 bytes with 15 whole rows and `has_more=true`.
+  Exact-limit responses pass and oversized responses remain rejected. Eight
+  unchanged backend source hashes/eight contract hashes match; two reviewed
+  backend hashes changed. The earlier 38-case pinned replay remains baseline
+  evidence; Android repinning and replay against the new candidate remain pending.
+  Earlier TLS/emulator/CI reports are not new runs or remote-status verification.
+- **Compatibility fix delivered locally; consumer update pending.** Read
+  [the caption-budget handoff](CAPTION_RESPONSE_BUDGET.md) for semantics, exact
+  commit, evidence and reproduction. Keep the client limit and explicitly repin
+  reviewed backend source/contract checksums before consuming this fix.
+- Authorized next work here: local launcher/operator-package review
   and synthetic no-listener tests. No new host/deployment/account/phone/push/merge
   authority is granted by this return.
 

@@ -1,6 +1,11 @@
 # PH-BACKEND-ANDROID-READINESS-01 — staging readiness review
 
 2026-09-09. **Outcome: proposal prepared; real-phone browsing is NO-GO.**
+Follow-up: [caption response budget fixed locally](CAPTION_RESPONSE_BUDGET.md) at
+`0cf5058acdb25224b26847fb55670307f8113181` with 201 backend tests and 14 in-memory
+Kotlin adapter cases passing. Android still pins `1e394f7`; coordinated review/repin
+is pending. The initial source observations and failure below are retained as
+historical evidence, not a claim that the new candidate still has that failure.
 Deployment identity, origin, host configuration and test audience remain unknown.
 This session has not deployed the protected backend. No live host, database, media,
 phone, private configuration or remembered endpoint was accessed. The receiving
@@ -86,7 +91,7 @@ must be supplied and reviewed locally before generating a runnable command.
 
 | Setting | Proposed requirement |
 | --- | --- |
-| Source | Candidate baseline `1e394f789ff1f7cef6d9930bb541186684f5a9a0`; approved release SHA is unset. The caption-budget fix requires a new reviewed commit and Android pin update. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
+| Source | Candidate with caption-budget fix `0cf5058acdb25224b26847fb55670307f8113181`; approved release SHA is unset. Android pin update remains pending; later launcher work needs a new reviewed release. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
 | Runtime | Explicit `RuntimeConfiguration(database=Path(...), web_origin=..., original_roots=(...), derived_root=...)` followed by `build_app()`. No `.env`/legacy settings/default-path discovery, schema fallback or worker startup. |
 | ASGI entry | A separately reviewed private launcher constructs that runtime; **stock `app.main:app` alone will not activate access**. The launcher/config/operator tool still need local implementation/review; existing model startup scripts are unsuitable. |
 | TLS | Direct TLS at the staging ASGI server using the selected host's system-trusted certificate chain and protected private key; Android normal system trust and hostname validation. No test/user CA bypass, cleartext, redirects, path prefix or custom trust in the APK. |
@@ -105,8 +110,9 @@ untrusted HTTPS test certificates or the JVM integration harness as a deploy lau
 
 ## Sequence, backups and rollback
 
-1. **Local release preparation (authorized now, not completed by this review):**
-   fix the caption budget and add the Kotlin boundary case with the Android owner;
+1. **Local release preparation (partially complete):**
+   caption budget and Kotlin boundary checks are implemented locally; coordinate
+   Android review/repin and baseline replay with its owner, then
    prepare explicit launcher/config validation and operator provisioning tool; pin
    a CPU runtime; review source and update the frozen consumer pin coherently.
 2. **Operator target review (new scoped authority required):** establish exact host,
@@ -176,6 +182,6 @@ A staging release is not ready until all of these have evidence:
 
 Return packet is [ANDROID_READINESS_RETURN.md](ANDROID_READINESS_RETURN.md).
 This review supplies no approved origin or credential. The next local work is the
-caption-budget/launcher preparation; the next external step needs explicit scoped
+Android repin and launcher preparation; the next external step needs explicit scoped
 authority and private target inputs. No push, merge, deployment, service restart,
 account change or phone installation was performed.
