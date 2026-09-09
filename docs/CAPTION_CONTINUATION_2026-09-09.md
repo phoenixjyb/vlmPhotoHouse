@@ -1,5 +1,10 @@
 # Qwen3 caption continuation — 9 September 2026
 
+Follow-up: the owner approved ordinary baby-care wording for the four quarantined
+photos. Their scoped API update and all four live retries succeeded; see
+[baby-care policy deployment](INFANT_CARE_CAPTION_POLICY_2026-09-09.md). The counts
+and initial quarantine decisions below remain the original continuation snapshot.
+
 The user approved inspecting the four first-batch failures and continuing the
 remaining Qwen3 caption workload. This is a live queue operation, not a backend
 security deployment. No service restart, model change, wake/sleep schedule change,
