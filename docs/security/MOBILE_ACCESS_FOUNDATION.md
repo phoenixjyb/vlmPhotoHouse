@@ -1,5 +1,9 @@
 # Mobile access foundation: route audit, slice 1
 
+Continuation: [slice 2 — manual invitations and phone/password accounts](MANUAL_INVITATION_ACCOUNTS.md)
+records the user's subsequent registration choice, dormant domain implementation,
+and remaining transport/migration gates. The slice-1 findings below are retained.
+
 Status: **inventory and synthetic failure evidence only; authorization is not
 implemented. This branch is not a security deployment candidate.**
 
