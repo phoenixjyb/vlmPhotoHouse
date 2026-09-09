@@ -147,6 +147,14 @@
       "expression": "app = FastAPI(title='RAM++ Tag Service', version='0.1.0')"
     },
     {
+      "source": "tests/security/harness.py",
+      "expression": "exec(compile(ast.Module(body=[constructor], type_ignores=[]), 'synthetic-app', 'exec'), namespace)"
+    },
+    {
+      "source": "tests/security/harness.py",
+      "expression": "exec(compile(module, relative, 'exec', dont_inherit=True), namespace)"
+    },
+    {
       "source": "tests/security/test_access_transport.py",
       "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)"
     },

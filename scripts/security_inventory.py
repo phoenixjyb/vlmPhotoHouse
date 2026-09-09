@@ -15,9 +15,18 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "docs/security/route_capabilities.json"
 HTTP = {"get", "post", "put", "patch", "delete", "head", "options", "trace"}
+META_REGISTRATION = {"middleware", "add_middleware", "exception_handler", "add_exception_handler", "on_event"}
 REGISTRATION = HTTP | {"route", "api_route", "websocket", "websocket_route",
                        "add_route", "add_api_route", "add_websocket_route",
                        "add_api_websocket_route", "mount", "include_router"}
+
+
+# These two existing harness expressions execute guarded, selected legacy AST in
+# synthetic namespaces. Pin exact expressions and topology; no file-wide bypass.
+REVIEWED_EXEC = {
+    ("tests/security/harness.py", "exec(compile(module, relative, 'exec', dont_inherit=True), namespace)"),
+    ("tests/security/harness.py", "exec(compile(ast.Module(body=[constructor], type_ignores=[]), 'synthetic-app', 'exec'), namespace)"),
+}
 
 
 def source_files(root: Path) -> list[Path]:
@@ -36,7 +45,11 @@ def scan(files: list[Path], root: Path) -> dict:
         code = path.read_text(encoding="utf-8-sig")
         # Some unrelated legacy CLI scripts are syntactically invalid. Scan every
         # source for HTTP declarations/imports, then parse every candidate strictly.
-        if not re.search(r"fastapi|starlette|FastAPI|APIRouter|include_router|add_api_route|@\w+\.(?:get|post|put|patch|delete|head|options|route|websocket)\s*\(", code):
+        candidate = re.search(r"fastapi|starlette|FastAPI|APIRouter|include_router|add_api_route|@\w+\.(?:get|post|put|patch|delete|head|options|route|websocket)\s*\(", code)
+        actions = "|".join(sorted(REGISTRATION | META_REGISTRATION))
+        reflective = re.search(r"getattr\s*\([^,]+,\s*['\"](?:" + actions + r")[ '\"]", code)
+        reference = re.search(r"\b\w+\s*=\s*\w+\.(?:" + actions + r")\s*(?:$|#)", code, re.MULTILINE)
+        if not (candidate or reflective or reference):
             continue
         tree = ast.parse(code, filename=source)
         decorators = {d for f in ast.walk(tree)
@@ -77,6 +90,31 @@ def scan(files: list[Path], root: Path) -> dict:
                                 for method in ("GET", "HEAD"):
                                     routes.append(dict(source=source, owner=owner, method=method,
                                                        path=url, handler=f"<framework:{handler}>"))
+        parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and any(ast.unparse(base) in factories
+                    or ast.unparse(base).rsplit('.', 1)[-1] in {'FastAPI', 'APIRouter'} for base in node.bases):
+                raise ValueError(f"Review custom HTTP factory: {source}:{node.lineno}")
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                if node.func.id in {'exec', 'eval'}:
+                    expression = ast.unparse(node)
+                    if (source, expression) not in REVIEWED_EXEC:
+                        raise ValueError(f"Review executable registration code: {source}:{node.lineno}")
+                    topology.append({'source': source, 'expression': expression})
+                if node.func.id == 'getattr' and len(node.args) >= 2:
+                    attribute = node.args[1].value if isinstance(node.args[1], ast.Constant) else None
+                    known_owner = ast.unparse(node.args[0]) in owners
+                    reflective_method = (attribute in REGISTRATION | META_REGISTRATION
+                                         if isinstance(attribute, str) else known_owner)
+                    if reflective_method:
+                        raise ValueError(f"Review reflective registration: {source}:{node.lineno}")
+            if isinstance(node, ast.Attribute) and node.attr in REGISTRATION | META_REGISTRATION:
+                parent = parents.get(node)
+                called = isinstance(parent, ast.Call) and parent.func is node
+                known_owner = ast.unparse(node.value) in owners
+                assigned = isinstance(parent, (ast.Assign, ast.AnnAssign)) and parent.value is node
+                if not called and (known_owner or assigned):
+                    raise ValueError(f"Review registration method reference: {source}:{node.lineno}")
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
                 continue

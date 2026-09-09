@@ -84,6 +84,44 @@ app.add_middleware(AuthMiddleware)
             with self.subTest(expression=expression), self.assertRaises(ValueError):
                 self.scan_snippet("from fastapi import FastAPI\napp = FastAPI()\n" + expression)
 
+    def test_reflective_registration_requires_review_including_imported_routers(self):
+        for text in (
+            "from fastapi import FastAPI\napp = FastAPI()\ngetattr(app, 'get')('/hidden')(handler)",
+            "from fastapi import FastAPI\napp = FastAPI()\ngetattr(app, action)('/hidden')(handler)",
+            "from somewhere import router\ngetattr(router, 'post')('/hidden')(handler)",
+            "from somewhere import router\ngetattr(router, 'include_router')(other)",
+        ):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'reflective registration'):
+                self.scan_snippet(text)
+
+    def test_bare_method_aliases_cannot_hide_http_or_middleware_registration(self):
+        for text in (
+            "from fastapi import FastAPI\napp = FastAPI()\nregister = app.get\nregister('/hidden')(handler)",
+            "from fastapi import FastAPI\napp = FastAPI()\nregister = app.add_middleware\nregister(Middleware)",
+            "from somewhere import router\nregister = router.post\nregister('/hidden')(handler)",
+        ):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'method reference'):
+                self.scan_snippet(text)
+
+    def test_custom_factory_and_executable_registration_require_review(self):
+        for text in (
+            "from fastapi import FastAPI as API\nclass Custom(API): pass\napp = Custom()",
+            "from fastapi import FastAPI\napp = FastAPI()\nexec(registration_code)",
+            "from fastapi import FastAPI\napp = FastAPI()\neval(registration_code)",
+        ):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                self.scan_snippet(text)
+
+    def test_historical_harness_exception_does_not_exempt_its_entire_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'tests/security/harness.py'
+            source.parent.mkdir(parents=True)
+            source.write_text("from fastapi import FastAPI\nexec(unreviewed_code)\n")
+            with self.assertRaisesRegex(ValueError,'executable registration'):
+                scan([source],root)
+        reviewed=[item for item in self.discovered['topology'] if item['source']=='tests/security/harness.py']
+        self.assertEqual(len(reviewed),2)
+
     def test_undecodable_candidate_fails(self):
         with self.assertRaises(SyntaxError):
             self.scan_snippet("from fastapi import FastAPI\napp = FastAPI(\n")

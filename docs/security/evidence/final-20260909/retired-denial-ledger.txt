@@ -1,0 +1,85 @@
+{"case": "anonymous/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "anonymous/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "anonymous/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "anonymous/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "anonymous/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "anonymous/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "anonymous/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "anonymous/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "anonymous/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "anonymous/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "anonymous/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "registered-unapproved/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "registered-unapproved/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "registered-unapproved/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "registered-unapproved/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "registered-unapproved/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "registered-unapproved/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "registered-unapproved/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "registered-unapproved/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "registered-unapproved/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "registered-unapproved/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "registered-unapproved/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "revoked/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "revoked/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "revoked/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "revoked/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "revoked/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "revoked/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "revoked/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "revoked/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "revoked/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "revoked/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "revoked/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "wrong-library/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "wrong-library/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "wrong-library/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "wrong-library/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "wrong-library/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "wrong-library/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "wrong-library/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "wrong-library/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "wrong-library/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "wrong-library/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "wrong-library/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-membership/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "expired-membership/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-membership/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-membership/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-membership/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-membership/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-membership/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "expired-membership/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-membership/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-membership/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "expired-membership/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "malformed-token/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "malformed-token/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "malformed-token/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "malformed-token/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "malformed-token/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "malformed-token/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "malformed-token/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "malformed-token/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "malformed-token/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "malformed-token/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "malformed-token/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-token/legacy-detail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "expired-token/original", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-token/download", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-token/video-range", "expected": "deny before protected effects", "status": 206, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-token/thumbnail", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-token/face-crop", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "file.response"], "secure": false}
+{"case": "expired-token/captions", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "db.query"], "secure": false}
+{"case": "expired-token/search-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-token/timeline-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "expired-token/album-cover-items", "expected": "deny before protected effects", "status": 200, "effects": ["db.get"], "secure": false}
+{"case": "expired-token/album-counts", "expected": "deny before protected effects", "status": 200, "effects": ["db.query"], "secure": false}
+{"case": "anonymous/operator-ingest", "expected": "deny before protected effects", "status": 200, "effects": ["ingest.invoke"], "secure": false}
+{"case": "anonymous/destructive-asset", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "files.delete", "db.commit"], "secure": false}
+{"case": "anonymous/foreign-conversation-delete", "expected": "deny before protected effects", "status": 200, "effects": ["provider.post"], "secure": false}
+{"case": "viewer/operator-ingest", "expected": "deny before protected effects", "status": 200, "effects": ["ingest.invoke"], "secure": false}
+{"case": "viewer/destructive-asset", "expected": "deny before protected effects", "status": 200, "effects": ["db.get", "files.delete", "db.commit"], "secure": false}
+{"case": "viewer/foreign-conversation-delete", "expected": "deny before protected effects", "status": 200, "effects": ["provider.post"], "secure": false}
+{"case": "voice/omitted-confirmation-token", "expected": "reject absent token", "status": "accepted", "effects": [], "secure": false}
+RETIRED HANDLER DENIAL GATE: 84/84 FAIL (historical failure ledger; active entry point tested separately)
