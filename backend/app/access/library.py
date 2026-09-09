@@ -21,6 +21,8 @@ router = APIRouter(route_class=LibraryRoute)
 SOURCE = ''' FROM assets a JOIN access_asset_libraries scope ON scope.asset_id=a.id
     WHERE scope.library_id=? AND (a.status IS NULL OR a.status='active')'''
 FIELDS = 'a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at'
+# Shared mobile response budget, measured with the actual JSON wire serializer.
+CAPTION_RESPONSE_BYTES = 512 * 1024
 
 
 def _asset(row, library_id):
@@ -74,10 +76,20 @@ class LibraryReads:
                 WHERE scope.library_id=? AND a.id=? AND (a.status IS NULL OR a.status='active')
                 AND c.superseded=0 ORDER BY c.user_edited DESC,c.id DESC LIMIT 21''',
                 (library_id, asset_id)).fetchall()
-            return {'library_id': library_id, 'asset_id': str(asset_id), 'has_more': len(rows) > 20,
-                    'items': [{'id': str(r[0]), 'text': r[1], 'truncated': r[2] > 8192,
-                               'user_edited': bool(r[3]), 'created_at': r[4], 'updated_at': r[5]}
-                              for r in rows[:20]]}
+            result = {'library_id': library_id, 'asset_id': str(asset_id),
+                      'has_more': bool(rows), 'items': []}
+            for r in rows[:20]:
+                result['items'].append({'id': str(r[0]), 'text': r[1], 'truncated': r[2] > 8192,
+                    'user_edited': bool(r[3]), 'created_at': r[4], 'updated_at': r[5]})
+                result['has_more'] = len(rows) > len(result['items'])
+                # UTF-8 and JSON escaping can exceed a character-count budget.
+                # Keep an ordered prefix of whole rows. Text truncation retains
+                # its existing meaning; has_more also reports omitted rows.
+                if len(JSONResponse(result).body) > CAPTION_RESPONSE_BYTES:
+                    result['items'].pop()
+                    result['has_more'] = True
+                    break
+            return result
 
 
 def _read(runtime, action, *args, **kwargs):

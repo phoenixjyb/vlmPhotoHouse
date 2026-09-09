@@ -182,6 +182,61 @@ class LibraryReadTests(unittest.TestCase):
         self.assertEqual(len(result['items']),20)
         self.assertTrue(all(len(r['text'])==8192 and r['truncated'] and r['user_edited'] for r in result['items']))
 
+    def replace_captions(self, texts):
+        with self.connection() as db:
+            db.execute('DELETE FROM captions WHERE asset_id=101')
+            db.executemany('''INSERT INTO captions(id,asset_id,text,model,user_edited,superseded)
+                VALUES (?,101,?,'synthetic',0,0)''',
+                [(10000+i, text) for i, text in enumerate(texts)])
+            db.commit()
+
+    def test_caption_wire_budget_counts_unicode_and_json_escaping(self):
+        # The independent client limit must cover encoded bytes, not codepoints.
+        for character in ('x', '\u5bb6', '\U0001f7e6', '\\', '"', '\x01'):
+            with self.subTest(character=repr(character)):
+                self.replace_captions([character*8192]*20)
+                response = self.get('/assets/101/captions?library=family-a')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+                self.assertEqual(int(response.headers['content-length']), len(response.content))
+                self.assertLessEqual(len(response.content), 524288)
+                result = response.json()
+                self.assertGreater(len(result['items']), 0)
+                self.assertEqual(result['has_more'], len(result['items']) < 20)
+                self.assertEqual([r['id'] for r in result['items']],
+                    [str(10019-i) for i in range(len(result['items']))])
+                self.assertTrue(all(r['text'] == character*8192 and not r['truncated']
+                                    for r in result['items']))
+
+    def test_caption_wire_budget_preserves_distinct_omission_and_truncation(self):
+        self.replace_captions(['\U0001f7e6'*9000]*21)
+        result = self.get('/assets/101/captions?library=family-a').json()
+        self.assertTrue(result['has_more'])
+        self.assertLess(len(result['items']), 20)
+        self.assertTrue(all(len(r['text']) == 8192 and r['truncated'] for r in result['items']))
+        self.replace_captions([])
+        self.assertEqual(self.get('/assets/101/captions?library=family-a').json(),
+            {'library_id': 'family-a', 'asset_id': '101', 'has_more': False, 'items': []})
+
+    def test_caption_exact_wire_limit_and_one_byte_over(self):
+        # ID 10000 is last in descending order. Fill its text to the exact
+        # consumer limit without exceeding any per-caption character bound.
+        self.replace_captions([''] + ['x'*8192]*3 + ['\x01'*8192]*10)
+        small = self.get('/assets/101/captions?library=family-a')
+        remaining = 524288 - len(small.content)
+        self.assertTrue(0 < remaining < 8192)
+        self.mutate('UPDATE captions SET text=? WHERE id=10000', ('x'*remaining,))
+        exact = self.get('/assets/101/captions?library=family-a')
+        self.assertEqual(len(exact.content), 524288)
+        self.assertEqual(len(exact.json()['items']), 14)
+        self.assertFalse(exact.json()['has_more'])
+        self.mutate('UPDATE captions SET text=? WHERE id=10000', ('x'*(remaining+1),))
+        over = self.get('/assets/101/captions?library=family-a')
+        self.assertLessEqual(len(over.content), 524288)
+        self.assertEqual(len(over.json()['items']), 13)
+        self.assertTrue(over.json()['has_more'])
+        self.assertFalse(any(r['truncated'] for r in over.json()['items']))
+
     def test_large_sqlite_ids_are_lossless_decimal_strings_for_javascript(self):
         large = 9223372036854775807
         self.mutate("INSERT INTO assets(id,path,hash_sha256,status) VALUES (?, 'synthetic/large.jpg','large','active')", (large,))
