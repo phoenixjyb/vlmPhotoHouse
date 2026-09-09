@@ -1,5 +1,8 @@
 # Closed application and authorized media — slice 4
 
+Continuation: [slice 5 — ORM metadata and real migration rehearsal](ORM_REHEARSAL.md).
+The missing-runtime and metadata gates below describe the slice-4 checkpoint.
+
 Status: **local synthetic verification of the actual `app.main` entry point. Not
 deployed, not a complete family release, and not an ORM migration rehearsal.**
 
