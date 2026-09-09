@@ -6,6 +6,7 @@ from starlette.routing import Match
 
 from .transport import PRIVACY_HEADERS, router as account_router
 from .media import router as media_router
+from .library import router as library_router
 from ..routers.ui import router as ui_router
 
 
@@ -20,7 +21,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, ui_router)
+                for router in (account_router, media_router, library_router, ui_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -42,6 +43,8 @@ class ClosedBoundary:
         if (method, path) in cls.ACCOUNT or (method == 'GET' and path in cls.UI):
             return True
         if method == 'POST' and re.fullmatch(r'/libraries/[^/]+/invitations(?:/cancel)?', path):
+            return True
+        if method == 'GET' and (path == '/assets' or re.fullmatch(r'/assets/(?:detail/[0-9]+|[0-9]+/captions)', path)):
             return True
         return method in {'GET', 'HEAD'} and bool(re.fullmatch(
             r'/(?:assets/[0-9]+/(?:media|thumbnail)|faces/[0-9]+/crop)', path))

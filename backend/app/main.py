@@ -6,6 +6,7 @@ and media runtimes; no environment/database discovery or legacy fallback exists.
 from fastapi import FastAPI
 from .access.transport import router as account_router
 from .access.media import router as media_router
+from .access.library import router as library_router
 from .access.boundary import ClosedBoundary
 from .routers.ui import router as ui_router
 
@@ -16,6 +17,7 @@ def create_app(*, access_runtime=None, media_runtime=None):
     app.state.media_runtime = media_runtime
     app.include_router(account_router)
     app.include_router(media_router)
+    app.include_router(library_router)
     app.include_router(ui_router)
     app.add_middleware(ClosedBoundary, routes=app.routes)
     return app

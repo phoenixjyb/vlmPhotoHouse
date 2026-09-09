@@ -54,7 +54,7 @@ class ImportIsolationTests(unittest.TestCase):
                 main = importlib.import_module(prefix + '.main')
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
-                self.assertEqual(len(main.app.routes), 18)
+                self.assertEqual(len(main.app.routes), 21)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)
@@ -163,7 +163,7 @@ class ClosedApplicationTests(unittest.TestCase):
         actual = [(method, route.path) for route in self.app.routes for method in route.methods]
         self.assertEqual(len(actual), len(set(actual)))
         self.assertEqual(set(actual), expected)
-        self.assertEqual(len(actual), 18)
+        self.assertEqual(len(actual), 21)
         for method, path in actual:
             sample = re.sub(r'\{[^}]+\}', '1', path)
             self.assertTrue(ClosedBoundary.allowed(method, sample))
@@ -196,7 +196,7 @@ class ClosedApplicationTests(unittest.TestCase):
         self.assert_private(response)
         self.assertEqual(self.client.get('/ui/app.js').status_code, 200)
         self.assertEqual(self.client.get('/ui/styles.css').status_code, 200)
-        self.assertEqual(self.client.get('/ui/../assets', follow_redirects=False).status_code, 403)
+        self.assertEqual(self.client.get('/ui/../assets', follow_redirects=False).status_code, 401)
 
     def test_unreviewed_route_and_shadowed_login_handler_are_denied(self):
         effects = []

@@ -23,6 +23,10 @@
   },
   "topology": [
     {
+      "source": "backend/app/access/library.py",
+      "expression": "router = APIRouter(route_class=LibraryRoute)"
+    },
+    {
       "source": "backend/app/access/media.py",
       "expression": "router = APIRouter(route_class=MediaRoute)"
     },
@@ -93,6 +97,10 @@
     {
       "source": "backend/app/main.py",
       "expression": "app.include_router(account_router)"
+    },
+    {
+      "source": "backend/app/main.py",
+      "expression": "app.include_router(library_router)"
     },
     {
       "source": "backend/app/main.py",
@@ -286,6 +294,9 @@
     {"source": "backend/app/access/media.py", "owner": "router", "method": "GET", "path": "/assets/{asset_id}/thumbnail", "handler": "thumbnail", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."},
     {"source": "backend/app/access/media.py", "owner": "router", "method": "HEAD", "path": "/assets/{asset_id}/thumbnail", "handler": "thumbnail", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."},
     {"source": "backend/app/access/media.py", "owner": "router", "method": "GET", "path": "/faces/{face_id}/crop", "handler": "crop", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."},
-    {"source": "backend/app/access/media.py", "owner": "router", "method": "HEAD", "path": "/faces/{face_id}/crop", "handler": "crop", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."}
+    {"source": "backend/app/access/media.py", "owner": "router", "method": "HEAD", "path": "/faces/{face_id}/crop", "handler": "crop", "surface": "photohouse", "capabilities": ["library.read"], "scope": "Selected library and active mapped parent asset; face crop joins face to its parent. Every GET/HEAD/Range retry checks current account/session/membership before filesystem lookup.", "current_control": "Shared policy and scoped SQLite join under a write reservation through stat/open; stream pinned descriptor; no-store; originals separately granted; cached derivatives only.", "gap": "Local synthetic full-entrypoint evidence only. Missing previews return 404; no generation. Single Range only; If-Range conservatively returns 200. No legacy mapping, real ORM, client/TLS or Windows filesystem verification."},
+    {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets", "handler": "gallery", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"},
+    {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/detail/{asset_id}", "handler": "detail", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"},
+    {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/{asset_id}/captions", "handler": "captions", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response", "gap": "Synthetic real-ASGI and migrated-SQLite only; production adapter and client acceptance pending"}
   ]
 }
