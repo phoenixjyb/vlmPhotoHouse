@@ -4,6 +4,10 @@
 on `codex/backend-android-readiness`. No deployment, mobile edits, credential/data
 access, network listener, push or merge. The Android consumer remains pinned to
 `1e394f789ff1f7cef6d9930bb541186684f5a9a0`; it does not yet consume this fix.
+The current staging candidate includes the later [launcher](STAGING_LAUNCHER.md)
+at `87a60b475b37b1d6873cd977bcb6e7254472da7e`. Its caption/application and frozen
+fixture source hashes match the tested caption commit; no Kotlin rerun is claimed
+for the launcher, which adds no API or contract changes.
 
 ## Behavior and limits
 
@@ -78,7 +82,8 @@ Java 17 for its no-network guard. The probe's explicit `--candidate` mode permit
 only the reviewed caption module/test checksum delta; all other frozen source and
 contract checks stay enforced. It records a candidate review, never a repin.
 
-The Android owner should review **`0cf5058acdb25224b26847fb55670307f8113181`**,
+The Android owner should review caption fix **`0cf5058acdb25224b26847fb55670307f8113181`**
+and current staging candidate **`87a60b475b37b1d6873cd977bcb6e7254472da7e`**,
 compare the two changed frozen source checksums, then update the shared backend
 pin/checksums, replay the 38 baseline cases and retain these boundary cases in the
 mobile test workflow. Review all pinned-source references together, including the
@@ -86,7 +91,7 @@ actual-backend integration runner. Do not make a pin gate silently accept either
 revision. This task leaves the mobile repository unchanged, so its existing strict
 verifier is expected to reject this candidate until that deliberate update.
 
-Next backend slice: explicit staging launcher/config validation and an operator
-package for the already reviewed provisioning sequence. Target/origin/audience,
+The explicit staging launcher/config validation is now implemented. Next backend
+slice: an operator package for the already reviewed provisioning sequence. Target/origin/audience,
 CPU Windows runtime lock, host/ingress isolation, backup/restore rehearsal and
 physical-phone authorization/acceptance remain open. The closed default remains.
