@@ -3,7 +3,7 @@
   "artifact_kind": "proposal_not_launch_configuration",
   "verdict": "NO_GO_REAL_PHONE",
   "deployed": "unknown",
-  "candidate_backend_commit": "18adeb6116280703f27613c8e1f0de1ed72f7345",
+  "candidate_backend_commit": "8d5e9cce77aaeb079d1dfb5801a932c2a01194d1",
   "caption_fix_commit": "0cf5058acdb25224b26847fb55670307f8113181",
   "explicit_launcher_implemented_locally": true,
   "launcher_listener_tested": false,
@@ -58,11 +58,20 @@
     "push_or_merge": false
   },
   "unmet_gates": [
-    "explicit_initialization_migration_backup_tool_and_rehearsal",
+    "reviewed_existing_database_migration_apply_and_recovery_procedure",
     "reviewed_cpu_windows_environment",
     "private_target_origin_certificate_and_audience",
     "host_and_ingress_identity",
     "backup_migration_provisioning_and_rollback_rehearsal",
     "configured_apk_and_authorized_physical_phone_acceptance"
-  ]
+  ],
+  "offline_database_preparation_implemented_locally": true,
+  "existing_database_migration_apply_implemented": false,
+  "database_preparation_scope": {
+    "initialize_new_empty": true,
+    "backup_new_file": true,
+    "migration_rehearsal_memory_only": true,
+    "input_limit_bytes": 67108864,
+    "wal_supported": false
+  }
 }

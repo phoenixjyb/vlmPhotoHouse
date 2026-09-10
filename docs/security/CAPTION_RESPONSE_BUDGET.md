@@ -93,6 +93,7 @@ does not describe the completed mobile repin. See the current backend return for
 new operator/package source identity; those additions leave frozen API hashes intact.
 
 The explicit launcher and [operator/source package](OPERATOR_TOOL.md) are now
-implemented. Explicit initialization/migration/backup tooling, target/origin/audience,
+implemented, along with [new-file initialization, backup and in-memory migration
+rehearsal](DATABASE_PREPARATION.md). Existing-database migration apply/recovery, target/origin/audience,
 CPU Windows runtime lock, host/ingress isolation, backup/restore rehearsal and
 physical-phone authorization/acceptance remain open. The closed default remains.

@@ -1,6 +1,6 @@
 # Return to Android — backend readiness, 2026-09-11
 
-**Android repin complete locally. Operator/source-package slice verified locally.
+**Android repin complete locally. Database-preparation/source-package slice verified locally.
 Real-phone credentials and deployment remain NO-GO until external gates are met.**
 
 - Android repin branch: `codex/android-backend-repin`, observed clean at
@@ -12,17 +12,17 @@ Real-phone credentials and deployment remain NO-GO until external gates are met.
   all eight verifier regression tests pass, and all ten pinned backend source hashes
   match this backend checkout. No mobile edits, APK build/install or TLS test occurred.
 - Latest backend implementation/source package:
-  **`18adeb6116280703f27613c8e1f0de1ed72f7345`**, branch
-  `codex/backend-android-readiness`. It adds offline operator commands and a source
-  package; it changes no frozen API source, wire contract or migration. The mobile
+  **`8d5e9cce77aaeb079d1dfb5801a932c2a01194d1`**, branch
+  `codex/backend-android-readiness`. It adds explicit initialization, backup and in-memory migration
+  rehearsal to the offline operator/source package; it changes no frozen API source, wire contract or migration. The mobile
   pin remains `87a60b4`. No immediate mobile change is requested by this tooling slice;
   final deployment source identity still needs coordinated review.
-- Fresh backend verification: **226 security tests pass**, including 12 operator
-  and three package tests; route completeness remains **152 entries**. The extracted
-  43-file package passed a fresh-process synthetic migration, seven in-process ASGI
-  checks and two operator commands. No listeners or live data were used.
+- Fresh backend verification: **240 security tests pass**, including 14 database-preparation,
+  12 operator and three package tests; route completeness remains **152 entries**. The extracted
+  45-file package passed three database-preparation commands, seven in-process ASGI
+  checks and three operator commands, including review of the generated backup. No listeners or live data were used.
 - Source ZIP SHA-256:
-  `9741d521cbda424656d95ff4b1ab771b36361a914518d0941beb74ab4160995c`.
+  `ea682cdac754ec510dab7846f6d2b6674fd1e88b3878d99fcb617386bd8ce8f5`.
   It contains source and a manifest only; no dependencies, database, media, private
   configuration or certificates. It is not installed or deployed.
 - The [operator tool](OPERATOR_TOOL.md) separates planning, validation, backup review,
@@ -33,13 +33,23 @@ Real-phone credentials and deployment remain NO-GO until external gates are met.
   mocked serving only. Default `app.main:app` remains closed. Required schema stays
   `b6e3f9a5c721`; actual target schema/owner/library/mappings/recovery state are unknown.
 
-Read [the current operator/package evidence](evidence/android-readiness/operator-package-validation.json)
+Read [the current database-preparation evidence](evidence/android-readiness/database-preparation-validation.json)
 and [staging decision](ANDROID_STAGING_DECISION.json). Earlier caption and launcher
 evidence remains historical, including the pre-repin probe's old consumer pin.
 
-**Next local backend work:** explicit synthetic initialization/migration/backup
-rehearsal command and CPU environment lock. The operator command assumes an already
-migrated database and separately prepared matching backup; it creates neither.
+**New local capability:** [database preparation](DATABASE_PREPARATION.md) creates a new
+empty migrated database, makes a separate private backup and rehearses migration only
+in memory. It refuses existing outputs, unknown revisions and WAL/sidecar databases;
+its current size limit is 64 MiB. Existing-database migration and restore are not implemented.
+
+**Next local backend work:** reviewed CPU environment lock and existing-database
+migration apply/recovery procedure. No Android repin is requested: all ten pinned
+backend source hashes remain unchanged. Continue Android work within the current
+synthetic scope; keep real credentials and phone connectivity gated.
+
+**Coordination:** the user requested a handoff to Android thread
+`01a08537-1f09-7bb3-9b0c-5781f1cabd60`. This document was queued to open there through
+the app file-panel tool. That is not a sent message, session wake-up or acknowledged receipt.
 
 **Still unset/unverified:** host/service identity, deployment/release approval,
 HTTPS origin/certificate/private-network behavior, approved synthetic audience,

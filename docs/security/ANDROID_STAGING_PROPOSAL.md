@@ -2,8 +2,8 @@
 
 Updated 2026-09-11. **Outcome: source preparation advanced; real-phone browsing is NO-GO.**
 Android completed its caption/launcher repin to `87a60b4`. The new
-[offline operator/source package](OPERATOR_TOOL.md) at
-`18adeb6116280703f27613c8e1f0de1ed72f7345` passes 226 security tests and an extracted
+[database-preparation/source package](DATABASE_PREPARATION.md) at
+`8d5e9cce77aaeb079d1dfb5801a932c2a01194d1` passes 240 security tests and an extracted
 package smoke test; all ten frozen backend source hashes still match the mobile
 manifest. The initial source observations and caption failure below are retained as
 historical evidence, not a claim that the new candidate still has that failure.
@@ -16,9 +16,9 @@ handoff asks for a proposal before external approval; it does not grant deployme
 
 | Question | Evidence-backed answer and remaining gate |
 | --- | --- |
-| Is the protected backend deployed? | **Unknown.** Local operator/source-package implementation is at `18adeb6116280703f27613c8e1f0de1ed72f7345`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
+| Is the protected backend deployed? | **Unknown.** Local operator/source-package implementation is at `8d5e9cce77aaeb079d1dfb5801a932c2a01194d1`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
 | What HTTPS origin should Android use? | **Unknown; do not configure credentials yet.** Exact hostname/port, system-trusted chain, DNS/private-network reachability and lifecycle must be selected/verified privately. Never infer an origin from historical host notes or reuse a test certificate. |
-| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; explicit initialization/migration/backup tooling and a reviewed CPU environment remain next. |
+| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; new-file initialization, backup and in-memory migration rehearsal are implemented; an existing-database migration apply/recovery procedure and reviewed CPU environment remain next. |
 | Is the exposure boundary correct? | Default `app.main:app` is closed: controlled synthetic `/auth/session` returns **503** without explicit runtime. The configured entry point has 23 active routes; 97 retired handlers and 32 standalone routes remain separate risks. Host ingress, other listeners, file shares and TLS forwarding have not been inspected. |
 | Who is the first audience? | **No real operator/owner/viewer/library selected.** Proposed first stage uses reserved synthetic owner/viewer labels and generated media only. Later, the owner manually issues a phone-bound invitation to a deliberately scoped viewer; no original grant is needed for Android's current browsing flow. |
 | What operations are authorized here? | Local source review, synthetic no-listener checks, proposal/doc edits and local commits. No Windows/Mac mini access, real DB/media/credentials, listener, service/account change, configured APK, phone installation, push or merge. Android's earlier fixture installation and PR publication do not transfer new authority here. |
@@ -92,7 +92,7 @@ must be supplied and reviewed locally before generating a runnable command.
 
 | Setting | Proposed requirement |
 | --- | --- |
-| Source | Candidate including operator/source packaging `18adeb6116280703f27613c8e1f0de1ed72f7345`; approved release SHA is unset. Android repinned to `87a60b4`; frozen API hashes remain identical. Coordinate final deployed source identity. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
+| Source | Candidate including operator/source packaging `8d5e9cce77aaeb079d1dfb5801a932c2a01194d1`; approved release SHA is unset. Android repinned to `87a60b4`; frozen API hashes remain identical. Coordinate final deployed source identity. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
 | Runtime | Explicit `RuntimeConfiguration(database=Path(...), web_origin=..., original_roots=(...), derived_root=...)` followed by `build_app()`. No `.env`/legacy settings/default-path discovery, schema fallback or worker startup. |
 | ASGI entry | `scripts/staging_app.py` constructs the explicit runtime from a separately selected private configuration; **stock `app.main:app` alone will not activate access**. Config syntax, mocked serving and offline operator commands are tested locally; target configuration and actual deployment remain unverified. Existing model startup scripts are unsuitable. |
 | TLS | Direct TLS at the staging ASGI server using the selected host's system-trusted certificate chain and protected private key; Android normal system trust and hostname validation. No test/user CA bypass, cleartext, redirects, path prefix or custom trust in the APK. |
@@ -114,8 +114,9 @@ untrusted HTTPS test certificates or the JVM integration harness as a deploy lau
 1. **Local release preparation (partially complete):**
    caption budget, Kotlin boundary checks, explicit launcher/config validation,
    operator commands and source packaging are implemented locally; Android repin
-   and baseline replay are complete. Prepare explicit initialization/migration/backup
-   tooling and a CPU environment lock, then review the final release identity.
+   and baseline replay are complete. New-file initialization, backup and in-memory
+   migration rehearsal now pass synthetic checks. Prepare a CPU environment lock and
+   reviewed existing-database migration apply/recovery procedure, then review release identity.
 2. **Operator target review (new scoped authority required):** establish exact host,
    staging paths/interface/port, certificate/renewal, stopped-worker procedure,
    filesystem identity/ACLs, current process versions and protected versus legacy
@@ -183,6 +184,6 @@ A staging release is not ready until all of these have evidence:
 
 Return packet is [ANDROID_READINESS_RETURN.md](ANDROID_READINESS_RETURN.md).
 This review supplies no approved origin or credential. The next local work is the
-initialization/migration/backup and CPU environment preparation; the next external step needs explicit scoped
+CPU environment lock and existing-database migration apply/recovery procedure; the next external step needs explicit scoped
 authority and private target inputs. No push, merge, deployment, service restart,
 account change or phone installation was performed.
