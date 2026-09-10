@@ -1,12 +1,11 @@
 # PH-BACKEND-ANDROID-READINESS-01 — staging readiness review
 
-2026-09-09. **Outcome: proposal prepared; real-phone browsing is NO-GO.**
-Follow-up: [caption response budget fixed locally](CAPTION_RESPONSE_BUDGET.md) at
-`0cf5058acdb25224b26847fb55670307f8113181` with 201 backend tests and 14 in-memory
-Kotlin adapter cases passing. Android still pins `1e394f7`; coordinated review/repin
-is pending. [The explicit launcher](STAGING_LAUNCHER.md) follows at
-`87a60b475b37b1d6873cd977bcb6e7254472da7e`; all 211 security tests pass, including
-10 launcher tests with serving mocked. The initial source observations and failure below are retained as
+Updated 2026-09-11. **Outcome: source preparation advanced; real-phone browsing is NO-GO.**
+Android completed its caption/launcher repin to `87a60b4`. The new
+[offline operator/source package](OPERATOR_TOOL.md) at
+`18adeb6116280703f27613c8e1f0de1ed72f7345` passes 226 security tests and an extracted
+package smoke test; all ten frozen backend source hashes still match the mobile
+manifest. The initial source observations and caption failure below are retained as
 historical evidence, not a claim that the new candidate still has that failure.
 Deployment identity, origin, host configuration and test audience remain unknown.
 This session has not deployed the protected backend. No live host, database, media,
@@ -17,9 +16,9 @@ handoff asks for a proposal before external approval; it does not grant deployme
 
 | Question | Evidence-backed answer and remaining gate |
 | --- | --- |
-| Is the protected backend deployed? | **Unknown.** Local backend source is verified at `1e394f789ff1f7cef6d9930bb541186684f5a9a0`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
+| Is the protected backend deployed? | **Unknown.** Local operator/source-package implementation is at `18adeb6116280703f27613c8e1f0de1ed72f7345`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
 | What HTTPS origin should Android use? | **Unknown; do not configure credentials yet.** Exact hostname/port, system-trusted chain, DNS/private-network reachability and lifecycle must be selected/verified privately. Never infer an origin from historical host notes or reuse a test certificate. |
-| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Local audited services exist, but no reviewed operator command/package is shipped. |
+| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; explicit initialization/migration/backup tooling and a reviewed CPU environment remain next. |
 | Is the exposure boundary correct? | Default `app.main:app` is closed: controlled synthetic `/auth/session` returns **503** without explicit runtime. The configured entry point has 23 active routes; 97 retired handlers and 32 standalone routes remain separate risks. Host ingress, other listeners, file shares and TLS forwarding have not been inspected. |
 | Who is the first audience? | **No real operator/owner/viewer/library selected.** Proposed first stage uses reserved synthetic owner/viewer labels and generated media only. Later, the owner manually issues a phone-bound invitation to a deliberately scoped viewer; no original grant is needed for Android's current browsing flow. |
 | What operations are authorized here? | Local source review, synthetic no-listener checks, proposal/doc edits and local commits. No Windows/Mac mini access, real DB/media/credentials, listener, service/account change, configured APK, phone installation, push or merge. Android's earlier fixture installation and PR publication do not transfer new authority here. |
@@ -93,9 +92,9 @@ must be supplied and reviewed locally before generating a runnable command.
 
 | Setting | Proposed requirement |
 | --- | --- |
-| Source | Candidate with caption fix and launcher `87a60b475b37b1d6873cd977bcb6e7254472da7e`; approved release SHA is unset. Android pin update remains pending; later operator/package work needs a reviewed release. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
+| Source | Candidate including operator/source packaging `18adeb6116280703f27613c8e1f0de1ed72f7345`; approved release SHA is unset. Android repinned to `87a60b4`; frozen API hashes remain identical. Coordinate final deployed source identity. Export/review exact immutable Git objects, never a moving master or dirty worktree. |
 | Runtime | Explicit `RuntimeConfiguration(database=Path(...), web_origin=..., original_roots=(...), derived_root=...)` followed by `build_app()`. No `.env`/legacy settings/default-path discovery, schema fallback or worker startup. |
-| ASGI entry | `scripts/staging_app.py` constructs the explicit runtime from a separately selected private configuration; **stock `app.main:app` alone will not activate access**. Config syntax and mocked serving are tested locally; the operator tool, target configuration and actual deployment remain unverified. Existing model startup scripts are unsuitable. |
+| ASGI entry | `scripts/staging_app.py` constructs the explicit runtime from a separately selected private configuration; **stock `app.main:app` alone will not activate access**. Config syntax, mocked serving and offline operator commands are tested locally; target configuration and actual deployment remain unverified. Existing model startup scripts are unsuitable. |
 | TLS | Direct TLS at the staging ASGI server using the selected host's system-trusted certificate chain and protected private key; Android normal system trust and hostname validation. No test/user CA bypass, cleartext, redirects, path prefix or custom trust in the APK. |
 | Network | Explicit private/VPN interface and reviewed staging port; firewall/ACL permits only the approved test network/devices. No `0.0.0.0`/`::` wildcard bind, public router forwarding or implicit existing-service route. |
 | Host/origin | One canonical HTTPS origin matches Android and `web_origin` exactly. Omit explicit default `:443`; retain a selected nondefault port. No path/query/fragment/userinfo. Verify actual Host serialization on the phone. |
@@ -113,10 +112,10 @@ untrusted HTTPS test certificates or the JVM integration harness as a deploy lau
 ## Sequence, backups and rollback
 
 1. **Local release preparation (partially complete):**
-   caption budget, Kotlin boundary checks and explicit launcher/config validation
-   are implemented locally. Coordinate Android review/repin and baseline replay
-   with its owner; prepare the operator provisioning tool and pin
-   a CPU runtime; review source and update the frozen consumer pin coherently.
+   caption budget, Kotlin boundary checks, explicit launcher/config validation,
+   operator commands and source packaging are implemented locally; Android repin
+   and baseline replay are complete. Prepare explicit initialization/migration/backup
+   tooling and a CPU environment lock, then review the final release identity.
 2. **Operator target review (new scoped authority required):** establish exact host,
    staging paths/interface/port, certificate/renewal, stopped-worker procedure,
    filesystem identity/ACLs, current process versions and protected versus legacy
@@ -184,6 +183,6 @@ A staging release is not ready until all of these have evidence:
 
 Return packet is [ANDROID_READINESS_RETURN.md](ANDROID_READINESS_RETURN.md).
 This review supplies no approved origin or credential. The next local work is the
-Android repin and operator/package preparation; the next external step needs explicit scoped
+initialization/migration/backup and CPU environment preparation; the next external step needs explicit scoped
 authority and private target inputs. No push, merge, deployment, service restart,
 account change or phone installation was performed.

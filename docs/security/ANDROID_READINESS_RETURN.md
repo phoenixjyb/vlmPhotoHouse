@@ -1,53 +1,53 @@
-# Return to Android — PH-BACKEND-ANDROID-READINESS-01
+# Return to Android — backend readiness, 2026-09-11
 
-**Status: review/proposal complete; NO-GO for real-phone credentials.**
+**Android repin complete locally. Operator/source-package slice verified locally.
+Real-phone credentials and deployment remain NO-GO until external gates are met.**
 
-- Deployed: **unknown**, no live host checked; this session performed no deployment.
-- Candidate backend: **`87a60b475b37b1d6873cd977bcb6e7254472da7e`**, including
-  caption fix `0cf5058` and the explicit staging launcher.
-  Android's frozen consumer still pins `1e394f789ff1f7cef6d9930bb541186684f5a9a0`.
-  Actual deployed/approved release: **unknown/unset**.
-- HTTPS origin/certificate/network: **not established**. Do not configure a private
-  origin or enable real credentials from this report. Private configuration remains
-  with the operator/Android owner after target approval.
-- Migration: runtime requires `b6e3f9a5c721`; actual target unverified.
-  Owner/library/mappings, backups and restored-access state: unverified.
-- Audience: propose synthetic owner/viewer and generated media for first isolated
-  staging; no real owner, phone login, invitation or library has been selected.
-- Local evidence: **211 backend security tests pass**, including 10 launcher tests.
-  **14 actual Kotlin adapter cases pass** for caption fix `0cf5058`; its application
-  and frozen fixture source hashes are unchanged by the launcher commit. No sockets
-  were opened. The former 657749-byte
-  caption case is now 493328 bytes with 15 whole rows and `has_more=true`.
-  Exact-limit responses pass and oversized responses remain rejected. Eight
-  unchanged backend source hashes/eight contract hashes match; two reviewed
-  backend hashes changed. The earlier 38-case pinned replay remains baseline
-  evidence; Android repinning and replay against the new candidate remain pending.
-  Earlier TLS/emulator/CI reports are not new runs or remote-status verification.
-- **Compatibility fix delivered locally; consumer update pending.** Read
-  [the caption-budget handoff](CAPTION_RESPONSE_BUDGET.md) for semantics, exact
-  commit, evidence and reproduction. Keep the client limit and explicitly repin
-  reviewed backend source/contract checksums before consuming this fix.
-- **Launcher delivered locally:** [explicit staging launcher](STAGING_LAUNCHER.md)
-  validates only the selected config in `--check-config` mode. `--serve` remains a
-  separate operation; only its mocked invocation was tested. No certificate, DB,
-  listener or host acceptance is implied by configuration validation.
-- Authorized next work here: local provisioning/operator-package and runtime-lock review
-  and synthetic no-listener tests. No new host/deployment/account/phone/push/merge
-  authority is granted by this return.
+- Android repin branch: `codex/android-backend-repin`, observed clean at
+  `1d4fc49c043d553df510c52b9a368ee0313398c6`. Its return reports the coordinated pin
+  to **`87a60b475b37b1d6873cd977bcb6e7254472da7e`**, 38 unchanged ASGI cases, 211
+  backend tests and 14 Kotlin boundary checks. This session read that return and
+  structured evidence; it did not rerun those historical integration checks.
+- Fresh mobile checks: the 12-operation/38-case/eight-file frozen contract validates,
+  all eight verifier regression tests pass, and all ten pinned backend source hashes
+  match this backend checkout. No mobile edits, APK build/install or TLS test occurred.
+- Latest backend implementation/source package:
+  **`18adeb6116280703f27613c8e1f0de1ed72f7345`**, branch
+  `codex/backend-android-readiness`. It adds offline operator commands and a source
+  package; it changes no frozen API source, wire contract or migration. The mobile
+  pin remains `87a60b4`. No immediate mobile change is requested by this tooling slice;
+  final deployment source identity still needs coordinated review.
+- Fresh backend verification: **226 security tests pass**, including 12 operator
+  and three package tests; route completeness remains **152 entries**. The extracted
+  43-file package passed a fresh-process synthetic migration, seven in-process ASGI
+  checks and two operator commands. No listeners or live data were used.
+- Source ZIP SHA-256:
+  `9741d521cbda424656d95ff4b1ab771b36361a914518d0941beb74ab4160995c`.
+  It contains source and a manifest only; no dependencies, database, media, private
+  configuration or certificates. It is not installed or deployed.
+- The [operator tool](OPERATOR_TOOL.md) separates planning, validation, backup review,
+  application and receipt lookup. It requires exact plan and cross-command review
+  digests, uses protected password prompts and preserves the existing atomic service
+  checks. Review references remain audit labels, not operator authentication.
+- The [launcher](STAGING_LAUNCHER.md) remains tested through config validation and
+  mocked serving only. Default `app.main:app` remains closed. Required schema stays
+  `b6e3f9a5c721`; actual target schema/owner/library/mappings/recovery state are unknown.
 
-Read [the staging proposal](ANDROID_STAGING_PROPOSAL.md),
-[decision record](ANDROID_STAGING_DECISION.json) and
-[probe evidence](evidence/android-readiness/source-asgi-probe.json).
-The [latest local validation and changed-file manifest](evidence/android-readiness/local-validation.json)
-separates the new checks from retained historical evidence.
-The proposal contains target/configuration choices, backup/migration/provisioning,
-rollback, phone acceptance and explicit unset operator inputs. Its target is a
-proposal, not confirmation that a host, certificate or unused port is available.
+Read [the current operator/package evidence](evidence/android-readiness/operator-package-validation.json)
+and [staging decision](ANDROID_STAGING_DECISION.json). Earlier caption and launcher
+evidence remains historical, including the pre-repin probe's old consumer pin.
 
-Preserve all existing mobile and backend worktrees. Do not change the frozen
-consumer files or launch the loopback TLS suite as part of this no-listener task.
-When a release/origin/audience and authority are established, the Android owner
-configures only ignored local properties, rebuilds privately and records a new
-APK/installed-build identity before phone acceptance. Public PR/check/merge status
-requires a separately current review; earlier publication is not merge authority.
+**Next local backend work:** explicit synthetic initialization/migration/backup
+rehearsal command and CPU environment lock. The operator command assumes an already
+migrated database and separately prepared matching backup; it creates neither.
+
+**Still unset/unverified:** host/service identity, deployment/release approval,
+HTTPS origin/certificate/private-network behavior, approved synthetic audience,
+real backup/restore and provisioning, legacy/standalone ingress isolation and
+physical-phone acceptance. No Windows/Mac mini access, real DB/media/credentials,
+service operation, push or merge was performed or authorized by this return.
+
+Preserve existing worktrees. Once target/origin/audience and scoped authority are
+established, the Android owner privately configures and rebuilds the connected APK,
+records its new identity and performs separately authorized phone acceptance.
+Publication/merge status was not rechecked; earlier publication is not merge authority.

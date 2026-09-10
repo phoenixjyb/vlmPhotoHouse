@@ -2,9 +2,10 @@
 
 2026-09-09. Implemented locally at **`0cf5058acdb25224b26847fb55670307f8113181`**
 on `codex/backend-android-readiness`. No deployment, mobile edits, credential/data
-access, network listener, push or merge. The Android consumer remains pinned to
-`1e394f789ff1f7cef6d9930bb541186684f5a9a0`; it does not yet consume this fix.
-The current staging candidate includes the later [launcher](STAGING_LAUNCHER.md)
+access, network listener, push or merge. Update on 2026-09-11: Android completed
+the coordinated repin to `87a60b475b37b1d6873cd977bcb6e7254472da7e` in its isolated
+worktree at `1d4fc49c043d553df510c52b9a368ee0313398c6`.
+The first staging candidate includes the later [launcher](STAGING_LAUNCHER.md)
 at `87a60b475b37b1d6873cd977bcb6e7254472da7e`. Its caption/application and frozen
 fixture source hashes match the tested caption commit; no Kotlin rerun is claimed
 for the launcher, which adds no API or contract changes.
@@ -82,16 +83,16 @@ Java 17 for its no-network guard. The probe's explicit `--candidate` mode permit
 only the reviewed caption module/test checksum delta; all other frozen source and
 contract checks stay enforced. It records a candidate review, never a repin.
 
-The Android owner should review caption fix **`0cf5058acdb25224b26847fb55670307f8113181`**
-and current staging candidate **`87a60b475b37b1d6873cd977bcb6e7254472da7e`**,
-compare the two changed frozen source checksums, then update the shared backend
-pin/checksums, replay the 38 baseline cases and retain these boundary cases in the
-mobile test workflow. Review all pinned-source references together, including the
-actual-backend integration runner. Do not make a pin gate silently accept either
-revision. This task leaves the mobile repository unchanged, so its existing strict
-verifier is expected to reject this candidate until that deliberate update.
+The Android owner reviewed caption fix **`0cf5058acdb25224b26847fb55670307f8113181`**
+and staging candidate **`87a60b475b37b1d6873cd977bcb6e7254472da7e`**, updated the
+shared pin/checksums and replayed the 38 baseline cases unchanged. Its return also
+records 14 Kotlin boundary cases and eight verifier regressions, retaining one
+strict accepted backend pin. The pre-repin probe above still deliberately requires
+the original consumer snapshot; its historical `consumer_repin_completed=false`
+does not describe the completed mobile repin. See the current backend return for
+new operator/package source identity; those additions leave frozen API hashes intact.
 
-The explicit staging launcher/config validation is now implemented. Next backend
-slice: an operator package for the already reviewed provisioning sequence. Target/origin/audience,
+The explicit launcher and [operator/source package](OPERATOR_TOOL.md) are now
+implemented. Explicit initialization/migration/backup tooling, target/origin/audience,
 CPU Windows runtime lock, host/ingress isolation, backup/restore rehearsal and
 physical-phone authorization/acceptance remain open. The closed default remains.

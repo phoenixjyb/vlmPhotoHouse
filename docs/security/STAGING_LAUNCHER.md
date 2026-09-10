@@ -89,8 +89,8 @@ Run with the existing repo-root security environment:
 No live runtime, TLS, Windows, emulator or device acceptance was run. In particular,
 this launcher does not establish a service account, backup, owner/library mapping,
 certificate or ingress boundary. It does not reopen quarantined restored access.
-The next local backend step is the explicit operator provisioning/package workflow
-and CPU runtime lock, using the existing sealed-plan/apply services. The Android
-owner still needs to review/repin the [caption fix](CAPTION_RESPONSE_BUDGET.md).
+The [operator provisioning/source package](OPERATOR_TOOL.md) is now implemented,
+and Android completed the local caption-fix repin. The next local backend step is
+explicit initialization/migration/backup tooling and the CPU environment lock.
 The [staging proposal](ANDROID_STAGING_PROPOSAL.md) retains the external authority,
 target, backup/migration/provisioning, rollback and phone gates.
