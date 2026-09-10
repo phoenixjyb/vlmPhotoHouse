@@ -94,7 +94,7 @@ files; choose a fresh output after review rather than overwriting them.
 `scripts/build_staging_package.py --commit "$PHOTOHOUSE_RELEASE_SHA" --out
 "$PHOTOHOUSE_SOURCE_ZIP"` accepts a full immutable local Git commit. A fixed
 allowlist selects the protected app/UI, metadata/migrations, staging launcher,
-operator tool, this guide and the incomplete config example. It reads Git blobs,
+operator and database-preparation tools, their guides and the incomplete config example. It reads Git blobs,
 not working-tree files. Symlinks, missing files and oversized source blobs fail.
 
 The deterministic ZIP includes `manifest.json` with source SHA and per-file SHA-256;
@@ -105,10 +105,12 @@ against independently reviewed evidence before later transfer/extraction; a mani
 is not a signature or authority. Existing output files are never overwritten.
 
 The package needs an independently reviewed CPU-only environment; it is **not a
-Windows runtime lock or an installable service**. It includes migration source for
-review/rehearsal, not a migration command. Do not invoke generic Alembic with ambient
-DATABASE_URL: the selected migration target must be supplied programmatically via
-an explicit connection. Runtime/application never creates or upgrades the database.
+Windows runtime lock or an installable service**. The separate
+[database preparation tool](DATABASE_PREPARATION.md) initializes new empty databases,
+creates private backups and rehearses migrations only in memory. It never upgrades
+an existing file. Do not invoke generic Alembic with ambient DATABASE_URL:
+preparation uses an explicit in-memory connection. Runtime/application never
+creates or upgrades the database.
 Required schema remains `b6e3f9a5c721`.
 
 `scripts/staging_app.py --config "$PHOTOHOUSE_PRIVATE_STAGING_CONFIG" --check-config`
@@ -131,12 +133,13 @@ Run focused tests using `-m unittest discover -s tests/security -p test_operator
 and `-p test_staging_package.py -v`. The repository retains the full security suite
 and package smoke harness outside the runtime ZIP.
 
-No backup creation, restore, quarantine CLI, password reset, access reopening,
-schema application command, production-size rehearsal, dependency installation,
+No restore, quarantine CLI, password reset, access reopening,
+existing-database migration application, production-size rehearsal, dependency installation,
 Windows/macOS service setup or phone installation is supplied by this slice.
 Existing recovery services remain available only through their separately reviewed
 offline APIs. Restored databases must stay closed until quarantine/reopening review;
 this tool cannot reconstruct post-backup revocations or certify an old backup safe.
-Next local work is an explicit synthetic initialization/migration/backup rehearsal
-command and the CPU environment lock. Host/HTTPS/audience selection, legacy and
+Initialization, backup and in-memory rehearsal now have a separate tested command.
+Next local work is the CPU environment lock and a reviewed existing-database migration
+apply/recovery procedure. Host/HTTPS/audience selection, legacy and
 standalone service isolation and live/device acceptance remain separate gates.

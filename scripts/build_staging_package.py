@@ -31,8 +31,9 @@ FILES = tuple(sorted([
         'a1c9d4e5f8b2_face_assignment_events','a5d2e8f4b610_legacy_read_schema',
         'b6e3f9a5c721_offline_receipts','c4e7a2d9f1b3_versioned_face_embeddings',
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
-    'scripts/staging_app.py', 'scripts/provision_access.py',
+    'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
+    'docs/security/DATABASE_PREPARATION.md',
 ]))
 
 
