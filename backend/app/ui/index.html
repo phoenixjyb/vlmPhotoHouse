@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="app_title">PhotoHouse</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260908-warm" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260911-viewer" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -631,9 +631,20 @@
         <button id="btn-preview-close" class="preview-close" type="button" data-i18n="close_preview">Close</button>
       </div>
     </div>
+    <div class="viewer-tools">
+      <div class="viewer-size-controls">
+        <button id="btn-viewer-fit" class="preview-close" type="button" data-i18n="viewer_fit" aria-pressed="true">Fit</button>
+        <button id="btn-viewer-actual" class="preview-close" type="button" data-i18n="viewer_actual" aria-pressed="false">Actual size</button>
+        <button id="btn-viewer-zoom-out" class="preview-close" type="button" aria-label="Zoom out">−</button>
+        <output id="viewer-zoom" aria-label="Zoom level">—</output>
+        <button id="btn-viewer-zoom-in" class="preview-close" type="button" aria-label="Zoom in">+</button>
+        <button id="btn-viewer-fullscreen" class="preview-close" type="button" data-i18n="viewer_fullscreen" aria-pressed="false">Full screen</button>
+      </div>
+      <span id="viewer-image-status" class="viewer-hint" role="status"></span>
+    </div>
     <div class="viewer-stage">
       <button id="btn-preview-prev" class="viewer-arrow" type="button" aria-label="Previous photo">&#8592;</button>
-      <div id="preview-modal-body" class="preview-modal-body"></div>
+      <div id="preview-modal-body" class="preview-modal-body" tabindex="0" role="region" aria-label="Photo viewer"></div>
       <button id="btn-preview-next" class="viewer-arrow" type="button" aria-label="Next photo">&#8594;</button>
     </div>
     <div id="preview-caption" class="viewer-caption" tabindex="0" role="region" aria-label="Photo description"></div>
@@ -644,6 +655,6 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script src="/ui/app.js?v=20260908-warm" defer></script>
+  <script src="/ui/app.js?v=20260911-face-people" defer></script>
 </body>
 </html>

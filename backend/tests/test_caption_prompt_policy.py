@@ -9,6 +9,9 @@ from app.caption_policy import (
     bilingual_caption_policy_matches,
     build_caption_retry_prompt,
     correct_chinese_policy_translation,
+    factual_rewrite_caption_prompt,
+    infant_care_allowed,
+    infant_care_caption_prompt,
     neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
@@ -16,6 +19,16 @@ from app.caption_policy import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_factual_rewrite_preserves_contract_and_omits_uncertain_claims():
+    prompt = factual_rewrite_caption_prompt(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert prompt.startswith(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert 'VISIBLE-FACTS REVIEW' in prompt
+    assert 'Omit uncertain details entirely' in prompt
+    assert 'Do not turn an uncertain claim into a confident assertion' in prompt
+    assert 'EN: ...' in prompt and 'ZH-CN: ...' in prompt
+    assert bilingual_caption_issues('EN: A person is possibly recording.\n\nZH-CN: 一位成人可能正在拍摄。') == ['english_policy', 'chinese_policy']
 
 
 def test_default_prompt_comes_from_canonical_bilingual_policy():
@@ -171,3 +184,58 @@ def test_legacy_monolingual_word_cap_is_unchanged():
     result = truncate_caption_text(text, 120)
 
     assert len(result.split()) == 120
+
+
+def test_infant_care_exception_requires_exact_operator_asset_allowlist():
+    assert infant_care_allowed(101, '101, 202')
+    assert not infant_care_allowed(102, '101,202')
+    assert not infant_care_allowed(101)
+    for config in ('*', '101,', '101,all', '0101', '-1', '1e2', '１０１', str(2**63), '1' * 4097):
+        assert not infant_care_allowed(101, config)
+    for asset_id in (True, '101', 0, -1, 2**63):
+        assert not infant_care_allowed(asset_id, '101')
+
+
+def test_infant_care_words_are_allowed_only_with_explicit_exception():
+    captions = (
+        'EN: A baby wears a diaper on a pale blanket.\n\nZH-CN: 一个婴儿穿着尿布躺在浅色毯子上。',
+        'EN: A baby with no clothing lies on a blanket.\n\nZH-CN: 一个没穿衣服的婴儿躺在毯子上。',
+        'EN: A baby without clothing lies on a blanket.\n\nZH-CN: 一个没穿衣服的婴儿躺在毯子上。',
+    )
+    for caption in captions:
+        assert bilingual_caption_issues(caption) == ['english_policy', 'chinese_policy']
+        assert bilingual_caption_issues(caption, allow_infant_care=True) == []
+        assert bilingual_caption_issue_summary(caption, allow_infant_care=True) == ''
+        assert bilingual_caption_issues(caption, allow_infant_care='true')
+
+
+def test_infant_care_exception_preserves_other_policy_and_format_checks():
+    caption = 'EN: A baby in a diaper is possibly recording.\n\nZH-CN: 一个穿尿布的婴儿可能正在录像。'
+    assert bilingual_caption_policy_matches(caption, allow_infant_care=True) == {
+        'english_policy': ['possibly', 'recording'], 'chinese_policy': ['可能', '录像'],
+    }
+    assert bilingual_caption_issues('EN: A baby wears a diaper.', allow_infant_care=True) == ['format']
+    assert bilingual_caption_issues('EN: A baby wears a diaper.\n\nZH-CN: untranslated', allow_infant_care=True) == ['chinese_script']
+    assert bilingual_caption_issues('EN: A naked person.\n\nZH-CN: 一位赤裸的成人。', allow_infant_care=True) == ['english_policy', 'chinese_policy']
+
+
+def test_infant_care_translation_keeps_permitted_words_but_blocks_speculation():
+    calls = []
+    caption = 'EN: A baby wears a diaper.\n\nZH-CN: 一个婴儿可能穿着尿布。'
+    def translate(english, avoid_terms):
+        calls.append((english, avoid_terms))
+        return '一个婴儿穿着尿布。'
+    result = correct_chinese_policy_translation(caption, translate, allow_infant_care=True)
+    assert result == 'EN: A baby wears a diaper.\n\nZH-CN: 一个婴儿穿着尿布。'
+    assert calls == [('A baby wears a diaper.', [t for t in CHINESE_POLICY_TERMS if t not in {'尿布', '没穿衣服'}])]
+    assert bilingual_caption_issues(result, allow_infant_care=True) == []
+
+
+def test_infant_care_prompt_exception_is_retained_in_correction():
+    prompt = infant_care_caption_prompt(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert prompt.startswith(DEFAULT_DETAILED_CAPTION_PROMPT)
+    assert 'this image only' in prompt
+    assert 'without intimate anatomical detail or sexual framing' in prompt
+    retry = build_caption_retry_prompt(prompt, ['format'], 'invalid')
+    assert 'Owner-reviewed baby-care exception' in retry
+    assert 'Include both paragraphs' in retry
