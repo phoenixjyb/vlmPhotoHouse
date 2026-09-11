@@ -1,10 +1,10 @@
 # Home TV backend readiness — Android integration may proceed
 
-**Latest pilot status:** the user has since authorized the bounded synthetic LAN
-deployment through the Android task. The earlier preparation-only authorization
-statements below describe that prior milestone. Current preflight is blocked by
-direct Windows SSH authentication and unresolved normal local DNS. See the
-[pilot return](HOME_TV_LAN_PILOT_RETURN.md); no new feed has been started.
+**Latest pilot status:** the authorized Windows synthetic pilot passed 37 real HTTPS
+checks. It is now stopped with temporary firewall rules removed; normal projector
+DNS and device acceptance remain pending. Direct SSH is resolved. See the
+[pilot return](HOME_TV_LAN_PILOT_RETURN.md). The preparation-only authorization and
+local-packaging statements below describe the earlier readiness milestone.
 
 **The anonymous feed contract is frozen and ready for local Android integration.
 Synthetic LAN deployment is planned, not authorized or executed by this follow-up.**
@@ -98,8 +98,9 @@ approval. No serving origin is approved by this note.
 
 ## Concrete synthetic LAN deployment sequence
 
-The [machine-readable plan](home-feed-deployment-plan.json) leaves every actual
-host/origin/operator input unresolved. A private proposal suggests reusing the
+The [machine-readable plan](home-feed-deployment-plan.json) retains actual
+host/origin/operator values only in the private handoff and records current gates.
+The original private proposal suggested reusing the
 existing Windows host with a distinct home-feed port; all historical values require
 fresh verification after authority. The proposed task must be independent of the
 protected API and ongoing caption runtime.

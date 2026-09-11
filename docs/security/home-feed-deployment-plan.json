@@ -14,8 +14,10 @@
       101
     ],
     "manifest": "home-feed-manifest.example.json",
-    "revision": 1,
-    "originals_allowed": false
+    "revision": 4,
+    "originals_allowed": false,
+    "packaged_manifest_revision": 1,
+    "manifest_role": "immutable initial package fixture; current private publication revision recorded separately"
   },
   "private_target_inputs": {
     "host_identity": null,
@@ -32,13 +34,12 @@
   },
   "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
   "unresolved_gates": [
-    "working authorized Windows SSH route; relay exception pending",
-    "current host/interface/port identity",
-    "normal projector DNS route without public forwarding",
-    "current certificate/key ACL and client system trust",
-    "LAN/guest/outside isolation including NAT/proxy/SNAT",
-    "new task start/stop and certificate reload lifecycle",
-    "installed projector artifact and visible acceptance"
+    "JMGO network identity and normal DNS controls",
+    "normal client local hostname route",
+    "selected LAN guest and outside isolation including proxy or SNAT paths",
+    "reviewed client admission and scoped rules before resuming service",
+    "configured TV APK identity and physical JMGO acceptance",
+    "managed long-term startup and renewed-certificate reload ownership"
   ],
   "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
   "archive_bytes": 596784,
@@ -66,8 +67,30 @@
     "scope": "separate synthetic selected home-LAN deployment only",
     "authority": "user continuation relayed by Android task after local review",
     "private_handoff_reference": "HOME-FEED-E6B2827-LAN-PILOT",
-    "status": "preflight in progress; direct SSH authentication rejected; normal DNS is public",
+    "status": "Windows staged and diagnostic HTTPS verified; task stopped pending normal DNS and TV inputs",
     "no_real_selection": true,
     "preserve_caption_and_protected_services": true
-  }
+  },
+  "windows_staging_verified": true,
+  "diagnostic_feed_was_served": true,
+  "actual_feed_served_semantics": "current listener state; diagnostic serving history is recorded separately",
+  "remaining_gates": [
+    "JMGO network identity and normal DNS controls",
+    "normal client local hostname route",
+    "selected LAN guest and outside isolation including proxy or SNAT paths",
+    "reviewed client admission and scoped rules before resuming service",
+    "configured TV APK identity and physical JMGO acceptance",
+    "managed long-term startup and renewed-certificate reload ownership"
+  ],
+  "private_target_inputs_note": "Exact resolved values are retained only in the private handoff; null values here do not mean every input is unknown.",
+  "resolved_private_inputs": [
+    "host_identity",
+    "bind_address_and_port",
+    "certificate_and_key_reference",
+    "service_principal",
+    "task_and_release_path",
+    "approved_operator",
+    "authorized_window"
+  ],
+  "pilot_receipt": "evidence/home-tv-feed-readiness/windows-lan-pilot.json"
 }
