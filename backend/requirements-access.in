@@ -1,0 +1,8 @@
+# Protected API and offline operator only. No worker, model, image generation, or server extras.
+# Preserve API pins except Starlette: 1.0.0 has published advisories; 1.3.1 is patched.
+fastapi==0.135.2
+starlette==1.3.1
+pydantic==2.12.5
+SQLAlchemy==2.0.52
+alembic==1.19.2
+uvicorn==0.52.4

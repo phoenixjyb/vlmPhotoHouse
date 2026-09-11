@@ -1,7 +1,3 @@
-# Synthetic CPU-only security harness. No app/model runtime dependency set.
-SQLAlchemy==2.0.52
-alembic==1.19.2
-fastapi==0.135.2
-starlette==1.0.0
-httpx==0.28.1
-pydantic==2.12.5
+# Compatibility entry point for the synthetic harness; use hash-checking installs.
+# The old Starlette 1.0.0 pin has published advisories and is superseded.
+-r requirements-access-test.lock

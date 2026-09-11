@@ -91,8 +91,14 @@ this launcher does not establish a service account, backup, owner/library mappin
 certificate or ingress boundary. It does not reopen quarantined restored access.
 The [operator provisioning/source package](OPERATOR_TOOL.md) is now implemented,
 and Android completed the local caption-fix repin. The next local backend step is
-the CPU environment lock and reviewed existing-database migration apply/recovery.
+reviewed existing-database migration apply/recovery.
 [Database preparation](DATABASE_PREPARATION.md) now supports new empty initialization,
 private backup and in-memory rehearsal, with synthetic evidence only.
 The [staging proposal](ANDROID_STAGING_PROPOSAL.md) retains the external authority,
 target, backup/migration/provisioning, rollback and phone gates.
+
+## CPU dependency prerequisite
+
+The [CPU environment lock and offline probe](CPU_ENVIRONMENT.md) now define the
+minimal dependency set. Verify a fresh release environment before the separate
+launcher step. This is not an automatic launcher hook or Windows deployment proof.

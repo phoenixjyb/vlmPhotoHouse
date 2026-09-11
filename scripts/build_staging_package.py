@@ -32,6 +32,10 @@ FILES = tuple(sorted([
         'b6e3f9a5c721_offline_receipts','c4e7a2d9f1b3_versioned_face_embeddings',
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
+    'scripts/check_access_environment.py',
+    'backend/requirements-access.in', 'backend/requirements-access.lock',
+    'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
+    'docs/security/CPU_ENVIRONMENT.md',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
     'docs/security/DATABASE_PREPARATION.md',
 ]))
