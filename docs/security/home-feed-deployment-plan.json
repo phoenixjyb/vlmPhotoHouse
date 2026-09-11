@@ -34,9 +34,9 @@
   },
   "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
   "unresolved_gates": [
-    "Android mapped APK source/identity and canonical-address/hostname/TLS validation",
-    "Physical JMGO install and app connection, remote/image/slideshow/lifecycle acceptance",
-    "Confirm prior projector DNS Save state before any resolver retirement",
+    "Physical JMGO install and app-scoped mapped HTTPS connection with platform trust",
+    "Physical remote/image/slideshow/reconnect/sleep-wake/disable acceptance",
+    "Confirm prior projector DNS Save state before resolver retirement",
     "Broader audience/network acceptance and durable startup/renewal remain separate"
   ],
   "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
@@ -53,32 +53,37 @@
   ],
   "android_local_integration": {
     "complete": true,
-    "source_commit": "e8ab9be3c5497778783edf1b4a009707922248d1",
-    "evidence_commit": "c866c74de881a24714282bbb8c426f7c29d03103",
+    "source_commit": "c42918a54991895a3869977f92aa29ffee2377e5",
+    "evidence_commit": "2b2ebf88dc9699860438438d43344eb48aefdfcf",
     "apk_sha256": "3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1",
     "review_receipt": "evidence/home-tv-feed-readiness/android-review.json",
     "configured_apk_ready": true,
     "physical_device_accepted": false,
     "configured_apk_network_verified": false,
-    "configured_apk_sha256": "15680809a11ab00639046bf2cca30953d66fea4b84061bd4437c1edfdbcca795",
-    "configured_apk_bytes": 8834278,
+    "configured_apk_sha256": "710c9d3aecd17dcc4b05f00e578504c0522cb1026652520242fe782b8b244b13",
+    "configured_apk_bytes": 8802427,
     "configured_apk_signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
-    "configured_build_evidence_commit": "887db83eb96db136d85589276bc9c6e93081bb54",
-    "configured_build_private_reference": "HOME-TV-E8AB9BE-CONFIGURED-NETWORK-PENDING",
+    "configured_build_evidence_commit": "2b2ebf88dc9699860438438d43344eb48aefdfcf",
+    "configured_build_private_reference": "HOME-TV-V3-LAN-MAPPED",
     "backend_review_checks": [
       "APK checksum and size",
-      "APK signer and package/version",
+      "signer and package/version",
+      "eleven source delta files match pinned Git blobs",
       "no main APK assets",
-      "private origin handoff checksum and origin string in DEX"
+      "both embedded configuration strings match private handoff",
+      "bounded mapper, adapter constructor and setup-failure source review"
     ],
-    "configured_build_receipt_sha256": "1fb9e8a5ec2812d097851ae2c399647a6358bfb09c4ddd6aa824095ae91f4198"
+    "configured_build_receipt_sha256": "a112ccff4d16e8cb28db7852973a55815920dc3a0886e683be03f1168ad11eca",
+    "configured_apk_version_code": 3,
+    "configured_apk_version_name": "0.3-home-lan-dev",
+    "mapped_jvm_live_network_verified": true
   },
   "active_pilot": {
     "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
     "scope": "separate synthetic selected home-LAN deployment only",
     "authority": "user continuation relayed by Android task after local review",
     "private_handoff_reference": "HOME-FEED-E6B2827-LAN-PILOT",
-    "status": "HTTPS and previously configured DNS running; Android implementing user-requested app-scoped mapping",
+    "status": "HTTPS and prior DNS running; mapped v3 APK verified locally; physical installation pending",
     "no_real_selection": true,
     "preserve_caption_and_protected_services": true
   },
@@ -86,9 +91,9 @@
   "diagnostic_feed_was_served": true,
   "actual_feed_served_semantics": "current listener state; diagnostic serving history is recorded separately",
   "remaining_gates": [
-    "Android mapped APK source/identity and canonical-address/hostname/TLS validation",
-    "Physical JMGO install and app connection, remote/image/slideshow/lifecycle acceptance",
-    "Confirm prior projector DNS Save state before any resolver retirement",
+    "Physical JMGO install and app-scoped mapped HTTPS connection with platform trust",
+    "Physical remote/image/slideshow/reconnect/sleep-wake/disable acceptance",
+    "Confirm prior projector DNS Save state before resolver retirement",
     "Broader audience/network acceptance and durable startup/renewal remain separate"
   ],
   "private_target_inputs_note": "Exact resolved values are retained only in the private handoff; null values here do not mean every input is unknown.",
@@ -110,9 +115,11 @@
   "client_connection_plan": {
     "mode": "app-scoped exact-host LAN address mapping requested by user",
     "owner": "Android task",
-    "implementation_and_tls_tests_pending": true,
+    "implementation_and_tls_tests_pending": false,
     "manual_projector_dns_required_for_new_apk": false,
     "normal_system_dns_acceptance_claimed": false,
-    "existing_resolver_retained_due_to_unknown_saved_projector_setting": true
+    "existing_resolver_retained_due_to_unknown_saved_projector_setting": true,
+    "local_implementation_reviewed": true,
+    "physical_apk_acceptance_pending": true
   }
 }

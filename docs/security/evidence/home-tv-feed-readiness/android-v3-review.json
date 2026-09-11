@@ -1,0 +1,31 @@
+{
+  "task": "PH-ANDROID-HOME-TV-LAN-MAP-01 backend review",
+  "android_source_commit": "c42918a54991895a3869977f92aa29ffee2377e5",
+  "android_evidence_commit": "2b2ebf88dc9699860438438d43344eb48aefdfcf",
+  "apk_sha256": "710c9d3aecd17dcc4b05f00e578504c0522cb1026652520242fe782b8b244b13",
+  "apk_bytes": 8802427,
+  "package": "dev.photohouse.tv",
+  "version_code": 3,
+  "version_name": "0.3-home-lan-dev",
+  "signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
+  "fresh_source_files_verified": 11,
+  "both_private_configuration_values_found_in_dex": true,
+  "private_handoff_provenance_verified": true,
+  "no_main_apk_assets": true,
+  "bounded_source_review_blockers": [],
+  "android_retained_results_not_rerun": {
+    "home_jvm_tests_passed": 29,
+    "live_mapped_adapter_tests_passed": 1,
+    "live_https_requests_in_that_test": 4,
+    "lint_errors": 0,
+    "existing_lint_warnings": 3
+  },
+  "evidence_sha256": {
+    "RETURN.md": "6b36986f0a082c59353b014a7f0b4076ee0963c87af77007da3c4b78ed680a51",
+    "result.json": "be05fbd054780b2b19727c90e9d72781f8afba01d6f36e7221c289ba2da1ed16",
+    "tests.json": "3c1ff787e5bb02fda0d10dbeca273e5767ba4a8e28a27d75938a29a75213920b"
+  },
+  "physical_projector_accepted": false,
+  "normal_system_dns_acceptance_claimed": false,
+  "server_changes_in_review": false
+}

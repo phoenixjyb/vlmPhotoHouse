@@ -83,3 +83,28 @@ that mapping change. Confirm the saved projector DNS state before retiring the
 existing resolver; no user-visible network change is inferred from the screenshot.
 Actual guest/WAN/SNAT probes, broader admission and durable startup/renewal remain
 separate from this two-client synthetic pilot.
+
+## Mapped v3 APK received and reviewed
+
+Android source `c42918a54991895a3869977f92aa29ffee2377e5`, evidence commit
+`2b2ebf88dc9699860438438d43344eb48aefdfcf`, now implements the requested exact-host
+private address mapping. The backend's bounded source review found no blocker:
+canonical RFC1918 parsing uses numeric bytes, unexpected hosts fail, proxy routing
+is disabled for mapped mode, default hostname/certificate validation remains, and
+invalid configuration stops at setup. The frozen backend/phone contracts remain.
+
+Backend review independently verified all eleven source-delta files against Git,
+both configuration strings in DEX against the private handoff, no main APK assets,
+APK checksum/size, package/version and unchanged signer. The private v3 APK is
+8,802,427 bytes, SHA-256
+`710c9d3aecd17dcc4b05f00e578504c0522cb1026652520242fe782b8b244b13`,
+package `dev.photohouse.tv`, version code 3 / `0.3-home-lan-dev`.
+It supersedes the v2 candidate above. Private reference: `HOME-TV-V3-LAN-MAPPED`.
+
+Android retains 29 passing home JVM tests and one opt-in live adapter test making
+four real HTTPS requests against the running synthetic feed using normal JVM trust.
+Those results were reviewed, not rerun here, and are not physical APK/projector
+acceptance. A [review receipt](evidence/home-tv-feed-readiness/android-v3-review.json)
+binds the source/artifact checks. Next install v3 and verify the actual JMGO; no
+manual projector DNS change or further server resume is required for this build.
+The existing resolver remains untouched because prior user Save state is unknown.
