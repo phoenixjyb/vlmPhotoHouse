@@ -1,0 +1,41 @@
+{
+  "verified_apks": [
+    {
+      "filename": "tv-v1-unconfigured-v5-6077904.apk",
+      "sha256": "7cf8ab01cf0827a290fa40a590cae01b705c8c1bb32fa5c89bc261a3336b77a6",
+      "bytes": 8900926,
+      "signature_package_version_verified": true,
+      "assets_directory_or_mp4_entries": false
+    },
+    {
+      "filename": "PhotoHouse-TV-catalog-v5-unconfigured.apk",
+      "sha256": "12daa39b2f4c85d92b8bab86cf8cf68c5ea8064a28e34ea26ab9b8836aed3af9",
+      "bytes": 8900932,
+      "signature_package_version_verified": true,
+      "assets_directory_or_mp4_entries": false
+    },
+    {
+      "filename": "PhotoHouse-TV-home-v5.apk",
+      "sha256": "9520d3a119334b083747c200747f00d5cd0956a2c221082371ea45e747941d32",
+      "bytes": 8900979,
+      "signature_package_version_verified": true,
+      "assets_directory_or_mp4_entries": false
+    }
+  ],
+  "v2_contract_identical": true,
+  "android_source": "6077904f4d2b5c160e600f88a44dc11c396bbcaa",
+  "android_evidence": "d2b224015ee84d12d1e44929cb34893780046793",
+  "review_scope": "Artifact hashes, signatures/package/version, empty APK assets/no MP4 entries, source-vs-evidence separation, frozen contract byte equality and retained test logs; not a full source/security audit or suite replay",
+  "owner_reported_tests": {
+    "jvm": 53,
+    "jvm_failures": 0,
+    "jvm_errors": 0,
+    "instrumentation_each_font_scale": 16,
+    "font_scales": [
+      1.0,
+      2.0
+    ],
+    "asgi": 12
+  },
+  "shared_gate": "Native Windows synthetic preparation replay, measured real-media canary, reviewed v2 origin, configured v2 APK and JMGO playback; no new operational authorization"
+}
