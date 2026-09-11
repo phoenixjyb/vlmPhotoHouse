@@ -189,6 +189,8 @@ def validate(discovered: dict, inventory: dict) -> list[str]:
             errors.append(f"Home feed exception outside reviewed surface: {identity(route)}")
         if 'home.catalog.read' in caps and (route['source'] != 'backend/app/home_catalog.py' or route['surface'] != 'home-catalog'):
             errors.append(f"Home catalog exception outside reviewed surface: {identity(route)}")
+        if 'home.discovery.read' in caps and (route['source'] != 'backend/app/home_discovery.py' or route['surface'] != 'home-discovery'):
+            errors.append(f"Home discovery exception outside reviewed surface: {identity(route)}")
     return errors
 
 
