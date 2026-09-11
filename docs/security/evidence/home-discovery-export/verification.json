@@ -1,0 +1,54 @@
+{
+  "implementation_commit": "d8f20a073e42f93ad2b046c4ae01d0ccd68a05bf",
+  "base_commit": "00aa4ffb05b7c2c37e9f752dc0cd2aa74d439da8",
+  "scope": "synthetic offline exporter only",
+  "checks": {
+    "focused_tests": {
+      "passed": 23,
+      "skipped": 0,
+      "seconds": 0.486
+    },
+    "combined_home_tests": {
+      "passed": 101,
+      "skipped": 0,
+      "seconds": 6.608
+    },
+    "inventory_tests": {
+      "passed": 19,
+      "skipped": 0,
+      "seconds": 0.635
+    },
+    "inventory_entries": 162,
+    "pinned_source_files": 17,
+    "pinned_focused_tests": 23,
+    "pinned_asgi_export_replay_checks": 13,
+    "fixture_publish_cli": "reproduced exact replay plan and output hashes",
+    "frozen_discovery_inputs_unchanged": 19,
+    "private_alias_exclusion": "passed across all five new implementation files",
+    "rendered_guide": "HTML structure/table/code/links passed",
+    "diff_check": "passed"
+  },
+  "attempts": [
+    "First SQL-trace test rejected sqlite3.deserialize internal ATTACH of its in-memory buffer. Corrected assertion to account for that exact first operation; subsequent statements remain query-only SELECT/BEGIN/ROLLBACK. No disk database or schema writes occurred.",
+    "Android review caught review-output containment missing inside candidate. Added rejection and unchanged-tree regression before implementation commit. Removed general synthetic approval helper; only new-tree fixture CLI and fresh synthetic test harnesses create fixture approvals."
+  ],
+  "limitations": [
+    "Standalone bounded SQLite snapshot only; live/WAL inputs refused; coherent real snapshot acquisition not provided",
+    "Manual source plus explicit assignment review required; DNN and caption mentions are not accepted as person matches",
+    "Byte/hash/JPEG marker checks are not native codec, image quality or physical playback acceptance",
+    "Cooperative time/byte/row limits, no hard RSS or blocking-I/O deadline",
+    "New partial output may remain disabled after disk failure; no activation or cleanup of existing paths",
+    "No real identities resolved and no actual library coverage measured"
+  ],
+  "external_actions": {
+    "windows": false,
+    "real_database_media": false,
+    "models_conversion": false,
+    "ports": false,
+    "deployment": false,
+    "credentials": false,
+    "android_edits": false,
+    "device_install": false,
+    "push_merge": false
+  }
+}
