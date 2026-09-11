@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "artifact_kind": "home_feed_source_and_synthetic_fixture_not_deployed",
+  "source_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_version": 1,
+  "dependencies_included": false,
+  "private_configuration_included": false,
+  "files": {
+    "fixture/prepared/display/101.jpg": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434",
+    "fixture/prepared/grid/101.jpg": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+    "fixture/selection.json": "90e49245370c3695de22d5c0bd261c0bee9bfd9ce99f7085c3d1e652e30600d7",
+    "source/backend/app/__init__.py": "f378e6b73a28874ade0c801a7446c03d279a4c7b9b0827f05ebd23183e1a340d",
+    "source/backend/app/home_feed.py": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c",
+    "source/backend/requirements-access.lock": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42",
+    "source/docs/security/HOME_TV_FEED.md": "d3c6698c92db9cd32e8e8aac4c1326a0fb0b5ef77d83c331662c43ee8f964033",
+    "source/docs/security/home-feed-contract-v1.json": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+    "source/scripts/check_access_environment.py": "262905bcab2dce84314357ea0fdd78518816f1014d6cd3115360b8c4346f2043",
+    "source/scripts/home_feed_app.py": "98c2bbcda284cfbc39f2d6c6bf2468ecae1c66952f2bad2ac512b09c3704a8ed"
+  },
+  "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
+  "archive_bytes": 596784,
+  "payload_files": 10,
+  "verified_exact_membership_and_hashes": true
+}

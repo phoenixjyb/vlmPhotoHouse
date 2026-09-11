@@ -1,0 +1,55 @@
+{
+  "plan_version": 1,
+  "task": "PH-BACKEND-HOME-TV-READINESS-02",
+  "implementation_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "android_integration_ready": true,
+  "deployment_ready": false,
+  "deployment_authorized": false,
+  "actual_feed_served": false,
+  "policy": "anonymous selected home LAN feed; no device approval or personal sign-in",
+  "synthetic_selection": {
+    "feed_id": "synthetic-home",
+    "asset_ids": [
+      101
+    ],
+    "manifest": "home-feed-manifest.example.json",
+    "revision": 1,
+    "originals_allowed": false
+  },
+  "private_target_inputs": {
+    "host_identity": null,
+    "origin": null,
+    "bind_address_and_port": null,
+    "normal_client_dns_route": null,
+    "peer_cidrs": null,
+    "certificate_and_key_reference": null,
+    "service_principal": null,
+    "task_and_release_path": null,
+    "approved_operator": null,
+    "authorized_window": null,
+    "projector_identity_and_install_operator": null
+  },
+  "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
+  "unresolved_gates": [
+    "explicit synthetic deployment authority and operator",
+    "current host/interface/port identity",
+    "normal projector DNS route without public forwarding",
+    "current certificate/key ACL and client system trust",
+    "LAN/guest/outside isolation including NAT/proxy/SNAT",
+    "new task start/stop and certificate reload lifecycle",
+    "installed projector artifact and visible acceptance"
+  ],
+  "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
+  "archive_bytes": 596784,
+  "steps": [
+    "review private target and operator inputs",
+    "verify immutable bundle, exact members and CPU environment",
+    "stage fresh synthetic publication under a new private root",
+    "validate native config and ACLs before any serve action",
+    "start only independent home-feed task after deployment authority",
+    "prove feed/preview integrity and peer/route denials over real HTTPS",
+    "rehearse disable/remove/re-enable and scoped restart/rollback",
+    "return exact served origin and receipts for Android device acceptance"
+  ]
+}

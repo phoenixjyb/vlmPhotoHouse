@@ -1,0 +1,1 @@
+{"package_smoke": "pass", "asgi_checks": 10, "config_syntax_check": "pass", "actual_4k_fixture": true, "listeners_opened": false, "host_accessed": false, "real_media_accessed": false}
