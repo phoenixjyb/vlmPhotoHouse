@@ -1,5 +1,5 @@
 {
-  "inventory_version": 2,
+  "inventory_version": 3,
   "status": "ACTIVE ENTRYPOINT CLOSED BY DEFAULT / RETIRED AND STANDALONE GAPS EXPLICIT",
   "base_commit": "932263504ac5fcc3ed178e951991619d8ee87049",
   "capabilities": {
@@ -19,7 +19,8 @@
     "account.register.invited": "Valid single-use owner-issued phone-bound invitation plus password, after shared login/registration admission. No first-signup owner.",
     "account.self": "Current active account/session for own profile; logout is idempotent even after expiry. Cookie mutations require same-origin CSRF; native bearer is explicit.",
     "account.invitation.accept": "Current active account/session plus matching unused owner invitation. Cannot reset a password or override newer membership decisions.",
-    "library.members.manage": "Current approved owner membership in the selected active library, distinct from system operator and original-byte permissions."
+    "library.members.manage": "Current approved owner membership in the selected active library, distinct from system operator and original-byte permissions.",
+    "home.feed.read": "Deliberately anonymous selected home feed. Any reachable client in the explicit LAN peer allowlist can read published metadata and prepared derivatives; no account, pairing, original or operator grant."
   },
   "topology": [
     {
@@ -37,6 +38,14 @@
     {
       "source": "backend/app/access/transport.py",
       "expression": "router = APIRouter(route_class=AccessRoute)"
+    },
+    {
+      "source": "backend/app/home_feed.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/home_feed.py",
+      "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
     },
     {
       "source": "backend/app/legacy_main.py",
@@ -315,6 +324,9 @@
     {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/detail/{asset_id}", "handler": "detail", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
     {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets/{asset_id}/captions", "handler": "captions", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
     {"source": "backend/app/access/members.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/members", "handler": "members", "surface": "photohouse", "capabilities": ["library.members.manage"], "scope": "Current owner in the selected library; member list is scoped before count/paging; target revocation uses displayed revision", "current_control": "Shared current-session owner policy, bounded readback and atomic revision-bound revocation; cookie Origin/CSRF; owner transfer and grants unavailable Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
-    {"source": "backend/app/access/members.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/members/{account_id}/revoke", "handler": "revoke", "surface": "photohouse", "capabilities": ["library.members.manage"], "scope": "Current owner in the selected library; member list is scoped before count/paging; target revocation uses displayed revision", "current_control": "Shared current-session owner policy, bounded readback and atomic revision-bound revocation; cookie Origin/CSRF; owner transfer and grants unavailable Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."}
+    {"source": "backend/app/access/members.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/members/{account_id}/revoke", "handler": "revoke", "surface": "photohouse", "capabilities": ["library.members.manage"], "scope": "Current owner in the selected library; member list is scoped before count/paging; target revocation uses displayed revision", "current_control": "Shared current-session owner policy, bounded readback and atomic revision-bound revocation; cookie Origin/CSRF; owner transfer and grants unavailable Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
+    {"source": "backend/app/home_feed.py", "owner": "app", "method": "GET", "path": "/home/v1/assets/{asset_id}/preview", "handler": "preview", "surface": "home-feed", "capabilities": ["home.feed.read"], "scope": "Only explicit enabled manifest selection and hash-bound prepared grid/display JPEGs; separate listener from protected phone API.", "current_control": "Literal RFC1918 peer allowlist, direct HTTPS host, handler-bound route allowlist, exact manifest/revision, bounded prepared JPEG reads, no-store; no account identity claimed.", "gap": "Local synthetic evidence only; deployment, actual LAN isolation and selected real content unverified. Trusted proxy/SNAT can hide remote origin; in-flight reads and downloaded copies cannot be revoked."},
+    {"source": "backend/app/home_feed.py", "owner": "app", "method": "HEAD", "path": "/home/v1/assets/{asset_id}/preview", "handler": "preview", "surface": "home-feed", "capabilities": ["home.feed.read"], "scope": "Only explicit enabled manifest selection and hash-bound prepared grid/display JPEGs; separate listener from protected phone API.", "current_control": "Literal RFC1918 peer allowlist, direct HTTPS host, handler-bound route allowlist, exact manifest/revision, bounded prepared JPEG reads, no-store; no account identity claimed.", "gap": "Local synthetic evidence only; deployment, actual LAN isolation and selected real content unverified. Trusted proxy/SNAT can hide remote origin; in-flight reads and downloaded copies cannot be revoked."},
+    {"source": "backend/app/home_feed.py", "owner": "app", "method": "GET", "path": "/home/v1/feed", "handler": "feed", "surface": "home-feed", "capabilities": ["home.feed.read"], "scope": "Only explicit enabled manifest selection and hash-bound prepared grid/display JPEGs; separate listener from protected phone API.", "current_control": "Literal RFC1918 peer allowlist, direct HTTPS host, handler-bound route allowlist, exact manifest/revision, bounded prepared JPEG reads, no-store; no account identity claimed.", "gap": "Local synthetic evidence only; deployment, actual LAN isolation and selected real content unverified. Trusted proxy/SNAT can hide remote origin; in-flight reads and downloaded copies cannot be revoked."}
   ]
 }

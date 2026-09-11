@@ -1,0 +1,32 @@
+{
+  "task": "PH-BACKEND-HOME-TV-FEED-01",
+  "checked_utc": "2026-09-11T09:20:39.439546+00:00",
+  "status": "local_implementation_verified",
+  "policy": "anonymous selected home LAN feed; no pairing or personal sign-in",
+  "security_tests": 296,
+  "security_seconds": 34.32,
+  "focused_home_feed_tests": 18,
+  "inventory_entries": 155,
+  "inventory_surfaces": {
+    "protected": 23,
+    "retired": 97,
+    "other_standalone": 32,
+    "home_feed": 3
+  },
+  "synthetic_4k_jpeg": {
+    "width": 3840,
+    "height": 2160,
+    "bytes": 523448,
+    "sha256": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434",
+    "generated_and_decoded_with": "Pillow 12.1.1; fixture preparation only"
+  },
+  "protected_application_and_lock_changed": false,
+  "sqlite_schema_changed": false,
+  "source_inventory_complete": true,
+  "manifest_response_matches_frozen_contract": true,
+  "listeners_opened": false,
+  "host_accessed": false,
+  "real_media_accessed": false,
+  "deployed": false,
+  "android_or_projector_acceptance": false
+}

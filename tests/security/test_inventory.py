@@ -49,6 +49,11 @@ class InventoryTests(unittest.TestCase):
         inventory["routes"][0]["capabilities"] = ["public.ui"]
         self.assertTrue(any("Public exception" in e for e in validate(self.discovered, inventory)))
 
+    def test_home_feed_exception_cannot_be_assigned_to_phone_or_other_services(self):
+        inventory = copy.deepcopy(self.inventory)
+        inventory['routes'][0]['capabilities'] = ['home.feed.read']
+        self.assertTrue(any('Home feed exception' in e for e in validate(self.discovered, inventory)))
+
     def scan_snippet(self, text):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

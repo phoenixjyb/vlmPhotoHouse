@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "enabled": true,
+  "revision": 1,
+  "feed_id": "synthetic-home",
+  "title": "Synthetic TV / 合成电视",
+  "assets": [
+    {
+      "id": 101,
+      "caption": "EN: Synthetic color patterns.\nZH-CN: 合成色彩图案。",
+      "previews": {
+        "grid": {
+          "width": 8,
+          "height": 8,
+          "bytes": 632,
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d"
+        },
+        "display": {
+          "width": 3840,
+          "height": 2160,
+          "bytes": 523448,
+          "sha256": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434"
+        }
+      }
+    }
+  ]
+}

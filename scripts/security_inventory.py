@@ -185,6 +185,8 @@ def validate(discovered: dict, inventory: dict) -> list[str]:
             errors.append(f"Unreviewed capability: {identity(route)}")
         if "public.ui" in caps and route["source"] != "backend/app/routers/ui.py":
             errors.append(f"Public exception outside reviewed UI shell: {identity(route)}")
+        if 'home.feed.read' in caps and (route['source'] != 'backend/app/home_feed.py' or route['surface'] != 'home-feed'):
+            errors.append(f"Home feed exception outside reviewed surface: {identity(route)}")
     return errors
 
 
