@@ -16,6 +16,46 @@ from .runtime import ExistingDatabase
 OPERATION = 'quarantine_restored_access'
 
 
+def _assert_quarantined(db, expected_key):
+    """Check the access barrier, including trigger-induced changes, before commit."""
+    if db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone() != (expected_key,):
+        raise PlanRejected('Recovery key replacement failed')
+    for query in (
+        "SELECT 1 FROM access_accounts WHERE state != 'disabled'",
+        "SELECT 1 FROM access_libraries WHERE state != 'closed'",
+        'SELECT 1 FROM access_sessions WHERE revoked != 1',
+        'SELECT 1 FROM access_invitations WHERE cancelled=0 AND consumed=0',
+        'SELECT 1 FROM access_attempts',
+        'SELECT 1 FROM access_kdf_slot',
+    ):
+        if db.execute(query).fetchone() is not None:
+            raise PlanRejected('Access quarantine incomplete')
+
+
+def _quarantine_access_state(db):
+    """Shared mutation, never an authorization entry point; caller owns transaction.
+
+    Call only after offline authority/quiescence review, or on an owned in-memory
+    candidate. No account is invented for pre-access databases. Nothing is reopened.
+    """
+    if not db.in_transaction:
+        raise PlanRejected('Explicit quarantine transaction required')
+    # Fresh random material must not repeat on restore/rollback.
+    old_key = db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone()[0]
+    key = secrets.token_bytes(32)
+    if not isinstance(key, bytes) or len(key) != 32 or key == old_key:
+        raise PlanRejected('Fresh recovery key unavailable')
+    db.execute("UPDATE access_accounts SET state='disabled' WHERE state='active'")
+    db.execute("UPDATE access_libraries SET state='closed' WHERE state='active'")
+    db.execute('UPDATE access_sessions SET revoked=1 WHERE revoked=0')
+    db.execute('UPDATE access_invitations SET cancelled=1 WHERE cancelled=0 AND consumed=0')
+    db.execute('UPDATE access_admission_key SET secret=? WHERE id=1', (key,))
+    db.execute('DELETE FROM access_attempts')
+    db.execute('DELETE FROM access_kdf_slot')
+    _assert_quarantined(db, key)
+    return key
+
+
 class _RecoveryState(_PlanState):
     def _state(self, operation, target):
         if operation != OPERATION or not isinstance(target, dict) or set(target) != {'operator_account_id', 'quiescence_reference'}:
@@ -98,18 +138,7 @@ def quarantine_restored_access(envelope, *, review, clock=time.time):
                 state._validate_in_transaction(envelope)
                 if not plan['created_at'] <= state.access._now() < plan['expires_at']:
                     raise PlanRejected('Recovery plan expired')
-                # Fresh random material is essential: a timestamp/DB counter would
-                # repeat on rollback. Never accept a supplied key or emit it.
-                key = secrets.token_bytes(32)
-                if key == db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone()[0]:
-                    raise PlanRejected('Fresh recovery key unavailable')
-                db.execute("UPDATE access_accounts SET state='disabled' WHERE state='active'")
-                db.execute("UPDATE access_libraries SET state='closed' WHERE state='active'")
-                db.execute('UPDATE access_sessions SET revoked=1 WHERE revoked=0')
-                db.execute('UPDATE access_invitations SET cancelled=1 WHERE cancelled=0 AND consumed=0')
-                db.execute('UPDATE access_admission_key SET secret=? WHERE id=1', (key,))
-                db.execute('DELETE FROM access_attempts')
-                db.execute('DELETE FROM access_kdf_slot')
+                key = _quarantine_access_state(db)
                 receipt = {
                     'version': 1, 'operation': OPERATION, 'plan_id': plan['plan_id'],
                     'plan_digest': review.plan_digest, 'applied_at': state.access._now(),
@@ -124,6 +153,7 @@ def quarantine_restored_access(envelope, *, review, clock=time.time):
                 db.execute('INSERT INTO access_provisioning_receipts VALUES (?,?,?)',
                            (plan['plan_id'], review.plan_digest, _json(receipt).decode()))
                 state.access._audit(plan['target']['operator_account_id'], 'offline.' + OPERATION, None, None)
+                _assert_quarantined(db, key)
                 if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
                     raise PlanRejected('Recovery target changed')
                 if not plan['created_at'] <= state.access._now() < plan['expires_at']:

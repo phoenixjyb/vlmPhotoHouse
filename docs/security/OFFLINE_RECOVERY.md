@@ -6,6 +6,18 @@ disabled and libraries closed. It does not restore a file, reopen access, reset 
 password, discover a database, stop a worker or expose an HTTP/CLI entry point.
 All execution used disposable synthetic SQLite and the in-process ASGI test client.
 
+## Candidate preparation addition — 2026-09-11
+
+[Database preparation](DATABASE_PREPARATION.md) now exposes a new-file
+`migrate-candidate` workflow for a reviewed source snapshot and separate matching
+backup. It reuses this service's quarantine mutation, including final access/key
+checks after receipt insertion. It runs migration/quarantine only in memory before
+creating a new private file, so pre-access databases need no invented operator.
+Its unsigned preparation receipt is distinct from this service's sealed review and
+operator-attributed audit. It neither replaces this reviewed in-place quarantine
+API nor implements cutover, owner recovery or reopening. The slice-16 evidence
+below remains historical; current results are in [the Android return](ANDROID_READINESS_RETURN.md).
+
 ## Why session revocation alone is insufficient
 
 An older backup can resurrect sessions, cancelled invitations, old password hashes,

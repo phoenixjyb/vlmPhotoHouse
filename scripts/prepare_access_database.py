@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Explicit offline initialization, backup and in-memory migration rehearsal.
+"""Explicit offline initialization, backup, rehearsal and quarantined candidates.
 
-No existing-database writes, implicit targets, service control or restore/apply.
+No existing-database writes, implicit targets, service control or cutover.
 Requires a trusted private directory and a quiescent rollback-journal database.
 """
 import argparse
@@ -9,11 +9,13 @@ from contextlib import closing, contextmanager
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import stat
 import sys
 import time
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
@@ -195,6 +197,55 @@ def write_new(snapshot, path):
             'restore_verified_in_memory': True}
 
 
+def migrate_candidate(args):
+    """Apply migration to a new quarantined copy of an exact reviewed snapshot.
+
+    References record external review; they neither authenticate the operator nor
+    stop writers. Both input snapshots stay pinned until output verification ends.
+    """
+    from app.access.provisioning_apply import _reference
+    from app.access.recovery import _quarantine_access_state, _assert_quarantined
+    if not re.fullmatch('[0-9a-f]{64}', args.reviewed_snapshot_digest):
+        raise Refused('Exact reviewed snapshot digest required')
+    authority = _reference(args.authority_reference)
+    quiescence = _reference(args.quiescence_reference)
+    if identity(args.database) == identity(args.backup):
+        raise Refused('Physically separate matching backup required')
+    with source_snapshot(args.database) as db, source_snapshot(args.backup) as backup:
+        source_digest = snapshot_digest(db)
+        if source_digest != args.reviewed_snapshot_digest or snapshot_digest(backup) != source_digest:
+            raise Refused('Source or backup differs from reviewed snapshot')
+        source_revision = validate(db)
+        upgrade_memory(db)
+        receipt = {
+            'version': 1, 'operation': 'prepare_quarantined_migration_candidate',
+            'receipt_id': str(uuid.uuid4()), 'receipt_kind': 'unsigned_local_preparation',
+            'source_revision': source_revision, 'revision': validate(db),
+            'source_snapshot_digest': source_digest, 'backup_snapshot_digest': source_digest,
+            'authority_reference': authority, 'quiescence_reference': quiescence,
+            'access_reopened': False, 'existing_database_modified': False,
+        }
+        encoded = json.dumps(receipt, sort_keys=True, separators=(',', ':'))
+        receipt_digest = hashlib.sha256(encoded.encode('utf-8')).hexdigest()
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            key = _quarantine_access_state(db)
+            db.execute('INSERT INTO access_provisioning_receipts VALUES (?,?,?)',
+                       (receipt['receipt_id'], receipt_digest, encoded))
+            _assert_quarantined(db, key)
+            validate(db)
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+        result = write_new(db, args.out)
+        return {**result, 'source_revision': source_revision, 'revision': receipt['revision'],
+                'source_snapshot_digest': source_digest, 'backup_verified': True,
+                'receipt_id': receipt['receipt_id'], 'receipt_digest': receipt_digest,
+                'candidate_quarantined': True, 'access_reopened': False,
+                'migration_applied_to_source': False}
+
+
 def main(argv=None):
     parser = Parser(description=__doc__, allow_abbrev=False)
     sub = parser.add_subparsers(dest='command', required=True, parser_class=Parser)
@@ -205,10 +256,19 @@ def main(argv=None):
     backup.add_argument('--out', type=Path, required=True)
     rehearse = sub.add_parser('rehearse-migration', allow_abbrev=False)
     rehearse.add_argument('--database', type=Path, required=True)
+    candidate = sub.add_parser('migrate-candidate', allow_abbrev=False)
+    candidate.add_argument('--database', type=Path, required=True)
+    candidate.add_argument('--backup', type=Path, required=True)
+    candidate.add_argument('--out', type=Path, required=True)
+    candidate.add_argument('--reviewed-snapshot-digest', required=True)
+    candidate.add_argument('--authority-reference', required=True)
+    candidate.add_argument('--quiescence-reference', required=True)
     completed = False
     try:
         args = parser.parse_args(argv)
-        if args.command == 'initialize':
+        if args.command == 'migrate-candidate':
+            result = migrate_candidate(args)
+        elif args.command == 'initialize':
             with closing(sqlite3.connect(':memory:')) as db:
                 configure(db)
                 upgrade_memory(db)

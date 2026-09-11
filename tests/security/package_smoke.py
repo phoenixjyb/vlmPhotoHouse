@@ -28,6 +28,16 @@ with ExitStack() as guards:
             assert prepare_access_database.main(['backup','--database',str(database),
                 '--out',str(data/'backup.sqlite')])==0
             assert prepare_access_database.main(['rehearse-migration','--database',str(database)])==0
+        preparation_output=io.StringIO()
+        with redirect_stdout(preparation_output):
+            assert prepare_access_database.main(['backup','--database',str(database),
+                '--out',str(data/'candidate-backup.sqlite')])==0
+        reviewed=json.loads(preparation_output.getvalue())['source_snapshot_digest']
+        with redirect_stdout(io.StringIO()):
+            assert prepare_access_database.main(['migrate-candidate','--database',str(database),
+                '--backup',str(data/'candidate-backup.sqlite'),'--out',str(data/'candidate.sqlite'),
+                '--reviewed-snapshot-digest',reviewed,'--authority-reference','synthetic-authority',
+                '--quiescence-reference','synthetic-stopped-workers'])==0
         with TestClient(create_app(),base_url='https://photohouse.test') as client:
             assert client.get('/auth/session').status_code==503
         runtime=RuntimeConfiguration(database,'https://photohouse.test',(data/'originals',),data/'derived')
@@ -51,5 +61,5 @@ with ExitStack() as guards:
                 '--backup',str(data/'backup.sqlite'),'--reviewed-plan-digest',plan_digest,
                 '--authority-reference','synthetic-authority','--restore-reference','synthetic-restore'])==0
 print(json.dumps({'package_smoke':'pass','synthetic_migration_revision':REQUIRED_REVISION,
-    'asgi_checks':7,'operator_commands':3,'database_preparation_commands':3,
+    'asgi_checks':7,'operator_commands':3,'database_preparation_commands':5,
     'listeners_opened':False,'live_data_accessed':False}))
