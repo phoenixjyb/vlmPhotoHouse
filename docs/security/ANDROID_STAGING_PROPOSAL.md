@@ -1,24 +1,27 @@
 # PH-BACKEND-ANDROID-READINESS-01 — staging readiness review
 
-Updated 2026-09-11. **Outcome: source preparation advanced; real-phone browsing is NO-GO.**
-Android completed its caption/launcher repin to `87a60b4`. The new
-[database-preparation/source package](DATABASE_PREPARATION.md) at
-`8d5e9cce77aaeb079d1dfb5801a932c2a01194d1` passes 240 security tests and an extracted
-package smoke test; all ten frozen backend source hashes still match the mobile
-manifest. The initial source observations and caption failure below are retained as
-historical evidence, not a claim that the new candidate still has that failure.
-Deployment identity, origin, host configuration and test audience remain unknown.
-This session has not deployed the protected backend. No live host, database, media,
-phone, private configuration or remembered endpoint was accessed. The receiving
-handoff asks for a proposal before external approval; it does not grant deployment.
+Updated 2026-09-11. **CPU environment/source package verified locally; real-phone browsing remains NO-GO.**
+The [CPU dependency slice](CPU_ENVIRONMENT.md) at
+`ce91cf68cd53dd5692042ee79ed7948f2231a50d` passes 247 synthetic security tests.
+It replaces the vulnerable Starlette 1.0.0 test baseline with 1.3.1 and supplies
+hash-locked runtime/test environments plus an offline prerequisite check. The
+51-file extracted source package passes its environment and synthetic ASGI/operator
+smoke checks; all ten Android-pinned backend source hashes remain unchanged.
+Windows x64 wheels were downloaded and hash-checked on the Mac, not executed on Windows.
+
+A separately authorized infrastructure step prepared DNS and certificates; private
+host/domain/key details remain outside this repository. That does not deploy the
+protected backend, approve a serving origin, configure ingress, or prove phone access.
+This CPU slice accessed no live host/database/media or TLS key and opened no listener.
+Earlier observations below are retained as historical evidence.
 
 ## Answer to the Android handoff
 
 | Question | Evidence-backed answer and remaining gate |
 | --- | --- |
-| Is the protected backend deployed? | **Unknown.** Local operator/source-package implementation is at `8d5e9cce77aaeb079d1dfb5801a932c2a01194d1`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
+| Is the protected backend deployed? | **Unknown.** Local CPU/source-package implementation is at `ce91cf68cd53dd5692042ee79ed7948f2231a50d`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
 | What HTTPS origin should Android use? | **Unknown; do not configure credentials yet.** Exact hostname/port, system-trusted chain, DNS/private-network reachability and lifecycle must be selected/verified privately. Never infer an origin from historical host notes or reuse a test certificate. |
-| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; new-file initialization, backup and in-memory migration rehearsal are implemented; an existing-database migration apply/recovery procedure and reviewed CPU environment remain next. |
+| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; new-file initialization, backup and in-memory migration rehearsal are implemented; an existing-database migration apply/recovery procedure and Windows execution of the new CPU lock remain next. |
 | Is the exposure boundary correct? | Default `app.main:app` is closed: controlled synthetic `/auth/session` returns **503** without explicit runtime. The configured entry point has 23 active routes; 97 retired handlers and 32 standalone routes remain separate risks. Host ingress, other listeners, file shares and TLS forwarding have not been inspected. |
 | Who is the first audience? | **No real operator/owner/viewer/library selected.** Proposed first stage uses reserved synthetic owner/viewer labels and generated media only. Later, the owner manually issues a phone-bound invitation to a deliberately scoped viewer; no original grant is needed for Android's current browsing flow. |
 | What operations are authorized here? | Local source review, synthetic no-listener checks, proposal/doc edits and local commits. No Windows/Mac mini access, real DB/media/credentials, listener, service/account change, configured APK, phone installation, push or merge. Android's earlier fixture installation and PR publication do not transfer new authority here. |
@@ -102,7 +105,7 @@ must be supplied and reviewed locally before generating a runnable command.
 | Serving | Proposed one worker, asyncio/h11, no reload or websockets, explicit concurrency/timeout limits (initially 16 requests and 5-second keepalive), no access-log request URLs or raw credential/body logging. Tune only after measured synthetic tests. |
 | Database | Separate explicit SQLite target at `b6e3f9a5c721`; `foreign_keys=ON`, no silent create/migrate/repair by runtime. Local writable DB directory only for SQLite and access state; no shared network-drive assumption. |
 | Media | Generated synthetic originals/prebuilt cached thumbnails only at first. Read-only runtime media ACLs, no static-file/proxy media alias, no worker/model generation. |
-| Dependencies | A separately reviewed CPU-only lock/environment. Existing requirements are broad and include unrelated processing dependencies; current Mac test overlay is not a Windows production lock. Verify installed Python/SQLite/OpenSSL/scrypt and package versions on the target before use. |
+| Dependencies | Use the new hash-locked CPU-only profile and offline probe; Mac verification and Windows wheel availability are recorded separately. Target Python/SQLite/OpenSSL/scrypt, host patch level and actual Windows execution still require verification. |
 
 Direct TLS, explicit bind addresses, proxy-header controls, asyncio selection and
 access-log controls are supported by [Uvicorn's official settings](https://uvicorn.dev/settings/).

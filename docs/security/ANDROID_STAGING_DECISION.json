@@ -3,7 +3,7 @@
   "artifact_kind": "proposal_not_launch_configuration",
   "verdict": "NO_GO_REAL_PHONE",
   "deployed": "unknown",
-  "candidate_backend_commit": "8d5e9cce77aaeb079d1dfb5801a932c2a01194d1",
+  "candidate_backend_commit": "ce91cf68cd53dd5692042ee79ed7948f2231a50d",
   "caption_fix_commit": "0cf5058acdb25224b26847fb55670307f8113181",
   "explicit_launcher_implemented_locally": true,
   "launcher_listener_tested": false,
@@ -43,7 +43,7 @@
     "derived_root": null,
     "certificate_reference": null,
     "tls_key_reference": null,
-    "runtime_lock": null,
+    "runtime_lock": "backend/requirements-access.lock",
     "service_identity": null,
     "owner_reference": null,
     "viewer_reference": null,
@@ -59,7 +59,7 @@
   },
   "unmet_gates": [
     "reviewed_existing_database_migration_apply_and_recovery_procedure",
-    "reviewed_cpu_windows_environment",
+    "windows_cpu_environment_execution_and_host_patch_review",
     "private_target_origin_certificate_and_audience",
     "host_and_ingress_identity",
     "backup_migration_provisioning_and_rollback_rehearsal",
@@ -73,5 +73,10 @@
     "migration_rehearsal_memory_only": true,
     "input_limit_bytes": 67108864,
     "wal_supported": false
-  }
+  },
+  "cpu_environment_lock_implemented_locally": true,
+  "cpu_environment_probe_passed_on_mac": true,
+  "cpu_environment_windows_wheels_hash_verified": true,
+  "cpu_environment_executed_on_windows": false,
+  "authority_scope": "This local CPU development slice; prior separately authorized DNS/certificate setup is not protected-backend deployment approval."
 }
