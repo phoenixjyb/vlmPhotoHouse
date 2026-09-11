@@ -146,11 +146,41 @@ No host, router, DNS, task, firewall, certificate, credential, real-media or phy
 installation action was performed in this follow-up. Packaging and local ASGI
 verification do not remove any of those unresolved operational gates.
 
-## Android owner's next bounded action
+## Android local integration reviewed
 
-Wire the frozen home-feed contract in its existing TV worktree, preserving the
-protected phone contract. Test automatic startup, strict response/media parsing,
-4K decode bounds, revision replacement, denied/disabled/empty states, reconnect,
-background privacy and absence of original/account fallback with synthetic inputs.
-Return source/contract/APK hashes and results. A live Windows origin is a later
-integration input, not a blocker to this local adapter implementation.
+PH-ANDROID-HOME-FEED-01 is complete locally at Android source commit
+`e8ab9be3c5497778783edf1b4a009707922248d1`, with evidence commit
+`c866c74de881a24714282bbb8c426f7c29d03103` on `codex/android-tv-foundation`.
+The backend review found no blocker in the inspected HTTPS transport and lifecycle
+store. This is a bounded review, not an exhaustive security audit. The frozen
+backend implementation and contract above remain unchanged.
+
+Fresh checks verified all 29 recorded Android source hashes against both working
+files and pinned Git blobs, both APK hashes and sizes, exact backend contract match,
+and absence of assets in the main APK. Android SDK tools independently verified
+the APK v2 signature, package `dev.photohouse.tv`, version code 2 and version
+`0.2-home-feed-dev`. The debug APK is 8,779,354 bytes with SHA-256
+`3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1`;
+signer SHA-256 is
+`56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28`.
+The [review receipt](evidence/home-tv-feed-readiness/android-review.json) binds
+these checks to the Android evidence files.
+
+Android's retained results report 110 passing JVM tests, ten actual backend ASGI
+checks, successful APK builds, zero lint errors with three existing warnings,
+and eight emulator tests each at normal and 2x font scale. These tests were not
+rerun during backend review. The emulator was a landscape phone AVD, not the JMGO;
+its 3840x2160 fixture decode does not prove projector surface resolution or quality.
+
+The TV app automatically loads the anonymous selected feed, refreshes visible
+metadata and clears content on background/disconnect/denial. The current APK has
+no configured origin and stops at setup. No real LAN end-to-end result, real-photo
+selection or physical installation is claimed. The grid cache is limited to
+16 MiB per page; overflow tiles are placeholders. Cross-page slideshow, albums,
+search, video, screensaver and offline storage remain outside this slice.
+
+The next backend step is the separately authorized synthetic LAN deployment
+sequence above, including normal DNS, trusted HTTPS and network isolation.
+Android then owns a private configured APK and JMGO launcher/remote, cold-start,
+sleep/wake, reconnect, disable/removal and visible-quality acceptance. Local adapter
+implementation no longer blocks that sequence; all operational gates remain open.

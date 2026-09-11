@@ -51,5 +51,14 @@
     "prove feed/preview integrity and peer/route denials over real HTTPS",
     "rehearse disable/remove/re-enable and scoped restart/rollback",
     "return exact served origin and receipts for Android device acceptance"
-  ]
+  ],
+  "android_local_integration": {
+    "complete": true,
+    "source_commit": "e8ab9be3c5497778783edf1b4a009707922248d1",
+    "evidence_commit": "c866c74de881a24714282bbb8c426f7c29d03103",
+    "apk_sha256": "3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1",
+    "review_receipt": "evidence/home-tv-feed-readiness/android-review.json",
+    "configured_apk_ready": false,
+    "physical_device_accepted": false
+  }
 }
