@@ -78,13 +78,21 @@ verified an existing exact 21-package environment and sent its read-only interpr
 path privately. A bounded follow-up was sent authorizing a fixed synthetic JPEG in
 mobile test tooling, preserving the exact strict backend pin, every frozen response
 and all contract files, without installing Pillow or adding a runtime dependency.
-That follow-up's completion is not yet claimed here; retain the failed cache attempt
-as historical evidence. Neither message is deployment/phone authority.
+That follow-up completed at `5773ec27db19012dd5d6de3d2717b2d781e6d664`: its return
+and evidence report 38 actual in-process cases passing with every frozen response
+unchanged, plus 12 verifier regressions. The earlier failed cache attempt remains
+historical evidence. No new Kotlin/TLS, APK or device result is claimed.
+
+The user then requested Android completion; `PH-ANDROID-MVP-COMPLETION-01` was sent
+to close demonstrated local MVP gaps and produce a requirement/source/test mapping.
+Completion of that new task is not claimed here. The [backend merge review](MERGE_READINESS.md)
+finds fast-forward Git compatibility but retains launch/upgrade and remote-review gates.
+These messages do not authorize deployment or phone installation.
 
 ## Remaining pipeline sequence
 
-1. Finish the exact pinned in-process 38-case replay under the CPU test lock using
-   the fixture-only harness change; keep the strict pin and response comparison.
+1. The exact pinned 38-case replay under the CPU test lock is complete. Finish the
+   Android MVP completion handoff and backend launch/upgrade integration review.
 2. Design/rehearse explicit service selection and rollback on synthetic local
    artifacts. Never switch back to an old access-enabled archive as a casual rollback.
 3. Separately review Windows CPU execution, host patch/ACL/reparse behavior, service

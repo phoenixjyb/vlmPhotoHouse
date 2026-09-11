@@ -96,6 +96,22 @@
     "reported_jvm_tests": 62,
     "readiness_return_read": true,
     "locked_profile_fixture_followup_sent": true,
-    "locked_profile_replay_verified": false
+    "locked_profile_replay_verified": true,
+    "locked_profile_commit": "5773ec27db19012dd5d6de3d2717b2d781e6d664",
+    "reported_actual_asgi_cases": 38,
+    "reported_verifier_tests": 12,
+    "mvp_completion_task_sent": true
+  },
+  "merge_review": {
+    "default_branch": "master",
+    "target_commit": "932263504ac5fcc3ed178e951991619d8ee87049",
+    "candidate_reviewed": "ceff3ab7ea89020b8909eff988177fa65a196179",
+    "ahead": 32,
+    "behind": 0,
+    "git_fast_forward_possible": true,
+    "merge_approved": false,
+    "remote_pr_checks_verified": false,
+    "remote_pr_check_failure": "GitHub CLI HTTP 401",
+    "launch_compatibility_review_needed": true
   }
 }
