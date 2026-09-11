@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "revision": 1,
+  "library": {
+    "id": "synthetic-library",
+    "title": "Synthetic / 合成"
+  },
+  "page": 1,
+  "page_size": 50,
+  "total": 2,
+  "has_more": false,
+  "items": [
+    {
+      "id": 102,
+      "kind": "video",
+      "label": "Synthetic video",
+      "width": null,
+      "height": null,
+      "previews": {
+        "grid": {
+          "state": "unavailable",
+          "reason": "not_prepared"
+        },
+        "display": {
+          "state": "unavailable",
+          "reason": "not_prepared"
+        }
+      },
+      "video": {
+        "state": "ready",
+        "mime": "video/mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "width": 320,
+        "height": 180,
+        "duration_ms": 500,
+        "bytes": 24336,
+        "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+        "url": "/home/v2/assets/102/video?revision=1"
+      },
+      "originals_allowed": false
+    },
+    {
+      "id": 101,
+      "kind": "photo",
+      "label": "Synthetic photo",
+      "width": 8,
+      "height": 8,
+      "previews": {
+        "grid": {
+          "state": "ready",
+          "width": 8,
+          "height": 8,
+          "bytes": 632,
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "url": "/home/v2/assets/101/preview?variant=grid&revision=1"
+        },
+        "display": {
+          "state": "ready",
+          "width": 8,
+          "height": 8,
+          "bytes": 632,
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "url": "/home/v2/assets/101/preview?variant=display&revision=1"
+        }
+      },
+      "video": null,
+      "originals_allowed": false
+    }
+  ]
+}

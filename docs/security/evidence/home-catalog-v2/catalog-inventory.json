@@ -1,0 +1,63 @@
+{
+  "visible_assets": 27842,
+  "hidden_assets_excluded": 364,
+  "kinds": {
+    "photo": 23599,
+    "video": 4243
+  },
+  "registered_bytes": {
+    "photo": 82080297423,
+    "video": 563971343901
+  },
+  "dimensions": {
+    "over_4k": 3616,
+    "up_to_4k": 19975,
+    "unknown": 4251
+  },
+  "formats": [
+    {
+      "kind": "photo",
+      "mime": "image/jpeg",
+      "extension": ".jpg",
+      "count": 23503
+    },
+    {
+      "kind": "video",
+      "mime": "video/mp4",
+      "extension": ".mp4",
+      "count": 4211
+    },
+    {
+      "kind": "photo",
+      "mime": "image/jpeg",
+      "extension": ".jpeg",
+      "count": 88
+    },
+    {
+      "kind": "video",
+      "mime": "video/quicktime",
+      "extension": ".mov",
+      "count": 32
+    },
+    {
+      "kind": "photo",
+      "mime": "image/png",
+      "extension": ".png",
+      "count": 8
+    }
+  ],
+  "recent_200_stat_sample": {
+    "sample_count": 200,
+    "original_exists": 200,
+    "thumbnail_256": 169,
+    "thumbnail_512": 0,
+    "video_sample": 52,
+    "video_frame_directory": 52
+  },
+  "elapsed_seconds": 4.719,
+  "evidence": "Read-only canonical catalog metadata; count matches live /assets. Stat sample is latest 200 IDs, not whole library. No decoded media or database copied to Mac.",
+  "query_first_attempt": "15-second progress budget interrupted; one 60-second-bounded retry completed in 4.719 seconds",
+  "saved_draft_albums": 0,
+  "originals_root_scope": "All visible rows under configured originals root; paths retained privately",
+  "physical_evidence": "User reports v3 connected and rendered striped synthetic image; remote controls, slideshow, sleep/wake and real playback not yet accepted."
+}

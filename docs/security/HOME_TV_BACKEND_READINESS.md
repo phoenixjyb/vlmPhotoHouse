@@ -1,5 +1,11 @@
 # Home TV backend readiness — Android integration may proceed
 
+**Full-catalog follow-up:** the user now wants all catalog photos/videos on TV.
+See [v2 catalog handoff](HOME_CATALOG_V2.md) for the separate source/fixture contract.
+V1 remains frozen and running. The user reports v3 connected and rendered its
+synthetic image; broader device acceptance and real-media publication remain open.
+The older selected-feed-only and physical-connection-pending wording below is historical.
+
 **Latest pilot status:** the scoped DNS resolver and synthetic feed are running,
 with DNS-to-HTTPS checks passed and no 30-minute shutdown deadline. Android is now
 implementing the user-requested app-scoped connection mapping; manual TV DNS is

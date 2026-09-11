@@ -1,0 +1,84 @@
+{
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 687,
+      "sha256": "6917d913fc5868e6b750c15da9f730f89fa93d282c3d804f99d4e938f9465dbd"
+    },
+    {
+      "path": "backend/app/home_catalog.py",
+      "bytes": 15515,
+      "sha256": "467b7fc9bcd04e07ff0578a4f4fe80a453d949fc850372986444c36c0592ab40"
+    },
+    {
+      "path": "backend/app/home_feed.py",
+      "bytes": 14397,
+      "sha256": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c"
+    },
+    {
+      "path": "scripts/build_home_catalog.py",
+      "bytes": 3758,
+      "sha256": "ae0f7f22214467507b9daedfe3e6d4a3439700015264ba378cded3f43004ae88"
+    },
+    {
+      "path": "scripts/build_home_catalog_fixture.py",
+      "bytes": 2719,
+      "sha256": "7e732dff39b5c4e9b8adf0df1d5ff03db08065fdfd2ad79d4e683f9223ec3d75"
+    },
+    {
+      "path": "scripts/home_catalog_app.py",
+      "bytes": 1487,
+      "sha256": "f1e1c620c9f706f7d1a34cd0a659bda190b074463efe287ee032fdbc86b6d147"
+    },
+    {
+      "path": "scripts/home_feed_app.py",
+      "bytes": 3114,
+      "sha256": "98c2bbcda284cfbc39f2d6c6bf2468ecae1c66952f2bad2ac512b09c3704a8ed"
+    },
+    {
+      "path": "scripts/security_inventory.py",
+      "bytes": 12703,
+      "sha256": "ffadd0929b3591dfa61a78b19b578a74ea9e329451a3f4efaaca13f94f304859"
+    },
+    {
+      "path": "tests/security/test_home_catalog.py",
+      "bytes": 20368,
+      "sha256": "71ee5380c6b8df6ff018a25654e885077289e0aa2b44c14a92c21f6956058858"
+    },
+    {
+      "path": "tests/security/test_inventory.py",
+      "bytes": 7215,
+      "sha256": "003e8e43e7c7d6aee9d6d625fcbde0c98370e5348d18c47a329852b994dde95e"
+    },
+    {
+      "path": "tests/security/fixtures/home-8x8.jpg",
+      "bytes": 632,
+      "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d"
+    },
+    {
+      "path": "tests/security/fixtures/home-video.mp4",
+      "bytes": 24336,
+      "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+    },
+    {
+      "path": "docs/security/home-catalog-contract-v2.json",
+      "bytes": 16767,
+      "sha256": "13cf10892dc4e91631ad71b5ee4bed21baa44697f1e779851c19026dbe606120"
+    },
+    {
+      "path": "docs/security/home-catalog-response-v2.example.json",
+      "bytes": 1756,
+      "sha256": "2cde48dd6de163e9fb0f78baf6de14e4da5bcdf12ce9d3830681d91dc4f109f9"
+    },
+    {
+      "path": "docs/security/route_capabilities.json",
+      "bytes": 122471,
+      "sha256": "11c5468c693eea95aebb804b15536183b69b05e49bc27a1cb8d4bd71a4567ce8"
+    },
+    {
+      "path": "docs/security/HOME_CATALOG_V2.md",
+      "bytes": 11381,
+      "sha256": "8f587fe63cd991a1c493afe12974e29e8195230433e66225f64a6fe3048ddc48"
+    }
+  ]
+}

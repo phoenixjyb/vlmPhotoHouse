@@ -1,0 +1,533 @@
+{
+  "contract": "photohouse.home-catalog",
+  "version": 2,
+  "authentication": "none; user-authorized whole visible catalog on explicit home LAN",
+  "sqlite_schema_change": false,
+  "protected_phone_api_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+  "v1_implementation_pin": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "v1_contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/home/v2/catalog",
+      "query": {
+        "page": "1..100000, default 1",
+        "page_size": "1..100, default 50",
+        "revision": "1..2147483647; optional on page 1, required on later pages"
+      },
+      "response": "catalog_response_schema"
+    },
+    {
+      "method": "GET",
+      "path": "/home/v2/assets/{asset_id}/preview",
+      "query": {
+        "variant": [
+          "grid",
+          "display"
+        ],
+        "revision": "required 1..2147483647"
+      },
+      "response": "image/jpeg; HEAD returns same length/status with no body; Range/If-Range rejected 400"
+    },
+    {
+      "method": "HEAD",
+      "path": "/home/v2/assets/{asset_id}/preview",
+      "query": {
+        "variant": [
+          "grid",
+          "display"
+        ],
+        "revision": "required 1..2147483647"
+      },
+      "response": "image/jpeg; HEAD returns same length/status with no body; Range/If-Range rejected 400"
+    },
+    {
+      "method": "GET",
+      "path": "/home/v2/assets/{asset_id}/video",
+      "query": {
+        "revision": "required 1..2147483647"
+      },
+      "response": "video/mp4; GET full 200 or single-range 206; HEAD 200 full Content-Length, no body, ignores Range"
+    },
+    {
+      "method": "HEAD",
+      "path": "/home/v2/assets/{asset_id}/video",
+      "query": {
+        "revision": "required 1..2147483647"
+      },
+      "response": "video/mp4; GET full 200 or single-range 206; HEAD 200 full Content-Length, no body, ignores Range"
+    }
+  ],
+  "pagination": {
+    "order": "asset id descending; one immutable offline snapshot",
+    "scope": "all active or NULL-status catalog IDs; hidden excluded; no latest-N cutoff",
+    "revision_change": "409 clears catalog/media and restarts page 1; 503 publication_changed is unavailable until operator restart",
+    "empty": "200 items=[], total=0, has_more=false; beyond-last-page also empty"
+  },
+  "range": {
+    "accepted": [
+      "bytes=start-end",
+      "bytes=start-",
+      "bytes=-suffix"
+    ],
+    "end": "inclusive; end beyond length clamped; suffix beyond length returns entire file with 206",
+    "malformed_multi_unsatisfiable": "416 JSON error plus Content-Range: bytes */N; no media",
+    "duplicate_range_or_if_range": "400 invalid_request",
+    "get_no_range": "200 complete prepared MP4 streamed in verified chunks",
+    "head": "Range ignored; complete prepared length; first chunk checked, remaining bytes not read",
+    "content_range": "206 includes bytes start-end/N",
+    "conditional": "No validators or If-Range fallback; no redirect",
+    "late_failure": "Connection terminates before unverified bytes; client must treat truncated response as failure"
+  },
+  "limits": {
+    "catalog_assets": 100000,
+    "catalog_file_bytes": 67108864,
+    "json_response_bytes": 524288,
+    "label_utf8_bytes": 256,
+    "title_utf8_bytes": 256,
+    "concurrent_requests_including_streams": 4,
+    "video_chunk_bytes": 4194304,
+    "video_max_bytes": 34359738368,
+    "video_max_duration_ms": 86400000,
+    "video_max_edge": 1920,
+    "video_max_pixels": 2073600,
+    "grid_max_edge": 512,
+    "grid_max_pixels": 262144,
+    "grid_max_bytes": 2097152,
+    "display_max_edge": 4096,
+    "display_max_pixels": 8847360,
+    "display_max_bytes": 12582912
+  },
+  "unavailable_reasons": [
+    "not_prepared",
+    "source_missing",
+    "unsupported",
+    "preparation_failed"
+  ],
+  "prepared_video_profile": "MP4 faststart, one H.264 8-bit yuv420p video <=1920 edge and <=1920x1080 pixels, <=30 fps, baseline/main/high <=level 4.1; zero or one AAC-LC audio track; no source metadata, subtitles, data tracks, chapters or attached images; offline verification required before publication",
+  "privacy": {
+    "originals_allowed": false,
+    "paths_gps_faces_captions_credentials": "never exported",
+    "all_responses": "no-store, no-cache, no-referrer, nosniff, same-origin CORP",
+    "network": "direct trusted HTTPS DNS origin + actual RFC1918 /24-or-narrower peers; no forwarded-header trust; no public ingress",
+    "unknown_routes_methods_credentials_cross_origin": "403 before storage",
+    "unavailable_media": "no URL, no original/legacy/provider fallback"
+  },
+  "lifecycle": {
+    "foreground": "clear old generation and fetch page 1",
+    "visible_revalidate_seconds": 60,
+    "background_disconnect_denied": "stop video/slideshow, clear or cover private content",
+    "busy": "429 Retry-After: 2",
+    "retry_seconds": [
+      2,
+      5,
+      15,
+      30,
+      60
+    ],
+    "revision_bound_media": true,
+    "disable": "403 new requests; active streams recheck control between chunks; admitted bytes and downloaded copies cannot be recalled"
+  },
+  "errors": {
+    "400": [
+      "invalid_request",
+      "revision_required"
+    ],
+    "403": [
+      "access_denied",
+      "feed_disabled"
+    ],
+    "404": [
+      "asset_unavailable",
+      "preview_unavailable",
+      "video_unavailable"
+    ],
+    "409": [
+      "feed_changed"
+    ],
+    "416": [
+      "range_not_satisfiable"
+    ],
+    "429": [
+      "busy"
+    ],
+    "503": [
+      "feed_unavailable",
+      "publication_changed"
+    ]
+  },
+  "catalog_response_example_file": "home-catalog-response-v2.example.json",
+  "source_only_boundary": "This contract does not mean real derivatives are prepared, v2 is deployed, or physical playback is accepted.",
+  "catalog_response_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "version": {
+        "const": 2
+      },
+      "revision": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2147483647
+      },
+      "library": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,64}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "page": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100000
+      },
+      "page_size": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100000
+      },
+      "has_more": {
+        "type": "boolean"
+      },
+      "items": {
+        "type": "array",
+        "maxItems": 100,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "kind": {
+              "enum": [
+                "photo",
+                "video",
+                "unsupported"
+              ]
+            },
+            "label": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "width": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "height": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "previews": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "grid": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "const": "unavailable"
+                        },
+                        "reason": {
+                          "enum": [
+                            "not_prepared",
+                            "source_missing",
+                            "unsupported",
+                            "preparation_failed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "reason"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "const": "ready"
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 512
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 512
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 2097152
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "url": {
+                          "type": "string",
+                          "pattern": "^/home/v2/assets/[1-9][0-9]*/preview\\?variant=(grid|display)&revision=[1-9][0-9]*$"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "width",
+                        "height",
+                        "bytes",
+                        "sha256",
+                        "url"
+                      ]
+                    }
+                  ]
+                },
+                "display": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "const": "unavailable"
+                        },
+                        "reason": {
+                          "enum": [
+                            "not_prepared",
+                            "source_missing",
+                            "unsupported",
+                            "preparation_failed"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "reason"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "const": "ready"
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 4096
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 4096
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 12582912
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "url": {
+                          "type": "string",
+                          "pattern": "^/home/v2/assets/[1-9][0-9]*/preview\\?variant=(grid|display)&revision=[1-9][0-9]*$"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "width",
+                        "height",
+                        "bytes",
+                        "sha256",
+                        "url"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "grid",
+                "display"
+              ]
+            },
+            "video": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "state": {
+                      "const": "unavailable"
+                    },
+                    "reason": {
+                      "enum": [
+                        "not_prepared",
+                        "source_missing",
+                        "unsupported",
+                        "preparation_failed"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "reason"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "state": {
+                      "const": "ready"
+                    },
+                    "mime": {
+                      "const": "video/mp4"
+                    },
+                    "video_codec": {
+                      "const": "h264"
+                    },
+                    "audio_codec": {
+                      "enum": [
+                        "aac",
+                        null
+                      ]
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1920
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1920
+                    },
+                    "duration_ms": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 86400000
+                    },
+                    "bytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 34359738368
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "url": {
+                      "type": "string",
+                      "pattern": "^/home/v2/assets/[1-9][0-9]*/video\\?revision=[1-9][0-9]*$"
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "mime",
+                    "video_codec",
+                    "audio_codec",
+                    "width",
+                    "height",
+                    "duration_ms",
+                    "bytes",
+                    "sha256",
+                    "url"
+                  ]
+                }
+              ]
+            },
+            "originals_allowed": {
+              "const": false
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "label",
+            "width",
+            "height",
+            "previews",
+            "video",
+            "originals_allowed"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "video"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "video": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "video": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "required": [
+      "version",
+      "revision",
+      "library",
+      "page",
+      "page_size",
+      "total",
+      "has_more",
+      "items"
+    ],
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+  }
+}
