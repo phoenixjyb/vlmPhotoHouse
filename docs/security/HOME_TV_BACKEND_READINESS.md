@@ -1,5 +1,11 @@
 # Home TV backend readiness — Android integration may proceed
 
+**Latest pilot status:** the user has since authorized the bounded synthetic LAN
+deployment through the Android task. The earlier preparation-only authorization
+statements below describe that prior milestone. Current preflight is blocked by
+direct Windows SSH authentication and unresolved normal local DNS. See the
+[pilot return](HOME_TV_LAN_PILOT_RETURN.md); no new feed has been started.
+
 **The anonymous feed contract is frozen and ready for local Android integration.
 Synthetic LAN deployment is planned, not authorized or executed by this follow-up.**
 The user chose selected-photo sharing without personal sign-in or device approval.

@@ -5,7 +5,7 @@
   "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
   "android_integration_ready": true,
   "deployment_ready": false,
-  "deployment_authorized": false,
+  "deployment_authorized": true,
   "actual_feed_served": false,
   "policy": "anonymous selected home LAN feed; no device approval or personal sign-in",
   "synthetic_selection": {
@@ -32,7 +32,7 @@
   },
   "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
   "unresolved_gates": [
-    "explicit synthetic deployment authority and operator",
+    "working authorized Windows SSH route; relay exception pending",
     "current host/interface/port identity",
     "normal projector DNS route without public forwarding",
     "current certificate/key ACL and client system trust",
@@ -60,5 +60,14 @@
     "review_receipt": "evidence/home-tv-feed-readiness/android-review.json",
     "configured_apk_ready": false,
     "physical_device_accepted": false
+  },
+  "active_pilot": {
+    "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
+    "scope": "separate synthetic selected home-LAN deployment only",
+    "authority": "user continuation relayed by Android task after local review",
+    "private_handoff_reference": "HOME-FEED-E6B2827-LAN-PILOT",
+    "status": "preflight in progress; direct SSH authentication rejected; normal DNS is public",
+    "no_real_selection": true,
+    "preserve_caption_and_protected_services": true
   }
 }
