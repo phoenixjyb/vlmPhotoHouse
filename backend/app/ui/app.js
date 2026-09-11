@@ -9,6 +9,7 @@ const state = {
     stories: [],
   },
   selectedAsset: null,
+  inspectorRequest: 0,
   persons: [],
   namedPersons: [],
   showUnnamedPeople: false,
@@ -293,6 +294,8 @@ const I18N = {
     create_person: "Create Person",
     create_and_assign: "Create + Assign",
     assign_to_person: "Assign to person...",
+    face_people_loading: "Loading saved people…",
+    face_people_failed: "Saved people could not be loaded. Retry before assigning or creating a person.",
     current_person: "Current: Person {id}",
     person_fallback: "Person {id}",
     new_person: "+ New Person",
@@ -669,6 +672,8 @@ const I18N = {
     create_person: "新建人物",
     create_and_assign: "新建并分配",
     assign_to_person: "分配到人物...",
+    face_people_loading: "正在加载已保存的人物…",
+    face_people_failed: "无法加载已保存的人物，请重试后再分配或新建人物。",
     current_person: "当前: 人物 {id}",
     person_fallback: "人物 {id}",
     new_person: "+ 新建人物",
@@ -2816,6 +2821,7 @@ async function restoreSimilarityReduction() {
 }
 
 function closeAssetInspector() {
+  state.inspectorRequest++;
   document.body.dataset.inspecting = "false";
   state.selectedAsset = null;
   qs("asset-inspector").classList.add("hidden");
@@ -3127,6 +3133,7 @@ function closePreviewModal() {
 }
 
 async function loadAssetInspector(assetId) {
+  const request = ++state.inspectorRequest;
   const id = Number(assetId);
   let asset = state.assetMap.get(id);
   if (!asset) {
@@ -3141,7 +3148,7 @@ async function loadAssetInspector(assetId) {
       return;
     }
   }
-  if (!asset) return;
+  if (!asset || request !== state.inspectorRequest) return;
   document.body.dataset.inspecting = "true";
   state.selectedAsset = asset;
   if (state.libraryViewItems.length) {
@@ -3152,6 +3159,7 @@ async function loadAssetInspector(assetId) {
   qs("asset-inspector").classList.remove("hidden");
   qs("asset-id").textContent = t("asset_prefix", { id: asset.id });
   qs("asset-path").textContent = asset.path || t("unknown_path");
+  qs("face-list").innerHTML = `<p role="status" class="muted">${esc(t("face_people_loading"))}</p>`;
 
   const preview = qs("asset-preview");
   if (isVideoAsset(asset)) {
@@ -3161,15 +3169,20 @@ async function loadAssetInspector(assetId) {
   }
 
   try {
-    const [captions, tags, faces] = await Promise.all([
+    const [captions, tags, faces, namedPeople] = await Promise.all([
       api(`/assets/${asset.id}/captions`),
       api(`/assets/${asset.id}/tags`),
       api(`/faces?asset_id=${asset.id}&page=1&page_size=200`),
+      loadNamedPeople().catch(() => null),
     ]);
+    if (request !== state.inspectorRequest) return;
+    if (namedPeople !== null) state.namedPersons = namedPeople;
     renderCaptions(captions.captions || []);
     renderTags(tags.tags || []);
-    renderFaces(faces.faces || []);
+    renderFaces(faces.faces || [], namedPeople !== null);
   } catch (e) {
+    if (request !== state.inspectorRequest) return;
+    qs("face-list").textContent = t("inspector_load_failed", { error: e.message });
     showToast(t("inspector_load_failed", { error: e.message }));
   }
 }
@@ -3333,13 +3346,14 @@ function personOptions(currentId) {
   return base.join("");
 }
 
-function renderFaces(faces) {
+function renderFaces(faces, namesReady = true) {
   const root = qs("face-list");
   if (!faces.length) {
     root.innerHTML = `<p class="muted">${esc(t("no_face_detections"))}</p>`;
     return;
   }
-  root.innerHTML = faces
+  const warning = namesReady ? "" : `<div role="alert"><p>${esc(t("face_people_failed"))}</p><button type="button" class="btn ghost" data-action="retry-face-people">${esc(t("retry"))}</button></div>`;
+  root.innerHTML = warning + faces
     .map(
       (f) => {
         const source = String(f.label_source || "").trim();
@@ -3358,12 +3372,12 @@ function renderFaces(faces) {
           <div class="face-body">
             <p class="small muted">${esc(t("face_prefix", { id: f.id }))}</p>
             ${sourceLine}
-            <select id="face-person-${f.id}">${personOptions(f.person_id)}</select>
-            <input id="face-new-name-${f.id}" type="text" placeholder="${esc(t("new_person_name_ph"))}" />
+            <select id="face-person-${f.id}" ${namesReady ? "" : "disabled"}>${namesReady ? personOptions(f.person_id) : `<option value="">${esc(t("assign_to_person"))}</option>`}</select>
+            <input id="face-new-name-${f.id}" type="text" ${namesReady ? "" : "disabled"} placeholder="${esc(t("new_person_name_ph"))}" />
             <div class="controls">
               <button class="btn ghost" data-action="open-face-asset" data-face-id="${f.id}" data-asset-id="${f.asset_id}">${esc(t("popup_open_asset"))}</button>
-              <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}">${esc(t("assign"))}</button>
-              <button class="btn ghost" data-action="create-assign-face" data-face-id="${f.id}">${esc(t("create_and_assign"))}</button>
+              <button class="btn ghost" data-action="assign-face" data-face-id="${f.id}" ${namesReady ? "" : "disabled"}>${esc(t("assign"))}</button>
+              <button class="btn ghost" data-action="create-assign-face" data-face-id="${f.id}" ${namesReady ? "" : "disabled"}>${esc(t("create_and_assign"))}</button>
               <button class="btn ghost" data-action="assign-face-stranger" data-face-id="${f.id}">${esc(t("mark_stranger"))}</button>
               <button class="btn danger" data-action="delete-face" data-face-id="${f.id}">${esc(t("not_face"))}</button>
             </div>
@@ -3375,6 +3389,22 @@ function renderFaces(faces) {
     .join("");
 }
 
+// Fetch fresh names for each assignment surface, independently of the People tab.
+// Stable ID ordering avoids page drift when face counts change during loading.
+async function loadNamedPeople() {
+  const people = new Map();
+  for (let page = 1; ; page++) {
+    const data = await api(`/persons?page=${page}&page_size=500&include_faces=false&named_only=true&sort_by=id&order=asc`);
+    if (!Array.isArray(data.persons)) throw new Error("Invalid people response");
+    const total = Number(data.total ?? data.persons.length);
+    if (!Number.isFinite(total) || total < 0) throw new Error("Invalid people total");
+    const previous = people.size;
+    for (const person of data.persons) people.set(Number(person.id), person);
+    if (people.size >= total) return [...people.values()];
+    if (people.size === previous) throw new Error("Incomplete people response");
+  }
+}
+
 async function loadPeople() {
   try {
     state.showUnnamedPeople = Boolean(qs("people-show-unnamed")?.checked);
@@ -3383,10 +3413,10 @@ async function loadPeople() {
       : "/persons?page=1&page_size=240&include_faces=true&named_only=true&sort_by=face_count&order=desc";
     const [data, named] = await Promise.all([
       api(personsUrl),
-      api("/persons?page=1&page_size=500&include_faces=false&named_only=true&sort_by=face_count&order=desc"),
+      loadNamedPeople(),
     ]);
     state.persons = data.persons || [];
-    state.namedPersons = named.persons || [];
+    state.namedPersons = named;
     renderPeopleList();
     await loadUnassignedFaces(state.unassignedFacesPager.page || 1);
   } catch (e) {
@@ -4122,6 +4152,10 @@ function initEvents() {
   qs("face-list").addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
+    if (btn.dataset.action === "retry-face-people") {
+      if (state.selectedAsset) await loadAssetInspector(state.selectedAsset.id);
+      return;
+    }
     if (btn.dataset.action === "open-face-asset") {
       await openAssetFromFaceAssetId(btn.dataset.assetId);
       return;

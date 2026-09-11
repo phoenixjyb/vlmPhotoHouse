@@ -36,6 +36,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     page.on('pageerror', error => errors.push(error.message));
     let failStories = true, empty = false, brokenImages = false, delayedCaption = false, lastQuery = null, searchCalls = 0;
     let longCaptions = false, failOriginal = false, delayOriginal = false, originals = 0;
+    let people = [], failNamesPage = 0, delayNamesOnce = false, assignedPerson = null;
     await page.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
       if (url.hostname !== '127.0.0.1') return route.abort();
@@ -57,7 +58,19 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
       }
       let data = {};
       if (url.pathname === '/assets') data = { assets: empty ? [] : assets, total: empty ? 0 : assets.length };
-      if (url.pathname === '/persons') data = { persons: [] };
+      if (url.pathname === '/persons') {
+        const pageNumber = Number(url.searchParams.get('page') || 1), size = Number(url.searchParams.get('page_size') || 50);
+        if (url.searchParams.get('include_faces') === 'false') {
+          if (delayNamesOnce) { delayNamesOnce = false; await sleep(600); }
+          if (pageNumber === failNamesPage) return route.fulfill({ status: 503, json: { detail: 'Names unavailable' } });
+        }
+        data = { persons: people.slice((pageNumber - 1) * size, pageNumber * size), total: people.length };
+      }
+      if (url.pathname === '/faces') {
+        const id = Number(url.searchParams.get('asset_id'));
+        data = { faces: id ? [{ id: id * 10 + 1, asset_id: id, person_id: id === 1 ? 501 : null }] : [], total: id ? 1 : 0 };
+      }
+      if (/\/faces\/\d+\/assign$/.test(url.pathname)) assignedPerson = request.postDataJSON().person_id;
       if (url.pathname === '/albums/stories') {
         await sleep(150);
         if (failStories) return route.fulfill({ status: 503, json: { detail: 'Fixture unavailable' } });
@@ -214,6 +227,44 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(await page.locator('#tab-library .left-panel').isVisible(), false);
     await page.locator('#btn-asset-back').click();
     assert.equal(await page.locator('#tab-home').getAttribute('aria-hidden'), 'false', 'Details returns to its original view');
+
+    // Direct Library entry must not depend on visiting People. Exercise two
+    // pages, an existing assignment, and Chinese/escaped names.
+    people = Array.from({ length: 501 }, (_, i) => ({ id: i + 1, display_name: i === 500 ? '家人 <测试>' : `Person ${i + 1}`, face_count: 1 }));
+    await page.goto(base + '?tab=library');
+    await page.locator('#library-grid .asset-card').first().click();
+    await page.locator('#btn-preview-details').click();
+    await page.waitForFunction(() => document.querySelector('#face-person-11 option[value="501"]')?.textContent === '家人 <测试>');
+    assert.equal(await page.locator('#face-person-11 option').count(), 504, 'All 501 names plus action options appear without People navigation');
+    assert.equal(await page.locator('#face-person-11').inputValue(), '501', 'Existing assignment remains selected');
+    await page.locator('#face-person-11').selectOption('500');
+    await page.locator('[data-action="assign-face"][data-face-id="11"]').click();
+    await page.waitForFunction(() => document.querySelector('#face-person-11 option[value="501"]'));
+    assert.equal(assignedPerson, 500, 'Assignment sends the saved person ID (mock API only)');
+    people[500].display_name = 'Updated family name';
+    await page.evaluate(() => loadAssetInspector(1));
+    assert.equal(await page.locator('#face-person-11 option[value="501"]').innerText(), 'Updated family name', 'Reopening refreshes renamed people');
+    failNamesPage = 2;
+    await page.evaluate(() => loadAssetInspector(1));
+    assert.equal(await page.locator('#face-person-11').isDisabled(), true, 'A failed later page cannot expose a partial or stale list');
+    assert.equal(await page.locator('[data-action="create-assign-face"][data-face-id="11"]').isDisabled(), true, 'Loading failure does not encourage duplicate creation');
+    assert.match(await page.locator('#face-list [role="alert"]').innerText(), /Saved people could not be loaded/);
+    assert.match(await page.locator('#caption-list textarea').first().inputValue(), /Memory 1/, 'Name failure does not hide captions');
+    failNamesPage = 0;
+    await page.locator('[data-action="retry-face-people"]').click();
+    await page.waitForFunction(() => document.querySelector('#face-person-11')?.disabled === false);
+    assert.equal(await page.locator('#face-person-11 option').count(), 504);
+    delayNamesOnce = true;
+    await page.evaluate(() => Promise.all([loadAssetInspector(1), loadAssetInspector(2)]));
+    assert.equal(await page.locator('#face-person-21').count(), 1, 'Late responses cannot repaint the previous asset');
+    assert.equal(await page.locator('#face-person-11').count(), 0);
+    people = [];
+    await page.evaluate(() => loadAssetInspector(2));
+    assert.equal(await page.locator('#face-person-21').isDisabled(), false, 'Empty saved list is distinct from an error');
+    assert.equal(await page.locator('#face-person-21 option').count(), 3);
+    console.log('PASS: direct face picker, 501 names/pagination, existing and mock assignment, rename refresh, partial failure/retry, empty list, stale inspector response.');
+    await page.goto(base);
+    await card.waitFor();
 
     await page.locator('.lang-btn[data-lang="zh"]').click();
     await card.click();
