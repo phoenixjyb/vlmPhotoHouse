@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "path": "scripts/prepare_home_catalog.py",
+      "bytes": 24826,
+      "sha256": "2bbb6f3ee4242274b5d27091c7fb93a70c8a15788b651bf1237ac466f8c87118"
+    },
+    {
+      "path": "tests/security/test_home_preparer.py",
+      "bytes": 15461,
+      "sha256": "b66b2c33ae1dca0db755df539b8b8f27f56c9844ad8862888629409093c907e6"
+    },
+    {
+      "path": "backend/requirements-home-preparation.lock",
+      "bytes": 361,
+      "sha256": "652c7ca450144abf07fc3b7e6bdcd76af6cb7ff46fbf6b673c2a7fe141ca9076"
+    },
+    {
+      "path": "docs/security/HOME_PREPARATION.md",
+      "bytes": 9431,
+      "sha256": "10a0b09e88484616369e2043ef8a51eb7f6a8a1df883f5cfd944c45c4bf6dac8"
+    },
+    {
+      "path": "docs/security/HOME_PREPARATION_CANARY_PLAN.md",
+      "bytes": 9781,
+      "sha256": "3328817bc59b0c252b9c950179d077b5cdb8465bcebb7ec4982b9366e257ca36"
+    },
+    {
+      "path": "docs/security/evidence/home-preparation/benchmark.py",
+      "bytes": 5790,
+      "sha256": "fed113f13f3693841832a97b73add45e2de052da4fcb763c57958ede6253c918"
+    }
+  ]
+}

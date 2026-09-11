@@ -1,0 +1,94 @@
+{
+  "synthetic_only": true,
+  "platform": "Darwin",
+  "machine": "arm64",
+  "python": "3.12.12",
+  "pillow": "12.3.0",
+  "ffmpeg": "ffmpeg version 9.0.1 Copyright (c) 2000-2026 the FFmpeg developers",
+  "inputs": {
+    "photo_pixels": [
+      4000,
+      3000
+    ],
+    "photo_bytes": 9079711,
+    "video_pixels": [
+      1920,
+      1080
+    ],
+    "video_seconds": 6,
+    "video_bytes": 4664237
+  },
+  "elapsed_prepare_seconds": 6.511,
+  "verified_resume_seconds": 0.02,
+  "child_usage": {
+    "user_seconds": 6.709,
+    "system_seconds": 0.235,
+    "maxrss_raw_including_fixture_generation": 380452864,
+    "maxrss_units": "bytes on Darwin, KiB on Linux; not an isolated preparation peak"
+  },
+  "items": [
+    {
+      "synthetic_id": 101,
+      "preparation_seconds": 0.602,
+      "grid": {
+        "state": "ready",
+        "width": 384,
+        "height": 512,
+        "bytes": 47842,
+        "sha256": "da6bdddccb160cf94b5dee322c8c7f9c20c1ea5a8e1af55cd3e338fda993f016"
+      },
+      "display": {
+        "state": "ready",
+        "width": 2575,
+        "height": 3433,
+        "bytes": 5370100,
+        "sha256": "4b46fbac7179006ee4ac09006726f84d08f4d845ac955ae2d53844ef33226e80"
+      },
+      "video": null
+    },
+    {
+      "synthetic_id": 102,
+      "preparation_seconds": 5.893,
+      "grid": {
+        "state": "ready",
+        "width": 512,
+        "height": 288,
+        "bytes": 13650,
+        "sha256": "34c695343b0127026ae95160847937d798b24902a0a27886528ffb9131f107b1"
+      },
+      "display": {
+        "state": "ready",
+        "width": 1920,
+        "height": 1080,
+        "bytes": 100529,
+        "sha256": "b2f7eaf16daf15f342372ea3acf6dd8e88ec8d2ca1cf87b948c4e181e6bae89b"
+      },
+      "video": {
+        "state": "ready",
+        "mime": "video/mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "width": 1920,
+        "height": 1080,
+        "duration_ms": 6000,
+        "bytes": 4432263,
+        "sha256": "d38336fe8b9c054e4f073aa8d44a47c28d6f47923c84a1cdec69a36cbab253e5",
+        "chunks_sha256": "c5f8e1862b3a5337690363c65d850580d1b1e80d3b1d8cc645550ff9e56543f6"
+      }
+    }
+  ],
+  "workspace_bytes": 10259678,
+  "publication_bytes": 9965804,
+  "source_and_database_hashes_unchanged": true,
+  "published_enabled": false,
+  "windows_canary_run": false,
+  "listeners": false,
+  "prepared_publication_asgi": {
+    "initial_disabled": true,
+    "catalog": true,
+    "valid_mp4_range_across_4mib_boundary": true,
+    "video_head": true,
+    "photo_display": true,
+    "disabled_restored": true
+  }
+}
