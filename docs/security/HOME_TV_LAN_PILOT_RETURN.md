@@ -95,3 +95,22 @@ is not the next step. Android owns the private configured APK and real JMGO remo
 image quality, slideshow, sleep/wake, reconnect and disable/removal acceptance. A
 candidate configured build can be prepared with networking explicitly pending; no
 TLS bypass or forced diagnostic mapping counts as completed device access.
+
+## Configured TV APK received
+
+Android evidence commit `887db83eb96db136d85589276bc9c6e93081bb54` returns the
+private configured build from unchanged source
+`e8ab9be3c5497778783edf1b4a009707922248d1`. Backend review independently verified
+APK SHA-256 `15680809a11ab00639046bf2cca30953d66fea4b84061bd4437c1edfdbcca795`,
+size 8,834,278 bytes, package `dev.photohouse.tv`, version code 2 /
+`0.2-home-feed-dev`, and debug signer SHA-256
+`56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28`.
+No main APK assets exist; the private origin handoff hash matches and that origin
+string is present in the APK DEX. Exact private artifact reference:
+`HOME-TV-E8AB9BE-CONFIGURED-NETWORK-PENDING`.
+
+Android reports a successful offline build/lint with zero errors and the same three
+warnings. Backend did not rerun builds or test suites for this artifact review.
+Android found no ADB-connected device. The configured artifact is available, but
+normal DNS, service resume and physical installation/acceptance remain pending.
+No backend runtime or mobile source change accompanied this receipt.

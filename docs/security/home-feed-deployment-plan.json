@@ -59,8 +59,21 @@
     "evidence_commit": "c866c74de881a24714282bbb8c426f7c29d03103",
     "apk_sha256": "3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1",
     "review_receipt": "evidence/home-tv-feed-readiness/android-review.json",
-    "configured_apk_ready": false,
-    "physical_device_accepted": false
+    "configured_apk_ready": true,
+    "physical_device_accepted": false,
+    "configured_apk_network_verified": false,
+    "configured_apk_sha256": "15680809a11ab00639046bf2cca30953d66fea4b84061bd4437c1edfdbcca795",
+    "configured_apk_bytes": 8834278,
+    "configured_apk_signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
+    "configured_build_evidence_commit": "887db83eb96db136d85589276bc9c6e93081bb54",
+    "configured_build_private_reference": "HOME-TV-E8AB9BE-CONFIGURED-NETWORK-PENDING",
+    "backend_review_checks": [
+      "APK checksum and size",
+      "APK signer and package/version",
+      "no main APK assets",
+      "private origin handoff checksum and origin string in DEX"
+    ],
+    "configured_build_receipt_sha256": "1fb9e8a5ec2812d097851ae2c399647a6358bfb09c4ddd6aa824095ae91f4198"
   },
   "active_pilot": {
     "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
