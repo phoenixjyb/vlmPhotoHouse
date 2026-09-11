@@ -1,9 +1,10 @@
 # PH-BACKEND-HOME-TV-LAN-PILOT-01 — Windows staged, TV routing pending
 
-The independent Windows synthetic feed has been staged and exercised over real
-home-LAN HTTPS. **It is currently stopped, with its temporary firewall rules removed.**
-Normal projector DNS and physical TV acceptance remain unresolved. No real family
-photos are selected, and this is not a completed LAN-wide deployment.
+**Current status:** the scoped DNS resolver and synthetic feed are running. See the
+[DNS pilot return](HOME_TV_DNS_PILOT_RETURN.md) for current rules, tests and the
+projector Save step. No real family photos are selected; device acceptance remains
+pending. The diagnostic staging/restart evidence below describes the earlier run,
+which ended with the feed stopped before the subsequent DNS setup.
 
 ## Exact artifact and runtime
 
@@ -51,8 +52,8 @@ Broader LAN admission and proxy/SNAT isolation still require actual network evid
 
 The task `PhotoHouse-HomeFeed-Synthetic` is manual-start, interactive user, Limited,
 with a 30-minute execution limit and zero triggers verified independently in exported
-XML. The scoped stop/config-switch/restart sequence changed only its process. The
-final task is Ready/stopped, no feed listener remains, and both temporary rules are
+XML. The scoped stop/config-switch/restart sequence changed only its process. At the end of that diagnostic, the
+final task was Ready/stopped, no feed listener remains, and both temporary rules are
 gone. Publication directory `publication-r1` now holds synthetic asset 101 at revision
 4; the alternate revision-5 publication and previous configs are preserved. Grid
 and 3840x2160 display bytes still match the frozen fixtures; originals remain off.

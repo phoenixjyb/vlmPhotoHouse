@@ -1,10 +1,11 @@
 # Home TV backend readiness — Android integration may proceed
 
-**Latest pilot status:** the authorized Windows synthetic pilot passed 37 real HTTPS
-checks. It is now stopped with temporary firewall rules removed; normal projector
-DNS and device acceptance remain pending. Direct SSH is resolved. See the
-[pilot return](HOME_TV_LAN_PILOT_RETURN.md). The preparation-only authorization and
-local-packaging statements below describe the earlier readiness milestone.
+**Latest pilot status:** the scoped DNS resolver and synthetic feed are running,
+with DNS-to-HTTPS checks passed and no 30-minute shutdown deadline. Android is now
+implementing the user-requested app-scoped connection mapping; manual TV DNS is
+not required for that new build. Physical app acceptance remains pending. See
+the [DNS pilot return](HOME_TV_DNS_PILOT_RETURN.md). Preparation-only authorization,
+packaging and earlier diagnostic statements below describe historical milestones.
 
 **The anonymous feed contract is frozen and ready for local Android integration.
 Synthetic LAN deployment is planned, not authorized or executed by this follow-up.**

@@ -1,0 +1,139 @@
+{
+  "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
+  "stage": "DNS resolver and synthetic feed running for projector pilot",
+  "runtime_source_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "projector_input": {
+    "source": "user-supplied settings photo",
+    "private_photo_sha256": "e483f4cae669ffb25e896fc6f634a547b141f797f9901927d2cfccc060d3dac2",
+    "manual_dns_control_observed": true,
+    "saved_settings_remotely_verified": false
+  },
+  "resolver": {
+    "version": "1.14.7",
+    "release": "https://github.com/coredns/coredns/releases/tag/v1.14.7",
+    "archive_url": "https://github.com/coredns/coredns/releases/download/v1.14.7/coredns_1.14.7_windows_amd64.zip",
+    "archive_sha256": "6b718a5ed57d7034b1e4c3df500121307830da291d15cf8387f41c297c6fdd56",
+    "archive_bytes": 23421098,
+    "exe_sha256": "a6ac3466a93f907c5ef7c170a41fdc6901df195da223c60adeca8de1a891d8b5",
+    "exe_bytes": 78098944
+  },
+  "resolver_configuration": {
+    "single_private_wired_bind": true,
+    "tcp_and_udp": true,
+    "local_photohouse_a_record": true,
+    "local_aaaa_empty": true,
+    "other_queries_forward_to_existing_projector_resolver": true,
+    "client_allowlist_count": 2,
+    "acl_on_local_and_forwarded_zones": true,
+    "coredns_query_logging_enabled": false,
+    "go_max_procs": 2,
+    "go_memory_soft_limit": "128MiB",
+    "priority": "BelowNormal"
+  },
+  "firewall": {
+    "owned_rule_count": 6,
+    "dns_rules_program_scoped": true,
+    "wired_address_only": true,
+    "other_ipv4_sources_explicitly_blocked": true,
+    "router_or_global_dns_changed": false,
+    "public_forwarding_added": false
+  },
+  "checks": {
+    "dns_allowed_cases": 11,
+    "dns_denied_cases": 4,
+    "dns_allowed_cases_passed_again_after_restart": true,
+    "dns_stop_and_restart_verified": true,
+    "dns_response_driven_https_cases": 7,
+    "additional_windows_https_denied_peer": 1,
+    "tls_bypass": false,
+    "hardcoded_connect_address_override_used_in_dns_driven_test": false,
+    "os_resolver_modified": false,
+    "normal_projector_dns_verified": false,
+    "physical_guest_or_wan_probe_performed": false
+  },
+  "current_services": [
+    {
+      "name": "PhotoHouse-HomeFeed-Synthetic",
+      "state": "Running",
+      "manual_start": true,
+      "trigger_count": 0,
+      "execution_time_limit": "PT0S",
+      "logon": "Interactive",
+      "run_level": "Limited"
+    },
+    {
+      "name": "PhotoHouse-HomeFeed-DNS-Pilot",
+      "state": "Running",
+      "manual_start": true,
+      "trigger_count": 0,
+      "execution_time_limit": "PT0S",
+      "logon": "Interactive",
+      "run_level": "Limited"
+    }
+  ],
+  "preservation": {
+    "caption_and_api_process_ids_start_times_paths": true,
+    "shared_access_running_same_pid": true,
+    "shared_access_wildcard_udp_endpoint_retained": true,
+    "protected_task_remains_stopped": true,
+    "real_media_accessed": false,
+    "mobile_repository_modified": false
+  },
+  "lifecycle_limitations": [
+    "Manual tasks have no boot/logon trigger; Windows and this user session must remain available.",
+    "DNS wrapper native child survived raw Stop-ScheduledTask; the tested scoped stop/restart procedure additionally terminates only the exact private CoreDNS binary path.",
+    "Restore the projector previous DNS before ending the DNS pilot."
+  ],
+  "helper_corrections": [
+    "Plugin inventory used bare names, not dns-prefixed names; guard corrected before listener start.",
+    "Initial start caller timed out although DNS queries succeeded. Wrapper now explicitly redirects its own standard streams and closes child stdin; independent state and subsequent restart completed successfully."
+  ],
+  "dns_files": [
+    {
+      "sha256": "a6ac3466a93f907c5ef7c170a41fdc6901df195da223c60adeca8de1a891d8b5",
+      "file": "coredns.exe"
+    },
+    {
+      "sha256": "2436a78ba16e8e08e350b671451715a604dd3731f271222ad54d898a6ae35862",
+      "file": "Corefile"
+    },
+    {
+      "sha256": "8e3fe61b10401d518e76f962fa952fec1c36c5de3788ab55ffdb3aae7db8a213",
+      "file": "home.hosts"
+    },
+    {
+      "sha256": "5cdfd7847b6dad07879dd25cbdbf7421dcb3a09c596ebf4854f4e043b31460fd",
+      "file": "run-dns.py"
+    },
+    {
+      "sha256": "bf90c05ba75b9b36507b20688ebd20809692560ceacf8e1644358573031215a7",
+      "file": "stop-dns.ps1"
+    }
+  ],
+  "evidence_sha256": {
+    "dns-inspect.stdout": "41bb4f9c7947af8cc7743b0060fb19ecb4db01921918372bbfaa0c37a96661b5",
+    "dns-plugins.stdout": "c1bfe4310f82f72ba443501aef69b000676be6c3c1553ea2dee96475724302d1",
+    "dns-state.stdout": "4c207f5bb598f1d64637da4c4914b2907f8a4f1f506d1dc27bf536649a599692",
+    "dns-restart.stdout": "c0ea11cf0b7229c00b3e643a7987bfe880d471ce9ca949e7070299eeaf0c28da",
+    "dns-tests.before-restart.json": "3687b52ac6057a16194e6a7d803821fca8d635c1fbe259fe9d38deaee6c95c06",
+    "dns-tests.json": "3687b52ac6057a16194e6a7d803821fca8d635c1fbe259fe9d38deaee6c95c06",
+    "dns-denial.stdout": "7ef0e9b29a8d83552888a2b16218731af3c4233e06499ea35976b97a1db1e68f",
+    "dns-driven-https.json": "6a8a4ed0dbf5090cff92fd05c02e807c3412326507da6d07a915898ec549d51f",
+    "dns-feed-final.json": "142e38cfe1787b6ee613952483d8144f49dc3e50fcfebeb28c0e8f5fd12221e9"
+  },
+  "remaining_gates": [
+    "Android mapped APK source/identity and canonical-address/hostname/TLS validation",
+    "Physical JMGO install and app connection, remote/image/slideshow/lifecycle acceptance",
+    "Confirm prior projector DNS Save state before any resolver retirement",
+    "Broader audience/network acceptance and durable startup/renewal remain separate"
+  ],
+  "subsequent_client_plan": {
+    "mode": "app-scoped exact-host LAN address mapping requested by user",
+    "owner": "Android task",
+    "implementation_and_tls_tests_pending": true,
+    "manual_projector_dns_required_for_new_apk": false,
+    "normal_system_dns_acceptance_claimed": false,
+    "existing_resolver_retained_due_to_unknown_saved_projector_setting": true
+  }
+}

@@ -6,7 +6,7 @@
   "android_integration_ready": true,
   "deployment_ready": false,
   "deployment_authorized": true,
-  "actual_feed_served": false,
+  "actual_feed_served": true,
   "policy": "anonymous selected home LAN feed; no device approval or personal sign-in",
   "synthetic_selection": {
     "feed_id": "synthetic-home",
@@ -34,12 +34,10 @@
   },
   "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
   "unresolved_gates": [
-    "JMGO network identity and normal DNS controls",
-    "normal client local hostname route",
-    "selected LAN guest and outside isolation including proxy or SNAT paths",
-    "reviewed client admission and scoped rules before resuming service",
-    "configured TV APK identity and physical JMGO acceptance",
-    "managed long-term startup and renewed-certificate reload ownership"
+    "Android mapped APK source/identity and canonical-address/hostname/TLS validation",
+    "Physical JMGO install and app connection, remote/image/slideshow/lifecycle acceptance",
+    "Confirm prior projector DNS Save state before any resolver retirement",
+    "Broader audience/network acceptance and durable startup/renewal remain separate"
   ],
   "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
   "archive_bytes": 596784,
@@ -80,7 +78,7 @@
     "scope": "separate synthetic selected home-LAN deployment only",
     "authority": "user continuation relayed by Android task after local review",
     "private_handoff_reference": "HOME-FEED-E6B2827-LAN-PILOT",
-    "status": "Windows staged and diagnostic HTTPS verified; task stopped pending normal DNS and TV inputs",
+    "status": "HTTPS and previously configured DNS running; Android implementing user-requested app-scoped mapping",
     "no_real_selection": true,
     "preserve_caption_and_protected_services": true
   },
@@ -88,12 +86,10 @@
   "diagnostic_feed_was_served": true,
   "actual_feed_served_semantics": "current listener state; diagnostic serving history is recorded separately",
   "remaining_gates": [
-    "JMGO network identity and normal DNS controls",
-    "normal client local hostname route",
-    "selected LAN guest and outside isolation including proxy or SNAT paths",
-    "reviewed client admission and scoped rules before resuming service",
-    "configured TV APK identity and physical JMGO acceptance",
-    "managed long-term startup and renewed-certificate reload ownership"
+    "Android mapped APK source/identity and canonical-address/hostname/TLS validation",
+    "Physical JMGO install and app connection, remote/image/slideshow/lifecycle acceptance",
+    "Confirm prior projector DNS Save state before any resolver retirement",
+    "Broader audience/network acceptance and durable startup/renewal remain separate"
   ],
   "private_target_inputs_note": "Exact resolved values are retained only in the private handoff; null values here do not mean every input is unknown.",
   "resolved_private_inputs": [
@@ -105,5 +101,18 @@
     "approved_operator",
     "authorized_window"
   ],
-  "pilot_receipt": "evidence/home-tv-feed-readiness/windows-lan-pilot.json"
+  "pilot_receipt": "evidence/home-tv-feed-readiness/windows-lan-pilot.json",
+  "dns_resolver_ready_for_projector_setting": true,
+  "projector_dns_setting_saved_verified": false,
+  "dns_receipt": "evidence/home-tv-feed-readiness/dns-ready-pilot.json",
+  "diagnostic_shutdown_deadline": null,
+  "manual_start_tasks_no_boot_triggers": true,
+  "client_connection_plan": {
+    "mode": "app-scoped exact-host LAN address mapping requested by user",
+    "owner": "Android task",
+    "implementation_and_tls_tests_pending": true,
+    "manual_projector_dns_required_for_new_apk": false,
+    "normal_system_dns_acceptance_claimed": false,
+    "existing_resolver_retained_due_to_unknown_saved_projector_setting": true
+  }
 }
