@@ -1,28 +1,29 @@
 # PH-BACKEND-ANDROID-READINESS-01 — staging readiness review
 
-Updated 2026-09-11. **Quarantined migration candidates verified locally; real-phone browsing remains NO-GO.**
-Implementation `4d6c4c5d982212b403d04845e1fd8df0c9e61556` passes 262 synthetic
-security tests. [Database preparation](DATABASE_PREPARATION.md) can migrate an exact
-reviewed source and separate matching backup to a new candidate with access closed.
-It does not overwrite an existing database or implement cutover/reopening. The
-51-file source package passes manifest, environment and ASGI/operator/preparation
-smoke checks. All ten Android-pinned backend source hashes remain unchanged.
-The [CPU lock](CPU_ENVIRONMENT.md) is unchanged; Windows execution remains unverified.
-See the [current return](ANDROID_READINESS_RETURN.md) for exact package/test evidence.
+Updated 2026-09-11. **First-owner recovery verified locally; real-phone browsing remains NO-GO.**
+Implementation `5103abdd0861c2dbb7553d6edeccddbb170deed7` passes 277 synthetic
+security tests. [Owner recovery](OWNER_RECOVERY.md) opens only one reviewed owner/
+library with a fresh protected password, revoking all other restored memberships
+and all originals. [Database preparation](DATABASE_PREPARATION.md) still creates
+quarantined copies without changing input files. Service cutover/rollback and
+other disabled-account recovery remain separate. The 53-file extracted source
+package passes manifest and ASGI/operator/preparation smoke checks. The CPU locks,
+Android API pin and runtime schema are unchanged. See [current return](ANDROID_READINESS_RETURN.md)
+for evidence and the Android task's 62-test readiness return/replay follow-up.
 
 A separately authorized infrastructure step prepared DNS and certificates; private
 host/domain/key details remain outside this repository. That does not deploy the
 protected backend, approve a serving origin, configure ingress, or prove phone access.
-This migration development slice accessed no live host/database/media or TLS key and opened no listener.
+This owner recovery development slice accessed no live host/database/media or TLS key and opened no listener.
 Earlier observations below are retained as historical evidence.
 
 ## Answer to the Android handoff
 
 | Question | Evidence-backed answer and remaining gate |
 | --- | --- |
-| Is the protected backend deployed? | **Unknown.** Local candidate/source-package implementation is at `4d6c4c5d982212b403d04845e1fd8df0c9e61556`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
+| Is the protected backend deployed? | **Unknown.** Local candidate/source-package implementation is at `5103abdd0861c2dbb7553d6edeccddbb170deed7`; Android pins the unchanged API source at `87a60b4`. No live process/release identity was inspected. A legacy web UI or a local pass cannot establish deployment. |
 | What HTTPS origin should Android use? | **Unknown; do not configure credentials yet.** Exact hostname/port, system-trusted chain, DNS/private-network reachability and lifecycle must be selected/verified privately. Never infer an origin from historical host notes or reuse a test certificate. |
-| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; new-file initialization, backup, rehearsal and quarantined migration candidates are implemented. Owner recovery, selective library reopening, service cutover/rollback and Windows execution remain next. |
+| Are migrations/provisioning ready? | Code requires **`b6e3f9a5c721`**, not the historical adapter document's `a5d2e8f4b610`. Actual target schema, owner, mappings, cached thumbnails and recovery state are **unverified**. Operator commands and a source package now pass synthetic checks; new-file initialization, backup, rehearsal and quarantined migration candidates are implemented. First-owner recovery/selective reopening passes synthetic checks. Other restored users/libraries, service cutover/rollback and Windows execution remain separate gates. |
 | Is the exposure boundary correct? | Default `app.main:app` is closed: controlled synthetic `/auth/session` returns **503** without explicit runtime. The configured entry point has 23 active routes; 97 retired handlers and 32 standalone routes remain separate risks. Host ingress, other listeners, file shares and TLS forwarding have not been inspected. |
 | Who is the first audience? | **No real operator/owner/viewer/library selected.** Proposed first stage uses reserved synthetic owner/viewer labels and generated media only. Later, the owner manually issues a phone-bound invitation to a deliberately scoped viewer; no original grant is needed for Android's current browsing flow. |
 | What operations are authorized here? | Local source review, synthetic no-listener checks, proposal/doc edits and local commits. No Windows/Mac mini access, real DB/media/credentials, listener, service/account change, configured APK, phone installation, push or merge. Android's earlier fixture installation and PR publication do not transfer new authority here. |
@@ -119,9 +120,9 @@ untrusted HTTPS test certificates or the JVM integration harness as a deploy lau
    caption budget, Kotlin boundary checks, explicit launcher/config validation,
    operator commands and source packaging are implemented locally; Android repin
    and baseline replay are complete. New-file initialization, backup and in-memory
-   migration rehearsal and quarantined candidates pass synthetic checks. The CPU lock
-   is implemented. Review owner recovery, selective reopening and service
-   cutover/rollback before enabling existing-library access.
+   migration rehearsal, quarantined candidates, CPU lock and first-owner recovery
+   pass local checks. Review service cutover/rollback and the exact synthetic audience
+   before enabling a served library.
 2. **Operator target review (new scoped authority required):** establish exact host,
    staging paths/interface/port, certificate/renewal, stopped-worker procedure,
    filesystem identity/ACLs, current process versions and protected versus legacy
@@ -189,6 +190,6 @@ A staging release is not ready until all of these have evidence:
 
 Return packet is [ANDROID_READINESS_RETURN.md](ANDROID_READINESS_RETURN.md).
 This review supplies no approved origin or credential. The next local work is the
-owner recovery, selective library reopening and service cutover/rollback; the next external step needs explicit scoped
+service cutover/rollback rehearsal and locked-profile Android replay; the next external step needs explicit scoped
 authority and private target inputs. No push, merge, deployment, service restart,
 account change or phone installation was performed.

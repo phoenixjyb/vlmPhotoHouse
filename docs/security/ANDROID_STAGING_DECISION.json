@@ -3,7 +3,7 @@
   "artifact_kind": "proposal_not_launch_configuration",
   "verdict": "NO_GO_REAL_PHONE",
   "deployed": "unknown",
-  "candidate_backend_commit": "4d6c4c5d982212b403d04845e1fd8df0c9e61556",
+  "candidate_backend_commit": "5103abdd0861c2dbb7553d6edeccddbb170deed7",
   "caption_fix_commit": "0cf5058acdb25224b26847fb55670307f8113181",
   "explicit_launcher_implemented_locally": true,
   "launcher_listener_tested": false,
@@ -58,7 +58,7 @@
     "push_or_merge": false
   },
   "unmet_gates": [
-    "reviewed_owner_credential_recovery_selective_reopening_and_service_cutover_rollback",
+    "reviewed_service_cutover_and_rollback",
     "windows_cpu_environment_execution_and_host_patch_review",
     "private_target_origin_certificate_and_audience",
     "host_and_ingress_identity",
@@ -82,5 +82,20 @@
   "cpu_environment_probe_passed_on_mac": true,
   "cpu_environment_windows_wheels_hash_verified": true,
   "cpu_environment_executed_on_windows": false,
-  "authority_scope": "This local migration candidate development slice; prior separately authorized DNS/certificate setup is not protected-backend deployment approval."
+  "authority_scope": "This local owner recovery development and explicitly requested Android coordination slice; prior DNS/certificate authority does not approve protected-backend rollout.",
+  "owner_recovery_scope": {
+    "separate_reviewed_first_owner_and_one_library": true,
+    "fresh_protected_password": true,
+    "other_memberships_revoked": true,
+    "all_original_grants_removed": true,
+    "other_disabled_account_recovery": false,
+    "service_cutover": false
+  },
+  "android_coordination": {
+    "readiness_commit": "ad6b9d9e079383c7e062fe4ba8138117022dc0e3",
+    "reported_jvm_tests": 62,
+    "readiness_return_read": true,
+    "locked_profile_fixture_followup_sent": true,
+    "locked_profile_replay_verified": false
+  }
 }

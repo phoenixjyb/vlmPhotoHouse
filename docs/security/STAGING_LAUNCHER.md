@@ -91,7 +91,9 @@ this launcher does not establish a service account, backup, owner/library mappin
 certificate or ingress boundary. It does not reopen quarantined restored access.
 The [operator provisioning/source package](OPERATOR_TOOL.md) is now implemented,
 and Android completed the local caption-fix repin. The next local backend step is
-reviewed owner recovery, selective library reopening and service cutover/rollback.
+reviewed service cutover/rollback. [First-owner recovery](OWNER_RECOVERY.md) now
+opens one reviewed owner/library in an offline quarantined candidate with a fresh
+password; other restored accounts/libraries remain closed.
 New-file quarantined migration candidates are now covered by
 [database preparation](DATABASE_PREPARATION.md); they do not activate an existing library.
 [Database preparation](DATABASE_PREPARATION.md) now supports new empty initialization,

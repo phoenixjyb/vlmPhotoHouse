@@ -1,0 +1,62 @@
+{
+  "slice": "reviewed_first_owner_recovery",
+  "source_commit": "5103abdd0861c2dbb7553d6edeccddbb170deed7",
+  "parent_commit": "75b702f17a3e460a632d580e8ee8ea12dba0d47f",
+  "schema_revision": "b6e3f9a5c721",
+  "security_tests": {
+    "passed": 277,
+    "elapsed_seconds": 33.908,
+    "new_owner_recovery_tests": 15
+  },
+  "development_failures": "Initial two assertions expected a list instead of the established asset envelope and 403 instead of the existing protected-resource 401. Tests corrected after source inspection; no API change.",
+  "inventory": {
+    "complete": true,
+    "entries": 152,
+    "active": 23,
+    "retired": 97,
+    "standalone": 32,
+    "historical_unsafe_denial_ledger_rerun": false
+  },
+  "source_package": {
+    "files": 53,
+    "bytes": 365384,
+    "sha256": "bcb7767f9493084c0a1b9c6bf0f9401f2d9c20b4998291a99be25ba0d287ebe1",
+    "manifest_hashes_verified": true,
+    "extracted_smoke": "pass",
+    "asgi_checks": 7,
+    "operator_commands": 9,
+    "preparation_invocations": 8
+  },
+  "cpu_test_probe": {
+    "pass": true,
+    "target": "macos-arm64-test",
+    "packages": 21,
+    "python": "3.12.12",
+    "lock_sha256": "ded98cb724b9ad408683824bab31c249fbf1a905658dbfc90776bce07ce1c1c5",
+    "windows_execution": false
+  },
+  "android": {
+    "task_message_sent": true,
+    "task_became_active_and_completed_readiness": true,
+    "readiness_commit": "ad6b9d9e079383c7e062fe4ba8138117022dc0e3",
+    "return_and_evidence_read": true,
+    "reported_compiled_jvm_tests": 62,
+    "reported_new_tests": 9,
+    "production_source_changed": false,
+    "backend_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+    "matching_backend_source_hashes": 10,
+    "locked_profile_fixture_followup_sent": true,
+    "locked_profile_replay_pass_observed": false
+  },
+  "scope": {
+    "synthetic_only": true,
+    "live_hosts_or_data_accessed": false,
+    "listeners_opened": false,
+    "deployed": false,
+    "pushed_or_merged": false,
+    "backend_task_wrote_mobile_files": false,
+    "other_restored_account_recovery_implemented": false,
+    "service_cutover_or_rollback_implemented": false
+  },
+  "next_step": "Finish locked-profile Android fixture replay, then reviewed synthetic service cutover/rollback preparation before separately authorized Windows/HTTPS/phone acceptance."
+}
