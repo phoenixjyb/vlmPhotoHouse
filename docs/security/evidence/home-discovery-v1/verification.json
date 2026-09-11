@@ -1,0 +1,46 @@
+{
+  "implementation_commit": "54f68427058c45f6bcc5a863cc6d708f5b325e45",
+  "scope": "synthetic source verification only",
+  "checks": {
+    "discovery_tests": {
+      "passed": 16,
+      "skipped": 0,
+      "seconds": 5.751
+    },
+    "combined_home_tests": {
+      "passed": 78,
+      "skipped": 0,
+      "seconds": 114.586
+    },
+    "inventory_tests": {
+      "passed": 19,
+      "skipped": 0,
+      "seconds": 7.627
+    },
+    "inventory_entries": 162,
+    "schema": "Draft2020-12 schema and five actual ASGI examples validated with format checking",
+    "pinned_git_blobs_verified": 19,
+    "pinned_replay_checks": 11,
+    "private_alias_exclusion": "passed for six new public runtime/fixture/contract/test files",
+    "diff_check": "passed"
+  },
+  "non_acceptance": {
+    "windows_contacted": false,
+    "real_database_or_media_accessed": false,
+    "live_index_exported": false,
+    "models_loaded": false,
+    "listener_started": false,
+    "deployed": false,
+    "pushed_or_merged": false,
+    "physical_tv_validated": false
+  },
+  "attempts": [
+    "Initial matching-budget test patched process-wide time.monotonic and stalled TestClient; interrupted the owned test process, replaced with a module-local imported clock patch, then passed the final suites. No stalled run counted as success."
+  ],
+  "limitations": [
+    "Starlette emitted TestClient/httpx deprecation warning; no runtime dependencies changed.",
+    "Source publication provenance is an operator assertion; real reviewed assignments and private aliases remain unresolved.",
+    "Matching deadline does not bound index loading, facets, body arrival or response sending; no hard RSS quota or native performance proof.",
+    "Existing legacy authorization gaps outside the isolated composed app remain inventoried."
+  ]
+}

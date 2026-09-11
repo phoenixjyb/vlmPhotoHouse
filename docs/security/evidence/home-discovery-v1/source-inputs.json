@@ -1,0 +1,100 @@
+{
+  "implementation_commit": "54f68427058c45f6bcc5a863cc6d708f5b325e45",
+  "files": [
+    {
+      "path": "backend/app/__init__.py",
+      "bytes": 87,
+      "sha256": "f378e6b73a28874ade0c801a7446c03d279a4c7b9b0827f05ebd23183e1a340d"
+    },
+    {
+      "path": "backend/app/home_feed.py",
+      "bytes": 14397,
+      "sha256": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c"
+    },
+    {
+      "path": "backend/app/home_catalog.py",
+      "bytes": 15515,
+      "sha256": "467b7fc9bcd04e07ff0578a4f4fe80a453d949fc850372986444c36c0592ab40"
+    },
+    {
+      "path": "backend/app/home_discovery.py",
+      "bytes": 17350,
+      "sha256": "97ddb87eabc7c551d06672c2bd32fe571f07c4e94d0bc3c52e4fb5165d22c958"
+    },
+    {
+      "path": "backend/requirements-access.lock",
+      "bytes": 31680,
+      "sha256": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42"
+    },
+    {
+      "path": "scripts/build_home_catalog_fixture.py",
+      "bytes": 2719,
+      "sha256": "7e732dff39b5c4e9b8adf0df1d5ff03db08065fdfd2ad79d4e683f9223ec3d75"
+    },
+    {
+      "path": "scripts/build_home_discovery_fixture.py",
+      "bytes": 3020,
+      "sha256": "f7973cf65726c64f0b36b5d39b2df57050941a3aab4c847d6b4d5b908c510b26"
+    },
+    {
+      "path": "tests/security/fixtures/home-8x8.jpg",
+      "bytes": 632,
+      "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d"
+    },
+    {
+      "path": "tests/security/fixtures/home-video.mp4",
+      "bytes": 24336,
+      "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+    },
+    {
+      "path": "tests/security/test_home_discovery.py",
+      "bytes": 14349,
+      "sha256": "4f5adad5072ec8c161906a32571c1843778aebbdc15b732c815eacbd42a33327"
+    },
+    {
+      "path": "tests/security/test_inventory.py",
+      "bytes": 7529,
+      "sha256": "c3f7f0c7ba538655c05a8384c1a4cd4f5213000d8f2ebe31a018931aab662f7a"
+    },
+    {
+      "path": "scripts/security_inventory.py",
+      "bytes": 12941,
+      "sha256": "c75a65948873a11c61e9b1c0a49da8e15dde1316a93d358504dc9114cb7706d1"
+    },
+    {
+      "path": "docs/security/route_capabilities.json",
+      "bytes": 125042,
+      "sha256": "13d14aa90b5bd1daca9aa42a1f7a2e2ae5911ed572aa839940a9c5a5ac66fdec"
+    },
+    {
+      "path": "docs/security/home-catalog-contract-v2.json",
+      "bytes": 16767,
+      "sha256": "13cf10892dc4e91631ad71b5ee4bed21baa44697f1e779851c19026dbe606120"
+    },
+    {
+      "path": "docs/security/home-discovery-contract-v1.json",
+      "bytes": 6959,
+      "sha256": "754c9edcb7d8dec250d900d942f8a7a6318a1e54680d06d3a1743ff27e05d9cd"
+    },
+    {
+      "path": "docs/security/home-discovery-schema-v1.json",
+      "bytes": 31387,
+      "sha256": "bc15d646ef83a6c5ee91199b3ba212ceaec068cb769541e7373cd2303cf8b92d"
+    },
+    {
+      "path": "docs/security/home-discovery-examples-v1.json",
+      "bytes": 10526,
+      "sha256": "bebb456c9acb4e386400b13888c0c407681c19dbd63903fd9edf39e935c4cdff"
+    },
+    {
+      "path": "docs/security/HOME_DISCOVERY_V1.md",
+      "bytes": 7428,
+      "sha256": "1a871a6e03af4519182ea88fbc39aaeb240c15ec6d62ee67fd9992c47723d1ea"
+    },
+    {
+      "path": "docs/security/evidence/home-discovery-v1/replay.py",
+      "bytes": 4075,
+      "sha256": "f47695b3a0625ec75340d422e8202ad2df12adc4c90009ff66d3001c1d601a9b"
+    }
+  ]
+}

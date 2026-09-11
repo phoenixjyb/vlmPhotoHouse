@@ -1,0 +1,22 @@
+{
+  "status": "PASS_SYNTHETIC_ASGI_ONLY",
+  "checks": [
+    "exact_people_facet_example",
+    "exact_tags_facet_example",
+    "exact_locations_facet_example",
+    "exact_combined_search_example",
+    "caption_mention_is_not_identity",
+    "stale_discovery_revision_rejected",
+    "v2_library_binding",
+    "frozen_v2_video_range",
+    "frozen_v2_photo_preview",
+    "legacy_original_denied",
+    "shared_disable"
+  ],
+  "check_count": 11,
+  "discovery_fixture_sha256": "e018e5432f50ae178f4fe3c606fd83919b5a3bc5b5db2abb6d9d8f477080d632",
+  "examples_sha256": "bebb456c9acb4e386400b13888c0c407681c19dbd63903fd9edf39e935c4cdff",
+  "listener_started": false,
+  "real_data_accessed": false,
+  "deployment_acceptance": false
+}
