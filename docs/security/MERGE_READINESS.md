@@ -1,3 +1,27 @@
+# Current review update — 2026-09-11
+
+Launch integration now retires six old combined launch/coordinator scripts before
+cleanup, intake, model loading or server startup. See [protected upgrade](PROTECTED_UPGRADE.md).
+Native Windows PowerShell parsed and exercised all five PowerShell stubs with
+former operational flags; all refused. The shell stub refused with external
+executables unavailable. The local security suite passed: 277 tests in 34.102 s.
+The package allowlist now also includes the protected upgrade guide; its three
+focused archive tests pass.
+
+GitHub visibility was restored per command by omitting stale ambient GH_TOKEN and
+GITHUB_TOKEN overrides; no credential was changed. No open PR existed at inspection.
+GitHub master is now `b886aca9344c8f9e838f28e2a1b380caad0ec40e`, unprotected,
+with nine commits absent from this candidate, including caption and legacy viewer
+work. The previous fast-forward assessment below is historical. Preserve those
+changes during integration; do not force-update master or replace its viewer work.
+No push or merge has occurred in this follow-up.
+
+The user assigned backend launch/review and synthetic Windows staging here, with
+Android acceptance owned by its separate task. Real captioning remains on its
+existing release. Live staging evidence will be recorded separately after execution.
+
+---
+
 # Backend merge-readiness review — 2026-09-11
 
 **Git-compatible; merge approval withheld pending integration review.**

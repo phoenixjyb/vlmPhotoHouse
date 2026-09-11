@@ -1,3 +1,11 @@
+# Protected-release entry point
+
+This release retires the combined API/model launchers described below. They now
+stop before runtime work. Follow [the protected upgrade guide](security/PROTECTED_UPGRADE.md)
+and use `scripts/staging_app.py` with an explicit private configuration.
+Existing installed caption releases are separate; updating this repository does
+not migrate or deploy them. The remaining content is historical reference.
+
 # Windows launcher quickstart
 
 This guide summarizes the common commands and options for the tmux‑style Windows launcher and related backend CLIs.

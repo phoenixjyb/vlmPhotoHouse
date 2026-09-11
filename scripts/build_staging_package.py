@@ -35,7 +35,7 @@ FILES = tuple(sorted([
     'scripts/check_access_environment.py',
     'backend/requirements-access.in', 'backend/requirements-access.lock',
     'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
-    'docs/security/CPU_ENVIRONMENT.md',
+    'docs/security/CPU_ENVIRONMENT.md', 'docs/security/PROTECTED_UPGRADE.md',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
     'docs/security/DATABASE_PREPARATION.md', 'docs/security/OWNER_RECOVERY.md',
 ]))
