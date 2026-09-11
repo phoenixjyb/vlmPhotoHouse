@@ -85,10 +85,11 @@ archive as the source and create a separate matching backup before review. The
 candidate closes resurrected access but cannot reconstruct revocations or changes
 made after that archive. Never select the unchanged archive as a serving database.
 
-**No cutover or reopening is implemented.** Keep the candidate offline and retain
-the original/backup privately. A later reviewed procedure must recover the owner's
-credentials, reconcile memberships/original grants, open only an approved library,
-and select the new database in service configuration. Starting the legacy service
+**No cutover or reopening occurs during preparation.** Keep the candidate offline
+and retain the original/backup privately. The separate [first-owner recovery
+workflow](OWNER_RECOVERY.md) can recover one reviewed owner/library; other restored
+accounts remain disabled. Service selection/cutover still needs an operational
+procedure. Starting the legacy service
 against a quarantined candidate can bypass this app's authorization entirely.
 Returning service configuration to an old file can also resurrect access; this is
 not a safe rollback procedure. No automatic startup restore detection is added.
@@ -149,7 +150,8 @@ four preparation command types (five invocations), seven in-process ASGI checks 
 including review of the generated backup against an owner plan.
 
 The CPU dependency lock is implemented in [CPU_ENVIRONMENT.md](CPU_ENVIRONMENT.md).
-Next local work is explicit owner recovery and selective library reopening, followed
-by a reviewed service cutover/rollback procedure. In-place migration remains absent. A real host, private HTTPS
+First-owner recovery and selective reopening are implemented separately in
+[OWNER_RECOVERY.md](OWNER_RECOVERY.md). Remaining work includes recovery of other
+restored accounts and reviewed service cutover/rollback. In-place migration remains absent. A real host, private HTTPS
 origin, approved audience, private backup/provisioning, ingress isolation and physical
 Android acceptance remain separate, unverified gates.

@@ -5,6 +5,12 @@ The operator command is `scripts/provision_access.py`. It wraps the existing
 reviewed services; it changes no HTTP API, migration, account policy or Android
 contract. All executed database operations use disposable synthetic fixtures.
 
+The [first-owner recovery workflow](OWNER_RECOVERY.md) adds `plan-recovery`,
+`validate-recovery`, `review-recovery` and `apply-recovery`. It reopens exactly one
+reviewed owner/library from a fully quarantined database with a fresh protected
+password, while revoking all other restored memberships and all original grants.
+It uses the existing `receipt` lookup. It is separate from creating a new owner.
+
 ## Authority and effects
 
 This is a tool for an independently authorized local database administrator.

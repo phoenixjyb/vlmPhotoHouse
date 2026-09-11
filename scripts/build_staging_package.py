@@ -20,7 +20,7 @@ FILES = tuple(sorted([
     'backend/app/routers/ui.py',
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
-        'transport','credentials','members','recovery','library','metadata','media',
+        'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
         'boundary','service','bootstrap')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
@@ -37,7 +37,7 @@ FILES = tuple(sorted([
     'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
     'docs/security/CPU_ENVIRONMENT.md',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
-    'docs/security/DATABASE_PREPARATION.md',
+    'docs/security/DATABASE_PREPARATION.md', 'docs/security/OWNER_RECOVERY.md',
 ]))
 
 

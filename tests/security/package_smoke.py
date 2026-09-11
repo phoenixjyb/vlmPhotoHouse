@@ -55,11 +55,45 @@ with ExitStack() as guards:
             assert provision_access.main(['plan-owner','--database',str(database),
                 '--request',str(request),'--out',str(plan)])==0
         plan_digest=json.loads(plan_output.getvalue())['plan_digest']
+        def operator(command, *args):
+            output=io.StringIO()
+            with redirect_stdout(output):
+                assert provision_access.main([command,*map(str,args)])==0
+            return json.loads(output.getvalue())
+        owner_args=['--database',database,'--plan',plan,'--backup',data/'backup.sqlite',
+            '--reviewed-plan-digest',plan_digest,'--authority-reference','synthetic-authority',
+            '--restore-reference','synthetic-restore']
+        operator('validate','--database',database,'--plan',plan)
+        reviewed=operator('review',*owner_args)
+        with patch('getpass.getpass',return_value='synthetic original owner password'):
+            applied=operator('apply',*owner_args,'--review-digest',reviewed['review_digest'])
+        preparation_output=io.StringIO()
+        with redirect_stdout(preparation_output):
+            assert prepare_access_database.main(['backup','--database',str(database),
+                '--out',str(data/'owned-backup.sqlite')])==0
+        reviewed_snapshot=json.loads(preparation_output.getvalue())['source_snapshot_digest']
+        recovered=data/'recovered.sqlite'
         with redirect_stdout(io.StringIO()):
-            assert provision_access.main(['validate','--database',str(database),'--plan',str(plan)])==0
-            assert provision_access.main(['review','--database',str(database),'--plan',str(plan),
-                '--backup',str(data/'backup.sqlite'),'--reviewed-plan-digest',plan_digest,
-                '--authority-reference','synthetic-authority','--restore-reference','synthetic-restore'])==0
+            assert prepare_access_database.main(['migrate-candidate','--database',str(database),
+                '--backup',str(data/'owned-backup.sqlite'),'--out',str(recovered),
+                '--reviewed-snapshot-digest',reviewed_snapshot,'--authority-reference','synthetic-authority',
+                '--quiescence-reference','synthetic-stopped-workers'])==0
+            assert prepare_access_database.main(['backup','--database',str(recovered),
+                '--out',str(data/'recovered-backup.sqlite')])==0
+        request=data/'recovery-request.json';plan=data/'recovery-plan.json'
+        request.write_text(json.dumps({'operator_account_id':applied['actor_account_id'],
+            'library_id':'synthetic-family','quiescence_reference':'synthetic-stopped-workers',
+            'reconciliation_reference':'synthetic-owner-history-review'}))
+        planned=operator('plan-recovery','--database',recovered,'--request',request,'--out',plan)
+        operator('validate-recovery','--database',recovered,'--plan',plan)
+        recovery_args=['--database',recovered,'--plan',plan,'--backup',data/'recovered-backup.sqlite',
+            '--reviewed-plan-digest',planned['plan_digest'],'--authority-reference','synthetic-authority',
+            '--restore-reference','synthetic-restore']
+        reviewed=operator('review-recovery',*recovery_args)
+        with patch('getpass.getpass',return_value='synthetic replacement owner password'):
+            operator('apply-recovery',*recovery_args,'--review-digest',reviewed['review_digest'])
+        assert operator('receipt','--database',recovered,'--plan-id',planned['plan_id'],
+            '--reviewed-plan-digest',planned['plan_digest'])['receipt_found']
 print(json.dumps({'package_smoke':'pass','synthetic_migration_revision':REQUIRED_REVISION,
-    'asgi_checks':7,'operator_commands':3,'database_preparation_commands':5,
+    'asgi_checks':7,'operator_commands':9,'database_preparation_commands':8,
     'listeners_opened':False,'live_data_accessed':False}))

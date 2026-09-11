@@ -3,7 +3,8 @@
 
 Explicit existing database, private request/plan files, separate backup, exact
 reviewed digest and audit references only. No service control, migration, backup
-creation, restored-access reopening, environment discovery or HTTP interface.
+creation, service cutover, environment discovery or HTTP interface.
+Owner recovery requires a separate sealed review and protected password entry.
 """
 import argparse
 import getpass
@@ -97,7 +98,8 @@ def write_new_plan(path, envelope):
 def parser():
     result = Parser(description=__doc__)
     commands = result.add_subparsers(dest='command', required=True)
-    for name in ('plan-owner', 'plan-assets', 'validate', 'review', 'apply', 'receipt'):
+    for name in ('plan-owner', 'plan-assets', 'validate', 'review', 'apply', 'receipt',
+                 'plan-recovery', 'validate-recovery', 'review-recovery', 'apply-recovery'):
         command = commands.add_parser(name)
         command.add_argument('--database', required=True, type=Path)
         if name.startswith('plan-'):
@@ -108,12 +110,12 @@ def parser():
             command.add_argument('--reviewed-plan-digest', required=True)
         else:
             command.add_argument('--plan', required=True, type=Path)
-            if name in ('review', 'apply'):
+            if name in ('review', 'apply', 'review-recovery', 'apply-recovery'):
                 command.add_argument('--backup', required=True, type=Path)
                 command.add_argument('--reviewed-plan-digest', required=True)
                 command.add_argument('--authority-reference', required=True)
                 command.add_argument('--restore-reference', required=True)
-                if name == 'apply':
+                if name in ('apply', 'apply-recovery'):
                     command.add_argument('--review-digest', required=True)
     return result
 
@@ -124,17 +126,29 @@ def execute(args, *, clock=time.time):
     from app.access.runtime import ExistingDatabase
     from app.access.provisioning import ProvisioningPlanner
     from app.access.provisioning_apply import plan_digest, review_backup, apply_reviewed
+    from app.access.owner_recovery import (OwnerRecoveryPlanner, review_owner_recovery_backup,
+                                           recover_owner_library)
+    recovery = args.command.endswith('-recovery')
+    planner_type = OwnerRecoveryPlanner if recovery else ProvisioningPlanner
+    reviewer = review_owner_recovery_backup if recovery else review_backup
+    application = recover_owner_library if recovery else apply_reviewed
     database = selected_path(args.database)
     if args.command.startswith('plan-'):
         request = read_json(args.request)
         expected = ({'phone_login', 'library_id'} if args.command == 'plan-owner'
                     else {'library_id', 'operator_account_id', 'asset_ids'})
+        if recovery:
+            expected = {'operator_account_id','library_id','quiescence_reference','reconciliation_reference'}
         if set(request) != expected:
             raise OperatorError('Unexpected request fields')
         with ExistingDatabase(database, read_only=True)() as connection:
-            planner = ProvisioningPlanner(connection, clock=clock)
-            envelope = (planner.owner(phone=request['phone_login'], library_id=request['library_id'])
-                if args.command == 'plan-owner' else planner.assets(**request))
+            planner = planner_type(connection, clock=clock)
+            if recovery:
+                envelope = planner.recover(**request)
+            elif args.command == 'plan-owner':
+                envelope = planner.owner(phone=request['phone_login'], library_id=request['library_id'])
+            else:
+                envelope = planner.assets(**request)
         write_new_plan(args.out, envelope)
         return {'applied': False, 'plan_id': envelope['plan']['plan_id'],
                 'operation': envelope['plan']['operation'], 'plan_digest': plan_digest(envelope)}
@@ -150,26 +164,26 @@ def execute(args, *, clock=time.time):
         receipt = json.loads(row[0])
         return receipt_summary(receipt) | {'receipt_found': True}
     envelope = read_json(args.plan)
-    if args.command == 'validate':
+    if args.command in ('validate', 'validate-recovery'):
         with ExistingDatabase(database, read_only=True)() as connection:
-            result = ProvisioningPlanner(connection, clock=clock).validate(envelope)
+            result = planner_type(connection, clock=clock).validate(envelope)
         return result | {'plan_digest': plan_digest(envelope)}
     # A saved review is never deserialized. Both commands construct a fresh local
     # review; only the distinct apply command can call the write service.
-    review = review_backup(database=database, backup=selected_path(args.backup), envelope=envelope,
+    review = reviewer(database=database, backup=selected_path(args.backup), envelope=envelope,
         reviewed_plan_digest=args.reviewed_plan_digest, authority_reference=args.authority_reference,
         restore_reference=args.restore_reference, clock=clock)
-    if args.command == 'review':
+    if args.command in ('review', 'review-recovery'):
         return {'backup_reviewed': True, 'applied': False, 'plan_id': envelope['plan']['plan_id'],
                 'operation': envelope['plan']['operation'], 'plan_digest': review.plan_digest,
                 'review_digest': review_digest(review),
                 'reviewed_effects': envelope['plan']['expected']}
-    if args.command != 'apply':
+    if args.command not in ('apply', 'apply-recovery'):
         raise OperatorError('Unknown operation')
     if (not re.fullmatch('[0-9a-f]{64}', args.review_digest)
             or not hmac.compare_digest(args.review_digest, review_digest(review))):
         raise OperatorError('Review changed; repeat explicit review')
-    return receipt_summary(apply_reviewed(envelope, review=review, clock=clock))
+    return receipt_summary(application(envelope, review=review, clock=clock))
 
 
 def review_digest(review):

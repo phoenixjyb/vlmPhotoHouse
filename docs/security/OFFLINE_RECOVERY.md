@@ -95,6 +95,15 @@ Their Fetch Metadata modeling and real TLS/proxy/CORP limitations still apply.
 The legacy backend suite, live hosts, production-size data, Windows recovery,
 mobile devices and deployment were not exercised.
 
+## First-owner reopening addition — 2026-09-11
+
+[OWNER_RECOVERY.md](OWNER_RECOVERY.md) now implements the bounded first-owner
+reopening step proposed below. It requires a fully quarantined database, recorded
+bootstrap owner, reviewed history references and a fresh protected password. Only
+one owner/library opens; all other memberships and all originals are revoked.
+Other disabled accounts/libraries and service cutover remain separate work. The
+historical slice-16 recommendations and evidence below are retained for provenance.
+
 ## Required next review before reopening
 
 This operation does **not** detect that a database was restored. An old backup can
