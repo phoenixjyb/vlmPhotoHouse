@@ -1,0 +1,145 @@
+{
+  "review_date": "2026-09-12",
+  "android_source_commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311",
+  "android_evidence_commit": "a2c48fb727402ccd6beead855a3faa78f552c973",
+  "backend_implementation_commit": "54f68427058c45f6bcc5a863cc6d708f5b325e45",
+  "scope": "Targeted discovery integration source review and next-slice plan; not exhaustive security audit",
+  "independently_checked": {
+    "contract_boundary_verifiers": 4,
+    "pinned_backend_blob_hashes": 19,
+    "synthetic_backend_asgi_checks": 11,
+    "apk_hash_size_no_assets_checks": 3,
+    "retained_jvm_xml_counts": {
+      "home": 80,
+      "core": 22,
+      "live_core": 65
+    },
+    "jvm_tests_rerun": false,
+    "screenshots_viewed": [
+      "1.0/discovery-advanced.png",
+      "2.0/discovery-zh.png"
+    ],
+    "private_shortcuts": {
+      "requested": 7,
+      "unresolved_person_ids": 7,
+      "aliases_in_public_receipt": false
+    }
+  },
+  "android_reported_not_rerun": {
+    "component_tests_normal": 24,
+    "component_tests_double_font": 24,
+    "build_lint": "passed",
+    "phone_gradle_tasks": "up-to-date"
+  },
+  "findings": [
+    {
+      "priority": "P2",
+      "path": "android/tv/src/main/java/dev/photohouse/tv/TvDiscovery.kt",
+      "line": 240,
+      "problem": "choiceHint maps reviewed_assignments and reviewed_region to Unknown source",
+      "impact": "Reviewed person/place provenance is mislabeled in bilingual choice cards",
+      "disposition": "Fixed in Android 63feba99db6adf6ff328987c91428345a745cad3; exact source diff and two passing retained unit-test XML results reviewed. Existing APKs do not include correction."
+    }
+  ],
+  "remaining": [
+    "Real publication-specific metadata and prepared photo/video counts unmeasured",
+    "Private IDs and disclosure/assignment review unresolved",
+    "No real exporter, origin, native operational or physical-TV acceptance from this review",
+    "Legacy authorization gaps outside the isolated application remain"
+  ],
+  "actions": {
+    "windows_access": false,
+    "real_db_media_access": false,
+    "mobile_edits": false,
+    "deployment": false,
+    "device_install": false,
+    "push_merge": false
+  },
+  "reviewed_file_hashes": [
+    {
+      "path": "android/home-core/src/main/kotlin/dev/photohouse/home/DiscoveryController.kt",
+      "sha256": "0ae0b66e26f2ee64c3c72e6f1cbffb34bde0b6a815720762d7a3f0e106cbee9c",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/home-core/src/main/kotlin/dev/photohouse/home/DiscoveryDraft.kt",
+      "sha256": "b5581b9ebb7e7638c7ee516f347af147e22828f94e50289063c9430400694465",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/home-core/src/main/kotlin/dev/photohouse/home/DiscoveryWire.kt",
+      "sha256": "aa1dd76c2399e4e20af7e743f4ec5d71557ab6a52a2b9ccb5d0676c68c8b0f05",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/home-core/src/main/kotlin/dev/photohouse/home/HttpsDiscoveryGateway.kt",
+      "sha256": "75ae2999b6b1fd89e44a56009d94f3cf21a6215f4aa6a3dd091605c8869ab085",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/home-core/src/main/kotlin/dev/photohouse/home/HomeStore.kt",
+      "sha256": "c17f47f20edc7543a4978c72b7d0c986dfaa2bcc02b431a22b6cc92357d02b7f",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/tv/src/main/java/dev/photohouse/tv/MainActivity.kt",
+      "sha256": "c71be7013ec6e1e7914b4064d3033d67ce7d5d348b9f259e7732d944303db70e",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/tv/src/main/java/dev/photohouse/tv/TvApp.kt",
+      "sha256": "b3578c2d9b70da333e32f2e2767f7c0318beac31bca5e67644d1de5e59d40049",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/tv/src/main/java/dev/photohouse/tv/TvDiscovery.kt",
+      "sha256": "111da5b6457b76a9d784320cffdc60b7acf7cd375fcaab3108b0a5b26136f224",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "android/tv/build.gradle.kts",
+      "sha256": "730d91fa2c791c670c3c493ddac6c4b5f924986e8055bb769ee873b2fe9723f4",
+      "commit": "0e9ba816dc1cb0324744d7ad03351c1f1e39d311"
+    },
+    {
+      "path": "docs/evidence/android/discovery-v1/RETURN.md",
+      "sha256": "e60b5610e69117d11ae8390327bdcbf4b5c3c9b64107c8823087af25548c263c",
+      "commit": "a2c48fb727402ccd6beead855a3faa78f552c973"
+    },
+    {
+      "path": "docs/evidence/android/discovery-v1/artifacts.json",
+      "sha256": "e22e505be7818711a8af289f131c43ff022719196b690f9f1f02f6ecc43331fa",
+      "commit": "a2c48fb727402ccd6beead855a3faa78f552c973"
+    },
+    {
+      "path": "docs/evidence/android/discovery-v1/jvm-tests.json",
+      "sha256": "8ec5e9e3f7adf53d4ef74c1697de88d950d3f2e85899f21177587e08861b0c83",
+      "commit": "a2c48fb727402ccd6beead855a3faa78f552c973"
+    }
+  ],
+  "label_fix": {
+    "source_commit": "63feba99db6adf6ff328987c91428345a745cad3",
+    "reviewed_files": [
+      {
+        "path": "android/tv/src/main/java/dev/photohouse/tv/TvDiscovery.kt",
+        "sha256": "580cc55bbedc946d416835238b9369f2cb9dbde7508aed67a8dd6705de837a41"
+      },
+      {
+        "path": "android/tv/build.gradle.kts",
+        "sha256": "01f09fbcc94fa48ec7c7ba8b4553339dab4545ec56045f06278e807b3ae00912"
+      },
+      {
+        "path": "android/tv/src/test/java/dev/photohouse/tv/DiscoveryLabelsTest.kt",
+        "sha256": "1556083fe1344a67a15fbfc00a159ff1700548c537919a232bdf87b2f61c047d"
+      },
+      {
+        "path": "docs/evidence/android/discovery-v1/REVIEWED_LABELS_RETURN.md",
+        "sha256": "88a1201aa42bde9ddcc87e6b4c0d630f8cfaa22a1b5d952aee623f25932578e5"
+      }
+    ],
+    "retained_tests": 2,
+    "rerun": false,
+    "test_xml_sha256": "731f8de1a32c81bac2b74614ec3cf7e20a5dec12b76850c94ef21a51aed7f86a",
+    "apk_rebuilt": false
+  }
+}

@@ -72,3 +72,8 @@ Changed implementation files:
 
 Evidence files: this return, `source-inputs.json`, `verification.json` and
 `pinned-replay.json` in the discovery evidence directory above.
+
+2026-09-12 follow-up: [Android integration review receipt](evidence/home-discovery-v1/android-v6-review.json)
+and [next export/publication readiness plan](HOME_DISCOVERY_PUBLICATION_PLAN.md).
+The plan records unmeasured real coverage and unresolved private identity review;
+it does not authorize real export or deployment.
