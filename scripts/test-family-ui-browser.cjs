@@ -15,6 +15,7 @@ const assets = [1, 2, 3].map(id => ({
   mime: id === 3 ? 'video/mp4' : 'image/jpeg', taken_at: '2026-05-04T12:00:00',
 }));
 const cover = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#c49c7c"/><circle cx="400" cy="260" r="140" fill="#eee1c9"/></svg>';
+const photo = (width, height) => `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#c49c7c"/><rect x="2" y="2" width="${width - 4}" height="${height - 4}" fill="none" stroke="white" stroke-width="4"/></svg>`;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 (async () => {
@@ -29,18 +30,28 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const artifacts = process.env.PHOTOHOUSE_UI_ARTIFACTS;
+    if (artifacts) await fs.mkdir(artifacts, { recursive: true });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     let failStories = true, empty = false, brokenImages = false, delayedCaption = false, lastQuery = null, searchCalls = 0;
+    let longCaptions = false, failOriginal = false, delayOriginal = false, originals = 0;
     await page.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
       if (url.hostname !== '127.0.0.1') return route.abort();
       if (url.pathname.startsWith('/ui')) return route.continue();
       if (url.pathname.includes('/thumbnail')) {
         if (brokenImages) return route.fulfill({ status: 404 });
-        return route.fulfill({ contentType: 'image/svg+xml', body: cover });
+        const id = Number(url.pathname.split('/')[2]);
+        return route.fulfill({ contentType: 'image/svg+xml', body: id === 1 ? photo(768, 1024) : id === 2 ? photo(1024, 512) : cover });
       }
       if (url.pathname.endsWith('/media')) {
+        const id = Number(url.pathname.split('/')[2]);
+        if (id !== 3) {
+          originals++;
+          if (delayOriginal) await sleep(600);
+          return failOriginal ? route.fulfill({ status: 404 }) : route.fulfill({ contentType: 'image/svg+xml', body: id === 1 ? photo(2400, 3200) : photo(4000, 2000) });
+        }
         await sleep(300);
         return route.fulfill({ status: 404 });
       }
@@ -55,7 +66,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
       if (/\/assets\/\d+\/captions$/.test(url.pathname)) {
         const id = Number(url.pathname.split('/')[2]);
         if (id === 1 && delayedCaption) await sleep(600);
-        data = { captions: [{ text: `EN: Memory ${id}\nZH-CN: 回忆 ${id}` }] };
+        data = { captions: [{ text: `EN: Memory ${id}\nZH-CN: 回忆 ${id}` + (longCaptions ? '\nA family memory. 家庭回忆。'.repeat(120) : '') }] };
       }
       if (url.pathname === '/search/smart') {
         searchCalls++;
@@ -97,6 +108,88 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(await card.evaluate(el => el === document.activeElement), true, 'Closing restores photo focus');
     assert.equal(await page.locator('.app-shell').evaluate(el => el.inert), false);
 
+    // Measure the image itself, not just the modal. The old hidden overflow
+    // made a 1477px portrait look contained inside a 479px stage to modal-only tests.
+    longCaptions = true;
+    for (const [width, height] of [[1440, 900], [1280, 720], [768, 844], [390, 844], [320, 568], [844, 390]]) {
+      await page.setViewportSize({ width, height });
+      for (const id of [1, 2]) {
+        await page.locator(`#home-recent-grid [data-asset-id="${id}"]`).click();
+        await page.waitForFunction(() => document.querySelector('#preview-modal-body img')?.naturalWidth > 0);
+        await page.waitForFunction(() => document.querySelector('#preview-caption').textContent.length > 500);
+        await page.waitForFunction(() => {
+          const body = document.querySelector('#preview-modal-body'), img = body.querySelector('img');
+          const b = body.getBoundingClientRect(), r = img.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.left >= b.left - 1 && r.top >= b.top - 1 && r.right <= b.right + 1 && r.bottom <= b.bottom + 1;
+        });
+        assert.equal(await page.locator('#btn-viewer-fit').getAttribute('aria-pressed'), 'true');
+        assert.ok(await page.locator('#preview-modal-body').evaluate(el => el.clientHeight > 80 && el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1), `Whole ${id === 1 ? 'portrait' : 'landscape'} fits at ${width}x${height}`);
+        if (artifacts && id === 1 && [1280, 390].includes(width)) await page.screenshot({ path: path.join(artifacts, `viewer-fit-${width}.png`) });
+        await page.keyboard.press('Escape');
+      }
+    }
+    assert.equal(originals, 0, 'Fit loads only lightweight previews');
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await card.click();
+    await page.locator('#btn-viewer-actual').click();
+    await page.waitForFunction(() => document.querySelector('#preview-modal-body img')?.naturalWidth === 2400);
+    assert.equal(await page.locator('#viewer-zoom').innerText(), '100%');
+    const viewport = page.locator('#preview-modal-body');
+    assert.equal(await viewport.locator('img').evaluate(el => el.getBoundingClientRect().width), 2400, 'Actual size uses original pixels, not thumbnail pixels');
+    assert.ok(await viewport.evaluate(el => el.scrollWidth > el.clientWidth && el.scrollHeight > el.clientHeight), 'Actual-size overflow is scrollable on both axes');
+    if (artifacts) await page.screenshot({ path: path.join(artifacts, 'viewer-actual.png') });
+    await viewport.evaluate(el => { el.scrollLeft = 0; el.scrollTop = 0; });
+    const box = await viewport.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 100, box.y + box.height / 2 - 70, { steps: 4 });
+    await page.mouse.up();
+    assert.ok(await viewport.evaluate(el => el.scrollLeft >= 99 && el.scrollTop >= 69), 'Mouse drag pans without changing photos');
+    assert.equal(await viewport.evaluate(el => el.classList.contains('is-dragging')), false);
+    await page.mouse.wheel(0, -100);
+    await page.waitForFunction(() => document.querySelector('#preview-modal-body img').getBoundingClientRect().width > 2400);
+    await page.locator('#btn-viewer-zoom-out').click();
+    await page.locator('#btn-viewer-fit').click();
+    assert.equal(await viewport.evaluate(el => el.scrollTop + el.scrollLeft), 0, 'Fit resets pan');
+    await viewport.dblclick();
+    assert.equal(await page.locator('#btn-viewer-actual').getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('0');
+    assert.equal(await page.locator('#btn-viewer-fit').getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('1');
+    assert.equal(await page.locator('#viewer-zoom').innerText(), '100%');
+    await page.locator('#btn-preview-next').click();
+    await page.waitForFunction(() => document.querySelector('#preview-modal-body img')?.naturalWidth === 1024);
+    assert.equal(await page.locator('#btn-viewer-fit').getAttribute('aria-pressed'), 'true', 'Changing photo resets zoom');
+    if (await page.evaluate(() => document.fullscreenEnabled)) {
+      await page.locator('#btn-viewer-fullscreen').click();
+      await page.waitForFunction(() => document.fullscreenElement?.id === 'preview-modal');
+      assert.equal(await page.locator('#btn-viewer-fullscreen').innerText(), 'Exit full screen');
+      await page.locator('#btn-viewer-fullscreen').click();
+      await page.waitForFunction(() => !document.fullscreenElement);
+    }
+    await page.keyboard.press('Escape');
+    failOriginal = true;
+    await page.reload(); // Drop decoded originals from the previous viewer.
+    await card.click();
+    await page.locator('#btn-viewer-actual').click();
+    await page.waitForFunction(() => document.querySelector('#viewer-image-status').textContent.includes('Original unavailable'));
+    assert.equal(await page.locator('#btn-viewer-actual').isDisabled(), true);
+    assert.equal(await viewport.locator('img').evaluate(el => el.naturalWidth), 768, 'Unsupported original leaves the preview intact');
+    assert.equal(await page.locator('#btn-viewer-fit').getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('Escape');
+    failOriginal = false;
+    delayOriginal = true;
+    await page.reload();
+    await card.click();
+    await page.locator('#btn-viewer-actual').click();
+    await page.locator('#btn-preview-next').click();
+    await sleep(750);
+    assert.equal(await viewport.locator('img').evaluate(el => el.naturalWidth), 1024, 'Late original cannot replace the next photo');
+    await page.keyboard.press('Escape');
+    delayOriginal = false;
+    longCaptions = false;
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
     delayedCaption = false;
     await page.clock.install();
     await page.locator('#btn-home-slideshow').click();
@@ -112,6 +205,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const video = page.locator('#preview-modal-body video');
     assert.equal(await video.evaluate(el => el.autoplay), false, 'Video never autoplays');
     assert.equal(await video.evaluate(el => el.controls && el.playsInline), true);
+    assert.equal(await page.locator('#btn-viewer-actual').isDisabled(), true, 'Image zoom controls do not hijack videos');
     await page.keyboard.press('Escape');
 
     await card.click();
@@ -122,6 +216,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(await page.locator('#tab-home').getAttribute('aria-hidden'), 'false', 'Details returns to its original view');
 
     await page.locator('.lang-btn[data-lang="zh"]').click();
+    await card.click();
+    assert.equal(await page.locator('#btn-viewer-fit').innerText(), '适应窗口');
+    assert.equal(await page.locator('#btn-viewer-actual').innerText(), '实际大小');
+    assert.equal(await page.locator('#btn-viewer-fullscreen').innerText(), '全屏');
+    await page.keyboard.press('Escape');
     await page.locator('[data-home-query]').first().click();
     await page.locator('#library-grid .asset-card').waitFor();
     assert.match(lastQuery.text, /[\u4e00-\u9fff]/, 'Chinese suggestion sends Chinese query');
@@ -158,7 +257,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(await page.locator('#home-recent-grid .asset-card').count(), 0);
     assert.ok((await page.locator('#home-recent-grid').innerText()).length > 0);
     assert.deepEqual(errors, [], 'No uncaught browser errors');
-    console.log('PASS: partial loading/retry; viewer and caption races; focus/keyboard; slideshow; video; bilingual search; retained navigation; four responsive widths; advanced mode; empty state.');
+    console.log('PASS: whole-image fit at six viewport sizes; portrait/landscape and long bilingual captions; lazy original/actual size; mouse pan/wheel zoom; keyboard/double-click reset; fullscreen; failed/stale originals; partial loading/retry; caption races; focus/keyboard; slideshow; video; bilingual search; retained navigation; advanced mode; empty state.');
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

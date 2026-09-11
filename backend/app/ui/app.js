@@ -2,7 +2,7 @@ const state = {
   activeTab: "home",
   uiMode: "family",
   gridItems: new Map(),
-  viewer: { items: [], index: 0, timer: null, request: 0, returnFocus: null, origin: "home" },
+  viewer: { items: [], index: 0, timer: null, request: 0, returnFocus: null, origin: "home", image: null },
   home: {
     recent: [],
     people: [],
@@ -248,6 +248,19 @@ const I18N = {
     back_to_results: "Back",
     fullscreen: "Full Screen",
     close_preview: "Close",
+    viewer_fit: "Fit",
+    viewer_actual: "Actual size",
+    viewer_fullscreen: "Full screen",
+    viewer_exit_fullscreen: "Exit full screen",
+    viewer_fullscreen_unavailable: "Full screen is unavailable in this browser.",
+    viewer_zoom_in: "Zoom in",
+    viewer_zoom_out: "Zoom out",
+    viewer_zoom_level: "Zoom level",
+    viewer_region: "Photo viewer",
+    viewer_image_hint: "Scroll to zoom · Drag to pan · Double-click to fit / actual size",
+    viewer_original_loading: "Loading original…",
+    viewer_original_failed: "Original unavailable in this browser. Showing preview; actual size is unavailable.",
+    viewer_preview_hint: "Preview · Zoom or choose Actual size to load the original",
     status_ok: "OK",
     status_degraded: "DEGRADED",
     no_thumbnail: "No thumbnail",
@@ -611,6 +624,19 @@ const I18N = {
     back_to_results: "返回",
     fullscreen: "全屏预览",
     close_preview: "关闭",
+    viewer_fit: "适应窗口",
+    viewer_actual: "实际大小",
+    viewer_fullscreen: "全屏",
+    viewer_exit_fullscreen: "退出全屏",
+    viewer_fullscreen_unavailable: "此浏览器暂不支持全屏。",
+    viewer_zoom_in: "放大",
+    viewer_zoom_out: "缩小",
+    viewer_zoom_level: "缩放比例",
+    viewer_region: "照片查看器",
+    viewer_image_hint: "滚轮缩放 · 拖动平移 · 双击切换适应窗口 / 实际大小",
+    viewer_original_loading: "正在加载原图…",
+    viewer_original_failed: "此浏览器无法显示原图，已保留预览图，实际大小不可用。",
+    viewer_preview_hint: "预览图 · 缩放或选择实际大小以加载原图",
     status_ok: "正常",
     status_degraded: "降级",
     no_thumbnail: "无缩略图",
@@ -1120,6 +1146,7 @@ function applyI18n() {
     el.classList.toggle("active", el.dataset.lang === state.lang);
   });
   updateUiModeControls();
+  updateViewerImageControls();
 }
 
 function updateUiModeControls() {
@@ -2870,11 +2897,29 @@ async function renderMemoryViewer() {
   qs("preview-caption").setAttribute("aria-label", state.lang === "zh" ? "照片描述" : "Photo description");
   qs("preview-filmstrip").setAttribute("aria-label", state.lang === "zh" ? "当前视图中的照片" : "Photos in this view");
   const body = qs("preview-modal-body");
+  resetViewerImage();
   body.innerHTML = isVideoAsset(asset)
     ? `<video controls playsinline preload="metadata" src="/assets/${Number(asset.id)}/media"></video>`
-    : `<img src="/assets/${Number(asset.id)}/thumbnail?size=1024" alt="${esc(basename(asset.path))}" />`;
-  body.firstElementChild.addEventListener("error", () => {
-    if (viewer.request === request) body.innerHTML = `<p class="viewer-photo-error">${esc(t("viewer_photo_error"))}</p>`;
+    : `<div class="viewer-canvas"><img draggable="false" src="/assets/${Number(asset.id)}/thumbnail?size=1024" alt="${esc(basename(asset.path))}" /></div>`;
+  const media = body.querySelector("img, video");
+  if (!isVideoAsset(asset)) {
+    const image = { el: media, assetId: Number(asset.id), mode: "fit", scale: 1, original: "preview", width: 0, height: 0 };
+    viewer.image = image;
+    const loaded = () => {
+      if (viewer.image !== image) return;
+      image.width = media.naturalWidth;
+      image.height = media.naturalHeight;
+      layoutViewerImage();
+    };
+    media.addEventListener("load", loaded, { once: true });
+    if (media.complete && media.naturalWidth) loaded();
+  }
+  updateViewerImageControls();
+  media.addEventListener("error", () => {
+    if (viewer.request !== request) return;
+    resetViewerImage();
+    body.innerHTML = `<p class="viewer-photo-error">${esc(t("viewer_photo_error"))}</p>`;
+    updateViewerImageControls();
   });
   // Window the strip so opening a 120-photo search doesn't fetch 120 thumbnails.
   const start = Math.max(0, viewer.index - 5);
@@ -2896,11 +2941,181 @@ async function renderMemoryViewer() {
   }
 }
 
+// Explicit pixel dimensions avoid percentage-sized images growing the grid's
+// implicit row beyond the visible stage. The canvas supplies real scroll bounds.
+function layoutViewerImage(anchor = null) {
+  const image = state.viewer.image, body = qs("preview-modal-body");
+  if (!image?.width || !body.clientWidth || !body.clientHeight) return;
+  const fit = Math.min(1, body.clientWidth / image.width, body.clientHeight / image.height);
+  if (image.mode === "fit") image.scale = fit;
+  else if (image.mode === "actual") image.scale = 1;
+  const width = image.width * image.scale, height = image.height * image.scale;
+  const canvasWidth = Math.max(body.clientWidth, width), canvasHeight = Math.max(body.clientHeight, height);
+  const left = (canvasWidth - width) / 2, top = (canvasHeight - height) / 2;
+  Object.assign(image.el.parentElement.style, { width: `${canvasWidth}px`, height: `${canvasHeight}px` });
+  Object.assign(image.el.style, { width: `${width}px`, height: `${height}px`, left: `${left}px`, top: `${top}px` });
+  body.classList.toggle("is-pannable", width > body.clientWidth + 1 || height > body.clientHeight + 1);
+  if (anchor) {
+    body.scrollLeft = left + anchor.u * width - anchor.x;
+    body.scrollTop = top + anchor.v * height - anchor.y;
+  } else if (image.mode === "fit") {
+    body.scrollLeft = body.scrollTop = 0;
+  }
+  updateViewerImageControls();
+}
+
+function viewerImageAnchor(x, y) {
+  const body = qs("preview-modal-body"), image = state.viewer.image;
+  const rect = image.el.getBoundingClientRect(), viewport = body.getBoundingClientRect();
+  x ??= body.clientWidth / 2;
+  y ??= body.clientHeight / 2;
+  return { x, y, u: (viewport.left + x - rect.left) / rect.width, v: (viewport.top + y - rect.top) / rect.height };
+}
+
+function updateViewerImageControls() {
+  const image = state.viewer.image, ready = Boolean(image?.width);
+  for (const name of ["fit", "actual", "zoom-in", "zoom-out"]) {
+    qs(`btn-viewer-${name}`).disabled = !ready || (name === "actual" && image.original === "failed");
+  }
+  qs("btn-viewer-fit").setAttribute("aria-pressed", String(image?.mode === "fit"));
+  qs("btn-viewer-actual").setAttribute("aria-pressed", String(image?.mode === "actual" && image.original === "ready"));
+  qs("viewer-zoom").textContent = ready ? `${Math.round(image.scale * 100)}%` : "—";
+  qs("viewer-zoom").setAttribute("aria-label", t("viewer_zoom_level"));
+  qs("btn-viewer-zoom-in").setAttribute("aria-label", t("viewer_zoom_in"));
+  qs("btn-viewer-zoom-out").setAttribute("aria-label", t("viewer_zoom_out"));
+  qs("preview-modal-body").setAttribute("aria-label", t("viewer_region"));
+  const hint = !ready ? "" : t(image.original === "loading" ? "viewer_original_loading"
+    : image.original === "failed" ? "viewer_original_failed"
+      : image.original === "preview" ? "viewer_preview_hint" : "viewer_image_hint");
+  qs("viewer-image-status").textContent = hint;
+  const fullscreen = document.fullscreenElement === qs("preview-modal");
+  qs("btn-viewer-fullscreen").textContent = t(fullscreen ? "viewer_exit_fullscreen" : "viewer_fullscreen");
+  qs("btn-viewer-fullscreen").setAttribute("aria-pressed", String(fullscreen));
+  qs("btn-viewer-fullscreen").disabled = !document.fullscreenEnabled;
+}
+
+function loadViewerOriginal() {
+  const image = state.viewer.image;
+  if (!image || image.original !== "preview") return;
+  image.original = "loading";
+  const original = new Image();
+  image.loader = original;
+  original.onload = () => {
+    if (state.viewer.image !== image) return;
+    const anchor = viewerImageAnchor();
+    // Keep the visible magnification when the sharper source replaces preview.
+    if (image.mode === "zoom") image.scale *= image.width / original.naturalWidth;
+    image.width = original.naturalWidth;
+    image.height = original.naturalHeight;
+    image.original = "ready";
+    original.alt = image.el.alt;
+    original.draggable = false;
+    image.el.replaceWith(original);
+    image.el = original;
+    layoutViewerImage(anchor);
+  };
+  original.onerror = () => {
+    if (state.viewer.image !== image) return;
+    image.original = "failed";
+    if (image.mode === "actual") image.mode = "fit";
+    layoutViewerImage();
+  };
+  original.src = `/assets/${image.assetId}/media`;
+  updateViewerImageControls();
+}
+
+function setViewerImageMode(mode) {
+  const image = state.viewer.image;
+  if (!image?.width || (mode === "actual" && image.original === "failed")) return;
+  stopSlideshow();
+  const anchor = viewerImageAnchor();
+  image.mode = mode;
+  if (mode === "actual") loadViewerOriginal();
+  layoutViewerImage(mode === "fit" ? null : anchor);
+}
+
+function zoomViewerImage(factor, x, y) {
+  const image = state.viewer.image, body = qs("preview-modal-body");
+  if (!image?.width) return;
+  stopSlideshow();
+  const anchor = viewerImageAnchor(x, y);
+  const minimum = Math.min(.1, body.clientWidth / image.width, body.clientHeight / image.height);
+  image.mode = "zoom";
+  image.scale = Math.max(minimum, Math.min(4, image.scale * factor));
+  layoutViewerImage(anchor);
+  loadViewerOriginal();
+}
+
+function resetViewerImage() {
+  const image = state.viewer.image, body = qs("preview-modal-body");
+  if (image?.loader) {
+    image.loader.onload = image.loader.onerror = null;
+    if (image.original === "loading") image.loader.src = "";
+  }
+  if (image?.drag && body.hasPointerCapture(image.drag.id)) body.releasePointerCapture(image.drag.id);
+  state.viewer.image = null;
+  body.classList.remove("is-pannable", "is-dragging");
+  body.scrollLeft = body.scrollTop = 0;
+}
+
+async function toggleViewerFullscreen() {
+  try {
+    if (document.fullscreenElement === qs("preview-modal")) await document.exitFullscreen();
+    else await qs("preview-modal").requestFullscreen();
+  } catch (_) { showToast(t("viewer_fullscreen_unavailable")); }
+}
+
+function bindViewerImageControls() {
+  qs("btn-viewer-fit").addEventListener("click", () => setViewerImageMode("fit"));
+  qs("btn-viewer-actual").addEventListener("click", () => setViewerImageMode("actual"));
+  qs("btn-viewer-zoom-in").addEventListener("click", () => zoomViewerImage(1.25));
+  qs("btn-viewer-zoom-out").addEventListener("click", () => zoomViewerImage(1 / 1.25));
+  qs("btn-viewer-fullscreen").addEventListener("click", toggleViewerFullscreen);
+  const body = qs("preview-modal-body");
+  new ResizeObserver(() => layoutViewerImage()).observe(body);
+  document.addEventListener("fullscreenchange", () => { layoutViewerImage(); updateViewerImageControls(); });
+  body.addEventListener("wheel", (event) => {
+    if (!state.viewer.image?.width) return;
+    event.preventDefault();
+    const rect = body.getBoundingClientRect();
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? body.clientHeight : 1);
+    zoomViewerImage(Math.exp(-Math.max(-100, Math.min(100, delta)) * .002), event.clientX - rect.left, event.clientY - rect.top);
+  }, { passive: false });
+  body.addEventListener("dblclick", () => {
+    if (state.viewer.image) setViewerImageMode(state.viewer.image.mode === "fit" ? "actual" : "fit");
+  });
+  body.addEventListener("pointerdown", (event) => {
+    const image = state.viewer.image;
+    if (!image || !event.isPrimary || event.button !== 0 || !body.classList.contains("is-pannable")) return;
+    stopSlideshow();
+    image.drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: body.scrollLeft, top: body.scrollTop };
+    body.setPointerCapture(event.pointerId);
+    body.classList.add("is-dragging");
+    body.focus({ preventScroll: true });
+    event.preventDefault();
+  });
+  body.addEventListener("pointermove", (event) => {
+    const drag = state.viewer.image?.drag;
+    if (!drag || drag.id !== event.pointerId) return;
+    body.scrollLeft = drag.left - event.clientX + drag.x;
+    body.scrollTop = drag.top - event.clientY + drag.y;
+  });
+  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) body.addEventListener(name, (event) => {
+    const image = state.viewer.image;
+    if (image?.drag?.id !== event.pointerId) return;
+    image.drag = null;
+    body.classList.remove("is-dragging");
+    if (body.hasPointerCapture(event.pointerId)) body.releasePointerCapture(event.pointerId);
+  });
+}
+
 function closePreviewModal() {
   const modal = qs("preview-modal");
   if (!modal || modal.classList.contains("hidden")) return;
   stopSlideshow();
   state.viewer.request++;
+  resetViewerImage();
+  if (document.fullscreenElement === modal) document.exitFullscreen().catch(() => {});
   document.querySelector(".app-shell").inert = false;
   document.body.classList.remove("viewer-open");
   modal.classList.add("hidden");
@@ -3584,6 +3799,7 @@ function initEvents() {
   qs("btn-preview-prev").addEventListener("click", () => moveMemoryViewer(-1));
   qs("btn-preview-next").addEventListener("click", () => moveMemoryViewer(1));
   qs("btn-preview-play").addEventListener("click", toggleSlideshow);
+  bindViewerImageControls();
   qs("preview-filmstrip").addEventListener("click", (event) => {
     const button = event.target.closest("[data-viewer-index]");
     if (!button) return;
@@ -3608,6 +3824,14 @@ function initEvents() {
   document.addEventListener("keydown", (event) => {
     if (!qs("preview-modal").classList.contains("hidden")) {
       if (event.target.closest("video, #preview-caption") && event.key !== "Tab") return;
+      if (["+", "=", "-", "0", "1"].includes(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        if (event.key === "0") setViewerImageMode("fit");
+        else if (event.key === "1") setViewerImageMode("actual");
+        else zoomViewerImage(event.key === "-" ? 1 / 1.25 : 1.25);
+        return;
+      }
+      if (event.target.closest("#preview-modal-body.is-pannable") && event.key.startsWith("Arrow")) return;
       if (event.key === "ArrowLeft") { event.preventDefault(); moveMemoryViewer(-1); }
       if (event.key === "ArrowRight") { event.preventDefault(); moveMemoryViewer(1); }
       if (event.key === "Tab") {
@@ -3821,7 +4045,8 @@ function initEvents() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      closePreviewModal();
+      if (document.fullscreenElement === qs("preview-modal")) document.exitFullscreen().catch(() => {});
+      else closePreviewModal();
     }
   });
 
