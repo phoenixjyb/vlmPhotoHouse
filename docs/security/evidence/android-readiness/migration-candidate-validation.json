@@ -1,0 +1,67 @@
+{
+  "slice": "offline_quarantined_migration_candidate",
+  "source_commit": "4d6c4c5d982212b403d04845e1fd8df0c9e61556",
+  "parent_commit": "55266b51aca7d1393d27019fd4c1bc5951a4035a",
+  "schema_revision": "b6e3f9a5c721",
+  "security_tests": {
+    "passed": 262,
+    "elapsed_seconds": 29.494,
+    "new_candidate_tests": 15,
+    "existing_recovery_tests": 18
+  },
+  "development_failure": "Initial new test fixture omitted PRAGMA foreign_keys=ON; 12 setup errors. Fixture corrected before 15 focused tests and full 262-test pass.",
+  "inventory": {
+    "complete": true,
+    "entries": 152,
+    "active": 23,
+    "retired": 97,
+    "standalone": 32,
+    "historical_unsafe_denials_failed": 84,
+    "unsafe_denial_ledger_rerun": false
+  },
+  "android": {
+    "contract_verifier": "pass",
+    "verifier_regression_tests": 8,
+    "operations": 12,
+    "fixture_cases": 38,
+    "pack_checksums": 8,
+    "backend_source_hashes_match": 10,
+    "backend_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+    "full_contract_replay_rerun": false,
+    "mobile_modified": false
+  },
+  "source_package": {
+    "files": 51,
+    "sha256": "ade79983129bd6b338df9b1b4c5d0255dc1463512d04fc6665eb41d90e1fae4c",
+    "bytes": 344689,
+    "manifest_hashes_verified": true,
+    "extracted_smoke": "pass",
+    "asgi_checks": 7,
+    "operator_commands": 3,
+    "preparation_invocations": 5,
+    "preparation_command_types": 4
+  },
+  "cpu_probe": {
+    "target": "macos-arm64-test",
+    "profile": "runtime",
+    "packages": 18,
+    "python": "3.12.12",
+    "pass": true,
+    "windows_execution_verified": false
+  },
+  "bounds": {
+    "synthetic_only": true,
+    "network_listener_opened": false,
+    "real_database_media_accessed": false,
+    "live_hosts_accessed": false,
+    "deployed": false,
+    "pushed_or_merged": false,
+    "existing_files_modified_by_candidate": false,
+    "in_place_migration_implemented": false,
+    "cutover_implemented": false,
+    "owner_recovery_and_reopening_implemented": false,
+    "wal_supported": false,
+    "input_limit_bytes": 67108864
+  },
+  "next_step": "Reviewed owner credential recovery and selective library reopening with exact candidate/backup, fresh protected password and reconciled audience; then service cutover/rollback."
+}
