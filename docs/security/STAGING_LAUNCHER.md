@@ -1,3 +1,7 @@
+> Current operational follow-up: [verified Windows synthetic staging](WINDOWS_STAGING_RETURN.md).
+> The local-only claims below describe the earlier checkpoint. Real-library and
+> physical-phone acceptance remain pending.
+
 # Explicit protected staging launcher — local implementation
 
 `scripts/staging_app.py` supplies the deliberate runtime wiring missing from the

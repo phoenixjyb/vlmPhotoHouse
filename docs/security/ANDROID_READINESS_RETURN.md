@@ -1,3 +1,7 @@
+> Current operational follow-up: [verified Windows synthetic staging](WINDOWS_STAGING_RETURN.md).
+> The local-only claims below describe the earlier checkpoint. Real-library and
+> physical-phone acceptance remain pending.
+
 # Return to Android — backend readiness, 2026-09-11
 
 **First-owner recovery and selective reopening verified locally. Protected-backend

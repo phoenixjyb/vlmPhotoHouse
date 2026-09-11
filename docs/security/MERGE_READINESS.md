@@ -18,7 +18,7 @@ No push or merge has occurred in this follow-up.
 
 The user assigned backend launch/review and synthetic Windows staging here, with
 Android acceptance owned by its separate task. Real captioning remains on its
-existing release. Live staging evidence will be recorded separately after execution.
+existing release. [Windows synthetic staging](WINDOWS_STAGING_RETURN.md) is now verified separately.
 
 ---
 
