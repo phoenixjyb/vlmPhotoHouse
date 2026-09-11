@@ -83,3 +83,32 @@ test. The service does not make Windows content available while Windows sleeps.
 
 Safari/iOS/Android device acceptance remains separate from Chromium checks.
 The full Qwen3 caption refresh and end-of-run failure review remain unfinished.
+
+## Follow-up: saved-person picker (09:50 +08:00)
+
+UI source `0aa4a04c91532463bb2d9b7cd12eedfb1b4836e3` supersedes the UI overlay
+above; the backend remains `01ade47`. The face inspector now loads saved people
+independently of People-tab navigation, fetches all pages in stable ID order,
+refreshes names on reopening, and rejects stale inspector responses. Name-load
+failure shows a retry control and disables assignment/new-person controls;
+captions remain available and no partial list is offered as complete.
+
+The updated browser regression suite passed, including 501 saved names across
+two pages, an existing assignment, mocked assignment payload, renamed people,
+second-page failure/retry, an empty list, and navigation races. The prior viewer
+suite and seven UI source checks also passed.
+
+Fresh-browser verification through the Mac URL showed all **30 saved names**
+in an enabled face picker without visiting People. All names/IDs matched the
+API response. Live verification blocked mutation requests and made zero
+assignment writes, with zero uncaught browser errors.
+
+The Windows deployment receipt and rollback files are in
+`viewer-ui-0aa4a04c9153` under the PhotoHouse log directory. Served hashes match
+the new source: JS `84c1b457f249034214daeb421edee37de681020e974cb7ab5586ff1cfe345a5f`,
+HTML `c8a4e7777eea2902059791316896227d588fba56bb4685327ffc370cb17afa37`;
+CSS is unchanged. API PID `23284` and Qwen PID `10460` remained unchanged,
+API/database/worker checks passed, and Qwen3-VL remained busy. No people,
+face assignments, queue contents, or schedules were edited.
+
+This follow-up is committed locally; its GitHub publication remains pending.
