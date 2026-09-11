@@ -1,0 +1,50 @@
+{
+  "catalog_assets": 4,
+  "check_count": 10,
+  "checks": [
+    "foreign_owner_denied_before_provider",
+    "scoped_counts_and_ordered_reviewed_shortcuts",
+    "six_filter_combination",
+    "caption_and_dnn_are_not_person_approval",
+    "lossless_native_64_bit_asset_and_kind",
+    "stable_bound_pagination",
+    "mixed_page_size_refused",
+    "no_original_grant",
+    "service_queries_do_not_change_database",
+    "next_request_revocation"
+  ],
+  "coverage": {
+    "caption": {
+      "with_values": 3,
+      "without_values": 1
+    },
+    "date": {
+      "with_values": 3,
+      "without_values": 1
+    },
+    "locations": {
+      "with_values": 3,
+      "without_values": 1
+    },
+    "media": {
+      "with_values": 4,
+      "without_values": 0
+    },
+    "people": {
+      "with_values": 2,
+      "without_values": 2
+    },
+    "tags": {
+      "with_values": 3,
+      "without_values": 1
+    }
+  },
+  "endpoint_mounted": false,
+  "indexed_assets": 4,
+  "internal_combined_result_sha256": "06df17270a66ce2689189e4ba60297fb30a34d4c20f75fa43dacde7e28edb652",
+  "internal_facets_sha256": "d9eb073a9c369abd85a1fe1fa5c1814f0741bb1362e20b7ac438884e83e6380d",
+  "listener_started": false,
+  "real_data_accessed": false,
+  "status": "PASS_INTERNAL_SERVICE_ONLY",
+  "wire_contract_frozen": false
+}

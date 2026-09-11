@@ -1,0 +1,81 @@
+{
+  "task": "PH-PHONE-DISCOVERY-SERVICE-01",
+  "status": "PASS_INTERNAL_SERVICE_ONLY",
+  "base_commit": "8d8e88974b8be515ad5a9ab088b91a94652b1e71",
+  "implementation_commit": "ddfb0fb893d96482eb1b4b1015328c66ec96077c",
+  "branch": "codex/backend-home-tv-feed",
+  "test_environment": "Existing isolated CPU environment from backend/requirements-access.lock; no models or app runtime started",
+  "regression": {
+    "passed": 158,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 23.506,
+    "modules": [
+      "test_phone_discovery",
+      "test_access_foundation",
+      "test_access_transport",
+      "test_library_reads",
+      "test_closed_application",
+      "test_member_management",
+      "test_runtime_adapter",
+      "test_inventory"
+    ]
+  },
+  "extracted_source": {
+    "files": 15,
+    "focused_passed": 25,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 0.12,
+    "replay_checks_passed": 10,
+    "matches_worktree_replay": true
+  },
+  "frozen_inputs": {
+    "protected_phone": {
+      "checked": 10,
+      "mismatches": []
+    },
+    "home_discovery": {
+      "checked": 19,
+      "mismatches": []
+    }
+  },
+  "route_inventory": {
+    "complete": true,
+    "method_path_entries": 162,
+    "new_routes": 0
+  },
+  "documentation": {
+    "markdown_rendered_to_html": true,
+    "rendered_structure_verified": true,
+    "headings": 6,
+    "code_blocks": 1,
+    "valid_local_links": 1,
+    "visual_browser_check": false
+  },
+  "review_corrections": [
+    "Complete-value BLOB byte bounds prevent oversized date prefixes and embedded NUL caption/tag suffixes from being accepted. Three adversarial tests added.",
+    "SQL trace test initially observed its own serialize PRAGMA; tracing now ends before test-only serialization.",
+    "Documentation check initially assumed seven headings; corrected to compare rendered headings with the six source headings."
+  ],
+  "limitations": [
+    "No HTTP transport, route mount or frozen wire schema.",
+    "No trusted real-index producer/loader or live freshness evidence.",
+    "No prepared viewer-media authorization or routes; original permission is unchanged.",
+    "Budgets are cooperative, not hard RSS or preemptive I/O/provider/SQLite-lock limits; one explicitly shared budget and dedicated connections are required.",
+    "An already-admitted authorized SQLite snapshot may complete after revocation; the next request refuses.",
+    "Legacy and standalone authorization gaps remain inventoried; this service does not secure or expose them.",
+    "No Android/device, deployment or production-size acceptance from these source tests."
+  ],
+  "external_actions": {
+    "windows_access": false,
+    "real_database_or_media": false,
+    "models_loaded": false,
+    "listener_started": false,
+    "credentials_changed": false,
+    "deployed": false,
+    "android_files_modified": false,
+    "pushed": false,
+    "merged": false
+  }
+}
