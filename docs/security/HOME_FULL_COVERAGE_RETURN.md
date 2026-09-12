@@ -1,5 +1,10 @@
 # PH-HOME-FULL-COVERAGE-01 — automatic preparation and coverage audit
 
+Later source follow-up: [bounded media profiles](HOME_MEDIA_PROFILE_RETURN.md)
+implements supervised hashing, large baseline-JPEG subsampling, longer SDR budgets
+and qualification inside the same full-library checkpoint. The source limitations
+below describe the original `0872cf8` audit slice. No real bulk run has followed.
+
 Verified 2026-09-12. The new coordinator traverses the entire visible metadata
 snapshot, checkpoints each item, resumes interrupted work and carries verified
 derivatives into a newer immutable revision. Operators no longer select batches

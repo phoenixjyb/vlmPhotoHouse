@@ -1,0 +1,83 @@
+{
+  "task": "PH-HOME-MEDIA-PROFILE-01",
+  "base_merged_master": "6d0bf84f85ece5b906e71e1418c45514ccfbbb0c",
+  "source_commits": [
+    "3edf0916bcc04e845d34bdc4d8adbd337ebbf02b",
+    "ee5c06faea3d6f62ec356a9f7bb086d3569aea59"
+  ],
+  "branch": "codex/home-media-profile-coverage",
+  "source_pushed_or_merged": false,
+  "native_final": {
+    "commit": "ee5c06faea3d6f62ec356a9f7bb086d3569aea59",
+    "tests": 128,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 263.112,
+    "source_blobs_verified_before_and_after": 323,
+    "inventory_entries": 162,
+    "real_data_used": false
+  },
+  "native_interim": {
+    "commit": "3edf0916bcc04e845d34bdc4d8adbd337ebbf02b",
+    "tests": 125,
+    "seconds": 243.51,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "mac": {
+    "profile_focused_tests": 125,
+    "profile_seconds": 89.931,
+    "qualification_tests": 3,
+    "qualification_seconds": 5.324,
+    "single_128_run": false,
+    "initial_48mp_case": "Stopped correctly by production 4GiB available-RAM floor; rerun used 256MiB test-only floor, production unchanged."
+  },
+  "boundaries": {
+    "wire_changed": false,
+    "new_real_media_prepared": 0,
+    "originals_or_live_database_accessed": false,
+    "existing_private_audit_read_only": true,
+    "listeners_opened": false,
+    "deployed_or_restarted": false,
+    "caption_paused": false,
+    "android_source_changed": false
+  },
+  "live_preservation": {
+    "observed_at": "2026-09-12T14:36:06.9680755+08:00",
+    "live_control": {
+      "version": 2,
+      "enabled": true,
+      "revision": 1,
+      "catalog_sha256": "f9dc78da4236e5c6c920b2eefd9dfafc8850bd874e240bb372fe861b58e44f52"
+    },
+    "candidate_control": {
+      "version": 2,
+      "enabled": false,
+      "revision": 2,
+      "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4"
+    },
+    "live_config_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+    "seed_journal_sha256": "2d049d5b1a9aeb306e7e407caae618246dd0a3cb33bffa1ef50864b7403ce349",
+    "four_pid_and_start_identities_unchanged": true
+  },
+  "limitations": [
+    "Synthetic 48MP decode does not establish actual 200MP decode.",
+    "125s 320x180 synthetic video does not benchmark 8K, 13-minute or 7.63GiB originals.",
+    "Progressive JPEGs needing subsampling remain deferred; the old audit lacks progressive flags.",
+    "21 old audit cases remain unresolved with detailed accounting.",
+    "Resource guard samples owned processes; metadata/copy/fsync operations can delay a stop.",
+    "No new hosted check; merged PR5 had a documented failing scanner finding for synthetic test data."
+  ],
+  "qualification_proposal": {
+    "distinct_cases": 12,
+    "photo_cases": 4,
+    "video_cases": 8,
+    "diagnostic_cases": 2,
+    "actual_ids_retained_on_windows_only": true,
+    "real_job_created": false,
+    "snapshot_bound_execution_plan_created": false,
+    "real_conversion_started": false
+  }
+}

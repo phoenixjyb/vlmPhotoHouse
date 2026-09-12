@@ -1,0 +1,10 @@
+<test-environment>/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+test_reviewed_qualification_selects_cases_then_full_run_reuses_them (test_home_media_profiles.MediaProfileTests.test_reviewed_qualification_selects_cases_then_full_run_reuses_them) ... ok
+test_qualification_plan_is_bounded_and_bound_to_the_full_snapshot (test_home_media_profiles.MediaProfileTests.test_qualification_plan_is_bounded_and_bound_to_the_full_snapshot) ... ok
+test_qualification_even_of_all_items_does_not_claim_full_run_verification (test_home_media_profiles.MediaProfileTests.test_qualification_even_of_all_items_does_not_claim_full_run_verification) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 5.324s
+
+OK

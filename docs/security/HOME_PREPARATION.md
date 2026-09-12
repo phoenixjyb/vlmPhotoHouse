@@ -6,6 +6,10 @@ snapshot traversal, verified carry-forward and resumable publication. Read
 audit counts and outstanding profiles. The 16-ID workflow below remains the
 legacy preparer interface; it is no longer the only preparation workflow.
 
+The subsequent [media-profile return](HOME_MEDIA_PROFILE_RETURN.md) documents the
+explicit `library-sdr-v1` profile, owned hashing/decoding and snapshot-bound
+qualification mode. Its real-media qualification and activation remain pending.
+
 `prepare_home_catalog.py` adds resumable preparation for the frozen v2 contract.
 It never starts a listener, changes a service, accesses an inference model, or
 writes the live database/originals. It does not enable an existing publication.
