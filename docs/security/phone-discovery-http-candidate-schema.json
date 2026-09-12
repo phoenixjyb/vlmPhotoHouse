@@ -1,0 +1,775 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:photohouse:protected-discovery:candidate:1",
+  "title": "Protected discovery candidate 1; not Android-approved or deployed",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[0-1][0-9]{17}|92[0-1][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[0-1][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-6]|9223372036854775807)$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "person": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "maxItems": 8
+        },
+        "provenance": {
+          "enum": [
+            "reviewed_assignments"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "asset_count",
+        "aliases",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "provenance": {
+          "enum": [
+            "reviewed_region"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "asset_count",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "tag": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "kind": {
+          "enum": [
+            "date",
+            "location",
+            "person",
+            "scene",
+            "custom",
+            "unknown"
+          ]
+        },
+        "provenance_counts": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "manual",
+              "caption",
+              "image",
+              "caption_image",
+              "rule",
+              "unknown"
+            ]
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "asset_count",
+        "kind",
+        "provenance_counts"
+      ],
+      "additionalProperties": false
+    },
+    "asset": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "video",
+            "other"
+          ]
+        },
+        "width": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_sec": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000.0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "taken_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "thumbnail_url": {
+          "type": "string",
+          "pattern": "^/assets/[1-9][0-9]*/thumbnail\\?library=",
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "width",
+        "height",
+        "duration_sec",
+        "taken_at",
+        "thumbnail_url"
+      ],
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "match": {
+          "enum": [
+            "any",
+            "all"
+          ]
+        }
+      },
+      "required": [
+        "ids",
+        "match"
+      ],
+      "additionalProperties": false
+    },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "people": {
+          "$ref": "#/$defs/selection"
+        },
+        "tags": {
+          "$ref": "#/$defs/selection"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "image",
+              "video",
+              "other"
+            ]
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "date": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "additionalProperties": false
+    },
+    "searchRequest": {
+      "type": "object",
+      "properties": {
+        "binding": {
+          "$ref": "#/$defs/hash"
+        },
+        "filters": {
+          "$ref": "#/$defs/filters"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "fingerprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/hash"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "binding",
+        "filters",
+        "page",
+        "page_size",
+        "fingerprint"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "page": {
+                "minimum": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fingerprint": {
+                "$ref": "#/$defs/hash"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "facetsResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "library_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "binding": {
+          "$ref": "#/$defs/hash"
+        },
+        "revision": {
+          "$ref": "#/$defs/id"
+        },
+        "enabled": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "people",
+              "date",
+              "caption",
+              "tags",
+              "locations",
+              "media"
+            ]
+          },
+          "maxItems": 6,
+          "uniqueItems": true
+        },
+        "unavailable": {
+          "type": "object",
+          "properties": {
+            "themes": {
+              "const": "no_reviewed_taxonomy"
+            },
+            "topics": {
+              "const": "no_reviewed_taxonomy"
+            }
+          },
+          "required": [
+            "themes",
+            "topics"
+          ],
+          "additionalProperties": false
+        },
+        "catalog_assets": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "indexed_assets": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "index_complete": {
+          "type": "boolean"
+        },
+        "metadata_completeness": {
+          "const": "not_inferred"
+        },
+        "tag_generation_completeness": {
+          "const": "unknown"
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "people": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            },
+            "date": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            },
+            "caption": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            },
+            "tags": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            },
+            "locations": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            },
+            "media": {
+              "type": "object",
+              "properties": {
+                "with_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                },
+                "without_values": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100000
+                }
+              },
+              "required": [
+                "with_values",
+                "without_values"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "people",
+            "date",
+            "caption",
+            "tags",
+            "locations",
+            "media"
+          ],
+          "additionalProperties": false
+        },
+        "captured_date_bounds": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        "pinned_person_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "pinned_people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/person"
+          },
+          "maxItems": 32
+        },
+        "facet": {
+          "enum": [
+            "people",
+            "tags",
+            "locations"
+          ]
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/person"
+              },
+              {
+                "$ref": "#/$defs/tag"
+              },
+              {
+                "$ref": "#/$defs/location"
+              }
+            ]
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "version",
+        "library_id",
+        "binding",
+        "revision",
+        "enabled",
+        "unavailable",
+        "catalog_assets",
+        "indexed_assets",
+        "index_complete",
+        "metadata_completeness",
+        "tag_generation_completeness",
+        "coverage",
+        "captured_date_bounds",
+        "pinned_person_ids",
+        "pinned_people",
+        "facet",
+        "page",
+        "page_size",
+        "total",
+        "has_more",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "searchResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "library_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "binding": {
+          "$ref": "#/$defs/hash"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/hash"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "originals_allowed": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/asset"
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "version",
+        "library_id",
+        "binding",
+        "fingerprint",
+        "page",
+        "page_size",
+        "total",
+        "has_more",
+        "originals_allowed",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "enum": [
+            "access_denied",
+            "invalid_request",
+            "request_too_large",
+            "request_timeout",
+            "discovery_changed",
+            "discovery_busy",
+            "discovery_unavailable",
+            "request_cancelled"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "error",
+        "detail"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/facetsResponse"
+    },
+    {
+      "$ref": "#/$defs/searchResponse"
+    },
+    {
+      "$ref": "#/$defs/error"
+    }
+  ]
+}
