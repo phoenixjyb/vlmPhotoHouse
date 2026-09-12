@@ -190,6 +190,15 @@ class PhoneDiscoveryHttpTests(unittest.TestCase):
             asset=next(a for a in response.json()['items'] if a['id']=='101')
             self.assertIsNone(asset['width']);self.assertIsNone(asset['height']);self.assertIsNone(asset['duration_sec'])
 
+    def test_newline_ids_binding_and_fingerprint_are_not_canonical(self):
+        initial=self.post().json()
+        for suffix in ('\n','\r\n','\t','\u2028'):
+            with self.subTest(suffix=repr(suffix)):
+                self.private(self.post(self.payload(filters={'people':{'ids':['301'+suffix],'match':'any'}})),400)
+                self.private(self.post(self.payload(binding=initial['binding']+suffix)),400)
+                self.private(self.post(self.payload(fingerprint=initial['fingerprint']+suffix)),400)
+                self.private(self.get({'binding':initial['binding']+suffix}),400)
+
     def test_stream_limit_mismatch_and_body_deadline(self):
         async def attempt(chunks,headers,delay=0):
             async def receive():
