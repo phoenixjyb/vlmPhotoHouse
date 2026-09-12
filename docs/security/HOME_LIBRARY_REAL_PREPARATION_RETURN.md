@@ -1,4 +1,47 @@
-# Real-library preparation — active qualification checkpoint
+# Real-library preparation — stopped by memory guard
+
+2026-09-12, 17:07 +08. **Qualification stopped at 16:58:00 +08 with
+`memory_pressure`; full-library preparation has not started.** The earlier
+running checkpoint below is historical.
+
+The largest 8K HEVC sample passed full preparation and verification: an
+8,193,114,694-byte, 816.667433-second original produced 1,099,456,511 bytes of
+normalized video/previews. Its `prepare_one` elapsed time was 5,653.563 seconds
+(94.23 minutes), including validation. This is not the encoder-only time, nor
+a full-library ETA. The output video is 1920 × 1080; the original is unchanged.
+
+The next sample, the 664-second full-range video, was interrupted when available
+RAM reached **4,239,200,256 bytes**, below the unchanged **4 GiB
+(4,294,967,296-byte)** floor. The completed run summary contains 6,371 resource
+samples and an observed owned-process peak of 655,355,904 bytes. These sampled
+measurements are not an OS memory quota or a diagnosis of other memory users.
+
+Checkpoint: **5 ready, 1 interrupted working entry, 27,836 pending**. The working
+entry is persisted recovery state, not an active encoder. The runner and its
+observed children were absent at 17:06:45, and the held SSH invocation completed.
+No incomplete derivative was counted as ready. Three large-photo cases, another
+long-video case and two diagnostic cases remain pending; qualification has not
+passed. No bulk gate, bulk process, automatic retry or guard reduction was applied.
+
+At 17:06, free storage was 5,244,024,569,856 bytes and available RAM was
+4,419,506,176 bytes, only 124,538,880 bytes above the floor. This single recovery
+sample does not establish sustained headroom. All 323 staged source hashes still
+matched the pinned source. Existing publication/config/seed hashes and four
+service PID/start identities matched baseline. Caption rows reached 42,950;
+the latest task observation recorded 442 failed and four dead tasks, versus
+440 failed at preflight. Captioning continued without intervention; the cause
+of the increase was not established.
+
+[Memory-stop evidence](evidence/home-library-real-preparation/checkpoint-memory-stop.json)
+records the completed run and subsequent read-only observations. Next: inspect
+memory pressure without changing other workloads, establish sustained headroom,
+then review a resume of the same qualification plan with unchanged guards.
+After qualification passes, complete the capacity/throughput review before bulk.
+No caption pause, unrelated process stop, service restart or publication is
+authorized by this evidence. The checkpoint and all five ready results remain
+available for verified reuse.
+
+## Historical running checkpoint
 
 2026-09-12, 15:42 +08. **Representative qualification is running; the uncapped
 full-library preparation has not started.** This is an operational checkpoint,
