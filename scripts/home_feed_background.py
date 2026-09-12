@@ -83,11 +83,14 @@ def console_window():
     return int(kernel.GetConsoleWindow() or 0)
 
 
-def serve_existing(source, kind, config, server_run=None):
+def serve_existing(source, kind, config, server_run=None, delivery_args=()):
     """Keep the release's validation, factory and all serving options."""
     scripts = source / 'scripts'
     sys.path.insert(0, str(scripts))
-    entry = scripts / ('home_feed_app.py' if kind == 'v1' else 'home_catalog_app.py')
+    entry = scripts / {'v1': 'home_feed_app.py', 'v2': 'home_catalog_app.py',
+                       'v3': 'home_originals_app.py'}[kind]
+    if delivery_args and kind != 'v3':
+        raise ValueError('Original delivery arguments require v3')
     spec = importlib.util.spec_from_file_location('_home_background_entry', entry)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -101,8 +104,8 @@ def serve_existing(source, kind, config, server_run=None):
             raise ValueError('Unexpected serving policy')
         return server_run(app, **dict(options, log_config=None))
 
-    if kind == 'v2':
-        return module.main(['--config', str(config), '--serve'], server_run=bounded_run)
+    if kind in ('v2', 'v3'):
+        return module.main(['--config', str(config), '--serve', *delivery_args], server_run=bounded_run)
     configuration, options = module.load_config(config)
     module.serve(configuration, options, server_run=bounded_run)
     return 0
@@ -117,10 +120,27 @@ def write_receipt(path, value):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, required=True)
-    parser.add_argument('--kind', choices=('v1', 'v2'), required=True)
+    parser.add_argument('--kind', choices=('v1', 'v2', 'v3'), required=True)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--log-dir', type=Path, required=True)
+    parser.add_argument('--sources', type=Path)
+    parser.add_argument('--sources-sha256')
+    parser.add_argument('--original-root', type=Path, action='append')
+    parser.add_argument('--cache', type=Path)
+    parser.add_argument('--allow-originals', action='store_true')
     args = parser.parse_args(argv)
+    delivery_args = []
+    if args.kind == 'v3':
+        if not all((args.sources, args.sources_sha256, args.original_root, args.cache)):
+            parser.error('v3 requires sources, checksum, original roots and cache')
+        delivery_args = ['--sources', str(args.sources), '--sources-sha256', args.sources_sha256,
+                         '--cache', str(args.cache)]
+        for root in args.original_root:
+            delivery_args += ['--source-root', str(root)]
+        if args.allow_originals:
+            delivery_args.append('--allow-originals')
+    elif any((args.sources, args.sources_sha256, args.original_root, args.cache, args.allow_originals)):
+        parser.error('Original delivery arguments require v3')
     configure_logging(args.log_dir)
     window = console_window()
     receipt = {'pid': os.getpid(), 'parent_pid': os.getppid(),
@@ -134,7 +154,7 @@ def main(argv=None):
         if window:
             raise RuntimeError('Use pythonw.exe; a console is attached')
         logging.info('Starting existing %s feed; pid=%s', args.kind, os.getpid())
-        result = serve_existing(args.source_root, args.kind, args.config)
+        result = serve_existing(args.source_root, args.kind, args.config, delivery_args=delivery_args)
         receipt['exit_code'] = result
         return result
     except Exception:

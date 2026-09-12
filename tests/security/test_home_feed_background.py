@@ -38,6 +38,30 @@ class BackgroundTests(unittest.TestCase):
                 self.assertEqual(result, 0)
                 self.assertEqual(calls, [(str(source/'config.json'), dict(options, log_config=None))])
 
+    def test_v3_passes_explicit_original_policy_with_bounded_logging(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory); (source/'scripts').mkdir()
+            (source/'scripts/home_originals_app.py').write_text(
+                'def main(args, server_run): return server_run(args, access_log=False, proxy_headers=False)')
+            calls = []; old = sys.path[:]
+            flags = ['--sources', 'private-index', '--sources-sha256', 'a'*64,
+                     '--source-root', 'originals', '--cache', 'private-cache', '--allow-originals']
+            try:
+                background.serve_existing(source, 'v3', source/'config',
+                    lambda app, **kw: calls.append((app, kw)), delivery_args=flags)
+                with self.assertRaises(ValueError):
+                    background.serve_existing(source, 'v2', source/'config', delivery_args=flags)
+            finally:
+                sys.path[:] = old
+            self.assertEqual(calls, [(['--config', str(source/'config'), '--serve', *flags],
+                dict(access_log=False, proxy_headers=False, log_config=None))])
+
+    def test_v3_refuses_missing_policy_before_logging_or_listener(self):
+        with patch.object(background, 'configure_logging') as logging_setup:
+            with self.assertRaises(SystemExit):
+                background.main(['--source-root', '.', '--kind', 'v3', '--config', 'config', '--log-dir', 'logs'])
+            logging_setup.assert_not_called()
+
     def test_rejects_changed_access_logging_policy(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory); (source/'scripts').mkdir()
