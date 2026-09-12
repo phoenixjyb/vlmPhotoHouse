@@ -199,6 +199,42 @@ class MediaProfileTests(unittest.TestCase):
             library.publish(job,self.root/'publication',guard=self.guard(job))
         self.assertEqual(observed,[900,900,900,900])
 
+    def qualification(self,job,ids):
+        config=json.loads((job/'job.json').read_text())
+        plan=self.root/'qualification.json'
+        plan.write_text(json.dumps({'revision':config['revision'],'base_sha256':config['base_sha256'],'asset_ids':ids}))
+        return plan
+
+    def test_reviewed_qualification_selects_cases_then_full_run_reuses_them(self):
+        job=self.root/'library';library.create(self.db,self.sources,job,self.ffmpeg,self.ffprobe,self.base,2,self.profile)
+        plan=self.qualification(job,[101])
+        state=library.run(job,guard=self.guard(job),qualification=plan)
+        self.assertEqual(state['run_status'],'qualification_complete');self.assertEqual(state['counts'],{'pending':1,'ready':1})
+        self.assertFalse(state['verified_complete']);self.assertEqual(state['qualification']['asset_ids'],[101])
+        original=prep.prepare_one;converted=[]
+        def record(source,*args,**kwargs):converted.append(source);return original(source,*args,**kwargs)
+        with patch.object(prep,'prepare_one',side_effect=record):
+            self.assertTrue(library.run(job,guard=self.guard(job))['verified_complete'])
+        self.assertEqual(converted,[self.video])
+
+    def test_qualification_plan_is_bounded_and_bound_to_the_full_snapshot(self):
+        job=self.root/'library';library.create(self.db,self.sources,job,self.ffmpeg,self.ffprobe,self.base,2,self.profile)
+        path=self.qualification(job,[101]);base=json.loads(path.read_text())
+        for changes in ({'revision':3},{'base_sha256':'0'*64},{'asset_ids':[999]},
+                        {'asset_ids':[101,101]},{'asset_ids':[]},{'asset_ids':list(range(17))},
+                        {'unreviewed':True},{'asset_ids':[True]}):
+            with self.subTest(changes=changes):
+                path.write_text(json.dumps(dict(base,**changes)))
+                with self.assertRaises(ValueError):library.run(job,guard=self.guard(job),qualification=path)
+                self.assertEqual(library.status(job)['counts'],{'pending':2})
+
+    def test_qualification_even_of_all_items_does_not_claim_full_run_verification(self):
+        job=self.root/'library';library.create(self.db,self.sources,job,self.ffmpeg,self.ffprobe,self.base,2,self.profile)
+        plan=self.qualification(job,[101,102]);state=library.run(job,guard=self.guard(job),qualification=plan)
+        self.assertTrue(state['all_ready']);self.assertFalse(state['verified_complete'])
+        with patch.object(prep,'prepare_one',side_effect=AssertionError('No duplicate qualification encoding')):
+            self.assertTrue(library.run(job,guard=self.guard(job))['verified_complete'])
+
     def test_corrupt_icc_profile_never_silently_drops_color_conversion(self):
         source=self.sources/'bad-icc.jpg'
         with Image.new('RGB',(80,40),'red') as image: image.save(source,icc_profile=b'not an ICC profile')

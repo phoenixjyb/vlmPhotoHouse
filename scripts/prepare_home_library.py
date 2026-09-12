@@ -202,7 +202,7 @@ def status(workspace):
         return {'total':total,'ready':ready,'counts':counts,'reasons':reasons,'all_ready':ready==total,
                 'verified_complete':verified_complete,
                 'queue_drained':not (counts.get('pending',0)+counts.get('working',0)),'run_status':meta(c,'status'),
-                'publication':meta(c,'publication'),'resources':meta(c,'resources')}
+                'publication':meta(c,'publication'),'resources':meta(c,'resources'),'qualification':meta(c,'qualification')}
 
 
 def validate_result(result,kind):
@@ -274,7 +274,22 @@ def complete(c,aid,result,origin):
                      (json.dumps(result),result['source_sha256'],json.dumps(origin),aid))
 
 
-def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None):
+def qualification_plan(path,job,entries):
+    """A bounded reviewed subset of this exact full snapshot, never a new scope."""
+    if path is None:return None
+    prep.canonical(path)
+    raw=bounded_read(path,65536);plan=json.loads(raw,object_pairs_hook=unique)
+    if (type(plan) is not dict or set(plan)!={'revision','base_sha256','asset_ids'}
+            or type(plan['revision']) is not int or plan['revision']!=job['revision']
+            or plan['base_sha256']!=job['base_sha256']):raise ValueError('qualification_snapshot_mismatch')
+    ids=plan['asset_ids']
+    if (type(ids) is not list or not 1<=len(ids)<=16
+            or any(type(i) is not int for i in ids) or len(set(ids))!=len(ids)
+            or not set(ids)<={e[0] for e in entries}):raise ValueError('qualification_ids_invalid')
+    return {'sha256':prep.sha(raw),'asset_ids':ids}
+
+
+def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,qualification=None):
     if any(v is not None and (type(v) is not int or v<1) for v in (max_items,max_seconds)):raise ValueError('invalid_run_limit')
     job=load_job(workspace);budget=prep.Budget(**job['budget'])
     guard=guard or Guard(workspace,budget.reserve_bytes,max_seconds=max_seconds)
@@ -283,9 +298,12 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None)
     with prep.workspace_lock(workspace),ExitStack() as stack,closing(connect(workspace)) as c:
         if meta(c,'publication') or meta(c,'publication_build'):raise ValueError('publication_job_is_frozen_create_new_revision')
         seed=Seed(job['seed'],job,stack) if job['seed'] else None
-        with c:meta(c,'status','running');meta(c,'seed_verified',False)
+        entries=c.execute('SELECT id,kind FROM items ORDER BY id DESC').fetchall()
+        reviewed=qualification_plan(qualification,job,entries)
+        if reviewed:entries=[e for e in entries if e[0] in reviewed['asset_ids']]
+        with c:meta(c,'status','running');meta(c,'seed_verified',False);meta(c,'qualification',reviewed or False)
         try:
-            for entry in c.execute('SELECT id,kind FROM items ORDER BY id DESC').fetchall():
+            for entry in entries:
                 aid,kind=entry;guard(force=True,extra_disk=budget.output_bytes+14*1024**2)
                 item=c.execute('SELECT * FROM items WHERE id=?',(aid,)).fetchone()
                 if max_items is not None and processed>=max_items:raise JobStopped('qualification_item_limit')
@@ -331,7 +349,7 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None)
                 except (OSError,ValueError,KeyError,TypeError,Refused):
                     mark(c,aid,'error','verification_failed');processed+=1
             if seed:seed.verify_pin()
-            with c:meta(c,'status','queue_drained');meta(c,'seed_verified',True)
+            with c:meta(c,'status','qualification_complete' if reviewed else 'queue_drained');meta(c,'seed_verified',True)
         except (JobStopped,KeyboardInterrupt) as error:
             with c:meta(c,'status',str(error) if isinstance(error,JobStopped) else 'interrupted')
         except (OSError,ValueError,KeyError,TypeError,sqlite3.Error,Refused):
@@ -446,6 +464,7 @@ def main(argv=None):
     init.add_argument('--carry-workspace',type=Path);init.add_argument('--carry-sha256');init.add_argument('--carry-kind',choices=('legacy','library'))
     run_parser=sub.add_parser('run');run_parser.add_argument('--workspace',type=Path,required=True)
     run_parser.add_argument('--retry-errors',action='store_true');run_parser.add_argument('--max-items',type=int);run_parser.add_argument('--max-seconds',type=int)
+    run_parser.add_argument('--qualification-plan',type=Path)
     stat=sub.add_parser('status');stat.add_argument('--workspace',type=Path,required=True)
     pub=sub.add_parser('publish');pub.add_argument('--workspace',type=Path,required=True);pub.add_argument('--output',type=Path,required=True);pub.add_argument('--allow-partial',action='store_true')
     args=parser.parse_args(argv)
@@ -457,7 +476,7 @@ def main(argv=None):
                 seed=seed_description(args.carry_workspace,args.carry_sha256,args.carry_kind)
             budget=prep.Budget(**read_json(args.budget_json,4096)) if args.budget_json else prep.PROFILES[args.profile or 'pilot']
             result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed)
-        elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds)
+        elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds,qualification=args.qualification_plan)
         elif args.command=='status':result=status(args.workspace)
         else:result=publish(args.workspace,args.output,args.allow_partial)
         print(json.dumps(result))
