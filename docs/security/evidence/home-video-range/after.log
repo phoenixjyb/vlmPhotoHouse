@@ -1,0 +1,8 @@
+test_full_range_mov_converts_luma_and_chroma_to_limited_range (test_home_preparer.PreparerTests.test_full_range_mov_converts_luma_and_chroma_to_limited_range) ... ok
+test_limited_range_mov_preserves_luma_and_chroma (test_home_preparer.PreparerTests.test_limited_range_mov_preserves_luma_and_chroma) ... ok
+test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration (test_home_preparer.PreparerTests.test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 5.451s
+
+OK

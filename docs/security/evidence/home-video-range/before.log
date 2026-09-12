@@ -1,0 +1,31 @@
+test_full_range_mov_converts_luma_and_chroma_to_limited_range (test_home_preparer.PreparerTests.test_full_range_mov_converts_luma_and_chroma_to_limited_range) ... FAIL
+test_limited_range_mov_preserves_luma_and_chroma (test_home_preparer.PreparerTests.test_limited_range_mov_preserves_luma_and_chroma) ... ok
+test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration (test_home_preparer.PreparerTests.test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration) ... FAIL
+
+======================================================================
+FAIL: test_full_range_mov_converts_luma_and_chroma_to_limited_range (test_home_preparer.PreparerTests.test_full_range_mov_converts_luma_and_chroma_to_limited_range)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<repo>/tests/security/test_home_preparer.py", line 120, in test_full_range_mov_converts_luma_and_chroma_to_limited_range
+    self.check_video_sample_range('pc')
+  File "<repo>/tests/security/test_home_preparer.py", line 110, in check_video_sample_range
+    state=self.run_prep((102,));item=state['items']['102'];self.assertEqual(item['state'],'ready',item)
+                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'unavailable' != 'ready'
+- unavailable
++ ready
+ : {'state': 'unavailable', 'reason': 'preparation_failed'}
+
+======================================================================
+FAIL: test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration (test_home_preparer.PreparerTests.test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<repo>/tests/security/test_home_preparer.py", line 254, in test_normalized_probe_rejects_extra_tracks_tags_hdr_and_bad_duration
+    with self.assertRaises(prep.PreparationError):prep.normalized_probe(value,1)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: PreparationError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 3.361s
+
+FAILED (failures=2)

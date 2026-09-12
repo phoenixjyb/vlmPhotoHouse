@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "source_commit": "50391b6db8a7c41dc276f6ec36c28dfc0b0a934d",
+  "parent_commit": "6b9c24c7ad978c7f3f73e826fd9527ad25a4ce98",
+  "environment": {
+    "platform": "macOS arm64",
+    "python": "3.12.12",
+    "pillow": "12.3.0",
+    "ffmpeg": "9.0.1",
+    "ffprobe": "9.0.1"
+  },
+  "synthetic_only": true,
+  "before": {
+    "tests": 3,
+    "passed": 1,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 0
+  },
+  "focused_after": {
+    "tests": 3,
+    "passed": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "combined": {
+    "tests": 86,
+    "passed": 86,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "duration_seconds": 30.634
+  },
+  "source_sha256": {
+    "scripts/prepare_home_catalog.py": "d0afa953023aa010cdc65d5c3dc98a4fe304712e8e3acdbc73d85e179a413c99",
+    "tests/security/test_home_preparer.py": "bcd9db66eaf701c15427fd8e0cecb701547f048063e52b2e4f5d067890adcd7f",
+    "backend/app/home_catalog.py": "467b7fc9bcd04e07ff0578a4f4fe80a453d949fc850372986444c36c0592ab40",
+    "backend/app/home_feed.py": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c",
+    "scripts/build_home_catalog.py": "ae0f7f22214467507b9daedfe3e6d4a3439700015264ba378cded3f43004ae88"
+  },
+  "logs_sha256": {
+    "after.log": "10ce6fed5696d1bda1f3881b19ce9093940368b23fd88f10f95523e357580504",
+    "before.log": "564ec170e83ee62b768322a3884dac25fe1481b71ef5c97766dc4d554e0f46b5",
+    "mac-tests.log": "95e2b9ff1a981e7b9e59ddfc9da56aa7d6a0f0030ce3ab3e8c833bca4bda027a"
+  },
+  "not_run": [
+    "Windows FFmpeg 7.1.1 native tests",
+    "real MOV retry",
+    "real preparation or publication",
+    "new-source Android or physical TV acceptance",
+    "live caption coexistence refresh"
+  ],
+  "external_changes": []
+}

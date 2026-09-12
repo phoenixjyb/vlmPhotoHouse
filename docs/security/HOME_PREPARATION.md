@@ -79,6 +79,18 @@ limits output to 1080p pixels/1920 edge, 30 fps, H.264 High <=4.1 and AAC-LC. It
 only the video and optional first audio track, drops source tags/chapters/subtitles/
 data, replaces handler/language tags, and requests faststart.
 
+The scale filter converts the detected input sample range to limited range, and
+the H.264 encoder receives matching `tv` range signaling. Merely requesting
+`format=yuv420p` previously left a full-range MOV output marked `yuvj420p`, which
+the output validator correctly rejected. Explicit full-range output signaling
+is also refused even if the pixel format reports `yuv420p`; absent/unknown range
+remains accepted for ordinary limited-range H.264 without explicit VUI metadata.
+[FFmpeg's scale range options](https://ffmpeg.org/ffmpeg-filters.html#scale-1)
+perform the sample conversion. Synthetic lossless input bars check decoded
+luma and chroma values after production encoding, including a limited-range
+regression to catch an unwanted second range compression. These are sample
+checks, not a general color-management or HDR acceptance claim.
+
 FFmpeg/ffprobe are invoked without a shell. Input protocol is restricted to local
 `file`, the MOV demuxer is forced, and external data references/absolute aliases
 are disabled; untrusted local media cannot select a network/playlist demuxer.
@@ -117,6 +129,10 @@ a polling interval and can overshoot their threshold briefly. Image dimensions
 bound allocations, but no Windows Job Object memory cap is implemented. Canaries
 must observe working set and use an external operator stop threshold. Repeated
 failed attempts consume retained disk space; no unattended bulk loop is supplied.
+
+For the range-fix rollout and the checkpoint/revision migration limits, see
+[the source return and incremental plan](HOME_VIDEO_RANGE_RETURN.md). That plan
+requires separate operational approval; this source fix changes no publication.
 
 A publication is an offline snapshot. Live hide/import changes do not automatically
 update it, and `publish` does not re-query the live database. Before enabling any
