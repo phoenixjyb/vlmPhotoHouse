@@ -1,0 +1,117 @@
+{
+  "source_commit": "7795133091c412ea7b1cfd9de8ac2271285bf7f0",
+  "production_code_changed": false,
+  "native_test_delta_commit": "7795133091c412ea7b1cfd9de8ac2271285bf7f0",
+  "files": [
+    {
+      "path": "backend/app/__init__.py",
+      "bytes": 87,
+      "sha256": "f378e6b73a28874ade0c801a7446c03d279a4c7b9b0827f05ebd23183e1a340d"
+    },
+    {
+      "path": "backend/app/home_feed.py",
+      "bytes": 14397,
+      "sha256": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c"
+    },
+    {
+      "path": "backend/app/home_catalog.py",
+      "bytes": 15515,
+      "sha256": "467b7fc9bcd04e07ff0578a4f4fe80a453d949fc850372986444c36c0592ab40"
+    },
+    {
+      "path": "scripts/build_home_catalog.py",
+      "bytes": 3758,
+      "sha256": "ae0f7f22214467507b9daedfe3e6d4a3439700015264ba378cded3f43004ae88"
+    },
+    {
+      "path": "scripts/prepare_home_catalog.py",
+      "bytes": 24826,
+      "sha256": "2bbb6f3ee4242274b5d27091c7fb93a70c8a15788b651bf1237ac466f8c87118"
+    },
+    {
+      "path": "scripts/home_feed_app.py",
+      "bytes": 3114,
+      "sha256": "98c2bbcda284cfbc39f2d6c6bf2468ecae1c66952f2bad2ac512b09c3704a8ed"
+    },
+    {
+      "path": "scripts/home_catalog_app.py",
+      "bytes": 1487,
+      "sha256": "f1e1c620c9f706f7d1a34cd0a659bda190b074463efe287ee032fdbc86b6d147"
+    },
+    {
+      "path": "scripts/security_inventory.py",
+      "bytes": 12941,
+      "sha256": "c75a65948873a11c61e9b1c0a49da8e15dde1316a93d358504dc9114cb7706d1"
+    },
+    {
+      "path": "backend/requirements-access.lock",
+      "bytes": 31680,
+      "sha256": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42"
+    },
+    {
+      "path": "backend/requirements-access-test.lock",
+      "bytes": 32239,
+      "sha256": "ded98cb724b9ad408683824bab31c249fbf1a905658dbfc90776bce07ce1c1c5"
+    },
+    {
+      "path": "backend/requirements-home-preparation.lock",
+      "bytes": 361,
+      "sha256": "652c7ca450144abf07fc3b7e6bdcd76af6cb7ff46fbf6b673c2a7fe141ca9076"
+    },
+    {
+      "path": "tests/security/test_home_feed.py",
+      "bytes": 15323,
+      "sha256": "4c65e2ca1749bca3b398c92d086c0c0c4082585374ef4a59b16b658b548e1a54"
+    },
+    {
+      "path": "tests/security/test_home_catalog.py",
+      "bytes": 20521,
+      "sha256": "c70adf3b1326dd257604d3daaae7c76e9044344dd9ec1c26393e283b8aac4611"
+    },
+    {
+      "path": "tests/security/test_home_preparer.py",
+      "bytes": 15659,
+      "sha256": "9c879260cf8287813bec061a8db138655d97f70ee367ad817e8c198b1831ad49"
+    },
+    {
+      "path": "tests/security/native_home_guards.py",
+      "bytes": 1989,
+      "sha256": "4957c23e6b8c31bafb4e17547b2f5f820d3cace84d9becea2ed5849a982c2fd9"
+    },
+    {
+      "path": "tests/security/test_native_home_guards.py",
+      "bytes": 1657,
+      "sha256": "39ce95dc93881dec17cdd1a3ef1fe73da620907ddce42da5275f6b258ad20274"
+    },
+    {
+      "path": "tests/security/test_inventory.py",
+      "bytes": 7529,
+      "sha256": "c3f7f0c7ba538655c05a8384c1a4cd4f5213000d8f2ebe31a018931aab662f7a"
+    },
+    {
+      "path": "tests/security/fixtures/home-8x8.jpg",
+      "bytes": 632,
+      "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d"
+    },
+    {
+      "path": "tests/security/fixtures/home-video.mp4",
+      "bytes": 24336,
+      "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+    },
+    {
+      "path": "docs/security/home-catalog-contract-v2.json",
+      "bytes": 16767,
+      "sha256": "13cf10892dc4e91631ad71b5ee4bed21baa44697f1e779851c19026dbe606120"
+    },
+    {
+      "path": "docs/security/route_capabilities.json",
+      "bytes": 125042,
+      "sha256": "13d14aa90b5bd1daca9aa42a1f7a2e2ae5911ed572aa839940a9c5a5ac66fdec"
+    },
+    {
+      "path": "docs/security/evidence/home-preparation/benchmark.py",
+      "bytes": 5833,
+      "sha256": "63ba9addae492fdfc750deeac1d001085510751a6393c810fe6b93e81aa4ca9e"
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "task": "PH-HOME-REAL-MEDIA-SERVE-01",
+  "status": "PASS_BOUNDED_REAL_MEDIA_LAN_SERVICE",
+  "verified_local_time": "2026-09-12T08:38:44+08:00",
+  "branch": "codex/backend-home-tv-feed",
+  "source_commit": "7795133091c412ea7b1cfd9de8ac2271285bf7f0",
+  "native": {
+    "tests_passed": 84,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 35.728,
+    "python": "3.12.10",
+    "pillow": "12.3.0",
+    "ffmpeg": "7.1.1-essentials_build",
+    "ffmpeg_sha256": "b90225987bdd042cca09a1efb5e34e9848f2d1dbf5fbcd388753a44145522997",
+    "ffprobe_sha256": "05e8fa639450f8191635192871ae37a3ec3e4638fa12f3b7d49c6522ba16a8ed",
+    "locked_cpu_environment_separate": true,
+    "pip_check_passed": true,
+    "all_staged_git_blob_hashes_verified": 318,
+    "inventory_entries": 162
+  },
+  "mac": {
+    "tests_passed": 84,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 6.805
+  },
+  "coverage": {
+    "catalog_entries": 27842,
+    "photo_entries": 23599,
+    "video_entries": 4243,
+    "ready_photos": 15,
+    "ready_videos": 1,
+    "unavailable_total": 27826,
+    "ready_items_on_page_one": 16,
+    "page_size": 50,
+    "revision": 1,
+    "discovery_enabled": false,
+    "complete_media_coverage": false,
+    "full_current_visible_scope_revalidated_before_enable": true,
+    "batch_completed_before_first_revision_one_serve": true
+  },
+  "preparation": {
+    "native_synthetic_seconds": 12.485,
+    "real_video_canary_seconds": 5.766,
+    "real_verified_resume_seconds": 0.937,
+    "fourteen_photo_batch_seconds": 20.156,
+    "batch_resume_seconds": 1.235,
+    "first_live_publication_bytes": 22887878,
+    "original_hashes_unchanged": true,
+    "selected_metadata_and_schema_unchanged": true,
+    "database_connections_read_only": true,
+    "no_job_submissions": true,
+    "windows_geometry_metadata_decode_hash_checks": true,
+    "windows_human_visual_review": false
+  },
+  "resources": {
+    "real_video_canary": {
+      "samples": 7,
+      "minimum_available_ram_bytes": 51090812928,
+      "max_observed_owned_peak_working_set_bytes": 366481408,
+      "sampled_cpu_delta_seconds_lower_bound": 2.890625,
+      "sampled_drive_free_delta_bytes": -757760
+    },
+    "verified_resume": {
+      "samples": 4,
+      "minimum_available_ram_bytes": 51441106944,
+      "max_observed_owned_peak_working_set_bytes": 200556544,
+      "sampled_cpu_delta_seconds_lower_bound": 2.796875,
+      "sampled_drive_free_delta_bytes": -8085504
+    },
+    "fourteen_photo_batch": {
+      "samples": 17,
+      "minimum_available_ram_bytes": 50901897216,
+      "max_observed_owned_peak_working_set_bytes": 201478144,
+      "sampled_cpu_delta_seconds_lower_bound": 5.34375,
+      "sampled_drive_free_delta_bytes": -37838848
+    }
+  },
+  "resource_measurement_limits": "One-second sleeps plus polling overhead; sampled CPU deltas are lower bounds and may miss short-lived children. Peak values are observed process peaks, not a hard OS memory quota. Drive deltas include concurrent background work.",
+  "live": {
+    "private_interface_only": true,
+    "existing_two_peer_acl_reused": true,
+    "tls_trust_verified": true,
+    "catalog": 200,
+    "photo_head": 200,
+    "video_head": 200,
+    "single_byte_range": 206,
+    "denied_server_peer": 403,
+    "spoofed_forwarded_peer": 403,
+    "wrong_host": 403,
+    "personal_credential_header": 403,
+    "closed_legacy_account_voice_operational_discovery_paths": 11,
+    "publication_disable_catalog": 403,
+    "publication_disable_video_head": 403,
+    "v2_only_task_stop_listener_absent": true,
+    "v2_only_firewall_rollback_and_restore": true,
+    "v1_https_during_rollback": 200,
+    "restored_page_equals_first_served_page": true
+  },
+  "android_reported_adapter": {
+    "source_commit": "ae975cb1e26db67bc5a3d1a0d1b5ce73673c7821",
+    "opt_in_tests_passed": 1,
+    "gradle_exit": 0,
+    "seconds": 6,
+    "normal_tls_trust_and_exact_lan_mapping": true,
+    "real_jpeg_previews_verified": 4,
+    "complete_prepared_video_bytes": 383496,
+    "bounded_range_full_hash_eof_backward_seek": true,
+    "repeated_page_stable": true,
+    "media_files_saved_on_mac": false,
+    "physical_tv_acceptance": false,
+    "final_feed_recheck_after_restore": true
+  },
+  "preservation": {
+    "v1_api_caption_process_identity_unchanged": true,
+    "caption_rows_initial": 41762,
+    "caption_rows_after_restore": 41810,
+    "caption_pause_or_restart": false,
+    "api_responsive_non_model_404_probe": true,
+    "dns_and_protected_task_state_unchanged": true,
+    "original_database_or_existing_credential_acls_changed": false,
+    "new_publication_acl_only": "Explicit read/traverse for existing limited task user; no write grant.",
+    "public_ingress_or_legacy_service_exposure": false,
+    "push_or_merge": false
+  },
+  "retained_failures": [
+    "Initial native fixture connections did not close; blanket socket guards blocked Windows asyncio self-pipe; GBK and missing staged Git index affected inventory. No skipped tests or relaxed production validation.",
+    "First harness correction had a Mock import typo and one remaining exporter fixture handle; both corrected before final84-test pass.",
+    "First full-range H264 MOV output remained yuvj420p and was correctly refused; failed attempt retained, one video remains preparation_failed. Limited-range eight-bit SDR HEVC fallback succeeded through unchanged preparer.",
+    "Monitor initially treated uncaptured Process.ExitCode as failure after successful driver assertions; retained handle and repeated verified resume/publication returned explicit0.",
+    "Final source comparison initially used checkout CRLF for an unused test PS1; corrected to committed blob hashes,318 verified.",
+    "Operator certificate preflight used removed ssl.match_hostname; corrected to exact SAN equality plus certificate/key load and trusted HTTPS verification.",
+    "Limited task initially could not read new publication due Administrators ownership of mode0700 directories; only new derivative publication received task-user read/traverse permission."
+  ],
+  "open_gates": [
+    "27,826 catalog entries still lack prepared media. No unattended or bulk conversion.",
+    "Full-range video normalization requires a reviewed preparer fix; retain refusal until tested.",
+    "Larger/HDR/long/unsupported sources require reviewed resource/profile work.",
+    "Snapshot hide/import freshness after publication is not automatic; refresh and revalidate scope before republishing.",
+    "Any changed served catalog/coverage requires a new higher revision and coherent hashes.",
+    "Manual interactive task has no startup trigger; reboot/logon persistence not claimed.",
+    "Physical TV APK installation, orientation, playback and D-pad acceptance remain Android/user gates.",
+    "No real discovery index or protected-phone discovery HTTP transport added."
+  ]
+}

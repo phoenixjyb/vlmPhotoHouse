@@ -1,0 +1,89 @@
+{
+  "synthetic_only": true,
+  "platform": "Windows",
+  "machine": "AMD64",
+  "python": "3.12.10",
+  "pillow": "12.3.0",
+  "ffmpeg": "ffmpeg version 7.1.1-essentials_build-www.gyan.dev Copyright (c) 2000-2025 the FFmpeg developers",
+  "inputs": {
+    "photo_pixels": [
+      4000,
+      3000
+    ],
+    "photo_bytes": 9080609,
+    "video_pixels": [
+      1920,
+      1080
+    ],
+    "video_seconds": 6,
+    "video_bytes": 4669305
+  },
+  "elapsed_prepare_seconds": 12.485,
+  "verified_resume_seconds": 0.563,
+  "child_usage": null,
+  "items": [
+    {
+      "synthetic_id": 101,
+      "preparation_seconds": 1.391,
+      "grid": {
+        "state": "ready",
+        "width": 384,
+        "height": 512,
+        "bytes": 48068,
+        "sha256": "1dc844557f96160d7847586bae2aeed4613840ab74d593600b6a362c1d6d76bb"
+      },
+      "display": {
+        "state": "ready",
+        "width": 2575,
+        "height": 3433,
+        "bytes": 5369864,
+        "sha256": "71b77cfe0be3204a5dc14870393392cf3ff5158e3ebbafbccf232f5f7865071e"
+      },
+      "video": null
+    },
+    {
+      "synthetic_id": 102,
+      "preparation_seconds": 10.5,
+      "grid": {
+        "state": "ready",
+        "width": 512,
+        "height": 288,
+        "bytes": 13629,
+        "sha256": "f3bf5af533b65d9b2d9163e12970335f4e0db725d71174ba9603206bf2ffa25f"
+      },
+      "display": {
+        "state": "ready",
+        "width": 1920,
+        "height": 1080,
+        "bytes": 102012,
+        "sha256": "4afec86ac240780a3acf477ec977300e9449a6edcc1dc9b251f7e5fb80d216f6"
+      },
+      "video": {
+        "state": "ready",
+        "mime": "video/mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "width": 1920,
+        "height": 1080,
+        "duration_ms": 6016,
+        "bytes": 4443027,
+        "sha256": "68b125c4b3c95e1e20b267118f04078379ea07262a3ee579923cc149b1f32d33",
+        "chunks_sha256": "2b507bbb52f0500d4a7bf7a5ff4a436bd94618aa06d18b436396b063820bef6d"
+      }
+    }
+  ],
+  "workspace_bytes": 10311544,
+  "publication_bytes": 9978020,
+  "source_and_database_hashes_unchanged": true,
+  "published_enabled": false,
+  "windows_canary_run": false,
+  "listeners": false,
+  "prepared_publication_asgi": {
+    "initial_disabled": true,
+    "catalog": true,
+    "valid_mp4_range_across_4mib_boundary": true,
+    "video_head": true,
+    "photo_display": true,
+    "disabled_restored": true
+  }
+}
