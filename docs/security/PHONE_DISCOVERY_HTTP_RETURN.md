@@ -1,7 +1,7 @@
 # Protected discovery HTTP candidate — source return
 
 2026-09-12. Candidate implementation commit
-`f2c8baf9e77d7d44c65eec9c9ca6228616314760` on
+`af8e0c8cf749f6e963dd8b196dce9aa842240387` on
 `codex/phone-discovery-http-candidate`, isolated worktree
 `_worktrees/phone-discovery-http-candidate` in the PhotoHouse workspace.
 Base: `9881769baf8182536a0e9fbbe39648d534167970`.
@@ -13,14 +13,22 @@ The [interface guide](PHONE_DISCOVERY_HTTP_CANDIDATE.md),
 [verification receipt](evidence/phone-discovery-http-candidate/verification.json)
 are ready for Android's independent review. Source remains unpublished.
 
+`af8e0c8` supersedes `f2c8baf` after Android identified a schema-only canonical
+string discrepancy: trailing `$` anchors could accept a final newline even though
+the service rejected it. The schema now uses an absolute-end negative lookahead,
+verified with both Python JSON Schema and ECMAScript regular expressions. New
+HTTP/schema negatives cover LF, CRLF, tabs and Unicode line separators on IDs,
+bindings and fingerprints. This was not an authorization bypass finding.
+
 Added candidate-only facets/search transport, explicit composition and exact
 handler registration, shared native/browser authentication and CSRF, bounded
 nested JSON, authorization before disclosure and again after body receipt,
 stale binding/fingerprint errors, 64-bit decimal-string IDs, cancellation and
 synthetic producer/negative tests. The default application is unchanged.
 
-151 selected regression tests passed without skips. The 17 focused HTTP tests
-also passed from extracted committed sources; all 14 producer examples reproduced
+151 selected regression tests passed without skips on the initial `f2c8baf`
+implementation. After independent review, the corrected candidate passed 18
+focused HTTP tests from extracted committed sources; all 14 producer examples reproduced
 exactly and passed schema checks. The global inventory is complete at 164
 method/path entries. Tests do not establish live deployment or repair retained
 legacy/standalone authorization gaps.

@@ -1,5 +1,5 @@
 {
-  "source_commit": "f2c8baf9e77d7d44c65eec9c9ca6228616314760",
+  "source_commit": "af8e0c8cf749f6e963dd8b196dce9aa842240387",
   "status": "CANDIDATE_FOR_INDEPENDENT_REVIEW",
   "files": [
     {
@@ -134,8 +134,8 @@
     },
     {
       "path": "docs/security/phone-discovery-http-candidate-schema.json",
-      "bytes": 17876,
-      "sha256": "b9ecc8b5742f4d4efc9e35e65ad250416b85f454e615f5b0beadc0b0db1c4ae6"
+      "bytes": 17944,
+      "sha256": "9b08873c1c65557a23b0aee80f6707e160703c9566ecf0a7f7f6cb3989680bd8"
     },
     {
       "path": "docs/security/route_capabilities.json",
@@ -149,8 +149,8 @@
     },
     {
       "path": "scripts/check_phone_discovery_http_candidate.py",
-      "bytes": 1873,
-      "sha256": "825d8127516f5ff548288b9edcf39c667b444737ec5248e5d709879088c527f9"
+      "bytes": 2294,
+      "sha256": "f3e8e895f1e4d38b6167082a809adfa6bbca1c130dba23895b748a1c4f27d578"
     },
     {
       "path": "scripts/security_inventory.py",
@@ -164,8 +164,8 @@
     },
     {
       "path": "tests/security/test_phone_discovery_http.py",
-      "bytes": 12976,
-      "sha256": "f40763d66032a60f06d1ba512b123c7e0e65fddf934ef49ddc66b1bbfddc06cf"
+      "bytes": 13580,
+      "sha256": "ebc980f86e818d73592eb182527a6add0a2656bb56f9caeaa78bc43be49bdb45"
     }
   ]
 }
