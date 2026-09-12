@@ -23,7 +23,7 @@ from app.home_feed import LIMITS,bounded_read,direct_path,unique,Refused
 
 SCHEMA=1
 CODE=('scripts/prepare_home_library.py','scripts/prepare_home_catalog.py',
-      'scripts/home_preparation_resources.py','scripts/build_home_catalog.py',
+      'scripts/home_preparation_resources.py','scripts/home_media_worker.py','scripts/build_home_catalog.py',
       'backend/app/home_catalog.py','backend/app/home_feed.py')
 
 
@@ -38,11 +38,11 @@ def code_pin():
 def profile(budget):
     # Configurable *preparation* budgets stay within the existing v2 output wire.
     values=asdict(budget)
-    if any(type(v) is not int or v<=0 for v in values.values()):raise ValueError('invalid_budget')
-    if (budget.output_bytes>MAX_VIDEO or budget.duration_seconds>86400 or budget.pixels>1000000000
+    if any(type(v) is not int or v<(0 if k=='jpeg_source_pixels' else 1) for k,v in values.items()):raise ValueError('invalid_budget')
+    if (budget.output_bytes>MAX_VIDEO or budget.duration_seconds>86400 or budget.pixels>40000000 or budget.jpeg_source_pixels>256000000 or budget.decoded_pixels>40000000
             or budget.input_bytes>128*1024**3 or budget.process_seconds>86400 or budget.asset_seconds>172800):
         raise ValueError('budget_exceeds_review_envelope')
-    if budget.process_seconds>budget.asset_seconds:raise ValueError('invalid_deadlines')
+    if max(budget.process_seconds,budget.hash_seconds,budget.decode_seconds,budget.probe_seconds)>budget.asset_seconds:raise ValueError('invalid_deadlines')
     return values
 
 
@@ -213,10 +213,10 @@ def validate_result(result,kind):
     if result['video']:validate_video(result['video'])
 
 
-def copy_file(source,target,guard):
+def copy_file(source,target,guard,budget=prep.Budget()):
     before=identity(source)
     if target.exists():
-        if prep.file_hash(target,before[2])!=prep.file_hash(source,before[2]):raise ValueError('existing_copy_changed')
+        if prep.file_hash(target,before[2],seconds=budget.hash_seconds,guard=guard)!=prep.file_hash(source,before[2],seconds=budget.hash_seconds,guard=guard):raise ValueError('existing_copy_changed')
         return
     guard(force=True,extra_disk=before[2])
     handle,name=tempfile.mkstemp(prefix='.copy-',dir=target.parent)
@@ -236,24 +236,19 @@ def copy_file(source,target,guard):
     temporary.rename(target)
 
 
-def copy_result(directory,target,result,guard):
-    prep.canonical(directory);prep.verify_ready(directory,result)
+def copy_result(directory,target,result,guard,budget):
+    prep.canonical(directory);prep.verify_ready(directory,result,budget,guard)
     for name in ('grid.jpg','display.jpg')+(('video.mp4','video.chunks.json') if result['video'] else ()):
-        copy_file(directory/name,target/name,guard)
-    prep.verify_ready(target,result)
+        copy_file(directory/name,target/name,guard,budget=budget)
+    prep.verify_ready(target,result,budget,guard)
 
 
 def precheck(source,kind,budget,directory,ffprobe,guard):
     info=identity(source)
+    if info[2]==0:raise prep.PreparationError('source_empty')
     if info[2]>budget.input_bytes:return 'input_budget'
     if kind=='photo':
-        from PIL import Image
-        try:
-            with Image.open(source) as image:
-                if image.width*image.height>budget.pixels:return 'pixel_budget'
-                if image.format not in ('JPEG','PNG'):return 'photo_format_profile'
-                if getattr(image,'n_frames',1)!=1:return 'animation_profile'
-        except (Image.DecompressionBombError,Image.DecompressionBombWarning):return 'pixel_budget'
+        return prep.photo_info(source,directory,budget,guard)['reason']
     elif kind=='video':
         if source.suffix.lower() not in ('.mp4','.mov'):return 'container_profile'
         probe=prep.probe(ffprobe,source,directory,budget,guard=guard)
@@ -305,8 +300,8 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None)
                         value=read_json(receipt,1024**2) if receipt.exists() else None
                         if value and value['job_sha256']==meta(c,'job_sha256') and value['metadata_hash']==metadata_hash:
                             result=value['result'];validate_result(result,kind)
-                            if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]))==result['source_sha256']:
-                                prep.verify_ready(directory,result)
+                            if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)==result['source_sha256']:
+                                prep.verify_ready(directory,result,budget,guard)
                                 complete(c,aid,result,value['origin']);continue
                         if item['status']=='ready' and not value:raise ValueError('ready_receipt_missing')
                     # Pin each attempt before work. A verified receipt permits crash recovery
@@ -317,22 +312,22 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None)
                     inherited=seed.item(aid,kind) if seed else None
                     if inherited:
                         seed_directory,old_result=inherited;validate_result(old_result,kind)
-                        if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]))==old_result['source_sha256']:
-                            copy_result(seed_directory,directory,old_result,guard)
+                        if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)==old_result['source_sha256']:
+                            copy_result(seed_directory,directory,old_result,guard,budget)
                             result=old_result;origin={'kind':'carry','seed_sha256':job['seed']['sha256'],'seed_revision':seed.revision}
                     if result is None:
                         reason=precheck(source,kind,budget,directory,ffprobe,guard)
                         if reason:mark(c,aid,'deferred',reason);processed+=1;continue
                         result=prep.prepare_one(source,kind,directory,ffmpeg,ffprobe,budget,guard=guard)
-                    validate_result(result,kind);prep.verify_ready(directory,result)
+                    validate_result(result,kind);prep.verify_ready(directory,result,budget,guard)
                     if source_row(database,aid,source_root,kind)!=(source,metadata_hash):raise ValueError('source_changed_during_attempt')
-                    if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]))!=result['source_sha256']:raise ValueError('source_changed_during_attempt')
+                    if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)!=result['source_sha256']:raise ValueError('source_changed_during_attempt')
                     prep.atomic_json(directory/'receipt.json',{'job_sha256':meta(c,'job_sha256'),'metadata_hash':metadata_hash,'result':result,'origin':origin})
                     complete(c,aid,result,origin);processed+=1
                 except JobStopped:raise
                 except FileNotFoundError:mark(c,aid,'error','source_missing');processed+=1
                 except prep.PreparationError as error:
-                    mark(c,aid,'deferred' if error.reason=='unsupported' else 'error','profile_review' if error.reason=='unsupported' else 'preparation_failed');processed+=1
+                    mark(c,aid,'deferred' if error.reason=='unsupported' else 'error','profile_review' if error.reason=='unsupported' else error.reason if error.reason in ('hash_timeout','process_timeout','probe_metadata_invalid','source_empty') else 'preparation_failed');processed+=1
                 except (OSError,ValueError,KeyError,TypeError,Refused):
                     mark(c,aid,'error','verification_failed');processed+=1
             if seed:seed.verify_pin()
@@ -369,12 +364,12 @@ def publish(workspace,output,allow_partial=False,guard=None):
             if item['status']=='ready':
                 row=source_row(Path(job['database']),asset['id'],Path(job['source_root']),asset['kind'])
                 result=json.loads(item['result']);validate_result(result,asset['kind'])
-                if row is None or row[1]!=item['metadata_hash'] or prep.file_hash(row[0],max(budget.input_bytes,identity(row[0])[2]))!=result['source_sha256']:raise ValueError('source_changed')
+                if row is None or row[1]!=item['metadata_hash'] or prep.file_hash(row[0],max(budget.input_bytes,identity(row[0])[2]),seconds=budget.hash_seconds,guard=guard)!=result['source_sha256']:raise ValueError('source_changed')
                 directory=prep.attempt_path(workspace,item['directory'],asset['id'])
                 receipt=read_json(directory/'receipt.json',1024**2)
                 if (receipt['job_sha256']!=meta(c,'job_sha256') or receipt['result']!=result
                         or receipt['metadata_hash']!=item['metadata_hash']):raise ValueError('receipt_mismatch')
-                prep.verify_ready(directory,result)
+                prep.verify_ready(directory,result,budget,guard)
                 asset.update(previews=result['previews'],video=result['video'])
                 total+=sum(m['bytes'] for m in result['previews'].values())+(result['video']['bytes'] if result['video'] else 0)
                 ready.append((asset['id'],directory,result));guard(force=True)
@@ -404,12 +399,12 @@ def publish(workspace,output,allow_partial=False,guard=None):
             folder.mkdir(parents=True,exist_ok=True);prep.canonical(folder)
         for aid,directory,result in ready:
             for variant in LIMITS:
-                target=output/'prepared'/variant/f'{aid}.jpg';copy_file(directory/f'{variant}.jpg',target,guard)
-                if prep.file_hash(target,result['previews'][variant]['bytes'])!=result['previews'][variant]['sha256']:raise ValueError('copy_hash_mismatch')
+                target=output/'prepared'/variant/f'{aid}.jpg';copy_file(directory/f'{variant}.jpg',target,guard,budget=budget)
+                if prep.file_hash(target,result['previews'][variant]['bytes'],seconds=budget.hash_seconds,guard=guard)!=result['previews'][variant]['sha256']:raise ValueError('copy_hash_mismatch')
             if result['video']:
                 for suffix,key in (('mp4','sha256'),('chunks.json','chunks_sha256')):
-                    target=output/'prepared/video'/f'{aid}.{suffix}';copy_file(directory/f'video.{suffix}',target,guard)
-                    if prep.file_hash(target,MAX_VIDEO if suffix=='mp4' else 1024**2)!=result['video'][key]:raise ValueError('copy_hash_mismatch')
+                    target=output/'prepared/video'/f'{aid}.{suffix}';copy_file(directory/f'video.{suffix}',target,guard,budget=budget)
+                    if prep.file_hash(target,MAX_VIDEO if suffix=='mp4' else 1024**2,seconds=budget.hash_seconds,guard=guard)!=result['video'][key]:raise ValueError('copy_hash_mismatch')
         final=Path(tempfile.mkdtemp(prefix='scope-final-',dir=workspace))/'base'
         if build_home_catalog.export(Path(job['database']),final,job['revision'])['catalog_sha256']!=job['base_sha256']:raise ValueError('scope_changed_during_publication')
         if (output/'catalog.json').exists():
@@ -445,7 +440,9 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='command',required=True)
     init=sub.add_parser('create')
     for name in ('database','source-root','workspace','ffmpeg','ffprobe','previous-publication'):init.add_argument('--'+name,type=Path,required=True)
-    init.add_argument('--revision',type=int,required=True);init.add_argument('--budget-json',type=Path)
+    init.add_argument('--revision',type=int,required=True)
+    profiles=init.add_mutually_exclusive_group();profiles.add_argument('--budget-json',type=Path)
+    profiles.add_argument('--profile',choices=prep.PROFILES,default=None)
     init.add_argument('--carry-workspace',type=Path);init.add_argument('--carry-sha256');init.add_argument('--carry-kind',choices=('legacy','library'))
     run_parser=sub.add_parser('run');run_parser.add_argument('--workspace',type=Path,required=True)
     run_parser.add_argument('--retry-errors',action='store_true');run_parser.add_argument('--max-items',type=int);run_parser.add_argument('--max-seconds',type=int)
@@ -458,7 +455,7 @@ def main(argv=None):
             if any((args.carry_workspace,args.carry_sha256,args.carry_kind)):
                 if not all((args.carry_workspace,args.carry_sha256,args.carry_kind)):raise ValueError('all_carry_fields_required')
                 seed=seed_description(args.carry_workspace,args.carry_sha256,args.carry_kind)
-            budget=prep.Budget(**read_json(args.budget_json,4096)) if args.budget_json else prep.Budget()
+            budget=prep.Budget(**read_json(args.budget_json,4096)) if args.budget_json else prep.PROFILES[args.profile or 'pilot']
             result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed)
         elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds)
         elif args.command=='status':result=status(args.workspace)

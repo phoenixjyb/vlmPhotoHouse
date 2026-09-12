@@ -113,9 +113,9 @@ class LibraryTests(unittest.TestCase):
         seed=self.legacy();self.create(seed)
         with closing(sqlite3.connect(self.db)) as c,c:c.execute("UPDATE assets SET status='hidden' WHERE id=101")
         original=prep.file_hash
-        def hash_guard(path,*args):
+        def hash_guard(path,*args,**kwargs):
             if path==self.photo:raise AssertionError('Hidden original must not be read')
-            return original(path,*args)
+            return original(path,*args,**kwargs)
         with patch.object(prep,'file_hash',side_effect=hash_guard):result=self.run_job()
         self.assertEqual(result['counts']['excluded'],1);self.assertEqual(result['ready'],1)
         output=self.root/'publication'
@@ -187,8 +187,8 @@ class LibraryTests(unittest.TestCase):
 
     def test_interrupted_publication_resumes_verified_copies_without_conversion(self):
         self.create();self.run_job();out=self.root/'publication';original=library.copy_file;copied=[]
-        def stop(source,target,guard):
-            original(source,target,guard);copied.append(target)
+        def stop(source,target,guard,**kwargs):
+            original(source,target,guard,**kwargs);copied.append(target)
             if len(copied)==1:raise KeyboardInterrupt
         with patch.object(library,'copy_file',side_effect=stop):
             with self.assertRaises(KeyboardInterrupt):library.publish(self.job,out,guard=self.guard())
@@ -208,7 +208,7 @@ class LibraryTests(unittest.TestCase):
     def test_pressure_mid_copy_retains_unverified_temporary_and_resumes_without_encoding(self):
         self.create();self.run_job();out=self.root/'publication';normal=self.guard()
         def stop(*args,**kwargs):
-            if not kwargs.get('force'):raise JobStopped('copy_pressure')
+            if not args and not kwargs.get('force'):raise JobStopped('copy_pressure')
             normal(*args,**kwargs)
         stop.reserve=1;stop.summary=normal.summary
         with self.assertRaises(JobStopped):library.publish(self.job,out,guard=stop)
