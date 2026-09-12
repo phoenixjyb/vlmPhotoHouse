@@ -89,6 +89,7 @@ class RuntimeConfiguration:
     web_origin: str
     original_roots: tuple[Path, ...]
     derived_root: Path
+    photo_cache: object = None
 
     def build_app(self, *, clock=time.time):
         """Build only; storage is opened lazily in the request's worker thread.
@@ -99,6 +100,6 @@ class RuntimeConfiguration:
         """
         database = ExistingDatabase(self.database)
         access = AccessRuntime(database, self.web_origin, clock=clock)
-        media = MediaRuntime(self.original_roots, self.derived_root)
+        media = MediaRuntime(self.original_roots, self.derived_root, self.photo_cache)
         from ..main import create_app
         return create_app(access_runtime=access, media_runtime=media)

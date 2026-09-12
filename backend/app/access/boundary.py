@@ -52,7 +52,7 @@ class ClosedBoundary:
         if method == 'GET' and (path == '/assets' or re.fullmatch(r'/assets/(?:detail/[0-9]+|[0-9]+/captions)', path)):
             return True
         return method in {'GET', 'HEAD'} and bool(re.fullmatch(
-            r'/(?:assets/[0-9]+/(?:media|thumbnail)|faces/[0-9]+/crop)', path))
+            r'/(?:assets/[0-9]+/(?:media|thumbnail|display)|faces/[0-9]+/crop)', path))
 
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'websocket':
