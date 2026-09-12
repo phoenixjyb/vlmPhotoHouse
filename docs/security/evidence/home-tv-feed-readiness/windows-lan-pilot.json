@@ -1,0 +1,113 @@
+{
+  "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
+  "status": "Windows staging and diagnostic HTTPS verified; stopped pending normal DNS and TV network inputs",
+  "backend_base": "ea8dc42884181791596f62c4af62e6d33b7ced72",
+  "runtime_source_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
+  "runtime_lock_sha256": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42",
+  "direct_ssh_verified": true,
+  "relay_used": false,
+  "source_payload_hashes_verified_on_windows_before_and_after": 10,
+  "runtime": {
+    "python": "3.12.10",
+    "openssl": "3.0.16",
+    "offline_hash_locked_packages": 18,
+    "pip_check": "pass",
+    "native_runtime_probe": "pass",
+    "installed_file_bytes_attested": false
+  },
+  "native_tls": {
+    "certificate_key_match": true,
+    "chain_build_without_revocation_check": true,
+    "mac_system_curl_trust": true,
+    "windows_denied_peer_system_curl_trust": true,
+    "private_key_copied": false
+  },
+  "checks": {
+    "mac_real_lan_https": 23,
+    "mac_real_lan_disable_remove_restore": 7,
+    "mac_real_lan_publication_switch_rollback": 6,
+    "windows_real_https_denied_peer": 1,
+    "total_https_passed": 37,
+    "normal_dns_verified": false,
+    "guest_or_wan_probe_performed": false,
+    "projector_test_performed": false,
+    "prior_security_or_android_suites_rerun": false
+  },
+  "task_state": {
+    "name": "PhotoHouse-HomeFeed-Synthetic",
+    "state": "Ready/stopped",
+    "manual_start_only": true,
+    "trigger_count": 0,
+    "execution_time_limit": "PT30M",
+    "run_level": "Limited",
+    "logon": "Interactive",
+    "current_listener": false,
+    "temporary_firewall_rules_remaining": 0
+  },
+  "synthetic_publication": {
+    "active_directory": "publication-r1",
+    "revision": 4,
+    "asset_ids": [
+      101
+    ],
+    "originals_allowed": false,
+    "alternate_preserved_directory": "publication-r5",
+    "grid_sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+    "display_sha256": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434"
+  },
+  "existing_runtime_preserved": {
+    "caption_and_api_ids_start_times_paths": true,
+    "protected_task_state": true,
+    "caption_queue_or_gpu_health_inspected": false
+  },
+  "operator_script_hashes": [
+    {
+      "sha256": "667c3ad7f850fad1e4af405592d8d7d86a74bddc11846f70ac5480a023ab8655",
+      "file": "denied-peer.py"
+    },
+    {
+      "sha256": "5fe33c03ab8f18790c74dd59aaf255a70e9e12c17c8fa8a818da5100ecb2111f",
+      "file": "native-verify.py"
+    },
+    {
+      "sha256": "c046f568ede0df5f8ec976446fca0359bddc134d54a5aad93ca5e12ddb70999b",
+      "file": "run-home-feed.py"
+    },
+    {
+      "sha256": "40e5a082b45de6a2e47df1627635551fce123c65942c43a850807b8ba3a04519",
+      "file": "switch-publication.py"
+    },
+    {
+      "sha256": "68e906ff9b55eb4d67f7e98a0db3b1ce91725372559b881928116b4db2a7ec27",
+      "file": "update-selection.py"
+    }
+  ],
+  "private_evidence_sha256": {
+    "inspect.stdout": "2896127bbfbcfc531357c9e97baef37b0849218e6cc3029c08f34adf1b8d57d9",
+    "native-preflight.stdout": "6be1b848485e1ae11bf24720512b1db36f9a002972f71b08cab934bf2b688142",
+    "stage.stdout": "7015f147b01be800588ba335f40f8f328b01f15ccd8d99788fced82f9a0f9d67",
+    "start-diagnostic.stdout": "00f489532cac49f870933d3e213672e8cf6139bad2ba3d406b423e8750547920",
+    "tls-checks.json": "6d7881605149f3238cd348f0676fa1eec4dc933ef6a4c82d9bf77bcc4b7ec70b",
+    "lifecycle-checks.json": "28b326b070fdf19a7c359512c727b70b2f5ba1966374bad8a7c0e4c33d37c3b2",
+    "switch-checks.json": "66a5abbbd4321789fd4d39f5650105df33b2e8aba2e83c57b2f5406198d2336e",
+    "denial-recheck.stdout": "354ee474be18fc73b3f766138e1a6618e456eba618bb869e0da32ec11467e367",
+    "final-inspect.stdout": "6fd7a6a0a94d3dc0ca9db76c4e6f2f2346eb809c169b48d936ba6d4e7ca56705",
+    "task.xml": "e03a379054a0784e83408c68f00a6fc762d9cd74bf4c379a3b993921eb2a0156"
+  },
+  "corrected_pilot_helper_failures": [
+    "Long PowerShell encoded command exceeded Windows command-line limit; used stdin script transport before staging.",
+    "Windows default GBK decoding rejected UTF-8 fixture in selection helper before mutation; explicit UTF-8 fixed and all lifecycle checks passed.",
+    "Denied-peer probes initially assumed the wrong response tier; direct subprocess capture verified HTTP 403 with TLS verification zero.",
+    "PowerShell null trigger collection reported one; corrected count and independently verified zero triggers in exported task XML."
+  ],
+  "remaining_gates": [
+    "JMGO network identity and normal DNS controls",
+    "normal client local hostname route",
+    "selected LAN guest and outside isolation including proxy or SNAT paths",
+    "reviewed client admission and scoped rules before resuming service",
+    "configured TV APK identity and physical JMGO acceptance",
+    "managed long-term startup and renewed-certificate reload ownership"
+  ]
+}

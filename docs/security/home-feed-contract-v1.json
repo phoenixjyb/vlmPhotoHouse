@@ -1,0 +1,132 @@
+{
+  "contract": "photohouse.home-feed",
+  "version": 1,
+  "authentication": "none; deliberately selected LAN sharing",
+  "sqlite_schema_change": false,
+  "protected_phone_api_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/home/v1/feed",
+      "query": {
+        "page": "integer 1..2000; default 1",
+        "page_size": "integer 1..100; default 50"
+      },
+      "response": "feed_response_example"
+    },
+    {
+      "method": "GET",
+      "path": "/home/v1/assets/{asset_id}/preview",
+      "query": {
+        "variant": [
+          "grid",
+          "display"
+        ],
+        "revision": "required integer 1..2147483647"
+      },
+      "response": "exact prepared baseline JPEG"
+    },
+    {
+      "method": "HEAD",
+      "path": "/home/v1/assets/{asset_id}/preview",
+      "query": {
+        "variant": [
+          "grid",
+          "display"
+        ],
+        "revision": "required integer 1..2147483647"
+      },
+      "response": "same headers/status, no body"
+    }
+  ],
+  "feed_response_example": {
+    "version": 1,
+    "revision": 1,
+    "feed": {
+      "id": "synthetic-home",
+      "title": "Synthetic TV / 合成电视"
+    },
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "has_more": false,
+    "items": [
+      {
+        "id": 101,
+        "caption": "EN: Synthetic color patterns.\nZH-CN: 合成色彩图案。",
+        "previews": {
+          "grid": {
+            "width": 8,
+            "height": 8,
+            "bytes": 632,
+            "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+            "url": "/home/v1/assets/101/preview?variant=grid&revision=1"
+          },
+          "display": {
+            "width": 3840,
+            "height": 2160,
+            "bytes": 523448,
+            "sha256": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434",
+            "url": "/home/v1/assets/101/preview?variant=display&revision=1"
+          }
+        },
+        "originals_allowed": false
+      }
+    ]
+  },
+  "errors": {
+    "400": "invalid_request",
+    "403": [
+      "access_denied",
+      "feed_disabled"
+    ],
+    "404": "preview_unavailable",
+    "409": "feed_changed",
+    "429": "busy; Retry-After: 2",
+    "503": "feed_unavailable"
+  },
+  "limits": {
+    "manifest_bytes": 2097152,
+    "selected_assets": 2000,
+    "json_response_bytes": 524288,
+    "caption_utf8_bytes": 1024,
+    "title_utf8_bytes": 256,
+    "concurrent_reads": 4,
+    "grid": {
+      "max_edge": 512,
+      "max_pixels": 262144,
+      "max_bytes": 2097152
+    },
+    "display": {
+      "max_edge": 4096,
+      "max_pixels": 8847360,
+      "max_bytes": 12582912
+    }
+  },
+  "invariants": [
+    "No personal sign-in, pairing, cookie or bearer",
+    "No original/Range/worker/account endpoints",
+    "Relative revision-bound URLs only",
+    "No server fallback or on-demand derivative generation",
+    "All responses no-store",
+    "Manifest changes apply to next request; in-flight reads may finish",
+    "No per-device revocation or recall of downloaded content"
+  ],
+  "client_lifecycle": {
+    "cold_start": "GET feed, no credentials",
+    "revision_conflict": "clear stale page and fetch feed",
+    "background": "stop requests/slideshow and cover/clear content",
+    "foreground": "fresh feed before content",
+    "visible_refresh_seconds": 60,
+    "retry_delays_seconds": [
+      2,
+      5,
+      15,
+      30,
+      60
+    ],
+    "retry_max_seconds": 60,
+    "retry_after": "never earlier than server value",
+    "persistent_media": false
+  }
+}

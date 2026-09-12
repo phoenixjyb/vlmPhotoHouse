@@ -1,0 +1,3 @@
+# Compatibility entry point for the synthetic harness; use hash-checking installs.
+# The old Starlette 1.0.0 pin has published advisories and is superseded.
+-r requirements-access-test.lock

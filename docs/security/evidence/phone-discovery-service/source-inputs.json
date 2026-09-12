@@ -1,0 +1,81 @@
+{
+  "implementation_commit": "ddfb0fb893d96482eb1b4b1015328c66ec96077c",
+  "scope": "unmounted internal service; not a wire contract",
+  "files": [
+    {
+      "path": "backend/app/__init__.py",
+      "bytes": 87,
+      "sha256": "f378e6b73a28874ade0c801a7446c03d279a4c7b9b0827f05ebd23183e1a340d"
+    },
+    {
+      "path": "backend/app/access/__init__.py",
+      "bytes": 83,
+      "sha256": "342fc5abcc46c492d5682aaf6cb9697f167399adbdd49675af2a2be78bdd6562"
+    },
+    {
+      "path": "backend/app/access/admission.py",
+      "bytes": 3907,
+      "sha256": "12d77f6193298bafd67cc888412638d85a495028c5c809e17afdb611709f448c"
+    },
+    {
+      "path": "backend/app/access/credentials.py",
+      "bytes": 3053,
+      "sha256": "29af47d7cdc18a5347d635ee9c2e53dc9475aedbf4141c451478cf9fed7d4b2f"
+    },
+    {
+      "path": "backend/app/access/discovery.py",
+      "bytes": 20757,
+      "sha256": "1f7e2d329dfa4b29212819a9532ffbfc9387b4e58275d3d3411728adaae35f82"
+    },
+    {
+      "path": "backend/app/access/discovery_provider.py",
+      "bytes": 2042,
+      "sha256": "b6fa6f4b07a2077b3670b9fe71fbcb76d00a7758d67ec124c147507f162dc0db"
+    },
+    {
+      "path": "backend/app/access/library.py",
+      "bytes": 7329,
+      "sha256": "5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe"
+    },
+    {
+      "path": "backend/app/access/schema.py",
+      "bytes": 3262,
+      "sha256": "2f58f47641a8afe752227d8db23a595db73cf6f81d6dfd0e6bd8a72077caba43"
+    },
+    {
+      "path": "backend/app/access/service.py",
+      "bytes": 18946,
+      "sha256": "c1fc33b39207512fe6f32f52f0564dce8da855f1dd9aee1fd012c4984ab99881"
+    },
+    {
+      "path": "backend/app/access/transport.py",
+      "bytes": 13041,
+      "sha256": "3df4fcfe6797ddee2a26ea34adc202c9aa92b88cf51439ad5c53bc7be37e2e87"
+    },
+    {
+      "path": "backend/requirements-access.lock",
+      "bytes": 31680,
+      "sha256": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42"
+    },
+    {
+      "path": "docs/security/PHONE_DISCOVERY_SERVICE.md",
+      "bytes": 10304,
+      "sha256": "54aa8af51c604f034d86904a623af0db1c26f9a4ff3ccf870fd057eb4a05d4d5"
+    },
+    {
+      "path": "docs/security/evidence/phone-discovery-service/replay.py",
+      "bytes": 4406,
+      "sha256": "a153e126288af361fe515fcccab69a66decb51d4d872af54c4c5b89b73ce7ac7"
+    },
+    {
+      "path": "tests/security/phone_discovery_fixture.py",
+      "bytes": 4685,
+      "sha256": "42d2b184ec985d3a206434cbaaeaed18188edb4197114af14313b72104bbadb2"
+    },
+    {
+      "path": "tests/security/test_phone_discovery.py",
+      "bytes": 21300,
+      "sha256": "a4011b551086960af179ba4384ae10a3f2faca31d2f1fa2aa4c71f30e5051df0"
+    }
+  ]
+}

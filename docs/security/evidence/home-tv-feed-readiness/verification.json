@@ -1,0 +1,11 @@
+{
+  "checked_utc": "2026-09-11T09:32:08.655543+00:00",
+  "pinned_source_files_verified": 12,
+  "implementation_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_unchanged": true,
+  "full_security_result": "retained: 296 passed; not rerun in readiness follow-up",
+  "fresh_checks": "bundle membership/hash verification, extracted config syntax and ten in-process ASGI checks",
+  "host_accessed": false,
+  "deployed": false,
+  "real_media_accessed": false
+}

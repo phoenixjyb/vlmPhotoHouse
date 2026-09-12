@@ -1,0 +1,7 @@
+test_pressure_mid_copy_retains_unverified_temporary_and_resumes_without_encoding (test_home_library.LibraryTests.test_pressure_mid_copy_retains_unverified_temporary_and_resumes_without_encoding) ... ok
+test_resume_never_overwrites_an_externally_enabled_control (test_home_library.LibraryTests.test_resume_never_overwrites_an_externally_enabled_control) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.773s
+
+OK

@@ -1,0 +1,20 @@
+{
+  "format_version": 1,
+  "task": "PH-BACKEND-HOME-TV-FEED-01",
+  "base_commit": "b3284f1a05d11648e98805fbd18c036365ad442e",
+  "contract_version": 1,
+  "files": {
+    "backend/app/home_feed.py": "c7f22deab8cd58a7bc6060ce6427086568a30073c13917727da30be9865cf37c",
+    "scripts/home_feed_app.py": "98c2bbcda284cfbc39f2d6c6bf2468ecae1c66952f2bad2ac512b09c3704a8ed",
+    "docs/security/HOME_TV_FEED.md": "d3c6698c92db9cd32e8e8aac4c1326a0fb0b5ef77d83c331662c43ee8f964033",
+    "docs/security/home-feed-contract-v1.json": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+    "docs/security/home-feed-manifest.example.json": "90e49245370c3695de22d5c0bd261c0bee9bfd9ce99f7085c3d1e652e30600d7",
+    "docs/security/route_capabilities.json": "dd70062becbff6cba8595a239ba981c031f4928323da84aadce4e6228e4df4b8",
+    "scripts/security_inventory.py": "cd32f43a989fd63656010abefd5b83a46a0e84d8099d5d60e0aac3a461ed4dd0",
+    "tests/security/test_home_feed.py": "f147a94fa11f64c0437c93b85934508a5f90910e2165c18d994a1d7e2b2c6ca2",
+    "tests/security/test_inventory.py": "56c9af1d065c03eaeb5e9884f9612c590fb31accf06a246a3ce7c726e942f066",
+    "tests/security/fixtures/home-8x8.jpg": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+    "tests/security/fixtures/home-3840x2160.jpg": "c610ec0406005683fc6acf9ee48b5fd1bcb37e2bb23667c46e1fd01dc9979434",
+    "backend/requirements-access.lock": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42"
+  }
+}

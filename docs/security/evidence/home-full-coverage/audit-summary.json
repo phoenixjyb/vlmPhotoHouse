@@ -1,0 +1,102 @@
+{
+  "metadata_unchanged": true,
+  "snapshot_sha256": "d3c6179394e524be727a9a4f8382b2ced5b8905475dd2c5730c6b6d945b2d08f",
+  "total_visible": 27842,
+  "audited": 27842,
+  "complete": true,
+  "stop": null,
+  "kind_totals": {
+    "photo": {
+      "count": 23599,
+      "bytes": 82075731406,
+      "pixels": 239806138080,
+      "duration_seconds": 0,
+      "current_profile_candidates": 23331
+    },
+    "video": {
+      "count": 4243,
+      "bytes": 563971343901,
+      "pixels": 21443364352,
+      "duration_seconds": 141269.2325929994,
+      "current_profile_candidates": 3616
+    }
+  },
+  "reasons_overlapping": {
+    "pixels_above_40MP": 257,
+    "large_image_header_limit": 26,
+    "photo_format_profile_needed": 1,
+    "animation_profile_needed": 1,
+    "duration_above_60s": 598,
+    "input_above_512MiB": 185,
+    "pixel_format_profile_needed": 1,
+    "dimensions_unknown": 17,
+    "duration_unknown": 8,
+    "video_probe_unresolved": 9,
+    "source_missing": 2,
+    "photo_header_unresolved": 8
+  },
+  "formats": {
+    "photo:JPEG": 23558,
+    "photo:.jpg": 36,
+    "photo:MPO": 1,
+    "photo:PNG": 4,
+    "video:.mp4": 4211,
+    "video:.mov": 32
+  },
+  "mime": {
+    "image/jpeg": 23591,
+    "image/png": 8,
+    "video/mp4": 4211,
+    "video/quicktime": 32
+  },
+  "duration_bins": {
+    "<=60s": 3637,
+    "<=5min": 574,
+    "<=30min": 24,
+    "unknown": 8
+  },
+  "size_bins": {
+    "<=64MiB": 25974,
+    "<=512MiB": 1676,
+    "<=2GiB": 174,
+    "unknown": 7,
+    ">2GiB": 11
+  },
+  "pixel_bins": {
+    "<=12MP": 20974,
+    "<=40MP": 6594,
+    "<=100MP": 231,
+    ">100MP": 26,
+    "unknown": 17
+  },
+  "video_codecs": {
+    "h264": 1242,
+    "hevc": 2992
+  },
+  "video_pixel_formats": {
+    "yuv420p": 4061,
+    "yuvj420p": 172,
+    "None": 1
+  },
+  "video_transfer": {
+    "bt709": 3882,
+    "smpte170m": 243,
+    "None": 109
+  },
+  "audit_seconds_this_invocation": 352.68700000003446,
+  "header_probe_seconds_total": 1020.7789999945089,
+  "before": {
+    "captions": 42444,
+    "failed_dead": 443
+  },
+  "after": {
+    "captions": 42455,
+    "failed_dead": 443
+  },
+  "resources": {
+    "samples": 7915,
+    "observed_peak_rss": 159813632,
+    "observed_minimum_available_ram": 22874587136
+  },
+  "all_candidate_does_not_mean_decode_ready": true
+}

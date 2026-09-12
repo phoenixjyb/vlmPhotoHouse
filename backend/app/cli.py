@@ -1264,7 +1264,6 @@ from .config import get_settings
 from sqlalchemy import create_engine, inspect
 from .tasks import INDEX_SINGLETON, EMBED_DIM
 from .vector_index import load_index_from_embeddings
-from .main import SessionLocal
 
 # Reuse the same Typer app defined above; do not reassign.
 
@@ -1327,23 +1326,30 @@ def rebuild_index(limit: int = typer.Option(None, help='Max embeddings to load (
         typer.secho('Index not initialized (create TaskExecutor first).', fg=typer.colors.RED)
         raise typer.Exit(1)
     IDX.clear()
-    loaded = load_index_from_embeddings(SessionLocal, IDX, limit=limit or settings.max_index_load)
+    engine, session_factory = _session_factory()
+    try:
+        loaded = load_index_from_embeddings(session_factory, IDX, limit=limit or settings.max_index_load)
+    finally:
+        engine.dispose()
     typer.secho(f'Rebuilt index with {loaded} embeddings (dim={EMBED_DIM}).', fg=typer.colors.GREEN)
     
 @app.command()
 def recluster_persons():
     """Enqueue a full face/person recluster task."""
     from .db import Task
-    from .main import SessionLocal as _SessionLocal
-    with _SessionLocal() as session:
-        existing = session.query(Task).filter(Task.type=='person_recluster', Task.state=='pending').first()
-        if existing:
-            typer.echo("Recluster already pending (task id %s)" % existing.id)
-            return
-        t = Task(type='person_recluster', priority=300, payload_json={})
-        session.add(t)
-        session.commit()
-        typer.echo(f"Enqueued person_recluster task {t.id}")
+    engine, session_factory = _session_factory()
+    try:
+        with session_factory() as session:
+            existing = session.query(Task).filter(Task.type=='person_recluster', Task.state=='pending').first()
+            if existing:
+                typer.echo("Recluster already pending (task id %s)" % existing.id)
+                return
+            t = Task(type='person_recluster', priority=300, payload_json={})
+            session.add(t)
+            session.commit()
+            typer.echo(f"Enqueued person_recluster task {t.id}")
+    finally:
+        engine.dispose()
 
 @app.command()
 def rebuild_video_indices() -> None:

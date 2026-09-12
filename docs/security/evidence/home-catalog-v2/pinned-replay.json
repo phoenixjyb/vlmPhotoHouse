@@ -1,0 +1,20 @@
+{
+  "checks_passed": 12,
+  "checks": [
+    "exact_catalog_fixture",
+    "no_store",
+    "complete_synthetic_mp4",
+    "range_exact_status_bytes_headers",
+    "head_ignores_range",
+    "multipart_denied",
+    "revision_required",
+    "revision_conflict",
+    "exact_jpeg",
+    "legacy_original_denied",
+    "disabled_stream_denied",
+    "public_peer_denied_before_storage"
+  ],
+  "real_media": false,
+  "listeners": false,
+  "contract_sha256": "13cf10892dc4e91631ad71b5ee4bed21baa44697f1e779851c19026dbe606120"
+}

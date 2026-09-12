@@ -1,0 +1,117 @@
+{
+  "contract": "photohouse.home-discovery",
+  "version": 1,
+  "status": "frozen synthetic/source interface; no live index/origin",
+  "authentication": "none; explicit reviewed home-LAN metadata publication",
+  "v2_runtime_pin": "a5d0f595d7cd26379ed2845a944ec1d58d7885cc",
+  "v2_contract_sha256": "13cf10892dc4e91631ad71b5ee4bed21baa44697f1e779851c19026dbe606120",
+  "schema_file": "home-discovery-schema-v1.json",
+  "examples_file": "home-discovery-examples-v1.json",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/home/discovery/v1/facets",
+      "query": {
+        "facet": "people|tags|locations; default people",
+        "page": "1..5000; default 1",
+        "page_size": "1..100; default 50",
+        "revision": "required on pages after 1; optional first-page revalidation"
+      },
+      "response_schema": "#/$defs/facets_response"
+    },
+    {
+      "method": "POST",
+      "path": "/home/discovery/v1/search",
+      "content_type": "application/json exactly; no URL query parameters",
+      "request_schema": "#/$defs/search_request",
+      "response_schema": "#/$defs/search_response"
+    }
+  ],
+  "binding": {
+    "library": "Both responses carry id/title exactly from paired v2 catalog",
+    "revision": "Discovery revision; every search requires it. Facet pages after first require it. Mismatch 409 discovery_changed.",
+    "catalog_revision": "Paired v2 publication revision. Index also binds exact catalog file SHA-256. Every result item uses unchanged v2 media URLs and that catalog revision.",
+    "composition": "New optional same-origin ASGI composition dispatches the two discovery routes and preserves frozen v2 child handlers. Existing v1/v2/phone apps do not acquire discovery automatically. No launcher/deployment supplied.",
+    "lifecycle": "Snapshot/index changes require stopped release switch. Live index-file change 503 index_changed; mismatch 503 index_mismatch; shared control disable 403. Clear discovery/catalog/media generations after 409/denial; retain v2 no-store/media lifecycle."
+  },
+  "facets": {
+    "scope": "Global counts over published metadata and paired visible catalog, not current-query-conditioned counts.",
+    "ordering": "Facet items ascending numeric id. pinned_person_ids is separate operator order, <=32, no duplicates; pinned_people contains those exact records in that order on every facet page, independent of pagination.",
+    "aliases": "Server supplied literal strings including bilingual aliases; never compiled family names. Person-ID/alias mapping and order must be reviewed privately; unresolved mappings are not published.",
+    "date": "captured_date_bounds is observed min/max taken_day, nullable; no year/month count facets in v1. No created_at/import-date substitution or timezone inference.",
+    "locations": "Reviewed coarse region IDs/labels only, any match. No raw GPS, geocoding or caption-inferred place identity.",
+    "tags": "Published tag IDs with kind and provenance_counts. Caption/image/manual/rule/unknown remain distinct; kind person never becomes identity.",
+    "themes_topics": "Unavailable: no_reviewed_taxonomy. UI must not invent these endpoints or a completed generated taxonomy."
+  },
+  "filters": {
+    "join": "AND across present categories. Omitted category imposes no constraint. Empty filters browse all catalog IDs, including unindexed ones.",
+    "people": "ids with explicit match any/all; reviewed assignments only. All means the same asset contains every selected reviewed person.",
+    "tags": "ids with explicit match any/all; no identity inference. Sources are reported, not a query constraint in v1.",
+    "locations": "Array of reviewed IDs; ANY within this category.",
+    "media": "Array of photo/video/unsupported; ANY within this category.",
+    "date": "Inclusive from/to recorded capture calendar dates. Either endpoint nullable, at least one required. Unknown capture date cannot match. Invalid/reversed dates 400.",
+    "caption": "NFKC, Unicode casefold, strip outer query whitespace, literal substring phrase; no stemming, token OR, regex, FTS query syntax or semantic provider.",
+    "missing": "Missing/unindexed metadata never matches that active filter; it is not proof that a person/tag/location is absent.",
+    "invalid": "Unknown filter categories 422 unsupported_filter; supported-but-disabled 422 capability_unavailable; invalid/unknown IDs, duplicates, empty selections, malformed dates/types 400. No silent filter drop."
+  },
+  "paging": {
+    "order": "asset id descending",
+    "bounds": "page 1..100000; page_size 1..100. Search body requires all four top-level keys; never duplicate query/JSON fields.",
+    "fingerprint": "SHA-256 of canonical normalized filters plus discovery and catalog revision; independent of page and page_size. Same filters/revisions must match when appending pages. Changing filters/page_size resets pagination.",
+    "after_last": "200 empty items and has_more false; total remains matched asset count"
+  },
+  "coverage": {
+    "index_complete": "Only whether metadata rows cover every paired catalog ID; not completeness of people detection, captions, tags or models.",
+    "with_without_values": "Observed published values per enabled filter; without includes unknown/unindexed/unpublished metadata, not a proved negative.",
+    "metadata_completeness": "Always not_inferred in this slice",
+    "tag_generation_completeness": "Always unknown; no completion claim from existing tag rows"
+  },
+  "limits": {
+    "request_body_bytes": 16384,
+    "caption_query_utf8_bytes": 512,
+    "caption_index_utf8_bytes_per_asset": 4096,
+    "response_bytes": 524288,
+    "selected_ids_per_category": 20,
+    "person_aliases_per_id": 8,
+    "alias_utf8_bytes": 128,
+    "label_utf8_bytes": 256,
+    "roster_entries_per_kind": 5000,
+    "pinned_people": 32,
+    "index_bytes": 134217728,
+    "index_assets": 100000,
+    "discovery_concurrent_actions": 2,
+    "matching_loop_budget_seconds": 2
+  },
+  "errors": {
+    "400": [
+      "invalid_request",
+      "revision_required"
+    ],
+    "403": [
+      "access_denied",
+      "feed_disabled"
+    ],
+    "409": [
+      "discovery_changed"
+    ],
+    "413": [
+      "request_too_large"
+    ],
+    "422": [
+      "unsupported_filter",
+      "capability_unavailable"
+    ],
+    "429": [
+      "busy; Retry-After: 2"
+    ],
+    "503": [
+      "discovery_unavailable",
+      "index_mismatch",
+      "index_changed",
+      "publication_changed",
+      "search_budget_exceeded"
+    ]
+  },
+  "privacy": "Same direct HTTPS hostname/actual-peer/CORP/no-store boundary as frozen v2; no credentials, original paths, raw GPS, faces/crops/embeddings, legacy fallbacks, live DB writes, models, query logs or alias hardcoding.",
+  "remaining": "No real index exporter/reviewed mappings/live coverage/native benchmark/launcher/deployment/device acceptance. Reviewed provenance in the file is an operator assertion, not automatic proof from legacy manual flags."
+}

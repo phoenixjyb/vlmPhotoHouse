@@ -1,0 +1,77 @@
+{
+  "task": "PH-HOME-FULL-COVERAGE-01",
+  "source_commit": "0872cf8ae799b366eb80da7b6d77ff9ad79d56b7",
+  "branch": "codex/backend-home-tv-feed",
+  "windows": {
+    "tests": 108,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 137.3,
+    "source_blobs_verified_before_and_after": 321,
+    "inventory_entries": 162,
+    "data": "synthetic only"
+  },
+  "mac": {
+    "combined_suite": {
+      "tests": 105,
+      "seconds": 24.576,
+      "failures": 0,
+      "errors": 0
+    },
+    "subsequent_publication_tests": {
+      "tests": 2,
+      "seconds": 1.773,
+      "failures": 0,
+      "errors": 0
+    },
+    "subsequent_native_memory_smoke": {
+      "tests": 1,
+      "passed": true
+    },
+    "single_108_test_run": false
+  },
+  "live_preservation": {
+    "observed_at": "2026-09-12T13:43:28.0512402+08:00",
+    "live_control": {
+      "version": 2,
+      "enabled": true,
+      "revision": 1,
+      "catalog_sha256": "f9dc78da4236e5c6c920b2eefd9dfafc8850bd874e240bb372fe861b58e44f52"
+    },
+    "candidate_control": {
+      "version": 2,
+      "enabled": false,
+      "revision": 2,
+      "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4"
+    },
+    "live_config_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+    "four_service_pid_and_start_identities_unchanged": true,
+    "live_ready": 16,
+    "disabled_candidate_ready": 17,
+    "real_bulk_preparation_started": false,
+    "activated_or_restarted": false
+  },
+  "audit": {
+    "total_visible": 27842,
+    "passes": 2,
+    "elapsed_seconds": 1253.077,
+    "source_metadata_snapshot_unchanged": true,
+    "caption_rows_start": 42406,
+    "caption_rows_end_audit": 42455,
+    "caption_failed_dead_during_audit": 443,
+    "observed_peak_rss_bytes": 343072768,
+    "observation_limit": "Audit helper can miss short child peaks; sampling is not an OS quota."
+  },
+  "final_observation": {
+    "captions": 42503,
+    "caption_failed_dead": 443,
+    "free_bytes": 5245264932864
+  },
+  "limits": [
+    "Header eligibility is not successful decode or ready-media coverage.",
+    "No large-JPEG or long/large-SDR real conversion benchmark in this slice.",
+    "No physical TV acceptance.",
+    "Standalone/legacy authorization gaps remain inventoried."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "task": "PH-PHONE-DISCOVERY-CONTRACT-PLAN-01",
+  "backend_head_observed": "3080c9cae90efab373fc0c0a218211c615020e92",
+  "protected_phone_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+  "protected_inputs_verified": [
+    {
+      "path": "backend/app/main.py",
+      "sha256": "451e41dd5863ec5b4035bf25afff92f918cd6f1c62cc6d84c0fe9f7375bfb26a"
+    },
+    {
+      "path": "backend/app/access/transport.py",
+      "sha256": "3df4fcfe6797ddee2a26ea34adc202c9aa92b88cf51439ad5c53bc7be37e2e87"
+    },
+    {
+      "path": "backend/app/access/service.py",
+      "sha256": "c1fc33b39207512fe6f32f52f0564dce8da855f1dd9aee1fd012c4984ab99881"
+    },
+    {
+      "path": "backend/app/access/credentials.py",
+      "sha256": "29af47d7cdc18a5347d635ee9c2e53dc9475aedbf4141c451478cf9fed7d4b2f"
+    },
+    {
+      "path": "backend/app/access/library.py",
+      "sha256": "5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe"
+    },
+    {
+      "path": "backend/app/access/media.py",
+      "sha256": "ed3aa21e138b1959659027cf61b80f44eb90970c3b18606fdca2ee0c22438a95"
+    },
+    {
+      "path": "backend/app/access/boundary.py",
+      "sha256": "0e11c1ff560429fa093ddd91c5ee2ee3297e530eee6ddeb5d181c81c66f8d599"
+    },
+    {
+      "path": "backend/app/access/runtime.py",
+      "sha256": "b2b7c0695a3e243a67a8156028b0d038a5d6eb4263ec5affa3fe78266a4760e9"
+    },
+    {
+      "path": "tests/security/test_library_reads.py",
+      "sha256": "44be0da6baa759d06138c5f430464a6ccb0e21dac3c39201660e9ff5a7e7aadd"
+    },
+    {
+      "path": "tests/security/test_orm_migrations.py",
+      "sha256": "77c3b999d1c67e46691496e90f7dcf19468fa4aa7083195c2d28787b8da15076"
+    }
+  ],
+  "action": "documentation proposal only; no new wire schema or runtime implementation",
+  "checks": [
+    "10 protected input Git blobs and phone-manifest hashes match current backend",
+    "Targeted source review of transport, policy, scoped reads, media, closed boundary and existing discovery/export",
+    "Existing TV/Android evidence read without live queries"
+  ],
+  "live_queries": false,
+  "android_edits": false,
+  "new_tests_or_runtime": false
+}

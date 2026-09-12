@@ -1,0 +1,99 @@
+{
+  "check_count": 13,
+  "checks": [
+    "explicit_review_produces_disabled_bundle",
+    "snapshot_request_candidate_unchanged",
+    "all_output_hashes_verified",
+    "catalog_and_discovery_disabled",
+    "library_revisions_pins_and_reviewed_people_coverage",
+    "all_combined_filters",
+    "dnn_and_caption_do_not_become_reviewed_identity",
+    "missing_date_is_unknown_not_a_match",
+    "verified_prepared_photo",
+    "verified_prepared_video_range",
+    "legacy_original_denied",
+    "shared_disable_restored",
+    "final_bundle_disabled_hashes_restored"
+  ],
+  "coverage": {
+    "approved_face_evidence_rows": 3,
+    "caption_exclusions": {
+      "superseded": 1
+    },
+    "caption_states": {
+      "missing": 1,
+      "selected": 3
+    },
+    "catalog_assets": 4,
+    "catalog_media_kinds": {
+      "photo": 2,
+      "video": 2
+    },
+    "dates": {
+      "missing": 1,
+      "valid": 3
+    },
+    "index_complete": true,
+    "indexed_assets": 4,
+    "media": {
+      "display": {
+        "bytes_verified_ready": 1,
+        "not_prepared": 3
+      },
+      "grid": {
+        "bytes_verified_ready": 1,
+        "not_prepared": 3
+      },
+      "video": {
+        "bytes_verified_ready": 1,
+        "not_prepared": 1
+      }
+    },
+    "media_validation": "hashes/dimensions only; codec and physical quality require prior preparation evidence",
+    "metadata_completeness": "not_inferred",
+    "metadata_with_values": {
+      "caption": 3,
+      "date": 3,
+      "locations": 3,
+      "people": 2,
+      "tags": 3
+    },
+    "metadata_without_values": {
+      "caption": 1,
+      "date": 1,
+      "locations": 1,
+      "people": 2,
+      "tags": 1
+    },
+    "reviewed_person_ids": 2,
+    "tag_exclusions": {
+      "blocked": 1
+    },
+    "tag_generation_completeness": "unknown",
+    "tag_kinds": {
+      "custom": 1,
+      "scene": 1
+    },
+    "tag_sources": {
+      "caption": 2,
+      "manual": 2
+    },
+    "unresolved_shortcuts": 0,
+    "unreviewed_face_rows": 1
+  },
+  "final_enabled": false,
+  "listener_started": false,
+  "output_hashes": {
+    "catalog.json": "d7451aaa523f6044c3afcd6748d7418b727a4b50caa29b652369e55e7b17f677",
+    "control.json": "90a81ab993bc1d77480bad177a70696d66d04b96b13955ca93216382c113afc5",
+    "coverage.json": "a4d466bc73064d12020c82295ccacc51e3ae22c579501d1970b5ac3f840b263b",
+    "discovery.json": "3bf4d8bb67ffdf5630ba5ef9455be297e12946e6ef57103423bdb94f2631c8bc",
+    "prepared/display/101.jpg": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+    "prepared/grid/101.jpg": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+    "prepared/video/102.chunks.json": "cd23f31f1e7a19b160b590ceed87842e72156942b5afd8a3690e485b1a37de59",
+    "prepared/video/102.mp4": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+  },
+  "plan_sha256": "53372a4a69fde9203a4e0e8adf2c67c73bac443cc5bc6453c24a04a85798106d",
+  "real_data_accessed": false,
+  "status": "PASS_SYNTHETIC_EXPORT_AND_ASGI_ONLY"
+}

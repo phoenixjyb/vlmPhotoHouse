@@ -1,0 +1,55 @@
+{
+  "implementation_pin": "a5d0f595d7cd26379ed2845a944ec1d58d7885cc",
+  "worktree_branch": "codex/backend-home-tv-feed",
+  "full_security_suite": {
+    "passed": 318,
+    "seconds": 39.928,
+    "scope": "Before final explicit SQLite/stream cleanup and three additional focused cases; no failures",
+    "log_sha256": "aeb1270250fc49939ca45896396e3a1d6a8f4d4fa0cd413b1a91eaa0415f9339"
+  },
+  "final_focused_catalog_suite": {
+    "passed": 24,
+    "seconds": 0.519,
+    "scope": "Final implementation; synthetic ASGI/export/launcher, no listeners/models/real media"
+  },
+  "pinned_git_blob_replay": {
+    "files_verified": 16,
+    "checks_passed": 12,
+    "fixture_mp4_normal_git_blob_bytes": 24336
+  },
+  "inventory": {
+    "method_path_entries": 160,
+    "complete": true
+  },
+  "schema": {
+    "dialect": "JSON Schema Draft 2020-12",
+    "validator": "jsonschema 4.26.0 in temporary local tooling directory",
+    "schema_and_response_example": "pass"
+  },
+  "synthetic_video": {
+    "ffprobe": "H.264 constrained baseline level 3.1, yuv420p, 320x180, AAC-LC, 0.5 seconds",
+    "ffmpeg_decode_to_null": "pass"
+  },
+  "markdown": {
+    "files": [
+      "HOME_CATALOG_V2.md",
+      "HOME_TV_BACKEND_READINESS.md"
+    ],
+    "render": "Marked HTML generated; structure and local links checked; no screenshot review claimed"
+  },
+  "preserved": {
+    "v1_source_launcher_contract_byte_identical": true,
+    "protected_phone_pin": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
+    "windows_caption_api_process_identity_unchanged_at_inventory": true,
+    "v1_dns_tasks_running_at_inventory": true
+  },
+  "not_done": [
+    "v2 live deployment/origin",
+    "real catalog publication",
+    "real derivative normalization/coverage",
+    "real v2 device playback",
+    "whole population codec or file availability scan",
+    "live database schema/membership changes",
+    "push or merge"
+  ]
+}

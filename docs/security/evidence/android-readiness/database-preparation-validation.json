@@ -1,0 +1,86 @@
+{
+  "source_commit": "8d5e9cce77aaeb079d1dfb5801a932c2a01194d1",
+  "package": {
+    "source_commit": "8d5e9cce77aaeb079d1dfb5801a932c2a01194d1",
+    "source_files": 45,
+    "zip_sha256": "ea682cdac754ec510dab7846f6d2b6674fd1e88b3878d99fcb617386bd8ce8f5",
+    "bytes": 256043,
+    "deployed": false
+  },
+  "smoke": {
+    "package_smoke": "pass",
+    "synthetic_migration_revision": "b6e3f9a5c721",
+    "asgi_checks": 7,
+    "operator_commands": 3,
+    "database_preparation_commands": 3,
+    "listeners_opened": false,
+    "live_data_accessed": false
+  },
+  "pinned_backend_hashes_match": 10,
+  "consumer_commit": "1d4fc49c043d553df510c52b9a368ee0313398c6",
+  "task": "PH-BACKEND-ANDROID-READINESS-01",
+  "slice": "offline_database_preparation",
+  "date": "2026-09-11",
+  "branch": "codex/backend-android-readiness",
+  "prior_head": "a9543cfaf0faa6b1d5088fc217cdb266de51c54f",
+  "security_suite": {
+    "passed": 240,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 28.623,
+    "command": "python -B -m unittest discover -s tests/security -p test_*.py -v"
+  },
+  "inventory": {
+    "complete": true,
+    "entries": 152
+  },
+  "android_contract_validation": {
+    "operations": 12,
+    "cases": 38,
+    "files": 8,
+    "verifier_regression_tests_passed": 8,
+    "fresh_asgi_replay": false,
+    "fresh_kotlin_boundary_replay": false
+  },
+  "scope": {
+    "synthetic_only": true,
+    "api_or_migration_changes": false,
+    "mobile_edits": false,
+    "existing_database_migration_apply": false,
+    "windows_or_mac_mini_access": false,
+    "listeners": false,
+    "deployment": false,
+    "push_or_merge": false
+  },
+  "handoff_delivery": {
+    "thread_id": "01a08537-1f09-7bb3-9b0c-5781f1cabd60",
+    "file_panel_status": "queued",
+    "message_sent": false,
+    "receipt_acknowledged": false
+  },
+  "remaining_gates": [
+    "CPU environment lock",
+    "existing-database migration apply and recovery",
+    "private target origin audience and scoped authority",
+    "host and legacy or standalone ingress isolation",
+    "real backup provisioning recovery and physical-phone acceptance"
+  ],
+  "changed_files": [
+    "scripts/prepare_access_database.py",
+    "scripts/build_staging_package.py",
+    "tests/security/test_database_preparation.py",
+    "tests/security/package_smoke.py",
+    "docs/security/DATABASE_PREPARATION.md",
+    "docs/security/OPERATOR_TOOL.md",
+    "docs/security/ANDROID_READINESS_RETURN.md",
+    "docs/security/ANDROID_STAGING_DECISION.json",
+    "docs/security/ANDROID_STAGING_PROPOSAL.md",
+    "docs/security/STAGING_LAUNCHER.md",
+    "docs/security/CAPTION_RESPONSE_BUDGET.md",
+    "docs/security/evidence/android-readiness/database-preparation-validation.json"
+  ],
+  "documentation_validation": {
+    "markdown_rendered": 6,
+    "heading_table_and_local_link_checks": "pass"
+  }
+}

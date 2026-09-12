@@ -1,0 +1,157 @@
+{
+  "task": "PH-HOME-VIDEO-RANGE-NATIVE-01",
+  "status": "PASS_NATIVE_AND_BOUNDED_PREPARATION_CANDIDATE_DISABLED",
+  "verified_time": "2026-09-12T12:30:01.9190666+08:00",
+  "source_commit": "50391b6db8a7c41dc276f6ec36c28dfc0b0a934d",
+  "staged_commit": "6469cfc991325a82e4f70e3eab36d843fe05b5cb",
+  "branch": "codex/backend-home-tv-feed",
+  "source_files_verified": 318,
+  "native": {
+    "python": "3.12.10",
+    "pillow": "12.3.0",
+    "ffmpeg": "7.1.1-essentials_build",
+    "tests": 86,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 39.744,
+    "inventory_entries": 162,
+    "dependency_install_performed": false,
+    "new_interpreter_reuses_existing_reviewed_dependencies": true
+  },
+  "real_mov": {
+    "prepare_seconds": 8.515999999945052,
+    "output_bytes": 3295006,
+    "width": 1308,
+    "height": 980,
+    "pixel_format": "yuv420p",
+    "color_range": "tv",
+    "codec": "h264",
+    "profile": "High",
+    "audio": "AAC LC",
+    "full_decode_passed": true
+  },
+  "preservation_batch": {
+    "items": 16,
+    "prepare_seconds": 26.18799999996554
+  },
+  "candidate": {
+    "revision": 2,
+    "enabled": false,
+    "assets": 27842,
+    "ready_photos": 15,
+    "ready_videos": 2,
+    "ready": 17,
+    "unavailable": 27825,
+    "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4",
+    "total_publication_bytes": 26589028,
+    "verified_resume_seconds": 1.875,
+    "checks": [
+      "candidate_disabled_catalog_and_video_denied",
+      "all_34_previews_decode_geometry_metadata_hashes",
+      "both_videos_head_full_ranges_hashes_eof",
+      "stale_revision_409",
+      "invalid_host_and_denied_peer_and_forwarded_spoof_403",
+      "11_legacy_account_voice_ops_discovery_paths_403"
+    ]
+  },
+  "live": {
+    "revision": 1,
+    "ready": 16,
+    "publication_control_config_unchanged": true,
+    "listener_task_and_process_start_times_unchanged": true,
+    "api_non_model_probe_status": 404,
+    "caption_rows_initial": 42318,
+    "caption_rows_final": 42340,
+    "failed_caption_tasks_during_preparation": 437,
+    "dead_caption_tasks_during_preparation": 4,
+    "existing_failure_counts_unchanged_during_preparation": true
+  },
+  "originals": {
+    "all_17_hashes_unchanged": true,
+    "selected_metadata_and_schema_unchanged": true,
+    "read_only_database": true,
+    "media_copied_to_mac": false
+  },
+  "resource_samples": {
+    "select": {
+      "samples": 2,
+      "minimum_available_ram_bytes": 28773036032,
+      "maximum_observed_owned_peak_bytes": 31465472,
+      "minimum_free_disk_bytes": 5245332099072,
+      "caption_count_samples": [
+        42330,
+        42330
+      ],
+      "failed_or_dead_caption_tasks_samples": [
+        441,
+        441
+      ]
+    },
+    "canary": {
+      "samples": 7,
+      "minimum_available_ram_bytes": 28465106944,
+      "maximum_observed_owned_peak_bytes": 259805184,
+      "minimum_free_disk_bytes": 5245320470528,
+      "caption_count_samples": [
+        42331,
+        42331,
+        42331
+      ],
+      "failed_or_dead_caption_tasks_samples": [
+        441,
+        441,
+        441
+      ]
+    },
+    "preserve": {
+      "samples": 18,
+      "minimum_available_ram_bytes": 28319555584,
+      "maximum_observed_owned_peak_bytes": 367140864,
+      "minimum_free_disk_bytes": 5245302460416,
+      "caption_count_samples": [
+        42334,
+        42334,
+        42334,
+        42334,
+        42335
+      ],
+      "failed_or_dead_caption_tasks_samples": [
+        441,
+        441,
+        441,
+        441,
+        441
+      ]
+    },
+    "publish": {
+      "samples": 5,
+      "minimum_available_ram_bytes": 28216512512,
+      "maximum_observed_owned_peak_bytes": 181071872,
+      "minimum_free_disk_bytes": 5245269614592,
+      "caption_count_samples": [
+        42336,
+        42336
+      ],
+      "failed_or_dead_caption_tasks_samples": [
+        441,
+        441
+      ]
+    }
+  },
+  "resource_limitations": "One-second sleeps plus polling overhead; observed peaks and CPU samples are not hard OS quotas or complete accounting.",
+  "not_performed": [
+    "candidate activation",
+    "service restart",
+    "caption pause or retry",
+    "firewall or credential change",
+    "model execution",
+    "Android candidate test",
+    "human visual or physical TV acceptance",
+    "whole-library preparation",
+    "push or merge"
+  ],
+  "source_preparer_sha256": "d0afa953023aa010cdc65d5c3dc98a4fe304712e8e3acdbc73d85e179a413c99",
+  "live_preparer_sha256": "2bbb6f3ee4242274b5d27091c7fb93a70c8a15788b651bf1237ac466f8c87118",
+  "native_test_log_sha256": "6a60e3c39153c97e0ed46d1375d08b3dbee8b9e69b2b06b6745afc2c886c6e03"
+}

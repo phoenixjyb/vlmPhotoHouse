@@ -1,0 +1,35 @@
+{
+  "base_commit": "868cbb48aec50fa9c01689ee071c9d999e0b8e0d",
+  "scope": "Offline source plus synthetic measurements; no Windows access or real preparation in this slice",
+  "focused_integration": {
+    "passed": 62,
+    "skipped": 0,
+    "groups": {
+      "v1_feed": 18,
+      "v2_catalog": 24,
+      "preparer": 20
+    },
+    "log_sha256": "b3ac3782428c0dd660dae05f3c64f056003359844f023f5a3fe6af624e9067f8",
+    "seconds": 6.052
+  },
+  "inventory": {
+    "complete": true,
+    "method_path_entries": 160,
+    "new_routes": 0
+  },
+  "benchmark": "benchmark.json; real 12MP synthetic JPEG and six-second 1080p synthetic H.264/AAC, full conversion/probe/decode/hash/resume/disabled-publication/ASGI Range",
+  "tooling_failures_retained": [
+    "Initial wrong-ABI temporary Pillow wheel caused 14 skipped tests, not counted as success; matching CPython 3.12 wheel fixed tooling",
+    "Rotation fixture using metadata-only rotate did not create a matrix in FFmpeg 9; corrected fixture asserts input matrix before verification"
+  ],
+  "runtime_dependencies": "Separate preparation lock; no serving/caption environment change",
+  "not_run": [
+    "Native Windows FFmpeg 7.1.1/Pillow/locking replay",
+    "Real one-photo/one-video canary",
+    "Windows CPU/RAM/caption-impact measurement",
+    "Live v2 deployment",
+    "Whole-library preparation",
+    "Physical real-media TV acceptance",
+    "push or merge"
+  ]
+}

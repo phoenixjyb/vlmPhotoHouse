@@ -1,0 +1,6 @@
+# Separate offline preparation environment only. Serving environments are unchanged.
+# CPython 3.12 macOS arm64 and Windows amd64 wheels from PyPI.
+-r requirements-access.lock
+Pillow==12.3.0 \
+    --hash=sha256:ffd0c5368496f41b0944be820fcb7a838aa6e623d250b01acf2643939c3f99d7 \
+    --hash=sha256:a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09

@@ -1,0 +1,56 @@
+{
+  "review": "PH-ANDROID-HOME-FEED-01 backend review",
+  "outcome": "local integration accepted; deployment and device acceptance pending",
+  "backend_review_base": "90c2e2461f480c1ae49daab4ac83c629b44a2148",
+  "backend_implementation": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "android_source_commit": "e8ab9be3c5497778783edf1b4a009707922248d1",
+  "android_evidence_commit": "c866c74de881a24714282bbb8c426f7c29d03103",
+  "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "fresh_checks": {
+    "android_source_files_match_working_files_and_git": 29,
+    "apks_hash_and_size_verified": 2,
+    "main_apk_assets_absent": true,
+    "main_apk_v2_signature_verified": true,
+    "package": "dev.photohouse.tv",
+    "version_code": 2,
+    "version_name": "0.2-home-feed-dev"
+  },
+  "apk": {
+    "sha256": "3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1",
+    "bytes": 8779354,
+    "signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
+    "origin_configured": false
+  },
+  "reviewed_android_evidence_sha256": {
+    "RETURN.md": "43c7118910e1359c4def1d0b908e28010319321e8b7ec5137704f3070118e66c",
+    "result.json": "03c08b59aac219b75bdc33d25cff2dbe4b35b27e5c94bfb22040dcc9ad038ca4",
+    "source-inputs.json": "fce83bc20b380f01426889624a6e6f892b9d490026de4b8a9a24786acaf16d5e",
+    "jvm-tests.json": "82195f59f6dea93b2eddabb6a87b8ab986f85961174b22c11e7104a3144e4fe6",
+    "backend-asgi.json": "b46f838d3011afb7736542c289bbcb1f1c9786e04cd5b6f7689837ee7674f8b5"
+  },
+  "retained_android_results_not_rerun": {
+    "jvm_passed": 110,
+    "backend_asgi_passed": 10,
+    "emulator_passed_per_font_scale": 8,
+    "font_scales": [
+      1.0,
+      2.0
+    ],
+    "lint_errors": 0,
+    "lint_existing_warnings": 3
+  },
+  "source_review_scope": [
+    "HttpsHomeApi.kt transport and response admission",
+    "HomeStore.kt generation, clearing, refresh and retry"
+  ],
+  "source_review_blockers_found": [],
+  "limitations": [
+    "bounded review, not exhaustive security audit",
+    "no fresh JVM/build/emulator run",
+    "unconfigured debug APK; setup only",
+    "no live LAN or physical projector evidence"
+  ],
+  "deployment_authorized": false,
+  "actual_feed_served": false,
+  "physical_device_accepted": false
+}

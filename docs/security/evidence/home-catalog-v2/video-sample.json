@@ -1,0 +1,30 @@
+{
+  "scope": "Four representative header-only probes; not population codec census; detailed file metadata private",
+  "mp4_sample": {
+    "count": 2,
+    "video_codec": "hevc",
+    "profile": "Main",
+    "dimensions": [
+      7680,
+      4320
+    ],
+    "pixel_format": "yuv420p",
+    "fps": 30,
+    "audio": "AAC-LC"
+  },
+  "mov_sample": {
+    "count": 2,
+    "video_codec": "h264",
+    "profile": "High",
+    "dimensions": [
+      1440,
+      1080
+    ],
+    "pixel_format": "yuvj420p",
+    "fps": "30000/1001",
+    "audio": "AAC-LC",
+    "extra_data_tracks": true
+  },
+  "originals_decoded": false,
+  "media_copied_to_mac": false
+}

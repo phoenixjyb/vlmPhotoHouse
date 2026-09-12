@@ -1,0 +1,28 @@
+{
+  "plan": {
+    "version": 1,
+    "operation": "assign_unmapped_assets",
+    "plan_id": "ab2d4387-d22b-4571-9711-3c3c7e7ea58a",
+    "created_at": 2000000000,
+    "expires_at": 2000000900,
+    "target": {
+      "library_id": "family-a",
+      "operator_account_id": "52675fe9-f1d3-4a1c-9cd4-d4f3e5967921",
+      "asset_ids": [
+        "999"
+      ]
+    },
+    "database_binding": "3cdbf171ca833e780e18e6795e44f7990956f768ecf7a2a5ae0b282d98caf03a",
+    "expected": {
+      "operator_revision": "1",
+      "asset_state": "613f3fffcee8117f349123a80a6f95b0ce6ee94d0bbfed209923abc93a84bf80",
+      "count": 1,
+      "audience_state": "f4f23368d890483b6c12a4060ac7849f7f207d3f39da44cf76655185062ab070",
+      "current_readers": 2,
+      "current_original_readers": 0,
+      "originals_granted": false,
+      "moves_or_media_writes": false
+    }
+  },
+  "seal": "d3a4c088e3a888a8eb72d20ebe95b3cdd98a637501469ab3d59ab85fe8a080ea"
+}

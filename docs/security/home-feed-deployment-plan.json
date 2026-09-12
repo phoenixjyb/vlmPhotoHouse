@@ -1,0 +1,125 @@
+{
+  "plan_version": 1,
+  "task": "PH-BACKEND-HOME-TV-READINESS-02",
+  "implementation_commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+  "contract_sha256": "70328a653ddaa559bad6a4d654cf9870c89c5217e8e9e6c46a3501e9dd9e7548",
+  "android_integration_ready": true,
+  "deployment_ready": false,
+  "deployment_authorized": true,
+  "actual_feed_served": true,
+  "policy": "anonymous selected home LAN feed; no device approval or personal sign-in",
+  "synthetic_selection": {
+    "feed_id": "synthetic-home",
+    "asset_ids": [
+      101
+    ],
+    "manifest": "home-feed-manifest.example.json",
+    "revision": 4,
+    "originals_allowed": false,
+    "packaged_manifest_revision": 1,
+    "manifest_role": "immutable initial package fixture; current private publication revision recorded separately"
+  },
+  "private_target_inputs": {
+    "host_identity": null,
+    "origin": null,
+    "bind_address_and_port": null,
+    "normal_client_dns_route": null,
+    "peer_cidrs": null,
+    "certificate_and_key_reference": null,
+    "service_principal": null,
+    "task_and_release_path": null,
+    "approved_operator": null,
+    "authorized_window": null,
+    "projector_identity_and_install_operator": null
+  },
+  "private_candidate_reference": "HOME-FEED-E6B2827-PROPOSAL",
+  "unresolved_gates": [
+    "Physical JMGO install and app-scoped mapped HTTPS connection with platform trust",
+    "Physical remote/image/slideshow/reconnect/sleep-wake/disable acceptance",
+    "Confirm prior projector DNS Save state before resolver retirement",
+    "Broader audience/network acceptance and durable startup/renewal remain separate"
+  ],
+  "archive_sha256": "934339ab96ed42a6301ad45acf6aa51bb917b9b6947e03c0d3ccecd72fbe0b79",
+  "archive_bytes": 596784,
+  "steps": [
+    "review private target and operator inputs",
+    "verify immutable bundle, exact members and CPU environment",
+    "stage fresh synthetic publication under a new private root",
+    "validate native config and ACLs before any serve action",
+    "start only independent home-feed task after deployment authority",
+    "prove feed/preview integrity and peer/route denials over real HTTPS",
+    "rehearse disable/remove/re-enable and scoped restart/rollback",
+    "return exact served origin and receipts for Android device acceptance"
+  ],
+  "android_local_integration": {
+    "complete": true,
+    "source_commit": "c42918a54991895a3869977f92aa29ffee2377e5",
+    "evidence_commit": "2b2ebf88dc9699860438438d43344eb48aefdfcf",
+    "apk_sha256": "3fba5917cd0215f4696d4bdc8ae1e962e787409273c7ed92f574301aaec3c0d1",
+    "review_receipt": "evidence/home-tv-feed-readiness/android-review.json",
+    "configured_apk_ready": true,
+    "physical_device_accepted": false,
+    "configured_apk_network_verified": false,
+    "configured_apk_sha256": "710c9d3aecd17dcc4b05f00e578504c0522cb1026652520242fe782b8b244b13",
+    "configured_apk_bytes": 8802427,
+    "configured_apk_signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
+    "configured_build_evidence_commit": "2b2ebf88dc9699860438438d43344eb48aefdfcf",
+    "configured_build_private_reference": "HOME-TV-V3-LAN-MAPPED",
+    "backend_review_checks": [
+      "APK checksum and size",
+      "signer and package/version",
+      "eleven source delta files match pinned Git blobs",
+      "no main APK assets",
+      "both embedded configuration strings match private handoff",
+      "bounded mapper, adapter constructor and setup-failure source review"
+    ],
+    "configured_build_receipt_sha256": "a112ccff4d16e8cb28db7852973a55815920dc3a0886e683be03f1168ad11eca",
+    "configured_apk_version_code": 3,
+    "configured_apk_version_name": "0.3-home-lan-dev",
+    "mapped_jvm_live_network_verified": true
+  },
+  "active_pilot": {
+    "task": "PH-BACKEND-HOME-TV-LAN-PILOT-01",
+    "scope": "separate synthetic selected home-LAN deployment only",
+    "authority": "user continuation relayed by Android task after local review",
+    "private_handoff_reference": "HOME-FEED-E6B2827-LAN-PILOT",
+    "status": "HTTPS and prior DNS running; mapped v3 APK verified locally; physical installation pending",
+    "no_real_selection": true,
+    "preserve_caption_and_protected_services": true
+  },
+  "windows_staging_verified": true,
+  "diagnostic_feed_was_served": true,
+  "actual_feed_served_semantics": "current listener state; diagnostic serving history is recorded separately",
+  "remaining_gates": [
+    "Physical JMGO install and app-scoped mapped HTTPS connection with platform trust",
+    "Physical remote/image/slideshow/reconnect/sleep-wake/disable acceptance",
+    "Confirm prior projector DNS Save state before resolver retirement",
+    "Broader audience/network acceptance and durable startup/renewal remain separate"
+  ],
+  "private_target_inputs_note": "Exact resolved values are retained only in the private handoff; null values here do not mean every input is unknown.",
+  "resolved_private_inputs": [
+    "host_identity",
+    "bind_address_and_port",
+    "certificate_and_key_reference",
+    "service_principal",
+    "task_and_release_path",
+    "approved_operator",
+    "authorized_window"
+  ],
+  "pilot_receipt": "evidence/home-tv-feed-readiness/windows-lan-pilot.json",
+  "dns_resolver_ready_for_projector_setting": true,
+  "projector_dns_setting_saved_verified": false,
+  "dns_receipt": "evidence/home-tv-feed-readiness/dns-ready-pilot.json",
+  "diagnostic_shutdown_deadline": null,
+  "manual_start_tasks_no_boot_triggers": true,
+  "client_connection_plan": {
+    "mode": "app-scoped exact-host LAN address mapping requested by user",
+    "owner": "Android task",
+    "implementation_and_tls_tests_pending": false,
+    "manual_projector_dns_required_for_new_apk": false,
+    "normal_system_dns_acceptance_claimed": false,
+    "existing_resolver_retained_due_to_unknown_saved_projector_setting": true,
+    "local_implementation_reviewed": true,
+    "physical_apk_acceptance_pending": true
+  }
+}
