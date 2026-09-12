@@ -94,7 +94,7 @@ def workspace_lock(root):
             else: fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
-def run_process(args, directory, budget, output=None):
+def run_process(args, directory, budget, output=None, guard=None):
     """One child, no shell, one CPU thread requested by codec args, bounded logs/time.
 
     Windows BELOW_NORMAL priority; POSIX lower priority via os.nice in the worker
@@ -107,6 +107,7 @@ def run_process(args, directory, budget, output=None):
         start = time.monotonic()
         try:
             while process.poll() is None:
+                if guard is not None: guard(process)
                 if (time.monotonic()-start > budget.process_seconds
                         or os.fstat(stdout.fileno()).st_size > 2*1024**2
                         or os.fstat(stderr.fileno()).st_size > 65536
@@ -123,9 +124,9 @@ def run_process(args, directory, budget, output=None):
             process.wait()
 
 
-def probe(binary, source, directory, budget):
+def probe(binary, source, directory, budget, guard=None):
     raw = run_process([binary, '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mov', '-enable_drefs', '0', '-use_absolute_path', '0', '-export_all', '1', '-export_xmp', '1', '-show_streams', '-show_format', '-show_chapters',
-                       '-of', 'json', source], directory, budget)
+                       '-of', 'json', source], directory, budget, guard=guard)
     return json.loads(raw, object_pairs_hook=unique)
 
 
@@ -214,7 +215,7 @@ def previews(directory):
     return result
 
 
-def prepare_one(source, kind, output, ffmpeg, ffprobe, budget):
+def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None):
     began = time.monotonic(); before = identity(source)
     def remaining():
         seconds = int(budget.asset_seconds-(time.monotonic()-began))
@@ -222,11 +223,11 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget):
         return replace(budget,process_seconds=min(budget.process_seconds,seconds))
     source_hash = file_hash(source, budget.input_bytes)
     if kind == 'photo':
-        run_process([sys.executable, Path(__file__).resolve(), '_photo', source, output, str(budget.pixels)], output, remaining())
+        run_process([sys.executable, Path(__file__).resolve(), '_photo', source, output, str(budget.pixels)], output, remaining(), guard=guard)
         result = {'previews':previews(output),'video':None}
     elif kind == 'video':
         if source.suffix.lower() not in ('.mp4','.mov'): raise PreparationError('unsupported')
-        original = probe(ffprobe, source, output, remaining())
+        original = probe(ffprobe, source, output, remaining(), guard=guard)
         duration = float(original['format']['duration'])
         videos = [s for s in original.get('streams', []) if s.get('codec_type') == 'video' and not s.get('disposition',{}).get('attached_pic')]
         if (not math.isfinite(duration) or not 0 < duration <= budget.duration_seconds or len(videos) != 1
@@ -246,14 +247,14 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget):
                 '-c:a','aac','-b:a','128k','-ac','2','-ar','48000',
                 '-metadata:s:v:0','handler_name=VideoHandler','-metadata:s:a:0','handler_name=SoundHandler',
                 '-metadata:s','language=und','-movflags','+faststart','-fs',str(budget.output_bytes),target]
-        run_process(args, output, remaining(), target)
-        v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining()), duration)
+        run_process(args, output, remaining(), target, guard=guard)
+        v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining(),guard=guard), duration)
         faststart(target)
         # Full bounded decode, not merely an ffprobe/header success.
-        run_process([ffmpeg,'-v','error','-xerror','-nostdin','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-f','null','-'], output, remaining())
+        run_process([ffmpeg,'-v','error','-xerror','-nostdin','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-f','null','-'], output, remaining(), guard=guard)
         frame = output/'poster.png'
-        run_process([ffmpeg,'-v','error','-nostdin','-n','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-frames:v','1','-threads','1',frame], output, remaining())
-        run_process([sys.executable, Path(__file__).resolve(), '_photo', frame, output, str(budget.pixels)], output, remaining())
+        run_process([ffmpeg,'-v','error','-nostdin','-n','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-frames:v','1','-threads','1',frame], output, remaining(), guard=guard)
+        run_process([sys.executable, Path(__file__).resolve(), '_photo', frame, output, str(budget.pixels)], output, remaining(), guard=guard)
         video_hash = file_hash(target, budget.output_bytes); hashes = []
         with target.open('rb') as stream:
             for chunk in iter(lambda: stream.read(CHUNK_BYTES), b''): hashes.append(sha(chunk))
