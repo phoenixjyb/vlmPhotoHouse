@@ -97,7 +97,9 @@ class PhotoCache:
                 # Snapshot only this requested photo into the private temporary worker
                 # directory. This avoids path substitution between authorization and decode.
                 snapshot = output/'source'
-                actual = lambda: tuple(getattr(os.fstat(opened.fileno()), k) for k in ('st_dev','st_ino','st_size','st_mtime_ns'))
+                def actual():
+                    info = os.fstat(opened.fileno())
+                    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
                 if actual() != tuple(pin): raise Refused(409, 'source_changed')
                 opened.seek(0)
                 with snapshot.open('xb') as target_stream:
@@ -140,7 +142,7 @@ class PhotoCache:
         files = []
         import re
         for path in self.root.glob('*.jpg'):
-            if not re.fullmatch('[0-9a-f]{64}\.jpg',path.name): raise Refused(503,'cache_not_owned')
+            if not re.fullmatch(r'[0-9a-f]{64}\.jpg',path.name): raise Refused(503,'cache_not_owned')
             if len(files) >= 100000: raise Refused()
             pin = identity(path)
             files.append((pin[3], path, pin[2]))
