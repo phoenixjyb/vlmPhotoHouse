@@ -1,6 +1,7 @@
 """Synthetic offline catalog, real synthetic JPEG/MP4 and ASGI; no listeners/models."""
 import asyncio
 import copy
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from native_home_guards import install_windows_asyncio_wakeup
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'backend'), str(ROOT/'scripts')]
@@ -29,6 +31,7 @@ def sha(data): return hashlib.sha256(data).hexdigest()
 
 class CatalogTests(unittest.TestCase):
     def setUp(self):
+        install_windows_asyncio_wakeup(self)
         temp = tempfile.TemporaryDirectory(prefix='home-catalog-'); self.addCleanup(temp.cleanup)
         self.root = Path(temp.name).resolve(); self.media = self.root/'prepared'; self.media.mkdir()
         self.control = self.root/'control.json'
@@ -289,7 +292,7 @@ class ExportTests(unittest.TestCase):
     def test_readonly_all_visible_ids_no_paths_no_copy_and_disabled_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve(); db = root/'synthetic.sqlite'
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn, conn:
                 conn.execute('CREATE TABLE assets (id INTEGER PRIMARY KEY,mime TEXT,width INTEGER,height INTEGER,status TEXT,path TEXT)')
                 conn.executemany('INSERT INTO assets VALUES(?,?,?,?,?,?)', [
                     (1, 'image/jpeg', 8, 8, 'active', '/never/read/secret.jpg'),

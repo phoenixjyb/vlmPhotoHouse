@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch,Mock
+from native_home_guards import install_windows_asyncio_wakeup
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path[:0]=[str(ROOT/'backend'),str(ROOT/'scripts')]
@@ -23,6 +24,7 @@ import home_feed_app
 
 class HomeFeedTests(unittest.TestCase):
     def setUp(self):
+        install_windows_asyncio_wakeup(self)
         temp=tempfile.TemporaryDirectory(prefix='photohouse-home-feed-');self.addCleanup(temp.cleanup)
         self.root=Path(temp.name).resolve();self.media=self.root/'prepared';self.media.mkdir()
         self.path=self.root/'selection.json'

@@ -1,5 +1,6 @@
 """Synthetic-only offline image/video preparation; never use live data or ports."""
 import copy
+from contextlib import closing
 from dataclasses import replace
 import hashlib
 import json
@@ -13,6 +14,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch
+from native_home_guards import install_windows_asyncio_wakeup
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path[:0]=[str(ROOT/'scripts'),str(ROOT/'backend')]
@@ -29,6 +31,7 @@ except ImportError:
 @unittest.skipUnless(Image is not None and shutil.which('ffmpeg') and shutil.which('ffprobe'), 'Requires separate Pillow/FFmpeg preparation tooling')
 class PreparerTests(unittest.TestCase):
     def setUp(self):
+        install_windows_asyncio_wakeup(self)
         tmp=tempfile.TemporaryDirectory(prefix='home-preparer-');self.addCleanup(tmp.cleanup)
         self.root=Path(tmp.name).resolve();self.sources=self.root/'originals';self.sources.mkdir()
         self.db=self.root/'synthetic.sqlite';self.base=self.root/'base';self.workspace=self.root/'workspace'
@@ -40,7 +43,7 @@ class PreparerTests(unittest.TestCase):
         exif=Image.Exif();exif[274]=6;exif[270]='SECRET_DESCRIPTION';exif[271]='SECRET_MAKE'
         im.save(self.photo,exif=exif,quality=98)
         shutil.copyfile(ROOT/'tests/security/fixtures/home-video.mp4',self.video)
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.execute('CREATE TABLE assets(id INTEGER PRIMARY KEY,path TEXT,mime TEXT,width INTEGER,height INTEGER,status TEXT)')
             c.executemany('INSERT INTO assets VALUES(?,?,?,?,?,?)',[(101,str(self.photo),'image/jpeg',80,40,'active'),(102,str(self.video),'video/mp4',320,180,'active')])
         build_home_catalog.export(self.db,self.base,1)
@@ -78,7 +81,7 @@ class PreparerTests(unittest.TestCase):
                         '-metadata:s:v:0','handler_name=SECRET_HANDLER',str(tagged)],check=True,timeout=10)
         original=prep.probe(self.ffprobe,tagged,self.root,self.budget)
         self.assertTrue(any(s.get('side_data_list') for s in original['streams'] if s['codec_type']=='video'))
-        with sqlite3.connect(self.db) as c:c.execute('UPDATE assets SET path=?,mime=? WHERE id=102',(str(tagged),'video/quicktime'))
+        with closing(sqlite3.connect(self.db)) as c, c:c.execute('UPDATE assets SET path=?,mime=? WHERE id=102',(str(tagged),'video/quicktime'))
         state=self.run_prep((102,));item=state['items']['102'];self.assertEqual(item['state'],'ready',item)
         directory=self.workspace/item['directory'];data=(directory/'video.mp4').read_bytes()
         self.assertNotIn(b'SECRET',data)
@@ -91,7 +94,7 @@ class PreparerTests(unittest.TestCase):
         photo=self.sources/'alpha.png';im=Image.new('RGBA',(20,20),(255,0,0,0))
         im.putpixel((10,10),(255,0,0,255));tags=PngImagePlugin.PngInfo();tags.add_text('description','SECRET_PNG')
         im.save(photo,pnginfo=tags,icc_profile=ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
-        with sqlite3.connect(self.db) as c:c.execute('UPDATE assets SET path=?,mime=? WHERE id=101',(str(photo),'image/png'))
+        with closing(sqlite3.connect(self.db)) as c, c:c.execute('UPDATE assets SET path=?,mime=? WHERE id=101',(str(photo),'image/png'))
         state=self.run_prep();item=state['items']['101'];self.assertEqual(item['state'],'ready',item)
         result=self.workspace/item['directory']/'display.jpg';self.assertNotIn(b'SECRET',result.read_bytes())
         with Image.open(result) as output:
@@ -148,11 +151,11 @@ class PreparerTests(unittest.TestCase):
 
     def test_hidden_outside_root_and_symlink_sources_never_decode(self):
         for path,status in [(self.root/'outside.jpg','active'),(self.photo,'hidden')]:
-            with sqlite3.connect(self.db) as c:c.execute('UPDATE assets SET path=?,status=? WHERE id=101',(str(path),status))
+            with closing(sqlite3.connect(self.db)) as c, c:c.execute('UPDATE assets SET path=?,status=? WHERE id=101',(str(path),status))
             with patch.object(prep,'prepare_one',side_effect=AssertionError('No source decode')):
                 self.assertEqual(self.run_prep(retry_failed=True)['items']['101']['state'],'unavailable')
         alias=self.sources/'alias.jpg';alias.symlink_to(self.photo)
-        with sqlite3.connect(self.db) as c:c.execute('UPDATE assets SET path=?,status=? WHERE id=101',(str(alias),'active'))
+        with closing(sqlite3.connect(self.db)) as c, c:c.execute('UPDATE assets SET path=?,status=? WHERE id=101',(str(alias),'active'))
         with patch.object(prep,'prepare_one',side_effect=AssertionError('No source decode')):
             self.assertEqual(self.run_prep(retry_failed=True)['items']['101']['state'],'unavailable')
 

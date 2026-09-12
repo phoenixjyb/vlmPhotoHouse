@@ -1,4 +1,5 @@
 """Synthetic 12MP-photo/1080p-video preparation measurement; no serving or real media."""
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -33,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='home-preparation-measure-') as tmp:
                     '-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','6','-c:v','libx264','-threads','1','-filter_threads','1',
                     '-preset','fast','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',str(video)],check=True,timeout=60)
     db=root/'synthetic.sqlite'
-    with sqlite3.connect(db) as c:
+    with closing(sqlite3.connect(db)) as c, c:
         c.execute('CREATE TABLE assets(id INTEGER PRIMARY KEY,path TEXT,mime TEXT,width INTEGER,height INTEGER,status TEXT)')
         c.executemany('INSERT INTO assets VALUES(?,?,?,?,?,?)',[(101,str(photo),'image/jpeg',4000,3000,'active'),(102,str(video),'video/mp4',1920,1080,'active')])
     before={str(p.name):hashlib.sha256(p.read_bytes()).hexdigest() for p in (db,photo,video)}
