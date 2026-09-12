@@ -1,4 +1,5 @@
 """Synthetic original bytes, actual isolated decoder, no sockets or live database."""
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -93,7 +94,7 @@ class DeliveryTests(unittest.TestCase):
         finally:self.cache.slot.release()
     def test_index_reads_selected_database_rows_without_converting_or_writing_db(self):
         db=self.root/'db.sqlite'
-        with sqlite3.connect(db) as c:
+        with closing(sqlite3.connect(db)) as c, c:
             c.execute('create table assets(id integer,path text,status text)')
             c.executemany('insert into assets values(?,?,?)',[(101,str(self.photo),'active'),(102,str(self.video),'active'),(999,str(self.photo),'active')])
         before=db.read_bytes();output=self.root/'new-index.json'
