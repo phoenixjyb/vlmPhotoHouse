@@ -1,0 +1,122 @@
+{
+  "wrapper_sha256": "0393d826971a59629ed6cc284d469354ce34f17ddcfd7120668f0c58825a5b14",
+  "observation": {
+    "time": "2026-09-12T20:28:18.1028130+08:00",
+    "receipt": {
+      "pid": 3148,
+      "parent_pid": 12076,
+      "session": 0,
+      "console_window": 456982684,
+      "priority": 16384,
+      "principal": "yanbo",
+      "started_at": 1789215984.5278633,
+      "state": "running",
+      "source_commit": "ee5c06faea3d6f62ec356a9f7bb086d3569aea59",
+      "source_files": 323,
+      "startup_pins": {
+        "job.json": "082dd880edbd08b5a500b9d93648be4a32e1c4051f9a6eeceaa0b62bb534b818",
+        "qualification-plan.json": "51ffe86b8578fb439ae973a11f59e4bbcad4b1ec2b54c8bd1cd25033824d25b1",
+        "state.sqlite": "8f11ad7eeb506c40207d7c3c0f66c71d8a62fb3745e8a0e1ee782a1411a371e3"
+      },
+      "mode": "REVIEWED_12_CASE_QUALIFICATION_ONLY",
+      "bulk_started": false
+    },
+    "telemetry": {
+      "time": 1789216076.5231771,
+      "pid": 3148,
+      "status": {
+        "total": 27842,
+        "ready": 5,
+        "counts": {
+          "pending": 27836,
+          "ready": 5,
+          "working": 1
+        },
+        "reasons": {},
+        "all_ready": false,
+        "verified_complete": false,
+        "queue_drained": false,
+        "run_status": "running",
+        "publication": null,
+        "resources": {
+          "samples": 6371,
+          "observed_peak_rss": 655355904,
+          "observed_minimum_available_ram": 4239200256
+        }
+      },
+      "active_resources": {
+        "samples": 103,
+        "observed_peak_rss": 88403968,
+        "observed_minimum_available_ram": 54184239104
+      }
+    },
+    "owned": [
+      {
+        "ProcessId": 3148,
+        "ParentProcessId": 12076,
+        "Name": "python.exe",
+        "SessionId": 0,
+        "Priority": 6,
+        "WorkingSetSize": 88035328,
+        "CreationDate": "/Date(1789215982151)/"
+      },
+      {
+        "ProcessId": 21084,
+        "ParentProcessId": 3148,
+        "Name": "ffmpeg.exe",
+        "SessionId": 0,
+        "Priority": 6,
+        "WorkingSetSize": 383160320,
+        "CreationDate": "/Date(1789216076039)/"
+      }
+    ],
+    "terminals": [],
+    "services": [
+      {
+        "Id": 10460,
+        "StartTime": "/Date(1789082420026)/",
+        "WorkingSet64": 240308224
+      },
+      {
+        "Id": 23284,
+        "StartTime": "/Date(1789083007495)/",
+        "WorkingSet64": 69824512
+      },
+      {
+        "Id": 16020,
+        "StartTime": "/Date(1789208007585)/",
+        "WorkingSet64": 50192384
+      },
+      {
+        "Id": 20448,
+        "StartTime": "/Date(1789208008428)/",
+        "WorkingSet64": 68276224
+      }
+    ],
+    "available_ram_bytes": 53903597568
+  },
+  "synthetic_background_proof": [
+    {
+      "parent_pid": 5348,
+      "parent_session": 0,
+      "parent_console_window": 307233032,
+      "child": {
+        "pid": 20848,
+        "session": 0,
+        "console_window": 307233032,
+        "priority": 16384
+      }
+    },
+    {
+      "terminals": []
+    }
+  ],
+  "qualification_only": true,
+  "source_profile_and_guards_unchanged": true,
+  "notes": [
+    "Background session0 uses a hidden console; this is not console-free.",
+    "Telemetry active_resources describes resumed run; status.resources is the previous completed stop summary until the new run finishes.",
+    "Checkpoint working entry may represent interrupted recovery state while ready files are verified.",
+    "No automatic bulk transition or restart."
+  ]
+}
