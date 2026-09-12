@@ -10,6 +10,7 @@ UI_DIR = Path(__file__).resolve().parents[1] / "ui"
 INDEX_FILE = UI_DIR / "index.html"
 APP_FILE = UI_DIR / "app.js"
 STYLE_FILE = UI_DIR / "styles.css"
+ICON_FILE = UI_DIR / "photohouse-icon.png"
 NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",
@@ -39,6 +40,11 @@ async def ui_js():
 @router.get("/ui/styles.css")
 async def ui_css():
     return _ui_file_response(STYLE_FILE, "text/css")
+
+
+@router.get("/ui/photohouse-icon.png")
+async def ui_icon():
+    return _ui_file_response(ICON_FILE, "image/png")
 
 
 @router.get("/ui/search")

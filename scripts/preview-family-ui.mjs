@@ -15,6 +15,7 @@ const assets = {
   '/ui/': ['index.html', 'text/html; charset=utf-8'],
   '/ui/app.js': ['app.js', 'text/javascript; charset=utf-8'],
   '/ui/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+  '/ui/photohouse-icon.png': ['photohouse-icon.png', 'image/png'],
 };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');

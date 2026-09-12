@@ -1,0 +1,2 @@
+PASS: direct face picker, 501 names/pagination, existing and mock assignment, rename refresh, partial failure/retry, empty list, stale inspector response.
+PASS: whole-image fit at six viewport sizes; portrait/landscape and long bilingual captions; lazy original/actual size; mouse pan/wheel zoom; keyboard/double-click reset; fullscreen; failed/stale originals; partial loading/retry; caption races; focus/keyboard; slideshow; video; bilingual search; retained navigation; advanced mode; empty state.
