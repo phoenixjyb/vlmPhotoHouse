@@ -1,0 +1,66 @@
+{
+  "task": "PH-PHONE-DISCOVERY-HTTP-CANDIDATE-01",
+  "source_commit": "f2c8baf9e77d7d44c65eec9c9ca6228616314760",
+  "base_commit": "9881769baf8182536a0e9fbbe39648d534167970",
+  "status": "CANDIDATE_FOR_ANDROID_INDEPENDENT_REVIEW",
+  "source_input_files": 33,
+  "regression": {
+    "tests": 151,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 16.118
+  },
+  "focused": {
+    "tests": 17,
+    "seconds": 0.772
+  },
+  "extracted": {
+    "focused_tests": 17,
+    "seconds": 0.331,
+    "producer_examples": 14,
+    "producer_exact_match": true,
+    "schema": "Draft 2020-12",
+    "validator": "jsonschema 4.25.1",
+    "valid_id_boundaries": 3,
+    "invalid_id_boundaries": 7,
+    "invalid_response_cases": 5
+  },
+  "inventory": {
+    "method_path_entries": 164,
+    "complete": true,
+    "new_candidate_operations": 2,
+    "legacy_and_standalone_gaps_remain": true
+  },
+  "frozen_inputs": {
+    "protected_phone": {
+      "files": 10,
+      "mismatches": []
+    },
+    "home_discovery": {
+      "files": 19,
+      "mismatches": [
+        {
+          "path": "docs/security/route_capabilities.json",
+          "old_sha256": "13d14aa90b5bd1daca9aa42a1f7a2e2ae5911ed572aa839940a9c5a5ac66fdec",
+          "current_sha256": "0a30e8d005b5e7fa828f261f4c02414e01b6fc5b82686b01e229aea676e33862"
+        }
+      ],
+      "explanation": "18 of 19 old source hashes unchanged. Global inventory intentionally changes for two candidate routes and explicit factory topology. Home serving code, wire schema, examples and old manifest unchanged; this candidate does not repin the Android home contract."
+    }
+  },
+  "boundaries": {
+    "default_application_unchanged": true,
+    "live_runtime_wired": false,
+    "real_data_used_for_http_slice": false,
+    "listener_started": false,
+    "prepared_derivative_capability_added": false,
+    "android_contract_imported": false,
+    "pushed_or_merged": false
+  },
+  "corrections": [
+    "Initial extraction named absent namespace-package __init__.py; corrected explicit source list and reran tests from committed blobs.",
+    "Initial blanket frozen-input assertion correctly detected the intentionally changed global route inventory; documented 18/19 home hashes plus all10 protected hashes unchanged.",
+    "Inventory scanner refused reflective provider method lookup; replaced with explicit provider.get, leaving scanner strict."
+  ]
+}
