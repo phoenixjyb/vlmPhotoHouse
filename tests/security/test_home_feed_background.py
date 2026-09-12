@@ -73,6 +73,19 @@ class BackgroundTests(unittest.TestCase):
             self.assertEqual(len(log.call_args.args[2]), background.RECORD_CHARS)
         self.assertEqual(vars(stream), {'level': logging.INFO})
 
+    def test_rotation_failure_never_writes_redirected_stderr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            handler = background.DiagnosticHandler(Path(directory)/'server.log',
+                maxBytes=1, backupCount=3)
+            self.addCleanup(handler.close)
+            record = logging.LogRecord('synthetic', logging.INFO, '', 0, 'rotation', (), None)
+            with patch.object(handler, 'shouldRollover', return_value=True), patch.object(handler, 'doRollover', side_effect=PermissionError('synthetic')) as rollover, patch.object(sys, 'stderr') as stderr:
+                handler.handle(record)
+                rollover.assert_called_once()
+                stderr.write.assert_not_called()
+                self.assertEqual(handler.failed_records, 1)
+            handler.close()
+
     def test_console_refusal(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); config = root/'config.json'; config.write_text('{}')

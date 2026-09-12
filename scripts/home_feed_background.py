@@ -11,6 +11,7 @@ import importlib.util
 import json
 import logging
 import logging.config
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import sys
@@ -24,6 +25,16 @@ RECORD_CHARS = 2048
 class BoundedFormatter(logging.Formatter):
     def format(self, record):
         return super().format(record)[:RECORD_CHARS]
+
+
+class DiagnosticHandler(RotatingFileHandler):
+    """Never send logging I/O failures back into redirected stderr."""
+    failed_records = 0
+
+    def handleError(self, record):
+        # A permission/full-disk failure must not recurse through DiagnosticStream
+        # or create an unbounded fallback file. Drop and count the failed record.
+        self.failed_records += 1
 
 
 class DiagnosticStream:
@@ -53,7 +64,7 @@ def configure_logging(directory):
         'version': 1, 'disable_existing_loggers': False,
         'formatters': {'bounded': {'()': BoundedFormatter,
             'format': '%(asctime)s %(levelname)s %(name)s %(message)s'}},
-        'handlers': {'bounded': {'class': 'logging.handlers.RotatingFileHandler',
+        'handlers': {'bounded': {'()': DiagnosticHandler,
             'filename': str(directory / 'server.log'), 'maxBytes': LOG_BYTES,
             'backupCount': LOG_BACKUPS, 'encoding': 'utf-8', 'formatter': 'bounded'}},
         'root': {'handlers': ['bounded'], 'level': 'INFO'},
