@@ -106,9 +106,10 @@ acceptance remains pending. The candidate has not been tested through Android
 or a live HTTPS listener, and the current APK will not see the additional video
 until activation.
 
-Further thumbnail coverage needs additional explicitly selected batches and,
-for efficient repeated releases, the reviewed carry-forward helper proposed in
-the source return. Neither bulk preparation nor that helper was implemented here.
+Subsequent source/audit work now provides automatic full-snapshot traversal and
+verified carry-forward; see [the full-coverage return](HOME_FULL_COVERAGE_RETURN.md).
+The next coverage workflow does not require more explicitly selected batches.
+That follow-up has not started real bulk conversion or activated this candidate.
 
 Evidence: [native test log](evidence/home-video-range-native/native-tests.log)
 and [verification receipt](evidence/home-video-range-native/verification.json).

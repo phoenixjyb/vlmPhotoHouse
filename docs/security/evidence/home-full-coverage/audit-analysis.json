@@ -1,0 +1,125 @@
+{
+  "photo": {
+    "count": 23599,
+    "current_candidates": 23331,
+    "candidate_bytes": 78424744298,
+    "candidate_pixels": 220601668080,
+    "candidate_duration_seconds": 0,
+    "max_bytes": 56244807,
+    "max_pixels": 199756800,
+    "max_duration_seconds": 0,
+    "reasons_overlapping": {
+      "pixels_above_40MP": 257,
+      "large_image_header_limit": 26,
+      "photo_format_profile_needed": 1,
+      "animation_profile_needed": 1,
+      "source_missing": 2,
+      "dimensions_unknown": 8,
+      "photo_header_unresolved": 8
+    },
+    "after_budget_or_large_jpeg_profile_review_candidates": 23588,
+    "remaining_review_reasons": {
+      "photo_format_profile_needed": 1,
+      "animation_profile_needed": 1,
+      "source_missing": 2,
+      "dimensions_unknown": 8,
+      "photo_header_unresolved": 8
+    }
+  },
+  "video": {
+    "count": 4243,
+    "current_candidates": 3616,
+    "candidate_bytes": 249189829541,
+    "candidate_pixels": 16607909128,
+    "candidate_duration_seconds": 70059.87874,
+    "max_bytes": 8193114694,
+    "max_pixels": 33177600,
+    "max_duration_seconds": 816.667433,
+    "reasons_overlapping": {
+      "duration_above_60s": 598,
+      "input_above_512MiB": 185,
+      "pixel_format_profile_needed": 1,
+      "duration_unknown": 8,
+      "video_probe_unresolved": 9,
+      "dimensions_unknown": 9
+    },
+    "after_budget_or_large_jpeg_profile_review_candidates": 4233,
+    "remaining_review_reasons": {
+      "pixel_format_profile_needed": 1,
+      "duration_unknown": 8,
+      "video_probe_unresolved": 9,
+      "dimensions_unknown": 9
+    }
+  },
+  "calibration": {
+    "photo_samples": 15,
+    "video_samples": 2,
+    "photo_seconds_per_mpixel": {
+      "min": 0.13698934280639433,
+      "median": 0.1613010657193606,
+      "max": 0.37800387075963654
+    },
+    "photo_bytes_per_mpixel": {
+      "min": 92653.50877192983,
+      "median": 151331.70515097692,
+      "max": 186741.89609236235
+    },
+    "video_seconds_per_media_second": {
+      "min": 3.0535187760044264,
+      "median": 3.583150330617816,
+      "max": 4.112781885231206
+    },
+    "video_bytes_per_media_second": {
+      "min": 381663.4381895176,
+      "median": 1199184.8025367653,
+      "max": 2016706.1668840132
+    },
+    "video_sample_duration_seconds": [
+      1.835011,
+      1.514646
+    ]
+  },
+  "illustrative_extrapolation": {
+    "current_candidates": {
+      "min": {
+        "projected_worker_hours": 67.81923130818247,
+        "projected_derivative_bytes": 47178812787.60172,
+        "workspace_plus_publication_bytes": 94357625575.20345
+      },
+      "median": {
+        "projected_worker_hours": 79.61621161973548,
+        "projected_derivative_bytes": 117398768442.27287,
+        "workspace_plus_publication_bytes": 234797536884.54575
+      },
+      "max": {
+        "projected_worker_hours": 103.20257905378872,
+        "projected_derivative_bytes": 182485763284.50134,
+        "workspace_plus_publication_bytes": 364971526569.0027
+      }
+    },
+    "all_visible": {
+      "min": {
+        "projected_worker_hours": 128.94976095860574,
+        "projected_derivative_bytes": 76136181139.99693,
+        "workspace_plus_publication_bytes": 152272362279.99387
+      },
+      "median": {
+        "projected_worker_hours": 151.35274530835588,
+        "projected_derivative_bytes": 205698188572.87408,
+        "workspace_plus_publication_bytes": 411396377145.74817
+      },
+      "max": {
+        "projected_worker_hours": 186.5714414375456,
+        "projected_derivative_bytes": 329680385480.9212,
+        "workspace_plus_publication_bytes": 659360770961.8424
+      }
+    }
+  },
+  "estimate_caveats": [
+    "15 small-photo and two roughly two-second video samples only",
+    "Short-clip setup overhead is amplified by duration extrapolation",
+    "No longer-video or giant-JPEG conversion benchmark was run",
+    "Header/probe candidates are not decode-ready guarantees",
+    "Allow additional disk for metadata, retained attempts, copies and operator reserve"
+  ]
+}

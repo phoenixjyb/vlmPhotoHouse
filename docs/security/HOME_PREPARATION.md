@@ -1,5 +1,11 @@
 # Offline TV media preparation — source slice
 
+2026-09-12 follow-up: the separate full-library coordinator now provides automatic
+snapshot traversal, verified carry-forward and resumable publication. Read
+[the full-coverage return](HOME_FULL_COVERAGE_RETURN.md) for current commands,
+audit counts and outstanding profiles. The 16-ID workflow below remains the
+legacy preparer interface; it is no longer the only preparation workflow.
+
 `prepare_home_catalog.py` adds resumable preparation for the frozen v2 contract.
 It never starts a listener, changes a service, accesses an inference model, or
 writes the live database/originals. It does not enable an existing publication.
