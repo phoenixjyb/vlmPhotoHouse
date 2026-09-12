@@ -1,5 +1,9 @@
 # PH-HOME-VIDEO-RANGE-01 — source correction and next preparation plan
 
+Subsequently authorized Windows verification and the disabled revision-2 candidate
+are recorded in [the native operational return](HOME_VIDEO_RANGE_NATIVE_RETURN.md).
+The source-only observations below describe the earlier implementation slice.
+
 ## Result and boundary
 
 Source commit: **`50391b6db8a7c41dc276f6ec36c28dfc0b0a934d`**, on
