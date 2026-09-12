@@ -138,6 +138,7 @@ def normalized_probe(value, expected_duration):
     v = videos[0]; duration = float(value['format']['duration'])
     if (v.get('codec_name') != 'h264' or v.get('profile') not in ('Constrained Baseline', 'Baseline', 'Main', 'High')
             or v.get('pix_fmt') != 'yuv420p' or not 0 < int(v.get('level', 999)) <= 41
+            or v.get('color_range') not in (None, 'unknown', 'tv')
             or not 0 < Fraction(v.get('avg_frame_rate', '0')) <= 30
             or v.get('sample_aspect_ratio') not in ('1:1', None)
             or not math.isfinite(duration) or abs(duration-expected_duration) > max(0.25, expected_duration*.02)
@@ -235,10 +236,13 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget):
                 or videos[0].get('color_transfer') in ('smpte2084','arib-std-b67')):
             raise PreparationError('unsupported')
         target = output/'video.mp4'
+        # Convert samples as well as encoder range signaling. format=yuv420p
+        # alone can retain full-range H.264 VUI from a yuvj420p MOV source.
         args = [ffmpeg,'-hide_banner','-loglevel','error','-nostdin','-n','-threads','1','-filter_threads','1','-hwaccel','none','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',source,
                 '-map',f"0:{videos[0]['index']}",'-map','0:a:0?','-map_metadata','-1','-map_metadata:s','-1','-map_chapters','-1','-sn','-dn',
-                '-vf',"scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1,fps=30,format=yuv420p",
+                '-vf',"scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:in_range=auto:out_range=tv,setsar=1,fps=30,format=yuv420p",
                 '-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1',
+                '-color_range','tv',
                 '-c:a','aac','-b:a','128k','-ac','2','-ar','48000',
                 '-metadata:s:v:0','handler_name=VideoHandler','-metadata:s:a:0','handler_name=SoundHandler',
                 '-metadata:s','language=und','-movflags','+faststart','-fs',str(budget.output_bytes),target]

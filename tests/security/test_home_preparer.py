@@ -73,6 +73,55 @@ class PreparerTests(unittest.TestCase):
         self.assertEqual(item['result']['previews']['display']['state'],'ready')
         self.assertEqual(hashlib.sha256(self.video.read_bytes()).hexdigest(),self.before[self.video])
 
+    def check_video_sample_range(self, source_range):
+        # Raw planar bars give an independent numeric oracle, including chroma.
+        # Fixture encoding is lossless; production encoding retains its CRF 23.
+        width,height=320,180
+        limited=((16,71,126,181,235),(128,44,128,212,128),(128,212,128,44,128))
+        full=((0,64,128,192,255),(128,32,128,224,128),(128,224,128,32,128))
+        planes=full if source_range=='pc' else limited
+        frame=b''.join(b''.join(bytes([value])*(w//5) for value in values)*h
+                       for values,w,h in zip(planes,(width,width//2,width//2),(height,height//2,height//2)))
+        raw=self.root/'bars.yuv';raw.write_bytes(frame*15)
+        source=self.sources/'bars.mov'
+        subprocess.run([str(self.ffmpeg),'-v','error','-nostdin','-threads','1',
+                        '-f','rawvideo','-pixel_format','yuv420p','-video_size','320x180','-framerate','30',
+                        '-color_range',source_range,'-colorspace','bt709','-color_primaries','bt709',
+                        '-color_trc','bt709','-i',str(raw),'-c:v','libx264','-threads','1','-crf','0',
+                        '-pix_fmt','yuv420p','-color_range',source_range,'-colorspace','bt709',
+                        '-color_primaries','bt709','-color_trc','bt709',str(source)],check=True,timeout=10)
+        original=prep.probe(self.ffprobe,source,self.root,self.budget)
+        self.assertEqual(original['streams'][0]['color_range'],source_range)
+        def samples(path,pixel_format):
+            # Match the decoder's planar format, avoiding an implicit rescale in
+            # the measurement itself (especially yuvj420p -> yuv420p).
+            result=subprocess.run([str(self.ffmpeg),'-v','error','-nostdin','-threads','1','-i',str(path),
+                                   '-frames:v','1','-c:v','rawvideo','-threads','1','-pix_fmt',pixel_format,
+                                   '-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709',
+                                   '-f','rawvideo','pipe:1'],check=True,timeout=10,stdout=subprocess.PIPE).stdout
+            self.assertEqual(len(result),width*height*3//2)
+            return tuple(tuple(result[offset+(h//2)*w+(2*i+1)*w//10] for i in range(5))
+                         for offset,w,h in ((0,width,height),(width*height,width//2,height//2),
+                                            (width*height*5//4,width//2,height//2)))
+        self.assertEqual(samples(source,original['streams'][0]['pix_fmt']),planes)
+        source_hash=prep.file_hash(source,self.budget.input_bytes)
+        with closing(sqlite3.connect(self.db)) as c, c:
+            c.execute('UPDATE assets SET path=?,mime=? WHERE id=102',(str(source),'video/quicktime'))
+        state=self.run_prep((102,));item=state['items']['102'];self.assertEqual(item['state'],'ready',item)
+        directory=self.workspace/item['directory'];prep.verify_ready(directory,item['result'])
+        output=directory/'video.mp4';value=prep.probe(self.ffprobe,output,directory,self.budget)
+        self.assertEqual(value['streams'][0]['pix_fmt'],'yuv420p')
+        self.assertEqual(value['streams'][0]['color_range'],'tv')
+        for actual,expected in zip(samples(output,'yuv420p'),limited):
+            for a,e in zip(actual,expected):self.assertAlmostEqual(a,e,delta=3)
+        self.assertEqual(prep.file_hash(source,self.budget.input_bytes),source_hash)
+
+    def test_full_range_mov_converts_luma_and_chroma_to_limited_range(self):
+        self.check_video_sample_range('pc')
+
+    def test_limited_range_mov_preserves_luma_and_chroma(self):
+        self.check_video_sample_range('tv')
+
     def test_rotated_video_with_subtitles_and_private_tags_becomes_clean_two_track_mp4(self):
         subtitle=self.root/'synthetic.srt';subtitle.write_text('1\n00:00:00,000 --> 00:00:00,400\nSECRET_SUBTITLE\n')
         tagged=self.sources/'tagged.mov'
@@ -198,6 +247,7 @@ class PreparerTests(unittest.TestCase):
                        lambda x:x['format'].update(tags={'location':'SECRET'}),
                        lambda x:x['streams'][0].update(side_data_list=[{'rotation':90}]),
                        lambda x:x['streams'][0].update(pix_fmt='yuv420p10le'),
+                       lambda x:x['streams'][0].update(color_range='pc'),
                        lambda x:x['format'].update(duration='nan'),
                        lambda x:x['format'].update(duration='5')):
             value=copy.deepcopy(item);mutate(value)
