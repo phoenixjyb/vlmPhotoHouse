@@ -1,5 +1,9 @@
 # Existing home feeds recovered without Terminal
 
+Later update: [TV publication and v9 handoff](HOME_TV_VIDEO_PUBLICATION_RETURN.md)
+records completed qualification and the subsequent v2-only publication update.
+The observations below remain the earlier recovery snapshot.
+
 2026-09-12. The authorized recovery restored the existing v1 and v2 feeds on
 Windows without changing their source, publications, TLS identity or audience.
 Preparation remains stopped at its memory-pressure checkpoint: five ready,
