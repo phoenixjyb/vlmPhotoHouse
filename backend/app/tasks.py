@@ -21,6 +21,9 @@ from .caption_policy import (
     bilingual_caption_issues,
     build_caption_retry_prompt,
     correct_chinese_policy_translation,
+    factual_rewrite_caption_prompt,
+    infant_care_allowed,
+    infant_care_caption_prompt,
     neutralize_person_terms,
     parse_bilingual_caption,
     truncate_caption_text,
@@ -386,6 +389,14 @@ class TaskExecutor:
             return next(c for c in existing if c.user_edited)
         if existing and not force and not replace_generated and len(existing) >= max_variants:
             return existing[-1]
+        allow_infant_care = infant_care_allowed(
+            asset.id, os.getenv('CAPTION_INFANT_CARE_ASSET_IDS', ''),
+        )
+        if allow_infant_care:
+            caption_prompt = infant_care_caption_prompt(caption_prompt)
+        factual_rewrite = payload.get('caption_review') == 'factual_rewrite'
+        if factual_rewrite:
+            caption_prompt = factual_rewrite_caption_prompt(caption_prompt)
         text = ''
         model_name = 'unknown'
         err = None
@@ -427,7 +438,7 @@ class TaskExecutor:
             pass
         bilingual_output = parse_bilingual_caption(text)
         if 'ZH-CN: ...' in caption_prompt:
-            policy_issues = bilingual_caption_issues(text)
+            policy_issues = bilingual_caption_issues(text, allow_infant_care=allow_infant_care)
             try:
                 max_policy_retries = max(0, min(2, int(os.getenv('CAPTION_POLICY_MAX_RETRIES', '2') or '2')))
             except (TypeError, ValueError):
@@ -457,6 +468,7 @@ class TaskExecutor:
                             english,
                             avoid_terms=avoid_terms,
                         ),
+                        allow_infant_care=allow_infant_care,
                     )
                 if translated_correction is not None:
                     text = translated_correction
@@ -471,11 +483,13 @@ class TaskExecutor:
                 except Exception:
                     pass
                 bilingual_output = parse_bilingual_caption(text)
-                policy_issues = bilingual_caption_issues(text)
+                policy_issues = bilingual_caption_issues(text, allow_infant_care=allow_infant_care)
             if policy_issues:
                 asset.caption_processed_at = datetime.utcnow()
                 asset.caption_error_last = (
-                    'caption policy validation failed: ' + bilingual_caption_issue_summary(text)
+                    'caption policy validation failed: ' + bilingual_caption_issue_summary(
+                        text, allow_infant_care=allow_infant_care,
+                    )
                 )
                 session.commit()
                 raise ValueError(asset.caption_error_last)
@@ -483,8 +497,14 @@ class TaskExecutor:
         if bilingual_output and 'zh-cn' not in model_name.lower():
             model_name = f'{model_name}|bilingual-en-zh-cn'
             caption_model_version = 'bilingual-v1'
+        if bilingual_output and allow_infant_care:
+            caption_model_version = 'bilingual-v1-infant-care-v1'
+        if bilingual_output and factual_rewrite:
+            caption_model_version = (caption_model_version or 'bilingual-v1') + '-factual-review-v1'
         if replace_generated:
-            if not model_name.startswith('qwen3-vl-http') or bilingual_caption_issues(text):
+            if not model_name.startswith('qwen3-vl-http') or bilingual_caption_issues(
+                text, allow_infant_care=allow_infant_care,
+            ):
                 raise ValueError('Caption refresh requires validated bilingual Qwen3 output')
             # End the inference-time read transaction, then serialize the write
             # against edits made while the model was generating its response.

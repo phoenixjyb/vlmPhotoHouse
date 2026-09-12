@@ -1,3 +1,44 @@
+# Authorized GitHub integration — 2026-09-12
+
+The user authorized publishing and merging the accumulated backend work before
+further development. Candidate branch is `codex/backend-home-tv-feed`, starting
+at `2383162249b5bfcb79cf391ac87a64d39c58d69a` (64 commits absent from GitHub
+master). GitHub master `b886aca9344c8f9e838f28e2a1b380caad0ec40e` contributed nine
+commits absent from the candidate. A normal merge applied without conflicts;
+no history was rewritten and no other worktree was changed. The caption policy,
+tasks and legacy viewer JS/HTML/CSS match master's bytes after integration.
+
+Validation of the combined source:
+
+- 433 synthetic security tests passed in 97.965 seconds, no failures/errors/skips.
+- 18 synthetic caption-policy tests passed.
+- 14 Chromium protected-UI checks passed through a pipe to in-process ASGI, with
+  synthetic SQLite and external network requests denied. The existing CPU
+  interpreter was substituted into the test runner in memory; source was unchanged.
+- The 162 method/path inventory entries are complete. Known retired/standalone
+  authorization gaps remain recorded; route coverage is not security completion.
+- Outgoing history secret scan reviewed all 11 findings: each was verified against
+  a committed source checksum, an existing Git commit or an Alembic revision.
+  No credential was found by that scan. This is bounded scanner evidence.
+- `git diff --check` passed. No repository workflow exists; hosted PR checks are
+  inspected separately before merge. No ML/GPU/runtime suite or device test ran.
+
+Compatibility: `app.main:app` stays closed by default; protected setup requires the
+explicit database/migration/provisioning/launch workflow. Retired launchers refuse
+before intake/model startup; do not point public ingress at `legacy_main` to
+restore old behavior. Legacy viewer and caption changes are retained in source,
+not automatically exposed through the protected UI. The anonymous LAN TV contract
+remains separate from authenticated phone/library access. The protected phone
+search service remains unmounted. Full-library preparation is implemented but
+has not run on real media; large/long media profiles and device acceptance remain
+open. See [full coverage](HOME_FULL_COVERAGE_RETURN.md) and
+[protected upgrade](PROTECTED_UPGRADE.md).
+
+This integration changes GitHub source only. It does not update Windows releases,
+activate the disabled candidate, restart services, pause captions or alter media,
+access rules, credentials or network settings. Historical authorization/status
+notes below are retained as dated evidence, not current approval requirements.
+
 # Current review update — 2026-09-11
 
 Launch integration now retires six old combined launch/coordinator scripts before

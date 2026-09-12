@@ -1,0 +1,89 @@
+{
+  "date": "2026-09-12",
+  "candidate_before_merge": "2383162249b5bfcb79cf391ac87a64d39c58d69a",
+  "master_integrated": "b886aca9344c8f9e838f28e2a1b380caad0ec40e",
+  "branch": "codex/backend-home-tv-feed",
+  "candidate_commits": 64,
+  "master_commits_integrated": 9,
+  "merge_conflicts": 0,
+  "synthetic_security_tests": 433,
+  "security_seconds": 97.965,
+  "security_failures": 0,
+  "security_errors": 0,
+  "security_skips": 0,
+  "caption_policy_tests": 18,
+  "protected_browser_checks": 14,
+  "inventory_entries": 162,
+  "master_caption_tasks_viewer_bytes_preserved": true,
+  "real_media_used": false,
+  "network_listeners_opened": false,
+  "deployment_performed": false,
+  "secret_scan_review": [
+    {
+      "file": "docs/security/home-catalog-contract-v2.json",
+      "line": 6,
+      "commit": "36378576a4b025b4dd7d911587181aa64d268ba9",
+      "classification": "Existing Git commit ID"
+    },
+    {
+      "file": "docs/security/evidence/home-tv-feed-readiness/bundle.json",
+      "line": 14,
+      "commit": "90c2e2461f480c1ae49daab4ac83c629b44a2148",
+      "classification": "Verified committed source SHA256"
+    },
+    {
+      "file": "docs/security/evidence/home-tv-feed-readiness/bundle.json",
+      "line": 17,
+      "commit": "90c2e2461f480c1ae49daab4ac83c629b44a2148",
+      "classification": "Verified committed source SHA256"
+    },
+    {
+      "file": "docs/security/evidence/home-tv-feed/source-inputs.json",
+      "line": 18,
+      "commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+      "classification": "Verified committed source SHA256"
+    },
+    {
+      "file": "docs/security/home-feed-contract-v1.json",
+      "line": 6,
+      "commit": "e6b2827842b2c0b5223c85208299b60e8a1257f6",
+      "classification": "Existing Git commit ID"
+    },
+    {
+      "file": "docs/security/evidence/android-readiness/caption-budget-candidate.json",
+      "line": 80,
+      "commit": "8d9041450ed796efbc2b17693de5d7b185fbde5b",
+      "classification": "Verified committed source SHA256"
+    },
+    {
+      "file": "docs/security/evidence/android-readiness/caption-budget-candidate.json",
+      "line": 81,
+      "commit": "8d9041450ed796efbc2b17693de5d7b185fbde5b",
+      "classification": "Verified committed source SHA256"
+    },
+    {
+      "file": "tests/security/test_orm_migrations.py",
+      "line": 22,
+      "commit": "8728b7c14e781a4b235629ff2a2c8acb425f38d3",
+      "classification": "Existing Alembic migration revision"
+    },
+    {
+      "file": "tests/security/test_orm_migrations.py",
+      "line": 22,
+      "commit": "0013a8a052c172f49771cba8f8eed786cc7f9cf9",
+      "classification": "Existing Alembic migration revision"
+    },
+    {
+      "file": "tests/security/test_orm_migrations.py",
+      "line": 21,
+      "commit": "04c0bcb4971ba648e473b9041dc693eb0f7e19ae",
+      "classification": "Existing Alembic migration revision"
+    },
+    {
+      "file": "tests/security/test_orm_migrations.py",
+      "line": 22,
+      "commit": "04c0bcb4971ba648e473b9041dc693eb0f7e19ae",
+      "classification": "Existing Alembic migration revision"
+    }
+  ]
+}
