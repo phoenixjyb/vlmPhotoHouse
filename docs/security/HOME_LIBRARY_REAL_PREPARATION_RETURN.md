@@ -1,4 +1,34 @@
-# Real-library preparation — stopped by memory guard
+# Real-library preparation — qualification resumed
+
+2026-09-12, 20:27 +08. The user authorized continuation after memory recovered.
+**The same 12-case qualification has resumed; full-library processing has not
+started.** The earlier memory stop below remains historical evidence.
+
+Available RAM was about 50.7 GiB at both 20:21 and 20:22, similar to the earlier
+post-feed-recovery measurement. A one-shot background process resumed the exact
+revision-3 job, qualification plan and stopped checkpoint, with all 323 source
+hashes verified against `ee5c06faea3d6f62ec356a9f7bb086d3569aea59`. The five ready
+outputs are verified for reuse before remaining qualification work. No profile,
+timeout, resource guard, publication or task trigger changed.
+
+The native runner is PID 3148 (redirector 12076), started at 20:26:24 +08,
+below-normal priority in session 0, independent of the launching SSH connection.
+It uses a hidden session-0 console, **not** a console-free process; a synthetic
+parent/child proof and native observations found no WindowsTerminal/OpenConsole.
+Diagnostics use the reviewed bounded logger from the home-feed recovery. The
+one-shot operator wrapper SHA-256 is
+`0393d826971a59629ed6cc284d469354ce34f17ddcfd7120668f0c58825a5b14`.
+Private process/telemetry receipts are under
+`%LOCALAPPDATA%\PhotoHouseAccess\qualification-resume-20260912` on Windows.
+
+[Resume checkpoint](evidence/home-library-real-preparation/checkpoint-resumed.json)
+distinguishes the current run's active resource samples from the previous stopped
+run's persisted resource summary. The latter is not a new memory-pressure event.
+API, captioning and both recovered home-feed process identities remained unchanged.
+No automatic restart or bulk transition is installed: remaining qualification
+results and the capacity review must pass before a full-library launch.
+
+## Historical memory stop
 
 2026-09-12, 17:07 +08. **Qualification stopped at 16:58:00 +08 with
 `memory_pressure`; full-library preparation has not started.** The earlier
