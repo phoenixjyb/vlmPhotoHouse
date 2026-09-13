@@ -19,7 +19,7 @@ class ClosedBoundary:
         ('GET', '/auth/session'), ('POST', '/auth/logout'),
         ('POST', '/auth/invitations/accept'),
     }
-    UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/search', '/ui/admin'}
+    UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
                 for router in (account_router, media_router, library_router, member_router, ui_router)
