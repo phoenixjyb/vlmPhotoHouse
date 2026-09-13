@@ -5,6 +5,12 @@ services, selected catalog/control, originals, database and captioning were pres
 The configured TV v11 installer is published to the owner's existing read-only SMB
 APK folder. Physical projector installation and playback remain unverified.
 
+**13 September follow-up:** physical v11 testing exposed cache access failures
+under the Limited service account that administrative qualification missed. See
+[the service-account repair and memory-pressure return](TV_MEDIA_RECOVERY_20260913.md)
+for corrected evidence and TV v12 delivery. Earlier sample checks below retain their
+original qualification scope.
+
 ## Exact source and artifact
 
 - Deployed backend: `5269257b4b2a791b59f9181aa83d8e70a5d03b4d`.
