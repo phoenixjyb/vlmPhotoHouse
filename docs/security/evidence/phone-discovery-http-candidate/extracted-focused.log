@@ -1,0 +1,24 @@
+FastAPI TestClient emitted StarletteDeprecationWarning about httpx.
+  from starlette.testclient import TestClient as TestClient  # noqa
+test_body_limits_and_strict_envelope (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_body_limits_and_strict_envelope) ... ok
+test_changed_binding_fingerprint_and_session (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_changed_binding_fingerprint_and_session) ... ok
+test_disconnect_releases_budget (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_disconnect_releases_budget) ... ok
+test_facets_and_search_string_ids_and_coverage (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_facets_and_search_string_ids_and_coverage) ... ok
+test_json_duplicates_nonfinite_surrogates_encoding_and_depth (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_json_duplicates_nonfinite_surrogates_encoding_and_depth) ... ok
+test_membership_rechecked_after_body_receipt (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_membership_rechecked_after_body_receipt) ... ok
+test_methods_shadowed_handlers_default_app_and_runtime_disabled (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_methods_shadowed_handlers_default_app_and_runtime_disabled) ... ok
+test_missing_foreign_expired_revoked_denied_before_provider_or_bad_body (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_missing_foreign_expired_revoked_denied_before_provider_or_bad_body) ... ok
+test_native_cookie_ambiguity_origin_and_duplicate_auth (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_native_cookie_ambiguity_origin_and_duplicate_auth) ... ok
+test_origin_host_https_and_trailing_slash (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_origin_host_https_and_trailing_slash) ... ok
+test_paginated_search_fingerprint_normalization (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_paginated_search_fingerprint_normalization) ... ok
+test_query_duplicate_unknown_invalid_limits_and_missing_binding (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_query_duplicate_unknown_invalid_limits_and_missing_binding) ... ok
+test_service_errors_generic_busy_and_budget (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_service_errors_generic_busy_and_budget) ... ok
+test_stream_limit_mismatch_and_body_deadline (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_stream_limit_mismatch_and_body_deadline) ... ok
+test_unknown_library_and_membership_states (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_unknown_library_and_membership_states) ... ok
+test_untrusted_dimension_metadata_is_null_not_native_overflow (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_untrusted_dimension_metadata_is_null_not_native_overflow) ... ok
+test_web_same_origin_cookie_and_csrf (test_phone_discovery_http.PhoneDiscoveryHttpTests.test_web_same_origin_cookie_and_csrf) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.331s
+
+OK

@@ -27,6 +27,10 @@
   },
   "topology": [
     {
+      "source": "backend/app/access/discovery_transport.py",
+      "expression": "router = APIRouter(route_class=DiscoveryRoute)"
+    },
+    {
       "source": "backend/app/access/library.py",
       "expression": "router = APIRouter(route_class=LibraryRoute)"
     },
@@ -152,6 +156,38 @@
     },
     {
       "source": "backend/app/main.py",
+      "expression": "app.include_router(ui_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.add_middleware(CandidateBoundary, routes=app.routes)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.include_router(account_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.include_router(discovery_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.include_router(library_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.include_router(media_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
+      "expression": "app.include_router(member_router)"
+    },
+    {
+      "source": "backend/app/phone_discovery_candidate.py",
       "expression": "app.include_router(ui_router)"
     },
     {
@@ -370,6 +406,8 @@
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "HEAD", "path": "/home/v3/assets/{asset_id}/preview", "handler": "preview", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "GET", "path": "/home/v3/assets/{asset_id}/video", "handler": "video", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "HEAD", "path": "/home/v3/assets/{asset_id}/video", "handler": "video", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
-    {"source": "backend/app/home_originals.py", "owner": "app", "method": "GET", "path": "/home/v3/catalog", "handler": "catalog", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."}
+    {"source": "backend/app/home_originals.py", "owner": "app", "method": "GET", "path": "/home/v3/catalog", "handler": "catalog", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
+{"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/discovery/v1/facets", "handler": "facets", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
+    {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/discovery/v1/search", "handler": "search", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."}
   ]
 }

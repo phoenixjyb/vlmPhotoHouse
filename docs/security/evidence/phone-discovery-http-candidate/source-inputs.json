@@ -1,0 +1,171 @@
+{
+  "source_commit": "af8e0c8cf749f6e963dd8b196dce9aa842240387",
+  "status": "CANDIDATE_FOR_INDEPENDENT_REVIEW",
+  "files": [
+    {
+      "path": "backend/app/__init__.py",
+      "bytes": 87,
+      "sha256": "f378e6b73a28874ade0c801a7446c03d279a4c7b9b0827f05ebd23183e1a340d"
+    },
+    {
+      "path": "backend/app/access/__init__.py",
+      "bytes": 83,
+      "sha256": "342fc5abcc46c492d5682aaf6cb9697f167399adbdd49675af2a2be78bdd6562"
+    },
+    {
+      "path": "backend/app/access/admission.py",
+      "bytes": 3907,
+      "sha256": "12d77f6193298bafd67cc888412638d85a495028c5c809e17afdb611709f448c"
+    },
+    {
+      "path": "backend/app/access/bootstrap.py",
+      "bytes": 1879,
+      "sha256": "d047446ae23196f8f24ea8c1b93c78b88ea77b1ece1594313595a79a8bba77f0"
+    },
+    {
+      "path": "backend/app/access/boundary.py",
+      "bytes": 3744,
+      "sha256": "0e11c1ff560429fa093ddd91c5ee2ee3297e530eee6ddeb5d181c81c66f8d599"
+    },
+    {
+      "path": "backend/app/access/credentials.py",
+      "bytes": 3053,
+      "sha256": "29af47d7cdc18a5347d635ee9c2e53dc9475aedbf4141c451478cf9fed7d4b2f"
+    },
+    {
+      "path": "backend/app/access/discovery.py",
+      "bytes": 20757,
+      "sha256": "1f7e2d329dfa4b29212819a9532ffbfc9387b4e58275d3d3411728adaae35f82"
+    },
+    {
+      "path": "backend/app/access/discovery_provider.py",
+      "bytes": 2042,
+      "sha256": "b6fa6f4b07a2077b3670b9fe71fbcb76d00a7758d67ec124c147507f162dc0db"
+    },
+    {
+      "path": "backend/app/access/discovery_transport.py",
+      "bytes": 9120,
+      "sha256": "ea0ed43d6cb79138de3f2ec1c940b4cc615bb2a6ffe0792299b590c51faf9c89"
+    },
+    {
+      "path": "backend/app/access/library.py",
+      "bytes": 7329,
+      "sha256": "5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe"
+    },
+    {
+      "path": "backend/app/access/media.py",
+      "bytes": 13439,
+      "sha256": "ed3aa21e138b1959659027cf61b80f44eb90970c3b18606fdca2ee0c22438a95"
+    },
+    {
+      "path": "backend/app/access/members.py",
+      "bytes": 1656,
+      "sha256": "d04fe7891812b79b0f56aefed9974f2e101f11df054c008e927d2da77129adf6"
+    },
+    {
+      "path": "backend/app/access/metadata.py",
+      "bytes": 5313,
+      "sha256": "6a99a5e67d8ff9482d1827220781e823d039aa4cde5ae90296bd802c2572348d"
+    },
+    {
+      "path": "backend/app/access/owner_recovery.py",
+      "bytes": 11192,
+      "sha256": "a978677755d4c16f536000db575b4ea0221266ac00d77b899c69dd20699a1f07"
+    },
+    {
+      "path": "backend/app/access/provisioning.py",
+      "bytes": 8810,
+      "sha256": "2e514fd5403ef3d728c471fcc32778cd8cb206d7b523e62e16ff03697f8e4cd8"
+    },
+    {
+      "path": "backend/app/access/provisioning_apply.py",
+      "bytes": 10514,
+      "sha256": "dd264df482f63e27dcc5c1ea884d32b9b1c085fc91ae7353d3eb002b5c411728"
+    },
+    {
+      "path": "backend/app/access/recovery.py",
+      "bytes": 9341,
+      "sha256": "66e6ca07e55c412ac1521defdbbe6112eabafd7a37d0c8fb28ec80ed2bb9fe97"
+    },
+    {
+      "path": "backend/app/access/runtime.py",
+      "bytes": 4781,
+      "sha256": "b2b7c0695a3e243a67a8156028b0d038a5d6eb4263ec5affa3fe78266a4760e9"
+    },
+    {
+      "path": "backend/app/access/schema.py",
+      "bytes": 3262,
+      "sha256": "2f58f47641a8afe752227d8db23a595db73cf6f81d6dfd0e6bd8a72077caba43"
+    },
+    {
+      "path": "backend/app/access/service.py",
+      "bytes": 18946,
+      "sha256": "c1fc33b39207512fe6f32f52f0564dce8da855f1dd9aee1fd012c4984ab99881"
+    },
+    {
+      "path": "backend/app/access/transport.py",
+      "bytes": 13041,
+      "sha256": "3df4fcfe6797ddee2a26ea34adc202c9aa92b88cf51439ad5c53bc7be37e2e87"
+    },
+    {
+      "path": "backend/app/main.py",
+      "bytes": 1098,
+      "sha256": "451e41dd5863ec5b4035bf25afff92f918cd6f1c62cc6d84c0fe9f7375bfb26a"
+    },
+    {
+      "path": "backend/app/phone_discovery_candidate.py",
+      "bytes": 1718,
+      "sha256": "f7f4ce861105532f7bf2891b7b70d7bce4c9788f50c80c10ce886a5f87010c44"
+    },
+    {
+      "path": "backend/app/routers/ui.py",
+      "bytes": 1763,
+      "sha256": "09130b8c4b6990cca18bcad97913edbd58aebb450ea4ec0d397fba68cbeec150"
+    },
+    {
+      "path": "docs/security/PHONE_DISCOVERY_HTTP_CANDIDATE.md",
+      "bytes": 9302,
+      "sha256": "f1be200bc466fa4155a1a9c2d1cf55b165c917c9fbc067d76965584c9d2370cd"
+    },
+    {
+      "path": "docs/security/phone-discovery-http-candidate-examples.json",
+      "bytes": 20811,
+      "sha256": "8ff6d7213eb2a6efaafc1ce202d9792f90706eb80bacfd87204325fbdb064cd5"
+    },
+    {
+      "path": "docs/security/phone-discovery-http-candidate-schema.json",
+      "bytes": 17944,
+      "sha256": "9b08873c1c65557a23b0aee80f6707e160703c9566ecf0a7f7f6cb3989680bd8"
+    },
+    {
+      "path": "docs/security/route_capabilities.json",
+      "bytes": 127768,
+      "sha256": "0a30e8d005b5e7fa828f261f4c02414e01b6fc5b82686b01e229aea676e33862"
+    },
+    {
+      "path": "scripts/build_phone_discovery_http_fixture.py",
+      "bytes": 3218,
+      "sha256": "33e38cb8ffff5725fff082876bce6b88b0d5b566e064893e4c1e87a7c8cb760b"
+    },
+    {
+      "path": "scripts/check_phone_discovery_http_candidate.py",
+      "bytes": 2294,
+      "sha256": "f3e8e895f1e4d38b6167082a809adfa6bbca1c130dba23895b748a1c4f27d578"
+    },
+    {
+      "path": "scripts/security_inventory.py",
+      "bytes": 12941,
+      "sha256": "c75a65948873a11c61e9b1c0a49da8e15dde1316a93d358504dc9114cb7706d1"
+    },
+    {
+      "path": "tests/security/phone_discovery_fixture.py",
+      "bytes": 4685,
+      "sha256": "42d2b184ec985d3a206434cbaaeaed18188edb4197114af14313b72104bbadb2"
+    },
+    {
+      "path": "tests/security/test_phone_discovery_http.py",
+      "bytes": 13580,
+      "sha256": "ebc980f86e818d73592eb182527a6add0a2656bb56f9caeaa78bc43be49bdb45"
+    }
+  ]
+}
