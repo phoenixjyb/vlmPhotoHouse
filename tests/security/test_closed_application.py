@@ -54,7 +54,7 @@ class ImportIsolationTests(unittest.TestCase):
                 main = importlib.import_module(prefix + '.main')
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
-                self.assertEqual(len(main.app.routes), 25)
+                self.assertEqual(len(main.app.routes), 26)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)

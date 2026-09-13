@@ -9,7 +9,7 @@ UI_DIR = Path(__file__).resolve().parents[1] / "ui" / "access"
 INDEX_FILE = UI_DIR / "index.html"
 APP_FILE = UI_DIR / "app.js"
 STYLE_FILE = UI_DIR / "styles.css"
-ICON_FILE = UI_DIR / "photohouse-icon.png"
+ICON_FILE = UI_DIR.parent / "photohouse-icon.png"
 NO_CACHE_HEADERS = {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
     "Pragma": "no-cache",

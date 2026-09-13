@@ -17,7 +17,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 FILES = tuple(sorted([
     'backend/app/__init__.py', 'backend/app/main.py', 'backend/app/db.py',
-    'backend/app/routers/ui.py',
+    'backend/app/routers/ui.py', 'backend/app/ui/photohouse-icon.png',
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
