@@ -21,9 +21,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 (async () => {
   const server = http.createServer(async (req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
-    const name = { '/ui': 'index.html', '/ui/': 'index.html', '/ui/app.js': 'app.js', '/ui/styles.css': 'styles.css' }[pathname];
+    const name = { '/ui': 'index.html', '/ui/': 'index.html', '/ui/app.js': 'app.js', '/ui/styles.css': 'styles.css', '/ui/photohouse-icon.png': 'photohouse-icon.png' }[pathname];
     if (!name) { res.writeHead(404); res.end(); return; }
-    res.setHeader('Content-Type', { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }[path.extname(name)]);
+    res.setHeader('Content-Type', { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' }[path.extname(name)]);
     res.end(await fs.readFile(path.join(ui, name)));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -90,8 +90,17 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     });
     const base = `http://127.0.0.1:${server.address().port}/ui`;
     await page.goto(base);
+    await page.locator('.brand-mark').evaluate(img => img.decode());
+    assert.equal(await page.locator('.brand-mark').evaluate(img => img.naturalWidth), 1254);
+    assert.equal(await page.locator('link[rel="icon"]').getAttribute('href'), '/ui/photohouse-icon.png');
     await page.locator('#btn-home-retry').waitFor();
     assert.equal(await page.locator('#home-recent-grid .asset-card').count(), 3, 'Photos survive album API failure');
+    await page.evaluate(() => document.fonts.ready);
+    if (artifacts) await page.screenshot({ path: path.join(artifacts, 'brand-desktop.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.locator('.brand-mark').evaluate(img => img.getBoundingClientRect().width), 36);
+    if (artifacts) await page.screenshot({ path: path.join(artifacts, 'brand-mobile.png') });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     failStories = false;
     await page.locator('#btn-home-retry').click();
     await page.locator('#home-story-list .home-story-row').waitFor();
