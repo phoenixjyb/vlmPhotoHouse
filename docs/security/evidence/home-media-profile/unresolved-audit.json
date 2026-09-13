@@ -1,0 +1,21 @@
+{
+  "scope": "existing private audit only; no new real-media header/decode operation",
+  "total_unresolved": 21,
+  "mutually_exclusive_groups": {
+    "eight_frame_MPO_with_png_extension": 1,
+    "video_pixel_format_not_reported": 1,
+    "empty_video": 5,
+    "video_probe_JSON_incomplete_or_invalid": 1,
+    "missing_photo_original": 2,
+    "4096_byte_photo_header_unresolved": 4,
+    "sub_1KiB_photo_header_error": 4,
+    "4096_byte_video_header_unresolved": 3
+  },
+  "investigation_limits": [
+    "No claim that tiny files are recoverable or proven placeholders.",
+    "The 16 MB video JSON failure may be the original bounded probe; corruption is not established.",
+    "The 5 MB H264 video had no reported pixel format; do not invent one.",
+    "MPO representative-frame policy and HDR conversion remain deferred."
+  ],
+  "new_policy_gap": "Large progressive JPEGs needing reduced decoding remain deferred; old audit did not record progressive flags."
+}

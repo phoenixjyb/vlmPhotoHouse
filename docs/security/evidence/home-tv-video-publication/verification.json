@@ -1,0 +1,679 @@
+{
+  "build": {
+    "status": "VERIFIED_DISABLED_CLONE",
+    "revision": 2,
+    "total": 27842,
+    "ready_photos": 15,
+    "ready_videos": 2,
+    "previous_ready_exactly_preserved": 16,
+    "originals_and_metadata_rechecked": 17,
+    "previews_decoded": 34,
+    "candidate_catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4",
+    "source_candidate_control_sha256": "43bcc997650e2ce5c4f6848829702292b29af6ae70987638332d4e18c87ed211",
+    "clone_control_disabled_sha256": "43bcc997650e2ce5c4f6848829702292b29af6ae70987638332d4e18c87ed211",
+    "config_before_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+    "config_candidate_sha256": "fcb0701d894bbe321a7276e1b2c2625d808307fb223752e49f2834f5d442d21c",
+    "clone_bytes": 26589028,
+    "resources": {
+      "samples": 74,
+      "observed_peak_rss": 94699520,
+      "observed_minimum_available_ram": 54070321152
+    },
+    "video_metadata": [
+      {
+        "duration_ms": 1514,
+        "bytes": 383496
+      },
+      {
+        "duration_ms": 1856,
+        "bytes": 3295006
+      }
+    ]
+  },
+  "probe": {
+    "synthetic_peer_asgi_real_prepared_media": true,
+    "production_listener": false,
+    "disabled_clone_refused": true,
+    "ready": 17,
+    "photo_heads": 34,
+    "video_checks": [
+      {
+        "bytes": 383496,
+        "duration_ms": 1514,
+        "range_requests": 6,
+        "full_sha256_passed": true,
+        "head_200": true,
+        "eof_416": true,
+        "stale_revision_409": true
+      },
+      {
+        "bytes": 3295006,
+        "duration_ms": 1856,
+        "range_requests": 51,
+        "full_sha256_passed": true,
+        "head_200": true,
+        "eof_416": true,
+        "stale_revision_409": true
+      }
+    ],
+    "closed_routes_and_peer_spoof_denied": true
+  },
+  "publication": {
+    "revision": 2,
+    "enabled": true,
+    "ready_photos": 15,
+    "ready_videos": 2,
+    "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4",
+    "config_sha256": "fcb0701d894bbe321a7276e1b2c2625d808307fb223752e49f2834f5d442d21c",
+    "enabled_control_sha256": "65480031086cb92d4435ae77edc825013d03e4b158731a7bf4d81e0cee9b40c2",
+    "original_candidate_unchanged": true
+  },
+  "activation": {
+    "time": "2026-09-12T21:19:45.4132447+08:00",
+    "host": "JIAFAMILY",
+    "revision": 2,
+    "task_definition_unchanged": true,
+    "firewall_unchanged": true,
+    "other_runtime_identities_unchanged": true,
+    "listener": {
+      "LocalAddress": "192.168.0.108",
+      "LocalPort": 8445,
+      "OwningProcess": 8580
+    },
+    "receipt": {
+      "pid": 8580,
+      "parent_pid": 6864,
+      "started_at": 1789219175.564067,
+      "console_window": 0,
+      "kind": "v2",
+      "config_sha256": "fcb0701d894bbe321a7276e1b2c2625d808307fb223752e49f2834f5d442d21c",
+      "log_max_bytes": 1048576,
+      "log_backups": 3,
+      "state": "starting"
+    },
+    "chain": [
+      {
+        "ProcessId": 8580,
+        "ParentProcessId": 6864,
+        "Name": "pythonw.exe",
+        "SessionId": 2
+      },
+      {
+        "ProcessId": 6864,
+        "ParentProcessId": 2948,
+        "Name": "pythonw.exe",
+        "SessionId": 2
+      },
+      {
+        "ProcessId": 2948,
+        "ParentProcessId": 1564,
+        "Name": "svchost.exe",
+        "SessionId": 0
+      },
+      {
+        "ProcessId": 1564,
+        "ParentProcessId": 1420,
+        "Name": "services.exe",
+        "SessionId": 0
+      },
+      {
+        "ProcessId": 1420,
+        "ParentProcessId": 1300,
+        "Name": "wininit.exe",
+        "SessionId": 0
+      }
+    ],
+    "available_ram_bytes": 54090301440
+  },
+  "live-probe": {
+    "live_probes": [
+      {
+        "kind": "v1",
+        "port": 8444,
+        "trusted_hostname_tls": true,
+        "tls": "TLSv1.3",
+        "peer": "192.168.0.108 (not allowlisted)",
+        "checks": [
+          {
+            "method": "GET",
+            "case": "feed_or_catalog",
+            "status": 403
+          },
+          {
+            "method": "HEAD",
+            "case": "photo_head",
+            "status": 403
+          },
+          {
+            "method": "GET",
+            "case": "closed_route",
+            "status": 403
+          },
+          {
+            "method": "GET",
+            "case": "spoofed_peer",
+            "status": 403
+          }
+        ]
+      },
+      {
+        "kind": "v2",
+        "port": 8445,
+        "trusted_hostname_tls": true,
+        "tls": "TLSv1.3",
+        "peer": "192.168.0.108 (not allowlisted)",
+        "checks": [
+          {
+            "method": "GET",
+            "case": "feed_or_catalog",
+            "status": 403
+          },
+          {
+            "method": "HEAD",
+            "case": "photo_head",
+            "status": 403
+          },
+          {
+            "method": "GET",
+            "case": "closed_route",
+            "status": 403
+          },
+          {
+            "method": "GET",
+            "case": "spoofed_peer",
+            "status": 403
+          },
+          {
+            "method": "GET",
+            "case": "range",
+            "status": 403
+          }
+        ]
+      }
+    ],
+    "allowed_lan_client_acceptance": false
+  },
+  "qualification_complete": {
+    "observed_at": "2026-09-12T21:13:44.6336395+08:00",
+    "receipt": {
+      "pid": 3148,
+      "parent_pid": 12076,
+      "session": 0,
+      "console_window": 456982684,
+      "priority": 16384,
+      "principal": "yanbo",
+      "started_at": 1789215984.5278633,
+      "state": "finished",
+      "source_commit": "ee5c06faea3d6f62ec356a9f7bb086d3569aea59",
+      "source_files": 323,
+      "startup_pins": {
+        "job.json": "082dd880edbd08b5a500b9d93648be4a32e1c4051f9a6eeceaa0b62bb534b818",
+        "qualification-plan.json": "51ffe86b8578fb439ae973a11f59e4bbcad4b1ec2b54c8bd1cd25033824d25b1",
+        "state.sqlite": "8f11ad7eeb506c40207d7c3c0f66c71d8a62fb3745e8a0e1ee782a1411a371e3"
+      },
+      "mode": "REVIEWED_12_CASE_QUALIFICATION_ONLY",
+      "bulk_started": false,
+      "result": {
+        "total": 27842,
+        "ready": 12,
+        "counts": {
+          "pending": 27830,
+          "ready": 12
+        },
+        "reasons": {},
+        "all_ready": false,
+        "verified_complete": false,
+        "queue_drained": false,
+        "run_status": "qualification_complete",
+        "publication": null,
+        "resources": {
+          "samples": 2578,
+          "observed_peak_rss": 406441984,
+          "observed_minimum_available_ram": 52786204672
+        }
+      },
+      "finished_at": 1789218561.2873325
+    },
+    "cases": [
+      {
+        "case": "case-01",
+        "roles": [
+          "largest_photo_pixels",
+          "largest_portrait"
+        ],
+        "kind": "photo",
+        "width": 12240,
+        "height": 16320,
+        "bytes": 11347811,
+        "duration": null,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 1.735,
+        "origin": "prepared",
+        "normalized_bytes": 315677,
+        "attempt_bytes": 316394,
+        "decode": {
+          "format": "JPEG",
+          "source_size": [
+            16320,
+            12240
+          ],
+          "decoded_size": [
+            4080,
+            3060
+          ],
+          "subsampling": 4,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-02",
+        "roles": [
+          "first_above_40mp"
+        ],
+        "kind": "photo",
+        "width": 11040,
+        "height": 3664,
+        "bytes": 11235576,
+        "duration": null,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 1.625,
+        "origin": "prepared",
+        "normalized_bytes": 768070,
+        "attempt_bytes": 768786,
+        "decode": {
+          "format": "JPEG",
+          "source_size": [
+            11040,
+            3664
+          ],
+          "decoded_size": [
+            5520,
+            1832
+          ],
+          "subsampling": 2,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-03",
+        "roles": [
+          "widest_aspect"
+        ],
+        "kind": "photo",
+        "width": 19024,
+        "height": 1120,
+        "bytes": 5787493,
+        "duration": null,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 1.031,
+        "origin": "prepared",
+        "normalized_bytes": 211190,
+        "attempt_bytes": 211902,
+        "decode": {
+          "format": "JPEG",
+          "source_size": [
+            19024,
+            1120
+          ],
+          "decoded_size": [
+            9512,
+            560
+          ],
+          "subsampling": 2,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-04",
+        "roles": [
+          "longest_video",
+          "largest_video",
+          "hevc_video"
+        ],
+        "kind": "video",
+        "width": 7680,
+        "height": 4320,
+        "bytes": 8193114694,
+        "duration": 816.667433,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 5653.563,
+        "origin": "prepared",
+        "normalized_bytes": 1099456511,
+        "attempt_bytes": 1103914904,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            1920,
+            1080
+          ],
+          "decoded_size": [
+            1920,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-05",
+        "roles": [
+          "first_above_60s"
+        ],
+        "kind": "video",
+        "width": 4320,
+        "height": 960,
+        "bytes": 63285429,
+        "duration": 60.068,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 42.969,
+        "origin": "prepared",
+        "normalized_bytes": 5929542,
+        "attempt_bytes": 6328765,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            1920,
+            426
+          ],
+          "decoded_size": [
+            1920,
+            426
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-06",
+        "roles": [
+          "first_above_512mib"
+        ],
+        "kind": "video",
+        "width": 7680,
+        "height": 4320,
+        "bytes": 539078499,
+        "duration": 53.931367,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 351.141,
+        "origin": "prepared",
+        "normalized_bytes": 5403100,
+        "attempt_bytes": 5851454,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            608,
+            1080
+          ],
+          "decoded_size": [
+            608,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-07",
+        "roles": [
+          "highest_resolution_video"
+        ],
+        "kind": "video",
+        "width": 7680,
+        "height": 4320,
+        "bytes": 115168761,
+        "duration": 11.6936,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 84.125,
+        "origin": "prepared",
+        "normalized_bytes": 10542856,
+        "attempt_bytes": 13106831,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            1920,
+            1080
+          ],
+          "decoded_size": [
+            1920,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-08",
+        "roles": [
+          "full_range_video"
+        ],
+        "kind": "video",
+        "width": 1920,
+        "height": 1080,
+        "bytes": 1668651815,
+        "duration": 664.074958,
+        "status": "ready",
+        "reason": null,
+        "attempts": 2,
+        "preparation_seconds": 2416.891,
+        "origin": "prepared",
+        "normalized_bytes": 711183637,
+        "attempt_bytes": 713199881,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            1920,
+            1080
+          ],
+          "decoded_size": [
+            1920,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-09",
+        "roles": [
+          "verified_photo_carry"
+        ],
+        "kind": "photo",
+        "width": 4000,
+        "height": 2252,
+        "bytes": 2630321,
+        "duration": null,
+        "status": "ready",
+        "reason": null,
+        "attempts": 2,
+        "preparation_seconds": 1.297,
+        "origin": "carry",
+        "normalized_bytes": 1328039,
+        "attempt_bytes": 1328751
+      },
+      {
+        "case": "case-10",
+        "roles": [
+          "verified_video_carry"
+        ],
+        "kind": "video",
+        "width": 1920,
+        "height": 1080,
+        "bytes": 2057892,
+        "duration": 1.514646,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 4.625,
+        "origin": "carry",
+        "normalized_bytes": 578085,
+        "attempt_bytes": 579157
+      },
+      {
+        "case": "case-11",
+        "roles": [
+          "diagnostic_probe_case"
+        ],
+        "kind": "video",
+        "width": 1920,
+        "height": 1080,
+        "bytes": 5155929,
+        "duration": 3.010867,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 4.656,
+        "origin": "prepared",
+        "normalized_bytes": 1019798,
+        "attempt_bytes": 1942793,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            608,
+            1080
+          ],
+          "decoded_size": [
+            608,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      },
+      {
+        "case": "case-12",
+        "roles": [
+          "diagnostic_probe_case"
+        ],
+        "kind": "video",
+        "width": null,
+        "height": null,
+        "bytes": 16066536,
+        "duration": 8.664622,
+        "status": "ready",
+        "reason": null,
+        "attempts": 1,
+        "preparation_seconds": 11.063,
+        "origin": "prepared",
+        "normalized_bytes": 2354810,
+        "attempt_bytes": 3316192,
+        "decode": {
+          "format": "PNG",
+          "source_size": [
+            608,
+            1080
+          ],
+          "decoded_size": [
+            608,
+            1080
+          ],
+          "subsampling": 1,
+          "reason": null
+        }
+      }
+    ],
+    "free_disk_bytes": 5243270696960,
+    "bulk_started": false,
+    "published": false
+  },
+  "android": {
+    "source_commit": "0a4291ec2b02ec0668e823eb7d2d660484e63327",
+    "base": "eb59766d41b47864a6792f50a0c8bae240843774",
+    "artifact": "PhotoHouse-TV-v9.apk",
+    "bytes": 10411068,
+    "sha256": "6535fa69e852671443f943be85bef1f54bb1b494f993a3299b84befa55df6c82",
+    "package": "dev.photohouse.tv",
+    "version_code": 9,
+    "version_name": "0.9-tv-catalog-dev",
+    "min_sdk": 26,
+    "target_sdk": 34,
+    "signer_sha256": "56d7591b2b6c2538d506d1fe51327444f2307736cb12f5beefa08f1c410d6d28",
+    "native_abis": [],
+    "catalog_version": 2,
+    "discovery_enabled": false,
+    "private_origin_configured": true,
+    "app_lan_mapping_configured": true,
+    "test_assets_packaged": false,
+    "physical_installation": false,
+    "tests": {
+      "home_core_jvm": 85,
+      "tv_jvm": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "ui": {
+        "1.0": {
+          "passed": 25,
+          "seconds": 275.71
+        },
+        "2.0": {
+          "passed": 25,
+          "seconds": 319.173
+        }
+      }
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": [
+        "OldTargetApi",
+        "DiscouragedApi",
+        "MonochromeLauncherIcon"
+      ],
+      "information_count": 4
+    },
+    "contract_checks": {
+      "frozen_phone": true,
+      "home_v1": true,
+      "catalog_v2": true,
+      "discovery_v1": true,
+      "tv_boundaries": true,
+      "backend_v2_schema_and_example_exact_match": true
+    },
+    "emulator": {
+      "avd": "Medium_Phone_API_36.0",
+      "api": 36,
+      "serial": "emulator-5580",
+      "landscape": true,
+      "physical_tv": false,
+      "configured_apk_install_and_cold_start": "PASS",
+      "cold_start_total_ms": 5675,
+      "configured_start_network_disabled": true
+    },
+    "limitations": [
+      "No physical projector installation or playback/audio acceptance.",
+      "No actual approved-peer LAN media access during this APK packaging task.",
+      "Private server settings are excluded from Git.",
+      "Discovery remains disabled pending its approved backend.",
+      "Enlarged gallery uses scrolling; controls are not all simultaneously visible.",
+      "No push or merge; no phone APK built in this slice."
+    ],
+    "backend_publication": {
+      "observed_at": "2026-09-12T21:20:51.2004005+08:00",
+      "revision": 2,
+      "enabled": true,
+      "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4",
+      "config_and_control_hashes_match_owner": true,
+      "live_v2_pid": 8580,
+      "trusted_tls_unapproved_peer_status": 403,
+      "v1_api_caption_identities_preserved": true,
+      "ready_photos_backend_owner_report": 15,
+      "ready_videos_backend_owner_report": 2,
+      "total_assets_backend_owner_report": 27842,
+      "physical_allowed_peer_access": false
+    },
+    "evidence_commit": "db7d8344d922409b6b3db5b8e9511c1c02748685"
+  }
+}

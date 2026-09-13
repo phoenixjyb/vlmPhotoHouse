@@ -6,11 +6,10 @@ publication from the fixed base catalog. No service, network, jobs or DB writes.
 """
 import argparse
 from contextlib import closing, contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from fractions import Fraction
 import hashlib
 import importlib.metadata
-import io
 import json
 import math
 import os
@@ -22,7 +21,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import warnings
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'backend'))
@@ -43,6 +41,21 @@ class Budget:
     asset_seconds: int = 180
     process_seconds: int = 120
     reserve_bytes: int = 2 * 1024**3
+    hash_seconds: int = 60
+    probe_seconds: int = 20
+    decode_seconds: int = 120
+    jpeg_source_pixels: int = 0  # Zero inherits the ordinary source-pixel budget.
+    decoded_pixels: int = 40000000
+
+
+MEDIA_WORKER = Path(__file__).with_name('home_media_worker.py')
+PROFILES = {
+    'pilot': Budget(),
+    'library-sdr-v1': Budget(input_bytes=8*1024**3, output_bytes=4*1024**3,
+        duration_seconds=900, process_seconds=5400, asset_seconds=7200,
+        hash_seconds=900, probe_seconds=30, decode_seconds=1800,
+        jpeg_source_pixels=256000000, decoded_pixels=16000000),
+}
 
 
 def canonical(path):
@@ -54,16 +67,40 @@ def canonical(path):
 def sha(data): return hashlib.sha256(data).hexdigest()
 
 
-def file_hash(path, maximum):
+def file_fingerprint(path, maximum, *, seconds=60, guard=None, chunks=False):
+    """Supervise even stalled native reads; never hash media on the coordinator."""
     pin = identity(path)
     if not 0 < pin[2] <= maximum: raise PreparationError('unsupported')
-    total = hashlib.sha256(); start = time.monotonic()
-    with path.open('rb') as stream:
-        for data in iter(lambda: stream.read(CHUNK_BYTES), b''):
-            if time.monotonic()-start > 60: raise PreparationError()
-            total.update(data)
-    if identity(path) != pin: raise PreparationError()
-    return total.hexdigest()
+    try:
+        raw = run_process([sys.executable, MEDIA_WORKER, 'hash', path, maximum,
+                           'chunks' if chunks else 'digest'], path.parent,
+                          Budget(process_seconds=seconds, reserve_bytes=0), guard=guard)
+    except PreparationError as error:
+        if error.reason == 'process_timeout': raise PreparationError('hash_timeout') from error
+        raise
+    value = json.loads(raw, object_pairs_hook=unique)
+    if (identity(path) != pin or value['bytes'] != pin[2]
+            or not re.fullmatch('[0-9a-f]{64}', value['sha256'])
+            or len(value['chunks']) != (math.ceil(pin[2]/CHUNK_BYTES) if chunks else 0)
+            or any(not re.fullmatch('[0-9a-f]{64}', h) for h in value['chunks'])):
+        raise PreparationError()
+    return value
+
+
+def file_hash(path, maximum, *, seconds=60, guard=None):
+    return file_fingerprint(path, maximum, seconds=seconds, guard=guard)['sha256']
+
+
+def photo_info(source, directory, budget, guard=None, output=None):
+    args = [sys.executable, MEDIA_WORKER, 'photo' if output else 'photo-info', source,
+            json.dumps(asdict(budget))]
+    if output: args += [output, json.dumps(LIMITS)]
+    raw = run_process(args, directory, replace(budget, process_seconds=min(
+        budget.process_seconds, budget.decode_seconds if output else budget.probe_seconds)), guard=guard)
+    value = json.loads(raw, object_pairs_hook=unique)
+    if output and value['reason']: raise PreparationError('unsupported')
+    if output: atomic_json(output/'photo.decode.json', value)
+    return value
 
 
 def atomic_json(path, value):
@@ -108,13 +145,18 @@ def run_process(args, directory, budget, output=None, guard=None):
         try:
             while process.poll() is None:
                 if guard is not None: guard(process)
-                if (time.monotonic()-start > budget.process_seconds
-                        or os.fstat(stdout.fileno()).st_size > 2*1024**2
+                if time.monotonic()-start > budget.process_seconds: raise PreparationError('process_timeout')
+                if (os.fstat(stdout.fileno()).st_size > 2*1024**2
                         or os.fstat(stderr.fileno()).st_size > 65536
                         or (output is not None and output.exists() and output.stat().st_size > budget.output_bytes)
                         or shutil.disk_usage(directory).free < budget.reserve_bytes):
                     raise PreparationError()
                 time.sleep(0.05)
+            if guard is not None: guard(process)
+            if time.monotonic()-start > budget.process_seconds: raise PreparationError('process_timeout')
+            if ((output is not None and output.exists() and output.stat().st_size > budget.output_bytes)
+                    or shutil.disk_usage(directory).free < budget.reserve_bytes):
+                raise PreparationError()
             if process.returncode: raise PreparationError()
             if os.fstat(stdout.fileno()).st_size > 2*1024**2 or os.fstat(stderr.fileno()).st_size > 65536:
                 raise PreparationError()
@@ -126,8 +168,9 @@ def run_process(args, directory, budget, output=None, guard=None):
 
 def probe(binary, source, directory, budget, guard=None):
     raw = run_process([binary, '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mov', '-enable_drefs', '0', '-use_absolute_path', '0', '-export_all', '1', '-export_xmp', '1', '-show_streams', '-show_format', '-show_chapters',
-                       '-of', 'json', source], directory, budget, guard=guard)
-    return json.loads(raw, object_pairs_hook=unique)
+                       '-of', 'json', source], directory, replace(budget,process_seconds=min(budget.process_seconds,budget.probe_seconds)), guard=guard)
+    try: return json.loads(raw, object_pairs_hook=unique)
+    except (ValueError,UnicodeError) as error: raise PreparationError('probe_metadata_invalid') from error
 
 
 def normalized_probe(value, expected_duration):
@@ -142,7 +185,7 @@ def normalized_probe(value, expected_duration):
             or v.get('color_range') not in (None, 'unknown', 'tv')
             or not 0 < Fraction(v.get('avg_frame_rate', '0')) <= 30
             or v.get('sample_aspect_ratio') not in ('1:1', None)
-            or not math.isfinite(duration) or abs(duration-expected_duration) > max(0.25, expected_duration*.02)
+            or not math.isfinite(duration) or abs(duration-expected_duration) > max(0.25, min(1.0, expected_duration*.02))
             or any(a.get('codec_name') != 'aac' or a.get('profile') != 'LC' for a in audios)):
         raise PreparationError()
     # Standard muxer/codec descriptors only. No user tags, timestamps, GPS or display matrix.
@@ -179,31 +222,10 @@ def faststart(path):
 
 
 def photo_worker(source, output, pixel_limit):
-    from PIL import Image, ImageOps, ImageCms
-    Image.MAX_IMAGE_PIXELS = pixel_limit
-    warnings.simplefilter('error', Image.DecompressionBombWarning)
-    with Image.open(source) as image:
-        if image.format not in ('JPEG', 'PNG') or getattr(image, 'n_frames', 1) != 1:
-            raise PreparationError('unsupported')
-        if image.width*image.height > pixel_limit: raise PreparationError('unsupported')
-        image.load(); upright = ImageOps.exif_transpose(image)
-        icc = image.info.get('icc_profile')
-        if icc:
-            if len(icc)>1024**2: raise PreparationError('unsupported')
-            upright=ImageCms.profileToProfile(upright,ImageCms.ImageCmsProfile(io.BytesIO(icc)),
-                ImageCms.createProfile('sRGB'),outputMode='RGBA' if 'A' in upright.mode else 'RGB')
-        # Flatten alpha on black. Avoid full-size alpha buffers for opaque originals.
-        if 'A' in upright.mode or 'transparency' in upright.info:
-            rgba=upright.convert('RGBA');canvas=Image.new('RGBA',rgba.size,(0,0,0,255))
-            canvas.alpha_composite(rgba);rgb=canvas.convert('RGB')
-        else: rgb=upright.convert('RGB')
-        for variant, (edge, pixels, maximum) in LIMITS.items():
-            derivative = rgb.copy()
-            factor = min(1, edge/derivative.width, edge/derivative.height,
-                         math.sqrt(pixels/(derivative.width*derivative.height)))
-            derivative.thumbnail((max(1,int(derivative.width*factor)), max(1,int(derivative.height*factor))), Image.Resampling.LANCZOS)
-            clean = Image.frombytes('RGB', derivative.size, derivative.tobytes())
-            clean.save(output/f'{variant}.jpg', 'JPEG', quality=86, progressive=False, optimize=False, exif=b'')
+    # Retain the legacy private worker entry point while sharing bounded decoding.
+    from home_media_worker import photo
+    value = photo(source, asdict(Budget(pixels=pixel_limit)), output, LIMITS)
+    if value['reason']: raise PreparationError('unsupported')
 
 
 def previews(directory):
@@ -221,9 +243,9 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None):
         seconds = int(budget.asset_seconds-(time.monotonic()-began))
         if seconds < 1: raise PreparationError()
         return replace(budget,process_seconds=min(budget.process_seconds,seconds))
-    source_hash = file_hash(source, budget.input_bytes)
+    source_hash = file_hash(source, budget.input_bytes, seconds=min(budget.hash_seconds,remaining().process_seconds), guard=guard)
     if kind == 'photo':
-        run_process([sys.executable, Path(__file__).resolve(), '_photo', source, output, str(budget.pixels)], output, remaining(), guard=guard)
+        photo_info(source, output, remaining(), guard, output=output)
         result = {'previews':previews(output),'video':None}
     elif kind == 'video':
         if source.suffix.lower() not in ('.mp4','.mov'): raise PreparationError('unsupported')
@@ -239,48 +261,47 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None):
         target = output/'video.mp4'
         # Convert samples as well as encoder range signaling. format=yuv420p
         # alone can retain full-range H.264 VUI from a yuvj420p MOV source.
-        args = [ffmpeg,'-hide_banner','-loglevel','error','-nostdin','-n','-threads','1','-filter_threads','1','-hwaccel','none','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',source,
+        args = [ffmpeg,'-hide_banner','-loglevel','error','-xerror','-err_detect','explode','-nostdin','-n','-threads','1','-filter_threads','1','-hwaccel','none','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',source,
                 '-map',f"0:{videos[0]['index']}",'-map','0:a:0?','-map_metadata','-1','-map_metadata:s','-1','-map_chapters','-1','-sn','-dn',
                 '-vf',"scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:in_range=auto:out_range=tv,setsar=1,fps=30,format=yuv420p",
                 '-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1',
                 '-color_range','tv',
                 '-c:a','aac','-b:a','128k','-ac','2','-ar','48000',
                 '-metadata:s:v:0','handler_name=VideoHandler','-metadata:s:a:0','handler_name=SoundHandler',
-                '-metadata:s','language=und','-movflags','+faststart','-fs',str(budget.output_bytes),target]
+                '-metadata:s','language=und','-movflags','+faststart',target]
+        # Do not use -fs: it can return success after truncating a near-complete
+        # stream. The supervisor rejects oversized output during AND after exit.
         run_process(args, output, remaining(), target, guard=guard)
         v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining(),guard=guard), duration)
         faststart(target)
         # Full bounded decode, not merely an ffprobe/header success.
-        run_process([ffmpeg,'-v','error','-xerror','-nostdin','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-f','null','-'], output, remaining(), guard=guard)
+        run_process([ffmpeg,'-v','error','-xerror','-err_detect','explode','-nostdin','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-f','null','-'], output, replace(remaining(),process_seconds=min(remaining().process_seconds,budget.decode_seconds)), guard=guard)
         frame = output/'poster.png'
         run_process([ffmpeg,'-v','error','-nostdin','-n','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-frames:v','1','-threads','1',frame], output, remaining(), guard=guard)
-        run_process([sys.executable, Path(__file__).resolve(), '_photo', frame, output, str(budget.pixels)], output, remaining(), guard=guard)
-        video_hash = file_hash(target, budget.output_bytes); hashes = []
-        with target.open('rb') as stream:
-            for chunk in iter(lambda: stream.read(CHUNK_BYTES), b''): hashes.append(sha(chunk))
+        photo_info(frame, output, remaining(), guard, output=output)
+        fingerprint = file_fingerprint(target, budget.output_bytes, seconds=min(budget.hash_seconds,remaining().process_seconds), guard=guard, chunks=True)
+        video_hash, hashes = fingerprint['sha256'], fingerprint['chunks']
         chunk_bytes = json.dumps(hashes).encode(); (output/'video.chunks.json').write_bytes(chunk_bytes)
         video = {'state':'ready','mime':'video/mp4','video_codec':'h264','audio_codec':audio,
                  'width':v['width'],'height':v['height'],'duration_ms':round(actual_duration*1000),
                  'bytes':target.stat().st_size,'sha256':video_hash,'chunks_sha256':sha(chunk_bytes)}
         validate_video(video); result = {'previews':previews(output),'video':video}
     else: raise PreparationError('unsupported')
-    if identity(source) != before or file_hash(source,budget.input_bytes) != source_hash: raise PreparationError()
+    if identity(source) != before or file_hash(source,budget.input_bytes,seconds=min(budget.hash_seconds,remaining().process_seconds),guard=guard) != source_hash: raise PreparationError()
     remaining()
     result.update(source_sha256=source_hash,seconds=round(time.monotonic()-began,3))
     return result
 
 
-def verify_ready(directory, result):
+def verify_ready(directory, result, budget=Budget(), guard=None):
     if previews(directory) != result['previews']: raise PreparationError()
     if result['video']:
         video = result['video']; validate_video(video)
-        if file_hash(directory/'video.mp4', video['bytes']) != video['sha256']: raise PreparationError()
+        actual = file_fingerprint(directory/'video.mp4', video['bytes'],
+                                  seconds=budget.hash_seconds, guard=guard, chunks=True)
+        if actual['sha256'] != video['sha256']: raise PreparationError()
         raw = bounded_read(directory/'video.chunks.json',1024**2)
-        if sha(raw) != video['chunks_sha256']: raise PreparationError()
-        hashes = json.loads(raw)
-        with (directory/'video.mp4').open('rb') as stream:
-            actual = [sha(chunk) for chunk in iter(lambda:stream.read(CHUNK_BYTES),b'')]
-        if actual != hashes: raise PreparationError()
+        if sha(raw) != video['chunks_sha256'] or actual['chunks'] != json.loads(raw): raise PreparationError()
 
 
 def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffprobe, budget=Budget(), retry_failed=False):
@@ -299,7 +320,7 @@ def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffpro
     with workspace_lock(workspace):
         if shutil.disk_usage(workspace).free < budget.reserve_bytes+budget.output_bytes: raise PreparationError()
         fingerprint = {'base_sha256':sha(base_raw),'database_path_sha256':sha(str(database).encode()),'source_root':str(source_root),
-            'script_sha256':sha(Path(__file__).read_bytes()),'ffmpeg_sha256':file_hash(ffmpeg,256*1024**2),'ffprobe_sha256':file_hash(ffprobe,256*1024**2),
+            'script_sha256':sha(Path(__file__).read_bytes()+MEDIA_WORKER.read_bytes()),'ffmpeg_sha256':file_hash(ffmpeg,256*1024**2),'ffprobe_sha256':file_hash(ffprobe,256*1024**2),
             'pillow_version':importlib.metadata.version('Pillow'),'budget':budget.__dict__}
         journal = workspace/'journal.json'
         if journal.exists():
@@ -336,7 +357,7 @@ def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffpro
             except FileNotFoundError:
                 state['items'][key] = {'state':'unavailable','reason':'source_missing'}
             except PreparationError as error:
-                state['items'][key] = {'state':'unavailable','reason':error.reason}
+                state['items'][key] = {'state':'unavailable','reason':error.reason if error.reason in ('source_missing','unsupported') else 'preparation_failed'}
             except (OSError,ValueError,KeyError,TypeError,Refused):
                 state['items'][key] = {'state':'unavailable','reason':'preparation_failed'}
             atomic_json(journal,state)

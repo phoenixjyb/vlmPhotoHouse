@@ -19,7 +19,7 @@ class ClosedBoundary:
         ('GET', '/auth/session'), ('POST', '/auth/logout'),
         ('POST', '/auth/invitations/accept'),
     }
-    UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/search', '/ui/admin'}
+    UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
                 for router in (account_router, media_router, library_router, member_router, ui_router)
@@ -52,7 +52,7 @@ class ClosedBoundary:
         if method == 'GET' and (path == '/assets' or re.fullmatch(r'/assets/(?:detail/[0-9]+|[0-9]+/captions)', path)):
             return True
         return method in {'GET', 'HEAD'} and bool(re.fullmatch(
-            r'/(?:assets/[0-9]+/(?:media|thumbnail)|faces/[0-9]+/crop)', path))
+            r'/(?:assets/[0-9]+/(?:media|thumbnail|display)|faces/[0-9]+/crop)', path))
 
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'websocket':

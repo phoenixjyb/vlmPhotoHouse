@@ -1,0 +1,31 @@
+{
+  "status": "PROPOSED_NOT_AUTHORIZED_FOR_EXECUTION",
+  "audit_snapshot_sha256": "d3c6179394e524be727a9a4f8382b2ced5b8905475dd2c5730c6b6d945b2d08f",
+  "selected_cases": 12,
+  "photo_cases": 4,
+  "video_cases": 8,
+  "diagnostic_cases": 2,
+  "roles": [
+    "largest_photo_pixels",
+    "largest_portrait",
+    "first_above_40mp",
+    "widest_aspect",
+    "longest_video",
+    "largest_video",
+    "hevc_video",
+    "first_above_60s",
+    "first_above_512mib",
+    "highest_resolution_video",
+    "full_range_video",
+    "verified_photo_carry",
+    "verified_video_carry",
+    "diagnostic_probe_case",
+    "diagnostic_probe_case"
+  ],
+  "largest_photo_pixels": 199756800,
+  "largest_video_bytes": 8193114694,
+  "longest_video_seconds": 816.667433,
+  "actual_ids_retained_on_windows_only": true,
+  "real_job_created": false,
+  "real_conversion_started": false
+}

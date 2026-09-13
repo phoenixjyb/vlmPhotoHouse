@@ -54,7 +54,7 @@ class ImportIsolationTests(unittest.TestCase):
                 main = importlib.import_module(prefix + '.main')
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
-                self.assertEqual(len(main.app.routes), 23)
+                self.assertEqual(len(main.app.routes), 26)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)
@@ -165,7 +165,7 @@ class ClosedApplicationTests(unittest.TestCase):
         actual = [(method, route.path) for route in self.app.routes for method in route.methods]
         self.assertEqual(len(actual), len(set(actual)))
         self.assertEqual(set(actual), expected)
-        self.assertEqual(len(actual), 23)
+        self.assertEqual(len(actual), 26)
         for method, path in actual:
             sample = re.sub(r'\{[^}]+\}', '1', path)
             self.assertTrue(ClosedBoundary.allowed(method, sample))
@@ -198,6 +198,12 @@ class ClosedApplicationTests(unittest.TestCase):
         self.assert_private(response)
         self.assertEqual(self.client.get('/ui/app.js').status_code, 200)
         self.assertEqual(self.client.get('/ui/styles.css').status_code, 200)
+        icon = self.client.get('/ui/photohouse-icon.png?path=ignored')
+        self.assertEqual(icon.status_code, 200)
+        self.assertEqual(icon.headers['content-type'], 'image/png')
+        self.assertEqual(icon.content, (ROOT / 'backend/app/ui/photohouse-icon.png').read_bytes())
+        self.assert_private(icon)
+        self.assertEqual(self.client.post('/ui/photohouse-icon.png').status_code, 403)
         self.assertEqual(self.client.get('/ui/../assets', follow_redirects=False).status_code, 401)
 
     def test_safe_ui_has_strict_csp_and_legacy_deep_links_drop_private_query(self):

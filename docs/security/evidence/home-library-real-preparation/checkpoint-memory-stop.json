@@ -1,0 +1,357 @@
+{
+  "observed_at": "2026-09-12T17:06:21.688923+08:00",
+  "phase": "QUALIFICATION_STOPPED_MEMORY_PRESSURE",
+  "bulk_started": false,
+  "job": {
+    "source_commit": "ee5c06faea3d6f62ec356a9f7bb086d3569aea59",
+    "job_sha256": "082dd880edbd08b5a500b9d93648be4a32e1c4051f9a6eeceaa0b62bb534b818",
+    "base_sha256": "85d462852d7ef1a017e2e8ac5921a615fe6fea144bdf2826ab6eaa83d38cc067",
+    "qualification_sha256": "51ffe86b8578fb439ae973a11f59e4bbcad4b1ec2b54c8bd1cd25033824d25b1",
+    "revision": 3,
+    "selected_cases": 12
+  },
+  "status": {
+    "total": 27842,
+    "ready": 5,
+    "counts": {
+      "pending": 27836,
+      "ready": 5,
+      "working": 1
+    },
+    "reasons": {},
+    "all_ready": false,
+    "verified_complete": false,
+    "queue_drained": false,
+    "run_status": "memory_pressure",
+    "publication": null,
+    "resources": {
+      "samples": 6371,
+      "observed_peak_rss": 655355904,
+      "observed_minimum_available_ram": 4239200256
+    }
+  },
+  "cases": [
+    {
+      "case": "case-01",
+      "roles": [
+        "largest_photo_pixels",
+        "largest_portrait"
+      ],
+      "kind": "photo",
+      "width": 12240,
+      "height": 16320,
+      "bytes": 11347811,
+      "duration": null,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    },
+    {
+      "case": "case-02",
+      "roles": [
+        "first_above_40mp"
+      ],
+      "kind": "photo",
+      "width": 11040,
+      "height": 3664,
+      "bytes": 11235576,
+      "duration": null,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    },
+    {
+      "case": "case-03",
+      "roles": [
+        "widest_aspect"
+      ],
+      "kind": "photo",
+      "width": 19024,
+      "height": 1120,
+      "bytes": 5787493,
+      "duration": null,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    },
+    {
+      "case": "case-04",
+      "roles": [
+        "longest_video",
+        "largest_video",
+        "hevc_video"
+      ],
+      "kind": "video",
+      "width": 7680,
+      "height": 4320,
+      "bytes": 8193114694,
+      "duration": 816.667433,
+      "status": "ready",
+      "reason": null,
+      "attempts": 1,
+      "preparation_seconds": 5653.563,
+      "origin": "prepared",
+      "normalized_bytes": 1099456511,
+      "attempt_bytes": 1103914904,
+      "decode": {
+        "format": "PNG",
+        "source_size": [
+          1920,
+          1080
+        ],
+        "decoded_size": [
+          1920,
+          1080
+        ],
+        "subsampling": 1,
+        "reason": null
+      }
+    },
+    {
+      "case": "case-05",
+      "roles": [
+        "first_above_60s"
+      ],
+      "kind": "video",
+      "width": 4320,
+      "height": 960,
+      "bytes": 63285429,
+      "duration": 60.068,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    },
+    {
+      "case": "case-06",
+      "roles": [
+        "first_above_512mib"
+      ],
+      "kind": "video",
+      "width": 7680,
+      "height": 4320,
+      "bytes": 539078499,
+      "duration": 53.931367,
+      "status": "ready",
+      "reason": null,
+      "attempts": 1,
+      "preparation_seconds": 351.141,
+      "origin": "prepared",
+      "normalized_bytes": 5403100,
+      "attempt_bytes": 5851454,
+      "decode": {
+        "format": "PNG",
+        "source_size": [
+          608,
+          1080
+        ],
+        "decoded_size": [
+          608,
+          1080
+        ],
+        "subsampling": 1,
+        "reason": null
+      }
+    },
+    {
+      "case": "case-07",
+      "roles": [
+        "highest_resolution_video"
+      ],
+      "kind": "video",
+      "width": 7680,
+      "height": 4320,
+      "bytes": 115168761,
+      "duration": 11.6936,
+      "status": "ready",
+      "reason": null,
+      "attempts": 1,
+      "preparation_seconds": 84.125,
+      "origin": "prepared",
+      "normalized_bytes": 10542856,
+      "attempt_bytes": 13106831,
+      "decode": {
+        "format": "PNG",
+        "source_size": [
+          1920,
+          1080
+        ],
+        "decoded_size": [
+          1920,
+          1080
+        ],
+        "subsampling": 1,
+        "reason": null
+      }
+    },
+    {
+      "case": "case-08",
+      "roles": [
+        "full_range_video"
+      ],
+      "kind": "video",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 1668651815,
+      "duration": 664.074958,
+      "status": "working",
+      "reason": null,
+      "attempts": 1,
+      "attempt_bytes": 106692656
+    },
+    {
+      "case": "case-09",
+      "roles": [
+        "verified_photo_carry"
+      ],
+      "kind": "photo",
+      "width": 4000,
+      "height": 2252,
+      "bytes": 2630321,
+      "duration": null,
+      "status": "ready",
+      "reason": null,
+      "attempts": 2,
+      "preparation_seconds": 1.297,
+      "origin": "carry",
+      "normalized_bytes": 1328039,
+      "attempt_bytes": 1328751
+    },
+    {
+      "case": "case-10",
+      "roles": [
+        "verified_video_carry"
+      ],
+      "kind": "video",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 2057892,
+      "duration": 1.514646,
+      "status": "ready",
+      "reason": null,
+      "attempts": 1,
+      "preparation_seconds": 4.625,
+      "origin": "carry",
+      "normalized_bytes": 578085,
+      "attempt_bytes": 579157
+    },
+    {
+      "case": "case-11",
+      "roles": [
+        "diagnostic_probe_case"
+      ],
+      "kind": "video",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 5155929,
+      "duration": 3.010867,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    },
+    {
+      "case": "case-12",
+      "roles": [
+        "diagnostic_probe_case"
+      ],
+      "kind": "video",
+      "width": null,
+      "height": null,
+      "bytes": 16066536,
+      "duration": 8.664622,
+      "status": "pending",
+      "reason": null,
+      "attempts": 0
+    }
+  ],
+  "completed_runner_receipt": {
+    "started_at": 1789197009.532264,
+    "pid": 21788,
+    "disk_free_before": 5245256712192,
+    "stop_status": {
+      "total": 27842,
+      "ready": 0,
+      "counts": {
+        "pending": 27841,
+        "working": 1
+      },
+      "reasons": {},
+      "all_ready": false,
+      "verified_complete": false,
+      "queue_drained": false,
+      "run_status": "operator_stop",
+      "publication": null,
+      "resources": {
+        "samples": 2,
+        "observed_peak_rss": 86044672,
+        "observed_minimum_available_ram": 13908062208
+      }
+    },
+    "stopped_hash_pid": 13140,
+    "result": {
+      "total": 27842,
+      "ready": 5,
+      "counts": {
+        "pending": 27836,
+        "ready": 5,
+        "working": 1
+      },
+      "reasons": {},
+      "all_ready": false,
+      "verified_complete": false,
+      "queue_drained": false,
+      "run_status": "memory_pressure",
+      "publication": null,
+      "resources": {
+        "samples": 6371,
+        "observed_peak_rss": 655355904,
+        "observed_minimum_available_ram": 4239200256
+      }
+    },
+    "resumed_seconds": 6468.649690628052,
+    "finished_at": 1789203480.2006721,
+    "disk_free_after": 5244024778752
+  },
+  "captions": {
+    "rows": 42949,
+    "tasks": {
+      "dead": 4,
+      "done": 6689,
+      "failed": 442,
+      "finished": 79872,
+      "pending": 13554,
+      "running": 1
+    }
+  },
+  "subsequent_caption_rows": 42950,
+  "free_bytes": 5244024569856,
+  "current_available_ram_bytes": 4419506176,
+  "minimum_ram_guard_bytes": 4294967296,
+  "owned_processes_absent_at": "2026-09-12T17:06:45.0602349+08:00",
+  "preservation": {
+    "observed_at": "2026-09-12T17:06:44.8824731+08:00",
+    "live_control": {
+      "version": 2,
+      "enabled": true,
+      "revision": 1,
+      "catalog_sha256": "f9dc78da4236e5c6c920b2eefd9dfafc8850bd874e240bb372fe861b58e44f52"
+    },
+    "candidate_control": {
+      "version": 2,
+      "enabled": false,
+      "revision": 2,
+      "catalog_sha256": "7fd30c43a677236e6bfe8ac62221514c1842d796370428701af9966ee1903eb4"
+    },
+    "live_config_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+    "seed_journal_sha256": "2d049d5b1a9aeb306e7e407caae618246dd0a3cb33bffa1ef50864b7403ce349",
+    "four_service_pid_start_identities_unchanged": true,
+    "verified_source_files": 323
+  },
+  "limits": [
+    "Interrupted working entry is not an active process or ready result.",
+    "No bulk gate, restart, automatic retry, guard reduction or publication.",
+    "Resource summary contains sampled observations, not an OS quota.",
+    "Current available RAM is a single observation, not sustained headroom.",
+    "Caption failure increase has no established cause.",
+    "Qualification and full-library capacity review remain incomplete."
+  ]
+}

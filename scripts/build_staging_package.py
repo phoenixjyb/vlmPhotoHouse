@@ -17,7 +17,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 FILES = tuple(sorted([
     'backend/app/__init__.py', 'backend/app/main.py', 'backend/app/db.py',
-    'backend/app/routers/ui.py',
+    'backend/app/routers/ui.py', 'backend/app/ui/photohouse-icon.png',
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
@@ -33,6 +33,10 @@ FILES = tuple(sorted([
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/check_access_environment.py',
+    'backend/app/photo_delivery.py', 'backend/app/home_feed.py',
+    'scripts/home_media_worker.py', 'scripts/home_preparation_resources.py',
+    'backend/requirements-home-preparation.lock',
+    'docs/security/ON_DEMAND_MEDIA.md',
     'backend/requirements-access.in', 'backend/requirements-access.lock',
     'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
     'docs/security/CPU_ENVIRONMENT.md', 'docs/security/PROTECTED_UPGRADE.md',

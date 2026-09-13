@@ -1,0 +1,397 @@
+{
+  "source_commit": "0314ee92b2bb6e87122a424f8f7e6ff61a9d7930",
+  "launcher_sha256": "4c1cd3aafadbfc1dfafb515b342c5adea1e5338c34a6bacf1e8044e85f72bcc6",
+  "scope": "Restore unchanged existing v1/v2 feeds only; no preparation resume or new triggers",
+  "snapshot_after": {
+    "mode": "after",
+    "unchanged": true,
+    "time": "2026-09-12T18:16:03.126526+08:00",
+    "feeds": [
+      {
+        "name": "home-feed-e6b2827-pilot",
+        "config_sha256": "26119e1eea630c36a7ce7a2b6c9783a5c688d31d883017692dd850c042b7f4e3",
+        "manifest_sha256": "5cdf7160111d901adfc577e73a0709bfaad1800ba2da5eaf383259353bd23384",
+        "publication": {
+          "files": 3,
+          "sha256": "03b4deeff97f1296c67640a3047af4997b10bc5ea89c9b35a57b144607247abc"
+        },
+        "source": {
+          "files": 7,
+          "sha256": "8b2ca75ab411fb009e8b9e978ddb006de89b27f68793fe27ab25ac0fb9950080"
+        },
+        "certificate_sha256": "46613ccc41b236904b874658af254e161fa071513de7f640b33844ed1f9877c1",
+        "origin": "https://jiafamilyphotos.duckdns.org:8444",
+        "bind": "192.168.0.108",
+        "port": 8444,
+        "allowed_networks": [
+          "192.168.0.102/32",
+          "192.168.0.109/32"
+        ],
+        "revision": 4
+      },
+      {
+        "name": "home-catalog-v2-canary-20260912",
+        "config_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+        "manifest_sha256": "6196c1c7e52117a7d09b15b7400efe39aed511ace35e8de8beb1b3155a21f2e6",
+        "publication": {
+          "files": 36,
+          "sha256": "7f2ef91f7bf6c8118fc738d7c13b28788209d3c860bdb2f3fdf0b777b529d646"
+        },
+        "source": {
+          "files": 685,
+          "sha256": "715305e1b632f3d4ac8c5e8b56624458c7f637cdbb2ac8c4c2e0d2dc135cae67"
+        },
+        "certificate_sha256": "46613ccc41b236904b874658af254e161fa071513de7f640b33844ed1f9877c1",
+        "origin": "https://jiafamilyphotos.duckdns.org:8445",
+        "bind": "192.168.0.108",
+        "port": 8445,
+        "allowed_networks": [
+          "192.168.0.102/32",
+          "192.168.0.109/32"
+        ],
+        "revision": 1
+      }
+    ],
+    "preparation": {
+      "job_sha256": "082dd880edbd08b5a500b9d93648be4a32e1c4051f9a6eeceaa0b62bb534b818",
+      "checkpoint_sha256": "8f11ad7eeb506c40207d7c3c0f66c71d8a62fb3745e8a0e1ee782a1411a371e3",
+      "counts": {
+        "pending": 27836,
+        "ready": 5,
+        "working": 1
+      }
+    }
+  },
+  "live_processes": {
+    "time": "2026-09-12T18:16:11.4477520+08:00",
+    "host": "JIAFAMILY",
+    "firewall_unchanged": true,
+    "chains": [
+      {
+        "port": 8444,
+        "ancestry": [
+          {
+            "ProcessId": 16020,
+            "ParentProcessId": 12044,
+            "Name": "pythonw.exe",
+            "CreationDate": "/Date(1789208007585)/",
+            "SessionId": 2
+          },
+          {
+            "ProcessId": 12044,
+            "ParentProcessId": 2948,
+            "Name": "pythonw.exe",
+            "CreationDate": "/Date(1789208007487)/",
+            "SessionId": 2
+          },
+          {
+            "ProcessId": 2948,
+            "ParentProcessId": 1564,
+            "Name": "svchost.exe",
+            "CreationDate": "/Date(1788420139327)/",
+            "SessionId": 0
+          },
+          {
+            "ProcessId": 1564,
+            "ParentProcessId": 1420,
+            "Name": "services.exe",
+            "CreationDate": "/Date(1788420137756)/",
+            "SessionId": 0
+          },
+          {
+            "ProcessId": 1420,
+            "ParentProcessId": 1300,
+            "Name": "wininit.exe",
+            "CreationDate": "/Date(1788420137626)/",
+            "SessionId": 0
+          }
+        ],
+        "resource": {
+          "Id": 16020,
+          "CPU": 1.265625,
+          "WorkingSet64": 50032640,
+          "PeakWorkingSet64": 50032640
+        }
+      },
+      {
+        "port": 8445,
+        "ancestry": [
+          {
+            "ProcessId": 20448,
+            "ParentProcessId": 22808,
+            "Name": "pythonw.exe",
+            "CreationDate": "/Date(1789208008428)/",
+            "SessionId": 2
+          },
+          {
+            "ProcessId": 22808,
+            "ParentProcessId": 2948,
+            "Name": "pythonw.exe",
+            "CreationDate": "/Date(1789208008405)/",
+            "SessionId": 2
+          },
+          {
+            "ProcessId": 2948,
+            "ParentProcessId": 1564,
+            "Name": "svchost.exe",
+            "CreationDate": "/Date(1788420139327)/",
+            "SessionId": 0
+          },
+          {
+            "ProcessId": 1564,
+            "ParentProcessId": 1420,
+            "Name": "services.exe",
+            "CreationDate": "/Date(1788420137756)/",
+            "SessionId": 0
+          },
+          {
+            "ProcessId": 1420,
+            "ParentProcessId": 1300,
+            "Name": "wininit.exe",
+            "CreationDate": "/Date(1788420137626)/",
+            "SessionId": 0
+          }
+        ],
+        "resource": {
+          "Id": 20448,
+          "CPU": 1.578125,
+          "WorkingSet64": 68288512,
+          "PeakWorkingSet64": 112783360
+        }
+      }
+    ],
+    "logs": [
+      {
+        "kind": "v1",
+        "files": [
+          {
+            "Name": "server.log",
+            "Length": 0
+          }
+        ],
+        "receipt": {
+          "pid": 16020,
+          "parent_pid": 12044,
+          "started_at": 1789208008.1884394,
+          "console_window": 0,
+          "kind": "v1",
+          "config_sha256": "26119e1eea630c36a7ce7a2b6c9783a5c688d31d883017692dd850c042b7f4e3",
+          "log_max_bytes": 1048576,
+          "log_backups": 3,
+          "state": "starting"
+        }
+      },
+      {
+        "kind": "v2",
+        "files": [
+          {
+            "Name": "server.log",
+            "Length": 0
+          }
+        ],
+        "receipt": {
+          "pid": 20448,
+          "parent_pid": 22808,
+          "started_at": 1789208008.5245261,
+          "console_window": 0,
+          "kind": "v2",
+          "config_sha256": "e2721c645a49e9e63e2efbfe958972ea56c225e959232bc248e335c125a1c63c",
+          "log_max_bytes": 1048576,
+          "log_backups": 3,
+          "state": "starting"
+        }
+      }
+    ],
+    "terminals": [],
+    "existing": [
+      {
+        "Id": 10460,
+        "StartTime": "/Date(1789082420026)/",
+        "CPU": 119284.359375,
+        "WorkingSet64": 246145024
+      },
+      {
+        "Id": 23284,
+        "StartTime": "/Date(1789083007495)/",
+        "CPU": 7992.109375,
+        "WorkingSet64": 68648960
+      }
+    ],
+    "available_kib": 53201660,
+    "tasks": [
+      {
+        "TaskName": "PhotoHouse-HomeCatalog-V2-Canary",
+        "state": "Running",
+        "triggers": 0
+      },
+      {
+        "TaskName": "PhotoHouse-HomeFeed-Synthetic",
+        "state": "Running",
+        "triggers": 0
+      }
+    ]
+  },
+  "live_log_handle_observation": [
+    {
+      "kind": "v1",
+      "handle_bytes": 411,
+      "characters": 411,
+      "has_start_message": true,
+      "has_uvicorn": true,
+      "fileinfo_bytes": 411
+    },
+    {
+      "kind": "v2",
+      "handle_bytes": 411,
+      "characters": 411,
+      "has_start_message": true,
+      "has_uvicorn": true,
+      "fileinfo_bytes": 411
+    }
+  ],
+  "synthetic_and_live_probes": [
+    {
+      "kind": "v1",
+      "synthetic": true,
+      "listener_started": false,
+      "existing_source_factory": true,
+      "checks": [
+        "feed_or_catalog_200",
+        "photo_head_200",
+        "synthetic_photo_exact_bytes",
+        "closed_routes_403",
+        "denied_peer_spoof_403"
+      ]
+    },
+    {
+      "kind": "v2",
+      "synthetic": true,
+      "listener_started": false,
+      "existing_source_factory": true,
+      "checks": [
+        "feed_or_catalog_200",
+        "photo_head_200",
+        "synthetic_photo_exact_bytes",
+        "closed_routes_403",
+        "synthetic_video_range_206_exact_bytes",
+        "denied_peer_spoof_403"
+      ]
+    },
+    {
+      "live_probes": [
+        {
+          "kind": "v1",
+          "port": 8444,
+          "trusted_hostname_tls": true,
+          "tls": "TLSv1.3",
+          "peer": "192.168.0.108 (not allowlisted)",
+          "checks": [
+            {
+              "method": "GET",
+              "case": "feed_or_catalog",
+              "status": 403
+            },
+            {
+              "method": "HEAD",
+              "case": "photo_head",
+              "status": 403
+            },
+            {
+              "method": "GET",
+              "case": "closed_route",
+              "status": 403
+            },
+            {
+              "method": "GET",
+              "case": "spoofed_peer",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "kind": "v2",
+          "port": 8445,
+          "trusted_hostname_tls": true,
+          "tls": "TLSv1.3",
+          "peer": "192.168.0.108 (not allowlisted)",
+          "checks": [
+            {
+              "method": "GET",
+              "case": "feed_or_catalog",
+              "status": 403
+            },
+            {
+              "method": "HEAD",
+              "case": "photo_head",
+              "status": 403
+            },
+            {
+              "method": "GET",
+              "case": "closed_route",
+              "status": 403
+            },
+            {
+              "method": "GET",
+              "case": "spoofed_peer",
+              "status": 403
+            },
+            {
+              "method": "GET",
+              "case": "range",
+              "status": 403
+            }
+          ]
+        }
+      ],
+      "allowed_lan_client_acceptance": false
+    }
+  ],
+  "tests": {
+    "mac_focused": {
+      "passed": 7,
+      "seconds": 0.018
+    },
+    "windows_focused": {
+      "passed": 7,
+      "seconds": 0.18
+    },
+    "direct_asgi_bounds": {
+      "timeout_seconds": 10,
+      "response_bytes": 524288,
+      "messages": 128
+    },
+    "runtime_dependencies_changed": false,
+    "windows_rollback_command_doubles": {
+      "passed": 3,
+      "cases": [
+        "ownership_refusal_before_stop",
+        "live_process_refusal_before_action_restore",
+        "exact_two_saved_actions_without_restart"
+      ]
+    }
+  },
+  "independent_coordinator_report": {
+    "observed_at": "2026-09-12T18:14:31+08:00",
+    "native_curl_trusted_tls": true,
+    "curl_ssl_verify_result": 0,
+    "ports": [
+      8444,
+      8445
+    ],
+    "unapproved_peer_http_status": 403,
+    "free_ram_gib": 50.816,
+    "terminal_or_ffmpeg_present": false,
+    "api_caption_process_identity_unchanged": true,
+    "seven_local_tests_and_separate_io_failure_injection_passed": true,
+    "native_active_log_markers_verified": true
+  },
+  "limitations": [
+    "Actual approved LAN/TV client acceptance pending: operator Mac is off-LAN.",
+    "No cause established for historical Terminal memory growth.",
+    "Manual interactive tasks retain zero startup triggers/retries; reboot/logoff recovery not tested.",
+    "Initial TestClient probe could not run because httpx2 was absent; direct bounded ASGI probes passed without dependency change.",
+    "Task rollback uses tested command doubles; live rollback not exercised.",
+    "FileInfo initially reported stale zero log sizes; shared-handle reads verified411 bytes and native startup markers per feed.",
+    "This short observation does not prove long-term resource stability."
+  ]
+}

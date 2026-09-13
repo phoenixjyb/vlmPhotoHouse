@@ -1,0 +1,778 @@
+{
+  "synthetic_only": true,
+  "contract": "protected-discovery-http-candidate-1",
+  "examples": [
+    {
+      "name": "people-first",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/discovery/v1/facets?page_size=1",
+        "json": null
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "revision": "1",
+        "enabled": [
+          "people",
+          "date",
+          "caption",
+          "tags",
+          "locations",
+          "media"
+        ],
+        "unavailable": {
+          "themes": "no_reviewed_taxonomy",
+          "topics": "no_reviewed_taxonomy"
+        },
+        "catalog_assets": 4,
+        "indexed_assets": 4,
+        "index_complete": true,
+        "metadata_completeness": "not_inferred",
+        "tag_generation_completeness": "unknown",
+        "coverage": {
+          "people": {
+            "with_values": 2,
+            "without_values": 2
+          },
+          "date": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "caption": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "tags": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "locations": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "media": {
+            "with_values": 4,
+            "without_values": 0
+          }
+        },
+        "captured_date_bounds": {
+          "from": "2025-12-01",
+          "to": "2026-05-05"
+        },
+        "pinned_person_ids": [
+          "302",
+          "301"
+        ],
+        "pinned_people": [
+          {
+            "id": "302",
+            "label": "Sample Adult / 示例成人",
+            "aliases": [
+              "Sample Adult",
+              "示例成人"
+            ],
+            "asset_count": 1,
+            "provenance": "reviewed_assignments"
+          },
+          {
+            "id": "301",
+            "label": "Sample Child / 示例儿童",
+            "aliases": [
+              "Sample Child",
+              "示例儿童"
+            ],
+            "asset_count": 2,
+            "provenance": "reviewed_assignments"
+          }
+        ],
+        "facet": "people",
+        "page": 1,
+        "page_size": 1,
+        "total": 2,
+        "has_more": true,
+        "items": [
+          {
+            "id": "301",
+            "label": "Sample Child / 示例儿童",
+            "aliases": [
+              "Sample Child",
+              "示例儿童"
+            ],
+            "asset_count": 2,
+            "provenance": "reviewed_assignments"
+          }
+        ]
+      }
+    },
+    {
+      "name": "people-next",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/discovery/v1/facets?page_size=1&page=2&binding=b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "json": null
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "revision": "1",
+        "enabled": [
+          "people",
+          "date",
+          "caption",
+          "tags",
+          "locations",
+          "media"
+        ],
+        "unavailable": {
+          "themes": "no_reviewed_taxonomy",
+          "topics": "no_reviewed_taxonomy"
+        },
+        "catalog_assets": 4,
+        "indexed_assets": 4,
+        "index_complete": true,
+        "metadata_completeness": "not_inferred",
+        "tag_generation_completeness": "unknown",
+        "coverage": {
+          "people": {
+            "with_values": 2,
+            "without_values": 2
+          },
+          "date": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "caption": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "tags": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "locations": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "media": {
+            "with_values": 4,
+            "without_values": 0
+          }
+        },
+        "captured_date_bounds": {
+          "from": "2025-12-01",
+          "to": "2026-05-05"
+        },
+        "pinned_person_ids": [
+          "302",
+          "301"
+        ],
+        "pinned_people": [
+          {
+            "id": "302",
+            "label": "Sample Adult / 示例成人",
+            "aliases": [
+              "Sample Adult",
+              "示例成人"
+            ],
+            "asset_count": 1,
+            "provenance": "reviewed_assignments"
+          },
+          {
+            "id": "301",
+            "label": "Sample Child / 示例儿童",
+            "aliases": [
+              "Sample Child",
+              "示例儿童"
+            ],
+            "asset_count": 2,
+            "provenance": "reviewed_assignments"
+          }
+        ],
+        "facet": "people",
+        "page": 2,
+        "page_size": 1,
+        "total": 2,
+        "has_more": false,
+        "items": [
+          {
+            "id": "302",
+            "label": "Sample Adult / 示例成人",
+            "aliases": [
+              "Sample Adult",
+              "示例成人"
+            ],
+            "asset_count": 1,
+            "provenance": "reviewed_assignments"
+          }
+        ]
+      }
+    },
+    {
+      "name": "tags",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/discovery/v1/facets?facet=tags",
+        "json": null
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "revision": "1",
+        "enabled": [
+          "people",
+          "date",
+          "caption",
+          "tags",
+          "locations",
+          "media"
+        ],
+        "unavailable": {
+          "themes": "no_reviewed_taxonomy",
+          "topics": "no_reviewed_taxonomy"
+        },
+        "catalog_assets": 4,
+        "indexed_assets": 4,
+        "index_complete": true,
+        "metadata_completeness": "not_inferred",
+        "tag_generation_completeness": "unknown",
+        "coverage": {
+          "people": {
+            "with_values": 2,
+            "without_values": 2
+          },
+          "date": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "caption": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "tags": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "locations": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "media": {
+            "with_values": 4,
+            "without_values": 0
+          }
+        },
+        "captured_date_bounds": {
+          "from": "2025-12-01",
+          "to": "2026-05-05"
+        },
+        "pinned_person_ids": [
+          "302",
+          "301"
+        ],
+        "pinned_people": [
+          {
+            "id": "302",
+            "label": "Sample Adult / 示例成人",
+            "aliases": [
+              "Sample Adult",
+              "示例成人"
+            ],
+            "asset_count": 1,
+            "provenance": "reviewed_assignments"
+          },
+          {
+            "id": "301",
+            "label": "Sample Child / 示例儿童",
+            "aliases": [
+              "Sample Child",
+              "示例儿童"
+            ],
+            "asset_count": 2,
+            "provenance": "reviewed_assignments"
+          }
+        ],
+        "facet": "tags",
+        "page": 1,
+        "page_size": 50,
+        "total": 2,
+        "has_more": false,
+        "items": [
+          {
+            "id": "501",
+            "label": "Park / 公园",
+            "kind": "scene",
+            "asset_count": 2,
+            "provenance_counts": {
+              "caption": 2
+            }
+          },
+          {
+            "id": "502",
+            "label": "Favorite / 收藏",
+            "kind": "custom",
+            "asset_count": 2,
+            "provenance_counts": {
+              "manual": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "locations",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/discovery/v1/facets?facet=locations",
+        "json": null
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "revision": "1",
+        "enabled": [
+          "people",
+          "date",
+          "caption",
+          "tags",
+          "locations",
+          "media"
+        ],
+        "unavailable": {
+          "themes": "no_reviewed_taxonomy",
+          "topics": "no_reviewed_taxonomy"
+        },
+        "catalog_assets": 4,
+        "indexed_assets": 4,
+        "index_complete": true,
+        "metadata_completeness": "not_inferred",
+        "tag_generation_completeness": "unknown",
+        "coverage": {
+          "people": {
+            "with_values": 2,
+            "without_values": 2
+          },
+          "date": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "caption": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "tags": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "locations": {
+            "with_values": 3,
+            "without_values": 1
+          },
+          "media": {
+            "with_values": 4,
+            "without_values": 0
+          }
+        },
+        "captured_date_bounds": {
+          "from": "2025-12-01",
+          "to": "2026-05-05"
+        },
+        "pinned_person_ids": [
+          "302",
+          "301"
+        ],
+        "pinned_people": [
+          {
+            "id": "302",
+            "label": "Sample Adult / 示例成人",
+            "aliases": [
+              "Sample Adult",
+              "示例成人"
+            ],
+            "asset_count": 1,
+            "provenance": "reviewed_assignments"
+          },
+          {
+            "id": "301",
+            "label": "Sample Child / 示例儿童",
+            "aliases": [
+              "Sample Child",
+              "示例儿童"
+            ],
+            "asset_count": 2,
+            "provenance": "reviewed_assignments"
+          }
+        ],
+        "facet": "locations",
+        "page": 1,
+        "page_size": 50,
+        "total": 1,
+        "has_more": false,
+        "items": [
+          {
+            "id": "601",
+            "label": "Example region / 示例地区",
+            "asset_count": 3,
+            "provenance": "reviewed_region"
+          }
+        ]
+      }
+    },
+    {
+      "name": "all-media-first",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {},
+          "page": 1,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "fingerprint": "2c81bf1ca30561ec61a9943320a98d490abe34f5fd7e0abba51a161b020ddd80",
+        "page": 1,
+        "page_size": 1,
+        "total": 4,
+        "has_more": true,
+        "originals_allowed": false,
+        "items": [
+          {
+            "id": "9223372036854775807",
+            "kind": "other",
+            "width": 8,
+            "height": 8,
+            "duration_sec": null,
+            "taken_at": "2026-05-05",
+            "thumbnail_url": "/assets/9223372036854775807/thumbnail?library=family-a"
+          }
+        ]
+      }
+    },
+    {
+      "name": "all-media-next",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {},
+          "page": 2,
+          "page_size": 1,
+          "fingerprint": "2c81bf1ca30561ec61a9943320a98d490abe34f5fd7e0abba51a161b020ddd80"
+        }
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "fingerprint": "2c81bf1ca30561ec61a9943320a98d490abe34f5fd7e0abba51a161b020ddd80",
+        "page": 2,
+        "page_size": 1,
+        "total": 4,
+        "has_more": true,
+        "originals_allowed": false,
+        "items": [
+          {
+            "id": "103",
+            "kind": "image",
+            "width": 8,
+            "height": 8,
+            "duration_sec": null,
+            "taken_at": "2025-12-01",
+            "thumbnail_url": "/assets/103/thumbnail?library=family-a"
+          }
+        ]
+      }
+    },
+    {
+      "name": "all-filters",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {
+            "people": {
+              "ids": [
+                "301",
+                "302"
+              ],
+              "match": "all"
+            },
+            "date": {
+              "from": "2025-12-01",
+              "to": "2025-12-01"
+            },
+            "caption": "family",
+            "tags": {
+              "ids": [
+                "501"
+              ],
+              "match": "any"
+            },
+            "locations": [
+              "601"
+            ],
+            "media": [
+              "image"
+            ]
+          },
+          "page": 1,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 200,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "version": 1,
+        "library_id": "family-a",
+        "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+        "fingerprint": "f40992ce38a7b9aadb0a0a6ab4609030187422558e414a711dca38a26724e748",
+        "page": 1,
+        "page_size": 1,
+        "total": 1,
+        "has_more": false,
+        "originals_allowed": false,
+        "items": [
+          {
+            "id": "103",
+            "kind": "image",
+            "width": 8,
+            "height": 8,
+            "duration_sec": null,
+            "taken_at": "2025-12-01",
+            "thumbnail_url": "/assets/103/thumbnail?library=family-a"
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing-auth",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/discovery/v1/facets",
+        "json": null
+      },
+      "status": 401,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "access_denied",
+        "detail": "Access denied"
+      }
+    },
+    {
+      "name": "unknown-library",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/unknown/discovery/v1/facets",
+        "json": null
+      },
+      "status": 401,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "access_denied",
+        "detail": "Access denied"
+      }
+    },
+    {
+      "name": "stale-binding",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "0000000000000000000000000000000000000000000000000000000000000000",
+          "filters": {},
+          "page": 1,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 409,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "discovery_changed",
+        "detail": "Refresh discovery state"
+      }
+    },
+    {
+      "name": "stale-fingerprint",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {},
+          "page": 2,
+          "page_size": 1,
+          "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      },
+      "status": 409,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "discovery_changed",
+        "detail": "Refresh discovery state"
+      }
+    },
+    {
+      "name": "missing-fingerprint",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {},
+          "page": 2,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 400,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "invalid_request",
+        "detail": "Invalid discovery request"
+      }
+    },
+    {
+      "name": "invalid-id",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "b6723acc8cb437cf81a8aff97cdb139e8ec17167767f42f077a31f38a53e4792",
+          "filters": {
+            "people": {
+              "ids": [
+                301
+              ],
+              "match": "any"
+            }
+          },
+          "page": 1,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 400,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "invalid_request",
+        "detail": "Invalid discovery request"
+      }
+    },
+    {
+      "name": "revoked-before-stale",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/discovery/v1/search",
+        "json": {
+          "binding": "0000000000000000000000000000000000000000000000000000000000000000",
+          "filters": {},
+          "page": 1,
+          "page_size": 1,
+          "fingerprint": null
+        }
+      },
+      "status": 401,
+      "headers": {
+        "cache-control": "no-store",
+        "pragma": "no-cache",
+        "referrer-policy": "no-referrer",
+        "cross-origin-resource-policy": "same-origin"
+      },
+      "body": {
+        "error": "access_denied",
+        "detail": "Access denied"
+      }
+    }
+  ]
+}

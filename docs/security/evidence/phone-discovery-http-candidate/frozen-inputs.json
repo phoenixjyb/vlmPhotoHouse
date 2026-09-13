@@ -1,0 +1,17 @@
+{
+  "protected_phone": {
+    "files": 10,
+    "mismatches": []
+  },
+  "home_discovery": {
+    "files": 19,
+    "mismatches": [
+      {
+        "path": "docs/security/route_capabilities.json",
+        "old_sha256": "13d14aa90b5bd1daca9aa42a1f7a2e2ae5911ed572aa839940a9c5a5ac66fdec",
+        "current_sha256": "0a30e8d005b5e7fa828f261f4c02414e01b6fc5b82686b01e229aea676e33862"
+      }
+    ],
+    "explanation": "18 of 19 old source hashes unchanged. Global inventory intentionally changes for two candidate routes and explicit factory topology. Home serving code, wire schema, examples and old manifest unchanged; this candidate does not repin the Android home contract."
+  }
+}

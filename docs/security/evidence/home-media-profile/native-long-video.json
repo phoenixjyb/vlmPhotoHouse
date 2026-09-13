@@ -1,0 +1,1 @@
+{"source_seconds": 125, "result": {"state": "ready", "mime": "video/mp4", "video_codec": "h264", "audio_codec": null, "width": 320, "height": 180, "duration_ms": 125000, "bytes": 41652760, "sha256": "c7133e685b06b784f59f339a663dfb08d74831ae96bd138931356f6d4eeaddfe", "chunks_sha256": "61d51c0079c5d355dc340dbe5d1aded4c30d2153589212bada2fabfec824e5ec"}, "seconds": 20.344}

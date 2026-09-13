@@ -149,8 +149,12 @@ def load_configuration(path):
         raise InvalidConfiguration() from None
 
 
-def serve(config, *, server_run=None):
+def serve(config, *, server_run=None, photo_cache=None):
     app = config.build_app()
+    if photo_cache is not None:
+        from dataclasses import replace
+        from app.photo_delivery import PhotoCache
+        app.state.media_runtime = replace(app.state.media_runtime, photo_cache=PhotoCache(photo_cache))
     if server_run is None:
         import uvicorn
         server_run = uvicorn.run
@@ -160,17 +164,21 @@ def serve(config, *, server_run=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
+    parser.add_argument('--photo-cache', type=Path, help='Opt-in bounded on-demand JPEG cache; separate from originals')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--check-config', action='store_true')
     mode.add_argument('--serve', action='store_true')
     args = parser.parse_args(argv)
     try:
         config = load_configuration(args.config)
+        if args.photo_cache is not None:
+            if not args.photo_cache.is_absolute() or any(args.photo_cache.is_relative_to(p) or p.is_relative_to(args.photo_cache) for p in config.original_roots):
+                raise InvalidConfiguration()
         if args.check_config:
             print(json.dumps({'configuration_syntax': 'valid', 'storage_checked': False,
                 'certificate_checked': False, 'network_checked': False, 'listener_started': False}))
         else:
-            serve(config)
+            serve(config, photo_cache=args.photo_cache)
         return 0
     except InvalidConfiguration:
         print('Invalid staging configuration', file=sys.stderr)
