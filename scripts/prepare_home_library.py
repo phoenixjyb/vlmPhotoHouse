@@ -152,19 +152,21 @@ class Seed:
 
 
 def create(database,source_root,workspace,ffmpeg,ffprobe,previous_publication,revision,
-           budget=prep.Budget(),seed=None):
+           budget=prep.Budget(),seed=None,encoder='libx264',gpu=0):
     for path in (database,source_root,ffmpeg,ffprobe,previous_publication):prep.canonical(path)
     direct_path(workspace);prep.canonical(workspace.parent)
     for path in (source_root,database,previous_publication)+((Path(seed['path']),) if seed else ()):
         if path.is_relative_to(workspace) or workspace.is_relative_to(path):raise ValueError('workspace_overlap')
     previous=publication_pin(previous_publication)
     if type(revision) is not int or not previous['revision']<revision<=2**31-1:raise ValueError('revision_not_new')
+    prep.video_encoder_args(encoder,gpu)
     budgets=profile(budget)
     workspace.mkdir(mode=0o700) # Never adopt a foreign/half-initialized directory.
     with prep.workspace_lock(workspace):
         exported=build_home_catalog.export(database,workspace/'base',revision)
         job={'version':SCHEMA,'database':str(database),'source_root':str(source_root),'revision':revision,
              'base_sha256':exported['catalog_sha256'],'previous':previous,'budget':budgets,'seed':seed,
+             'encoder':{'name':encoder,'gpu':gpu},
              'ffmpeg':str(ffmpeg),'ffprobe':str(ffprobe),'ffmpeg_sha256':prep.file_hash(ffmpeg,256*1024**2),
              'ffprobe_sha256':prep.file_hash(ffprobe,256*1024**2),'pillow':importlib.metadata.version('Pillow'),'code':code_pin()}
         with ExitStack() as stack:
@@ -188,6 +190,9 @@ def load_job(workspace):
     if prep.sha(bounded_read(workspace/'base/catalog.json',MAX_CATALOG))!=job['base_sha256']:raise ValueError('base_changed')
     if publication_pin(Path(job['previous']['path']))!=job['previous']:raise ValueError('previous_publication_changed')
     profile(prep.Budget(**job['budget']))
+    encoding=job.get('encoder',{'name':'libx264','gpu':0})
+    if type(encoding) is not dict or set(encoding)!={'name','gpu'}:raise ValueError('invalid_encoder_config')
+    prep.video_encoder_args(encoding['name'],encoding['gpu'])
     with closing(connect(workspace,True)) as c:
         if meta(c,'job_sha256')!=prep.sha((workspace/'job.json').read_bytes()):raise ValueError('job_changed')
     return job
@@ -289,8 +294,10 @@ def qualification_plan(path,job,entries):
     return {'sha256':prep.sha(raw),'asset_ids':ids}
 
 
-def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,qualification=None):
+def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,qualification=None,kind=None):
     if any(v is not None and (type(v) is not int or v<1) for v in (max_items,max_seconds)):raise ValueError('invalid_run_limit')
+    if kind not in (None,'video','photo'):raise ValueError('invalid_kind_filter')
+    selected_kind=kind
     job=load_job(workspace);budget=prep.Budget(**job['budget'])
     guard=guard or Guard(workspace,budget.reserve_bytes,max_seconds=max_seconds)
     database=Path(job['database']);source_root=Path(job['source_root']);ffmpeg=Path(job['ffmpeg']);ffprobe=Path(job['ffprobe'])
@@ -301,6 +308,7 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
         entries=c.execute('SELECT id,kind FROM items ORDER BY id DESC').fetchall()
         reviewed=qualification_plan(qualification,job,entries)
         if reviewed:entries=[e for e in entries if e[0] in reviewed['asset_ids']]
+        if kind:entries=[e for e in entries if e[1]==kind]
         with c:meta(c,'status','running');meta(c,'seed_verified',False);meta(c,'qualification',reviewed or False)
         try:
             for entry in entries:
@@ -336,7 +344,9 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
                     if result is None:
                         reason=precheck(source,kind,budget,directory,ffprobe,guard)
                         if reason:mark(c,aid,'deferred',reason);processed+=1;continue
-                        result=prep.prepare_one(source,kind,directory,ffmpeg,ffprobe,budget,guard=guard)
+                        encoding=job.get('encoder',{'name':'libx264','gpu':0})
+                        options={} if encoding['name']=='libx264' else {'encoder':encoding['name'],'gpu':encoding['gpu']}
+                        result=prep.prepare_one(source,item['kind'],directory,ffmpeg,ffprobe,budget,guard=guard,**options)
                     validate_result(result,kind);prep.verify_ready(directory,result,budget,guard)
                     if source_row(database,aid,source_root,kind)!=(source,metadata_hash):raise ValueError('source_changed_during_attempt')
                     if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)!=result['source_sha256']:raise ValueError('source_changed_during_attempt')
@@ -349,7 +359,7 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
                 except (OSError,ValueError,KeyError,TypeError,Refused):
                     mark(c,aid,'error','verification_failed');processed+=1
             if seed:seed.verify_pin()
-            with c:meta(c,'status','qualification_complete' if reviewed else 'queue_drained');meta(c,'seed_verified',True)
+            with c:meta(c,'status','qualification_complete' if reviewed else selected_kind+'_queue_drained' if selected_kind else 'queue_drained');meta(c,'seed_verified',True)
         except (JobStopped,KeyboardInterrupt) as error:
             with c:meta(c,'status',str(error) if isinstance(error,JobStopped) else 'interrupted')
         except (OSError,ValueError,KeyError,TypeError,sqlite3.Error,Refused):
@@ -459,12 +469,15 @@ def main(argv=None):
     init=sub.add_parser('create')
     for name in ('database','source-root','workspace','ffmpeg','ffprobe','previous-publication'):init.add_argument('--'+name,type=Path,required=True)
     init.add_argument('--revision',type=int,required=True)
+    init.add_argument('--encoder',choices=('libx264','h264_nvenc'),default='libx264')
+    init.add_argument('--gpu',type=int,default=0)
     profiles=init.add_mutually_exclusive_group();profiles.add_argument('--budget-json',type=Path)
     profiles.add_argument('--profile',choices=prep.PROFILES,default=None)
     init.add_argument('--carry-workspace',type=Path);init.add_argument('--carry-sha256');init.add_argument('--carry-kind',choices=('legacy','library'))
     run_parser=sub.add_parser('run');run_parser.add_argument('--workspace',type=Path,required=True)
     run_parser.add_argument('--retry-errors',action='store_true');run_parser.add_argument('--max-items',type=int);run_parser.add_argument('--max-seconds',type=int)
     run_parser.add_argument('--qualification-plan',type=Path)
+    run_parser.add_argument('--kind',choices=('video','photo'))
     stat=sub.add_parser('status');stat.add_argument('--workspace',type=Path,required=True)
     pub=sub.add_parser('publish');pub.add_argument('--workspace',type=Path,required=True);pub.add_argument('--output',type=Path,required=True);pub.add_argument('--allow-partial',action='store_true')
     args=parser.parse_args(argv)
@@ -475,8 +488,8 @@ def main(argv=None):
                 if not all((args.carry_workspace,args.carry_sha256,args.carry_kind)):raise ValueError('all_carry_fields_required')
                 seed=seed_description(args.carry_workspace,args.carry_sha256,args.carry_kind)
             budget=prep.Budget(**read_json(args.budget_json,4096)) if args.budget_json else prep.PROFILES[args.profile or 'pilot']
-            result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed)
-        elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds,qualification=args.qualification_plan)
+            result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed,args.encoder,args.gpu)
+        elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds,qualification=args.qualification_plan,kind=args.kind)
         elif args.command=='status':result=status(args.workspace)
         else:result=publish(args.workspace,args.output,args.allow_partial)
         print(json.dumps(result))
