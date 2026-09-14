@@ -61,3 +61,7 @@ drive_e_*_report.json
 drive_e_integration_command.txt
 start-multi-proc-backup-*.ps1
 temp_snippet.ps1
+
+# Local volumes from the historical P1 Compose profile.
+deploy/data/
+deploy/data/**
