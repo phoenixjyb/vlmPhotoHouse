@@ -67,3 +67,7 @@ Stage source and matched opt-in APK together only after existing Limited Windows
 service-account checks. Preserve old launcher/source for rollback. No preparation
 job restart or mutation is needed. This source change does not authorize deployment,
 phone installation, push/merge, audience expansion or publication by itself.
+
+The authorized Windows v13 rollout and its bounded evidence are recorded in
+[TV v13 server qualification](TV_V13_SERVER_20260914.md). Physical TV acceptance
+and protected-phone parity remain separate gates.
