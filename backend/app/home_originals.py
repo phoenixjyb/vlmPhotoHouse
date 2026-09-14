@@ -71,6 +71,19 @@ class SourceIndex:
         self.load(); self.publication.asset(aid,revision)
         return self.entries.get(aid)
 
+    def ready(self, asset):
+        """Delivery admission from pinned metadata, never a byte-read guarantee.
+
+        No source stat, decoder or generated payload per catalog entry. Preview-only
+        videos are not playable; original-video permission remains independent.
+        """
+        entry = self.entries.get(asset['id'])
+        if asset['kind'] == 'photo':
+            return asset['previews']['display']['state'] == 'ready' or bool(entry and entry['kind'] == 'photo')
+        if asset['kind'] == 'video':
+            return asset['video']['state'] == 'ready' or bool(self.originals_allowed and entry and entry['kind'] == 'video')
+        return False
+
     def result(self, asset, revision):
         value=asset_result(asset,revision)
         for p in value['previews'].values():
@@ -130,16 +143,36 @@ def create_home_originals(config, sources, cache):
     @app.get('/home/v3/catalog')
     async def catalog(request:Request):
         def read():
-            q=parameters(request,('page','page_size','revision'));page=number(q.get('page','1'),100000);size=number(q.get('page_size','50'),100)
+            q=parameters(request,('page','page_size','revision','browse','availability','order','media'));page=number(q.get('page','1'),100000);size=number(q.get('page_size','50'),100)
             revision=number(q['revision'],2**31-1) if 'revision' in q else None
             if page>1 and revision is None:raise Refused(400,'revision_required')
             if 'range' in request.headers or 'if-range' in request.headers:raise Refused(400,'invalid_request')
+            browse = 'browse' in q
+            if (browse and q['browse'] != '1') or (not browse and any(k in q for k in ('availability','order','media'))):
+                raise Refused(400,'invalid_request')
+            availability=q.get('availability','all');order=q.get('order','catalog');media=q.get('media','all')
+            if availability not in ('all','ready') or order not in ('catalog','ready_first') or media not in ('all','photo','video'):
+                raise Refused(400,'invalid_request')
             c=sources.load()
             if revision is not None and revision!=c['revision']:raise Refused(409,'feed_changed')
             offset=(page-1)*size;assets=c['assets']
-            result=JSONResponse({'version':3,'revision':c['revision'],'library':{'id':c['library_id'],'title':c['title']},
+            selection = None
+            if browse:
+                assets = [a for a in assets if media == 'all' or a['kind'] == media]
+                matching_total = len(assets)
+                ready_ids = {a['id'] for a in assets if sources.ready(a)}
+                if availability == 'ready':
+                    assets = [a for a in assets if a['id'] in ready_ids]
+                elif order == 'ready_first':
+                    # Stable grouping retains catalog order within each section.
+                    assets = sorted(assets, key=lambda a: a['id'] not in ready_ids)
+                selection = {'version':1,'availability':availability,'order':order,'media':media,
+                             'ready_total':len(ready_ids),'matching_total':matching_total}
+            body={'version':3,'revision':c['revision'],'library':{'id':c['library_id'],'title':c['title']},
                 'page':page,'page_size':size,'total':len(assets),'has_more':offset+size<len(assets),
-                'items':[sources.result(a,c['revision']) for a in assets[offset:offset+size]]})
+                'items':[sources.result(a,c['revision']) for a in assets[offset:offset+size]]}
+            if selection is not None: body['browse'] = selection
+            result=JSONResponse(body)
             if len(result.body)>524288:raise Refused()
             return result
         return await run_in_threadpool(perform,read)
