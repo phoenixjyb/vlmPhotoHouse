@@ -19,6 +19,14 @@ inside the preparer. Publication copies and hashes bounded chunks and keeps
 only catalog metadata in memory. Give publication its own envelope and run it
 serially with expensive preparation for predictable resource use.
 
+The Windows sampler caches its ctypes API bindings and structure types once per
+process. Creating fresh structure/pointer types on every poll retained their type
+graphs in ctypes: a native 2,000-call reproduction grew the pointer cache by 4,000
+entries and RSS by about 30 MB despite garbage collection. A regression checks
+4,000 parent/child samples without new retained pointer types. Mutable sample
+buffers are still allocated separately for each call. The sampler must remain
+bounded as well as the media workload it observes.
+
 Example, with actual paths supplied by the operator:
 
 ```powershell
