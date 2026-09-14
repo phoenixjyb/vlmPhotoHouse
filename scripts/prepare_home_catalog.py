@@ -237,7 +237,22 @@ def previews(directory):
     return result
 
 
-def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None):
+def video_encoder_args(encoder='libx264', gpu=0):
+    if encoder not in ('libx264','h264_nvenc') or type(gpu) is not int or not 0 <= gpu <= 15:
+        raise ValueError('invalid_video_encoder')
+    if encoder == 'libx264':
+        if gpu != 0: raise ValueError('cpu_encoder_has_no_gpu')
+        return ['-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1']
+    # Explicit device, no lookahead/AQ CUDA work. CPU decode/scale preserves the
+    # tested orientation and range path; one NVENC session accelerates encoding.
+    return ['-c:v','h264_nvenc','-gpu',str(gpu),'-preset','p4','-tune','hq',
+            '-rc','vbr','-cq','23','-b:v','0','-maxrate','8M','-bufsize','16M',
+            '-rc-lookahead','0','-spatial_aq','0','-temporal_aq','0','-bf','2',
+            '-profile:v','high','-level:v','4.1']
+
+
+def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encoder='libx264', gpu=0):
+    encoder_args = video_encoder_args(encoder, gpu)
     began = time.monotonic(); before = identity(source)
     def remaining():
         seconds = int(budget.asset_seconds-(time.monotonic()-began))
@@ -264,14 +279,20 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None):
         args = [ffmpeg,'-hide_banner','-loglevel','error','-xerror','-err_detect','explode','-nostdin','-n','-threads','1','-filter_threads','1','-hwaccel','none','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',source,
                 '-map',f"0:{videos[0]['index']}",'-map','0:a:0?','-map_metadata','-1','-map_metadata:s','-1','-map_chapters','-1','-sn','-dn',
                 '-vf',"scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:in_range=auto:out_range=tv,setsar=1,fps=30,format=yuv420p",
-                '-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1',
+                *encoder_args,
                 '-color_range','tv',
                 '-c:a','aac','-b:a','128k','-ac','2','-ar','48000',
                 '-metadata:s:v:0','handler_name=VideoHandler','-metadata:s:a:0','handler_name=SoundHandler',
                 '-metadata:s','language=und','-movflags','+faststart',target]
         # Do not use -fs: it can return success after truncating a near-complete
         # stream. The supervisor rejects oversized output during AND after exit.
-        run_process(args, output, remaining(), target, guard=guard)
+        try:
+            run_process(args, output, remaining(), target, guard=guard)
+        except PreparationError:
+            if encoder == 'h264_nvenc':
+                from home_preparation_resources import JobStopped
+                raise JobStopped('nvenc_encode_failed') from None
+            raise
         v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining(),guard=guard), duration)
         faststart(target)
         # Full bounded decode, not merely an ffprobe/header success.

@@ -1,5 +1,6 @@
 """Sample only the coordinator/owned child. Never manage unrelated processes."""
 import ctypes
+from functools import lru_cache
 import os
 from pathlib import Path
 import re
@@ -13,20 +14,28 @@ class JobStopped(Exception):
     pass
 
 
+@lru_cache(maxsize=1)
+def _windows_memory_api():
+    # ctypes retains pointer types. Rebuilding these structures per sample leaks
+    # their type graphs through that cache, even after garbage collection.
+    from ctypes import wintypes as w
+    class Status(ctypes.Structure):
+        _fields_ = [('length',w.DWORD),('load',w.DWORD)]+[(n,ctypes.c_ulonglong) for n in
+            ('total','available','page_total','page_available','virtual_total','virtual_available','extended')]
+    class Counters(ctypes.Structure):
+        _fields_ = [('cb',w.DWORD),('faults',w.DWORD)]+[(n,ctypes.c_size_t) for n in
+            ('peak','rss','quota_peak_paged','quota_paged','quota_peak_nonpaged','quota_nonpaged','page','peak_page')]
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel.GlobalMemoryStatusEx.argtypes=[ctypes.POINTER(Status)]
+    kernel.GetCurrentProcess.restype=w.HANDLE
+    kernel.K32GetProcessMemoryInfo.argtypes=[w.HANDLE,ctypes.POINTER(Counters),w.DWORD]
+    return kernel,Status,Counters
+
+
 def memory(process=None):
     """Available physical memory and owned RSS. Sampling is not a hard OS quota."""
     if sys.platform == 'win32':
-        from ctypes import wintypes as w
-        class Status(ctypes.Structure):
-            _fields_ = [('length',w.DWORD),('load',w.DWORD)]+[(n,ctypes.c_ulonglong) for n in
-                ('total','available','page_total','page_available','virtual_total','virtual_available','extended')]
-        class Counters(ctypes.Structure):
-            _fields_ = [('cb',w.DWORD),('faults',w.DWORD)]+[(n,ctypes.c_size_t) for n in
-                ('peak','rss','quota_peak_paged','quota_paged','quota_peak_nonpaged','quota_nonpaged','page','peak_page')]
-        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
-        kernel.GlobalMemoryStatusEx.argtypes=[ctypes.POINTER(Status)]
-        kernel.GetCurrentProcess.restype=w.HANDLE
-        kernel.K32GetProcessMemoryInfo.argtypes=[w.HANDLE,ctypes.POINTER(Counters),w.DWORD]
+        kernel,Status,Counters=_windows_memory_api()
         status=Status();status.length=ctypes.sizeof(status)
         counters=Counters();counters.cb=ctypes.sizeof(counters)
         handle=int(process._handle) if process is not None else kernel.GetCurrentProcess()
