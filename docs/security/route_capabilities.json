@@ -24,6 +24,7 @@
     "home.catalog.read": "Deliberately anonymous full visible-catalog TV publication. Explicit LAN peer admission; prepared JPEG/MP4 only, no account, original, live DB, operator or public-ingress grant.",
     "home.feed.read": "Deliberately anonymous selected home feed. Any reachable client in the explicit LAN peer allowlist can read published metadata and prepared derivatives; no account, pairing, original or operator grant.",
     "home.originals.read": "Explicit v3 home LAN selected-source policy, pinned to the published catalog. Raw bytes require launcher allow-originals; never authorizes phone or arbitrary filesystem access.",
+    "home.discovery.tags.read": "Anonymous tag-name lookup over an explicitly pinned v2 metadata index, same reviewed Home media publication and actual LAN audience. No new media or identity grant.",
     "home.discovery.delivery.read": "Anonymous reviewed discovery for the exact Home catalog and source index, preserving v3 media capabilities; no identity inference, account grant or live database access."
   },
   "topology": [
@@ -85,6 +86,14 @@
     },
     {
       "source": "backend/app/home_originals.py",
+      "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
+    },
+    {
+      "source": "backend/app/home_tag_discovery.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/home_tag_discovery.py",
       "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
     },
     {
@@ -245,6 +254,8 @@
     }
   ],
   "routes": [
+    {"source": "backend/app/home_tag_discovery.py", "owner": "app", "method": "GET", "path": "/home/discovery/v3/facets", "handler": "facets", "surface": "home-tag-discovery", "capabilities": ["home.discovery.tags.read"], "scope": "Hash-bound index v2 and exact existing Home media/source policy; discovery v3 only.", "current_control": "Direct HTTPS/Host/actual-peer boundary, 10000-tag cap, 128-byte literal query, 100-item pages, revision binding, separate two-slot body/matching admission, 16 KiB/five-second body and 512 KiB response limits; no-store.", "gap": "Native resource qualification and family/device acceptance remain deployment gates; no automatic people mappings or taxonomy inference."},
+    {"source": "backend/app/home_tag_discovery.py", "owner": "app", "method": "POST", "path": "/home/discovery/v3/search", "handler": "search", "surface": "home-tag-discovery", "capabilities": ["home.discovery.tags.read"], "scope": "Hash-bound index v2 and exact existing Home media/source policy; discovery v3 only.", "current_control": "Direct HTTPS/Host/actual-peer boundary, 10000-tag cap, 128-byte literal query, 100-item pages, revision binding, separate two-slot body/matching admission, 16 KiB/five-second body and 512 KiB response limits; no-store.", "gap": "Native resource qualification and family/device acceptance remain deployment gates; no automatic people mappings or taxonomy inference."},
     {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/discovery/v1/facets", "handler": "facets", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
     {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/discovery/v1/search", "handler": "search", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
     {"source": "backend/app/access/library.py", "owner": "router", "method": "GET", "path": "/assets", "handler": "gallery", "surface": "photohouse", "scope": "Selected library; current membership before scoped count, paging, metadata or captions", "capabilities": ["library.read"], "current_control": "Shared session and membership policy plus active asset-to-library SQL join in one transaction; bounded redacted response Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},

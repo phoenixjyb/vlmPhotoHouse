@@ -195,6 +195,8 @@ def validate(discovered: dict, inventory: dict) -> list[str]:
             errors.append(f"Home discovery exception outside reviewed surface: {identity(route)}")
         if 'home.discovery.delivery.read' in caps and (route['source'] != 'backend/app/home_discovery_delivery.py' or route['surface'] != 'home-discovery-delivery'):
             errors.append(f"Home discovery delivery exception outside reviewed surface: {identity(route)}")
+        if 'home.discovery.tags.read' in caps and (route['source'] != 'backend/app/home_tag_discovery.py' or route['surface'] != 'home-tag-discovery'):
+            errors.append(f"Home tag exception outside reviewed surface: {identity(route)}")
     return errors
 
 

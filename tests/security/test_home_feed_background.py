@@ -70,6 +70,15 @@ class BackgroundTests(unittest.TestCase):
             with self.assertRaises(SystemExit):background.main(base+['--kind','v3','--discovery-index','metadata','--discovery-sha256','b'*64])
             setup.assert_not_called()
 
+    def test_tag_inputs_are_paired_and_search_only(self):
+        base=['--source-root','.','--config','config','--log-dir','logs','--sources','index',
+              '--sources-sha256','a'*64,'--original-root','originals','--cache','cache']
+        with patch.object(background,'configure_logging') as setup:
+            for flags in (['--kind','v3','--tag-index','tags','--tag-sha256','c'*64],
+                          ['--kind','v3-search','--discovery-index','legacy','--discovery-sha256','b'*64,'--tag-index','tags']):
+                with self.assertRaises(SystemExit):background.main(base+flags)
+            setup.assert_not_called()
+
     def test_rejects_changed_access_logging_policy(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory); (source/'scripts').mkdir()

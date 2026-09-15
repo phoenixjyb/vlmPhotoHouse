@@ -48,6 +48,24 @@ class MetadataTests(unittest.TestCase):
         self.assertNotIn('tags',v['enabled_filters']);self.assertEqual(v['tags'],[])
         self.assertTrue(r['coverage']['tag_roster_overflow']);self.assertEqual(r['coverage']['unpublished_tag_count'],5003)
         self.assertTrue(all(not a['tags'] for a in v['assets']))
+    def test_tag_lookup_exports_full_roster_above_legacy_limit(self):
+        catalog=json.loads(self.catalog.read_text())
+        template=catalog['assets'][0]
+        with sqlite3.connect(self.db) as c:
+            for aid in range(1000,1060):
+                catalog['assets'].append(dict(template,id=aid))
+                c.execute("INSERT INTO assets(id,status,taken_at) VALUES(?,?,?)",(aid,'active',None))
+            c.executemany('INSERT INTO tags VALUES(?,?,?)',[(i,'Synthetic '+str(i),'scene') for i in range(1000,7000)])
+            c.executemany('INSERT INTO asset_tags VALUES(?,?,?,?)',[(i,1000+(i-1000)//100,i,'manual') for i in range(1000,7000)])
+        catalog['assets'].sort(key=lambda a:a['id'],reverse=True)
+        self.catalog.write_text(json.dumps(catalog))
+        raw,receipt=export.build(self.db,self.catalog,9,tag_lookup=True);value=json.loads(raw)
+        self.assertEqual(value['version'],2);self.assertEqual(len(value['tags']),6002)
+        self.assertEqual(value['tags'][-1]['id'],6999)
+        self.assertEqual(receipt['policy'],'home-search-tags-2')
+        self.assertTrue(receipt['coverage']['tags_enabled'])
+        old,_=self.build();self.assertNotIn('tags',json.loads(old)['enabled_filters'])
+
     def test_view_refused(self):
         with sqlite3.connect(self.db) as c:
             c.execute('ALTER TABLE captions RENAME TO originals');c.execute('CREATE VIEW captions AS SELECT * FROM originals')

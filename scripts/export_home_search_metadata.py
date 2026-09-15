@@ -26,7 +26,7 @@ MAX_BYTES = 64 * 1024**2
 MAX_SECONDS = 120
 
 
-def build(database, catalog_path, revision):
+def build(database, catalog_path, revision, *, tag_lookup=False):
     start = time.monotonic()
     def budget():
         if time.monotonic() - start > MAX_SECONDS:
@@ -93,15 +93,19 @@ def build(database, catalog_path, revision):
             rows[aid]['tags'].append(dict(id=tid,source=source_map.get(source,'unknown'))); used.add(tid)
         db.execute('ROLLBACK')
     # Never truncate a tag roster or claim incomplete tag matching as complete.
-    tag_overflow = len(used) > 5000
+    tag_overflow = len(used) > (10000 if tag_lookup else 5000)
     unpublished_tags = len(used) if tag_overflow else 0
     if tag_overflow:
         used = set()
         for row in rows.values(): row['tags'] = []
-    index = dict(version=1,revision=revision,catalog_revision=catalog['revision'],catalog_sha256=digest,
+    index = dict(version=2 if tag_lookup else 1,revision=revision,catalog_revision=catalog['revision'],catalog_sha256=digest,
         enabled_filters=['caption','date','media'] + (['tags'] if used else []),people=[],pinned_person_ids=[],
         tags=[tags[i] for i in sorted(used)],locations=[],assets=[rows[i] for i in sorted(rows)])
-    validate_index(index,catalog,digest); output = packed(index)
+    if tag_lookup:
+        from app.home_tag_discovery import validate_tag_index
+        validate_tag_index(index,catalog,digest)
+    else: validate_index(index,catalog,digest)
+    output = packed(index)
     if len(output) > MAX_BYTES: raise ValueError('metadata_byte_budget')
     if bounded_read(catalog_path,MAX_BYTES) != raw: raise ValueError('catalog_changed')
     budget()
@@ -112,7 +116,7 @@ def build(database, catalog_path, revision):
         people_enabled=False,locations_enabled=False,unresolved_shortcuts=7,
         tags_enabled=bool(used),unpublished_tag_count=unpublished_tags,tag_roster_overflow=tag_overflow,
         rows_scanned=dict(scanned),elapsed_seconds=round(time.monotonic()-start,3))
-    return output,dict(policy='home-search-metadata-1',catalog_sha256=digest,
+    return output,dict(policy='home-search-tags-2' if tag_lookup else 'home-search-metadata-1',catalog_sha256=digest,
         index_sha256=hashlib.sha256(output).hexdigest(),index_bytes=len(output),coverage=coverage,
         media_copied=False,activated=False)
 
@@ -121,11 +125,12 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('database','catalog','output'): p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--revision',type=int,required=True)
+    p.add_argument('--tag-lookup',action='store_true')
     a=p.parse_args()
     try:
         direct_path(a.output)
         if a.output.exists() or a.output.is_symlink() or not a.output.parent.is_dir(): raise ValueError('output_collision')
-        raw,report=build(a.database,a.catalog,a.revision)
+        raw,report=build(a.database,a.catalog,a.revision,tag_lookup=a.tag_lookup)
         with a.output.open('xb') as f: a.output.chmod(0o600); f.write(raw)
         print(json.dumps(report));return 0
     except Exception:

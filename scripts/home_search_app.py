@@ -17,6 +17,7 @@ def main(argv=None,server_run=None):
     p.add_argument('--source-root',type=Path,action='append',required=True)
     p.add_argument('--cache',type=Path,required=True)
     p.add_argument('--discovery-index',type=Path,required=True);p.add_argument('--discovery-sha256',required=True)
+    p.add_argument('--tag-index',type=Path);p.add_argument('--tag-sha256')
     p.add_argument('--allow-originals',action='store_true')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--check',action='store_true');mode.add_argument('--serve',action='store_true')
     a=p.parse_args(argv)
@@ -26,13 +27,20 @@ def main(argv=None,server_run=None):
         c=sources.load();cache=PhotoCache(a.cache)
         metadata=DeliveryIndex(sources,a.discovery_index,a.discovery_sha256)
         metadata.load()
+        if bool(a.tag_index) != bool(a.tag_sha256): raise ValueError('Both tag inputs required')
+        if a.tag_index:
+            from app.home_tag_discovery import TagIndex,create_home_tag_discovery
+            TagIndex(sources,a.tag_index,a.tag_sha256).load()
+            app=create_home_tag_discovery(config,sources,cache,a.tag_index,a.tag_sha256,a.discovery_index,a.discovery_sha256)
+        else:
+            app=create_home_discovery_delivery(config,sources,cache,a.discovery_index,a.discovery_sha256)
         if a.check:
             print(json.dumps(dict(version=3,assets=len(c['assets']),indexed=len(sources.entries),originals_allowed=a.allow_originals,listener_started=False)))
         else:
             if server_run is None:
                 import uvicorn
                 server_run=uvicorn.run
-            server_run(create_home_discovery_delivery(config,sources,cache,a.discovery_index,a.discovery_sha256),**options)
+            server_run(app,**options)
         return 0
     except Exception:print('Invalid original delivery configuration');return 2
 if __name__=='__main__':raise SystemExit(main())

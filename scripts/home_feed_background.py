@@ -127,6 +127,8 @@ def main(argv=None):
     parser.add_argument('--sources-sha256')
     parser.add_argument('--original-root', type=Path, action='append')
     parser.add_argument('--cache', type=Path)
+    parser.add_argument('--tag-index', type=Path)
+    parser.add_argument('--tag-sha256')
     parser.add_argument('--discovery-index', type=Path)
     parser.add_argument('--discovery-sha256')
     parser.add_argument('--allow-originals', action='store_true')
@@ -149,6 +151,10 @@ def main(argv=None):
         delivery_args += ['--discovery-index',str(args.discovery_index),'--discovery-sha256',args.discovery_sha256]
     elif args.discovery_index or args.discovery_sha256:
         parser.error('Discovery arguments require v3-search')
+    if args.tag_index or args.tag_sha256:
+        if args.kind != 'v3-search' or not args.tag_index or not args.tag_sha256:
+            parser.error('Tag lookup requires explicit v3-search tag index and checksum')
+        delivery_args += ['--tag-index',str(args.tag_index),'--tag-sha256',args.tag_sha256]
     configure_logging(args.log_dir)
     window = console_window()
     receipt = {'pid': os.getpid(), 'parent_pid': os.getppid(),
