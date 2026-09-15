@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import rehearse_fullsize_database as full
 
 FROM_REVISION = 'd2b7e4f6a901'
-TO_REVISION = 'c7f4a9e2b610'
+TO_REVISION = 'd8e5b2f7a904'
 
 
 def _source(db, budget):

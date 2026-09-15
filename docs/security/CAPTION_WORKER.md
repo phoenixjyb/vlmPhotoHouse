@@ -51,7 +51,7 @@ python -I scripts/run_caption_worker.py
 ```
 
 The only qualified revisions are the pre-access `d2b7e4f6a901` and migrated
-`c7f4a9e2b610`; the actual file must match the selected revision exactly. No schema
+`c7f4a9e2b610` or `d8e5b2f7a904`; the actual file must match the selected revision exactly. No schema
 creation or migration is attempted. The execution connection uses SQLite `mode=rw`
 so a missing file cannot silently become a new catalog.
 

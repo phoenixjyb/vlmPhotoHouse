@@ -54,6 +54,9 @@ try:
                 fixture.mutate("UPDATE persons SET display_name=?,updated_at='changed-by-test' WHERE id=1",('<img src=x onerror="window.syntheticXSS=true">',))
             elif scenario=='face-assignment-changed':
                 fixture.mutate("UPDATE face_detections SET label_source='dnn',label_score=0.2 WHERE id=200")
+            elif scenario=='album-title-changed':
+                fixture.mutate("UPDATE albums SET title='Changed elsewhere' WHERE id IN (SELECT album_id FROM access_album_libraries)")
+                fixture.mutate('UPDATE access_album_libraries SET revision=revision+1')
             elif scenario=='china-login':
                 fixture.mutate("UPDATE access_accounts SET phone_login='+8610000000000' WHERE id=?", (fixture.member_id,))
             elif scenario=='international-login':

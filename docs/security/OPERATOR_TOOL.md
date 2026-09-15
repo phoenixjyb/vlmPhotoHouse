@@ -144,7 +144,8 @@ creates private backups and rehearses migrations only in memory. It never upgrad
 an existing file. Do not invoke generic Alembic with ambient DATABASE_URL:
 preparation uses an explicit in-memory connection. Runtime/application never
 creates or upgrades the database.
-Required schema remains `c7f4a9e2b610`.
+Current protected source requires `d8e5b2f7a904`; see the additional
+[management ownership and native qualification gates](LIBRARY_MANAGEMENT.md).
 
 `scripts/staging_app.py --config "$PHOTOHOUSE_PRIVATE_STAGING_CONFIG" --check-config`
 validates only the selected config syntax. A separate `--serve` action would start

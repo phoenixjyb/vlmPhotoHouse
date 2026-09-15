@@ -291,7 +291,7 @@ class AccessService:
             return member
         if capability == 'media.original.read' and member['originals']:
             return member
-        if capability in {'library.members.manage', 'library.people.manage'} and member['role'] == 'owner':
+        if capability in {'library.members.manage', 'library.people.manage', 'library.albums.manage'} and member['role'] == 'owner':
             return member
         if capability == 'story.write' and member['role'] in {'owner', 'contributor'}:
             return member

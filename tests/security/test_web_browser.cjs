@@ -29,6 +29,7 @@ const PASSWORD='Synthetic family passphrase!';
 const MEMBER='+12025550102';
 let hold=null,abortLogout=false,loseStorySave=false,loseStoryDelete=false;
 let loseFaceSave=false;
+let loseAlbumSave=false;
 const external=[],errors=[],checks=[];let syntheticFetchMetadata=0;
 function checkpoint(name){checks.push(name);console.log('PASS '+name);}
 function delayNext(predicate){
@@ -57,6 +58,7 @@ async function context(browser){
     if(loseStorySave&&request.method()==='POST'&&url.pathname.endsWith('/stories')){loseStorySave=false;await route.abort();return;}
     if(loseStoryDelete&&request.method()==='DELETE'&&url.pathname.startsWith('/stories/')){loseStoryDelete=false;await route.abort();return;}
     if(loseFaceSave&&request.method()==='POST'&&url.pathname.endsWith('/assignment')){loseFaceSave=false;await route.abort();return;}
+    if(loseAlbumSave&&request.method()==='POST'&&url.pathname==='/admin/albums'){loseAlbumSave=false;await route.abort();return;}
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
     const outputHeaders={...response.headers};delete outputHeaders['content-length'];delete outputHeaders['content-encoding'];
     try {await route.fulfill({status:response.status,headers:outputHeaders,body:Buffer.from(response.body,'base64')});}
@@ -269,6 +271,63 @@ let browser;
   await owner.locator('#close-viewer').click();await owner.locator('#language').click();await owner.setViewportSize({width:1200,height:900});
   await owner.locator('.asset').first().waitFor();
   checkpoint('Face pages discard closed-viewer responses; Chinese narrow-screen confirmation renders');
+  await owner.locator('.asset').filter({hasText:'102'}).click();await owner.locator('#face-panel summary').click();await face.waitFor();
+  await face.getByRole('button',{name:'Create a new person',exact:true}).click();
+  await owner.locator('.new-person-form input').fill('家人新名字');owner.once('dialog',dialog=>dialog.accept());
+  await owner.getByRole('button',{name:'Create and assign',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='家人新名字');
+  owner.once('dialog',dialog=>dialog.accept());await face.getByRole('button',{name:'Remove this assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='Unassigned');
+  await face.getByRole('button',{name:'Choose a person',exact:true}).click();
+  await owner.locator('.face-picker input').fill('家人新名字');await owner.locator('.face-picker form button').click();
+  await owner.locator('.person-choice').filter({hasText:'家人新名字'}).click();
+  await owner.getByRole('button',{name:'Confirm assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='家人新名字');
+  await owner.locator('#close-viewer').click();
+  checkpoint('New named person remains selectable after removing their last face assignment');
+  await owner.locator('#albums-panel summary').click();await owner.locator('#album-create').click();
+  await owner.locator('#album-title').fill('Our seaside trip');await owner.locator('#album-title_zh').fill('全家的海边旅行');
+  await owner.locator('#album-description').fill('A weekend together. 一起看海。');await owner.locator('#album-theme').selectOption('trip');
+  await owner.locator('#album-choices [data-asset-id="101"]').click();await owner.locator('#album-choices [data-asset-id="102"]').click();
+  await owner.locator('#album-selected [data-asset-id="102"]').getByRole('button',{name:'Move earlier',exact:true}).click();
+  await owner.locator('#album-selected [data-asset-id="102"]').getByRole('button',{name:'Use as cover',exact:true}).click();
+  assert.deepEqual(await owner.locator('#album-selected .album-selection').evaluateAll(rows=>rows.map(row=>row.dataset.assetId)),['102','101']);
+  await owner.locator('#album-save').scrollIntoViewIfNeeded();await owner.screenshot({path:path.join(artifacts,'album-editor-desktop.png')});
+  loseAlbumSave=true;await owner.locator('#album-save').click();
+  await owner.waitForFunction(()=>document.getElementById('album-editor-status').textContent.includes('Save not confirmed'));
+  assert.equal(await owner.locator('#album-title').isDisabled(),true);
+  await owner.locator('#album-save').click();await owner.locator('#album-editor').waitFor({state:'hidden'});
+  await owner.locator('.album-card').waitFor();assert.equal(await owner.locator('.album-card').count(),1);
+  await page.locator('#albums-panel summary').click();await page.locator('.album-card').waitFor();
+  assert.equal(await page.locator('#album-create').isVisible(),false);assert.equal(await page.getByRole('button',{name:'Edit album',exact:true}).count(),0);
+  await page.locator('.album-strip button').first().click();await page.locator('#viewer').waitFor({state:'visible'});await page.locator('#close-viewer').click();
+  checkpoint('Owner builds a bilingual themed album with ordered photos and cover; creation retry is not duplicated; members can view');
+  await owner.getByRole('button',{name:'Edit album',exact:true}).click();await owner.locator('#album-title').fill('Unsaved private draft');
+  await owner.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+  assert.equal(await owner.locator('#album-editor').isVisible(),false);assert.equal(await owner.locator('#album-title').count(),0);
+  await owner.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+  await owner.locator('#album-title').waitFor();assert.equal(await owner.locator('#album-title').inputValue(),'Unsaved private draft');
+  owner.once('dialog',dialog=>dialog.accept());await owner.locator('#album-editor').getByRole('button',{name:'Cancel',exact:true}).click();
+  checkpoint('Album draft clears from background DOM and returns only after same-owner revalidation');
+  await owner.getByRole('button',{name:'Edit album',exact:true}).click();await owner.locator('#album-description').fill('Stale draft');
+  await mutate('album-title-changed');await owner.locator('#album-save').click();
+  await owner.waitForFunction(()=>document.getElementById('album-editor-status').textContent.includes('Album changed'));
+  assert.equal(await owner.locator('#album-save').isDisabled(),true);
+  owner.once('dialog',dialog=>dialog.accept());await owner.locator('#album-editor').getByRole('button',{name:'Cancel',exact:true}).click();
+  await owner.locator('#albums-panel summary').click();await owner.locator('#albums-panel summary').click();
+  await owner.waitForFunction(()=>document.querySelector('.album-card h3')?.textContent==='Changed elsewhere');
+  await owner.getByRole('button',{name:'Edit album',exact:true}).click();
+  await owner.locator('#album-selected').getByRole('button',{name:'Remove',exact:true}).first().click();
+  await owner.locator('#album-selected').getByRole('button',{name:'Remove',exact:true}).first().click();
+  await owner.locator('#album-save').click();await owner.locator('#album-editor').waitFor({state:'hidden'});
+  assert.equal(await owner.locator('.album-card').count(),1);assert.equal(await owner.locator('.album-card img').count(),0);
+  await owner.setViewportSize({width:390,height:844});await owner.locator('#language').click();await owner.locator('.album-card').waitFor();
+  await owner.getByRole('button',{name:'编辑相册',exact:true}).click();await owner.locator('#album-title').scrollIntoViewIfNeeded();
+  await owner.screenshot({path:path.join(artifacts,'album-editor-mobile-zh.png')});
+  assert(await owner.locator('#album-editor').evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth));
+  await owner.locator('#album-editor').getByRole('button',{name:'取消',exact:true}).click();
+  await owner.locator('#language').click();await owner.setViewportSize({width:1200,height:900});await owner.locator('.asset').first().waitFor();
+  checkpoint('Album stale edits are refused; empty albums retain ownership; Chinese mobile editor fits');
   await owner.locator('#owner-panel summary').click();
   await owner.locator('#invite-phone').fill('+12025550103');await owner.locator('#invite-form button').click();
   await owner.locator('#created-code').waitFor({state:'visible'});

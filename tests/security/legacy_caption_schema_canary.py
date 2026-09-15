@@ -21,7 +21,7 @@ phase('source-preflight')
 assert database == work/'owner-canary.sqlite'
 with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True)) as check:
     check.execute('PRAGMA query_only=ON')
-    assert check.execute('SELECT version_num FROM alembic_version').fetchall() == [('c7f4a9e2b610',)]
+    assert check.execute('SELECT version_num FROM alembic_version').fetchall() == [('d8e5b2f7a904',)]
     assert check.execute('SELECT count(*) FROM access_accounts WHERE state != "disabled"').fetchone()[0] == 0
     assert check.execute('SELECT count(*) FROM access_libraries WHERE state != "closed"').fetchone()[0] == 0
     task_counts = check.execute('SELECT state,count(*) FROM tasks GROUP BY state ORDER BY state').fetchall()
@@ -97,7 +97,7 @@ with ExitStack() as guards:
             assert session.execute(text('SELECT * FROM access_stories')).fetchall()==story_before
             assert session.execute(text('SELECT * FROM access_story_revisions')).fetchall()==history_before
             assert session.execute(text('SELECT state,count(*) FROM tasks GROUP BY state ORDER BY state')).fetchall()==task_counts
-            assert session.execute(text('SELECT version_num FROM alembic_version')).fetchall()==[('c7f4a9e2b610',)]
+            assert session.execute(text('SELECT version_num FROM alembic_version')).fetchall()==[('d8e5b2f7a904',)]
             assert session.execute(text('PRAGMA foreign_key_check')).fetchone() is None
     finally: engine.dispose()
     print(json.dumps({'caption_schema_canary':'pass','actual_installed_handler':True,

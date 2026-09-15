@@ -1,7 +1,7 @@
 # Offline access-schema application
 
 `scripts/apply_access_schema.py` applies only the reviewed additive transition from
-`d2b7e4f6a901` to `c7f4a9e2b610`. It is an operator tool, not an API/startup hook.
+`d2b7e4f6a901` to `d8e5b2f7a904`. It is an operator tool, not an API/startup hook.
 It creates no account, password, session, library, media mapping or HTTP listener.
 The default operation reviews the selected target and separate backup read-only.
 
@@ -53,6 +53,9 @@ preservation, empty grants, refused running/WAL/stale/repeated targets, explicit
 shutdown confirmation, a racing writer, and rollback after DDL/data-change/timeouts.
 
 ## Qualification receipt — 2026-09-15
+
+This receipt covers the **earlier `c7f4a9e2b610` target only**. The new
+[library-management target](LIBRARY_MANAGEMENT.md) needs fresh native qualification.
 
 The 14 focused tests passed on Mac and native Windows CPython 3.12 (4.303 seconds
 on Windows). The full Mac security suite ran 664 tests: 659 passed and five skipped.

@@ -83,4 +83,6 @@ def migration_metadata(legacy_metadata):
         Column('receipt', Text, nullable=False))
     from .story_schema import add_story_tables
     add_story_tables(metadata)
+    from .management_schema import add_management_tables
+    add_management_tables(metadata)
     return metadata

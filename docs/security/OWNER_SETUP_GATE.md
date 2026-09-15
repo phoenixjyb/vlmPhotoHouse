@@ -1,5 +1,8 @@
 # First owner password and protected WebUI cutover
 
+Current source now requires the [library-management migration](LIBRARY_MANAGEMENT.md).
+Its native qualification and legacy ownership import are still cutover gates.
+
 The first owner password is entered **during the approved Windows cutover
 maintenance window, before protected traffic is enabled**. It need not wait for
 the caption refresh campaign to finish. It must not be pasted into chat, a script,

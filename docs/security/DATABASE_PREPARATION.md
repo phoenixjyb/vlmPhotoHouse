@@ -11,7 +11,7 @@ modify an existing database. It is included in the source-only staging package.
 
 | Command | Input | Effect | Verification |
 | --- | --- | --- | --- |
-| `initialize --out ABS_NEW_FILE` | No existing database | Migrate empty memory database to `c7f4a9e2b610`, then create a new private file | Required tables/key, integrity, foreign keys and in-memory restore equality |
+| `initialize --out ABS_NEW_FILE` | No existing database | Migrate empty memory database to `d8e5b2f7a904`, then create a new private file | Required tables/key, integrity, foreign keys and in-memory restore equality |
 | `backup --database ABS_EXISTING --out ABS_NEW_FILE` | Explicit known-revision database | Copy one read transaction to memory, then a separate new private file | Source/copy logical equality, integrity, foreign keys and in-memory restore equality |
 | `rehearse-migration --database ABS_EXISTING` | Explicit known-revision database | Upgrade an in-memory copy to the required revision and discard it | Actual Alembic chain, required tables/key, integrity and foreign keys |
 | `migrate-candidate` with source, separate matching backup, reviewed digest and review references | Exact reviewed known-revision snapshot | Migrate in memory, quarantine access, create a new private candidate | Both input snapshots, quarantine barriers, integrity, foreign keys and output restore equality |
@@ -61,7 +61,7 @@ opaque local review IDs (3–80 ASCII letters, digits, underscores or hyphens), 
 phones, passwords or paths. They record external review; they do not authenticate
 an operator, prove quiescence or provide a sealed/expiring approval protocol.
 
-The candidate is upgraded through the actual Alembic chain to `c7f4a9e2b610`.
+The candidate is upgraded through the actual Alembic chain to `d8e5b2f7a904`.
 Within a separate memory transaction it uses the same quarantine mutation as
 reviewed restore recovery: disable every active account, close every library,
 revoke sessions, cancel unused invitations, replace the admission/plan key with

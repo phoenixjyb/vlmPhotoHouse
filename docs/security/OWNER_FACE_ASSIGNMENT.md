@@ -1,5 +1,9 @@
 # Protected owner face assignment
 
+Follow-up: [library management](LIBRARY_MANAGEMENT.md) adds new-person creation,
+unassignment and durable library ownership under a newer schema. The evidence
+below describes the earlier single-face-assignment slice.
+
 Local implementation, 2026-09-15. Extends [people review](OWNER_PEOPLE_REVIEW.md).
 This is a manual, single-face correction to an existing person, not migration or
 deployment of the full legacy management interface.

@@ -3,6 +3,7 @@
   "status": "ACTIVE ENTRYPOINT CLOSED BY DEFAULT / RETIRED AND STANDALONE GAPS EXPLICIT",
   "base_commit": "932263504ac5fcc3ed178e951991619d8ee87049",
   "capabilities": {
+    "library.albums.manage": "Current owner of selected active library. Explicit album ownership, selected-asset scope, revision-bound edits, atomic audit. No publication or media deletion.",
     "library.people.manage": "Current approved owner in the selected active library. Scoped people review, audited revision-bound rename and single-face assignment between exclusively scoped people. Invalidates affected person aggregates without vector/file writes. No merge, propagation, original-byte or job grant.",
     "story.write": "Current contributor or owner membership. Contributors edit only their own stories; owners may moderate. Parent and child library scope, atomic revision checks, idempotent saves, CSRF for cookies. No AI caption or TV publication grant.",
     "public.ui": "Anonymous, code-only UI shell/assets/redirects; never embedded library data. Redirect parameters are untrusted and may contain private search text.",
@@ -31,6 +32,7 @@
     "home.discovery.delivery.read": "Anonymous reviewed discovery for the exact Home catalog and source index, preserving v3 media capabilities; no identity inference, account grant or live database access."
   },
   "topology": [
+    {"source":"backend/app/access/albums.py","expression":"router = APIRouter(route_class=LibraryRoute)"},
     {
       "source": "backend/app/access/discovery_transport.py",
       "expression": "router = APIRouter(route_class=DiscoveryRoute)"
@@ -176,6 +178,7 @@
       "source": "backend/app/main.py",
       "expression": "app.include_router(account_router)"
     },
+    {"source":"backend/app/main.py","expression":"app.include_router(album_router)"},
     {
       "source": "backend/app/main.py",
       "expression": "app.include_router(library_router)"
@@ -275,6 +278,11 @@
     }
   ],
   "routes": [
+    {"source":"backend/app/access/albums.py","owner":"router","method":"GET","path":"/library-albums","handler":"list_albums","surface":"photohouse","scope":"Explicit selected-library ownership","capabilities":["library.read"],"current_control":"Membership and scope before count; bounded album lists; moved assets filtered","gap":"Legacy unowned albums require reviewed import"},
+    {"source":"backend/app/access/albums.py","owner":"router","method":"POST","path":"/admin/albums","handler":"create_album","surface":"photohouse","scope":"Owned library with selected mapped assets","capabilities":["library.albums.manage"],"current_control":"Atomic owner check, ownership, creation mutation key, selected assets and audit","gap":"Local synthetic acceptance; not deployed"},
+    {"source":"backend/app/access/albums.py","owner":"router","method":"PUT","path":"/admin/albums/{album_id}","handler":"update_album","surface":"photohouse","scope":"Owned album in selected library","capabilities":["library.albums.manage"],"current_control":"Atomic owner and revision checks, asset scope, cover validation, audited edit","gap":"No publishing or media deletion"},
+    {"source":"backend/app/access/people.py","owner":"router","method":"POST","path":"/admin/faces/{face_id}/new-person","handler":"create_person","surface":"photohouse","scope":"Visible face and exclusive old person","capabilities":["library.people.manage"],"current_control":"Atomic owner, revision, ownership and assignment with worker conflict guard","gap":"Legacy unowned orphans require reviewed import"},
+    {"source":"backend/app/access/people.py","owner":"router","method":"POST","path":"/admin/faces/{face_id}/unassign","handler":"unassign","surface":"photohouse","scope":"Visible face and exclusive old person","capabilities":["library.people.manage"],"current_control":"Revision-bound removal retains person ownership and audit; no vector/media deletion","gap":"Automatic face writers require separate manual-label qualification"},
     {"source":"backend/app/access/people.py","owner":"router","method":"GET","path":"/admin/assets/{asset_id}/faces","handler":"asset_faces","surface":"photohouse","scope":"Active mapped parent asset in selected library","capabilities":["library.people.manage"],"current_control":"Owner and parent scope before face queries; 25 rows, opaque assignment revision, no vectors or global counts","gap":"Local synthetic acceptance only"},
     {"source":"backend/app/access/people.py","owner":"router","method":"POST","path":"/admin/faces/{face_id}/assignment","handler":"assign","surface":"photohouse","scope":"Scoped face and exclusively mapped source/target people","capabilities":["library.people.manage"],"current_control":"Fresh face and target-name revisions, owner and scope recheck, queued/running face-work refusal, atomic assignment/history/counts/aggregate invalidation/audit; cookie CSRF","gap":"No new person, unassignment, propagation or merge; global legacy writers require operational isolation"},
     {"source":"backend/app/access/people.py","owner":"router","method":"GET","path":"/admin/people","handler":"people","surface":"photohouse","scope":"Active mapped faces in the selected library","capabilities":["library.people.manage"],"current_control":"Current owner check before data queries; scoped name search and 25-row pages; no biometric vectors or global counts","gap":"Local synthetic acceptance; not deployed"},

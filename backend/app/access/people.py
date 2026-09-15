@@ -1,7 +1,7 @@
 """Owner-only, library-scoped people review and explicit manual corrections.
 
 No merge, vector/media write, automatic propagation or legacy API import.
-Unmapped/orphan people require an explicit future ownership/import workflow.
+Legacy unowned orphans require an explicit offline import review.
 """
 import hashlib
 import hmac
@@ -41,13 +41,19 @@ class People:
     def _exclusive(self, person, library):
         # Person names are legacy global records. Editing a shared/unmapped person's
         # name would affect another audience, even if this owner sees one face.
+        owner = self.db.execute('SELECT library_id FROM access_person_libraries WHERE person_id=?', (person,)).fetchone()
+        if owner is not None and owner[0] != library:
+            return False
         return self.db.execute('''SELECT 1 FROM face_detections f
             LEFT JOIN access_asset_libraries l ON l.asset_id=f.asset_id
             WHERE f.person_id=? AND (l.library_id IS NULL OR l.library_id!=?) LIMIT 1''',
             (person, library)).fetchone() is None
 
     def _person(self, person, library):
-        if self.db.execute('SELECT 1' + SCOPED + ' AND f.person_id=? LIMIT 1', (library, person)).fetchone() is None:
+        owner = self.db.execute('SELECT library_id FROM access_person_libraries WHERE person_id=?', (person,)).fetchone()
+        if owner is not None and owner[0] != library:
+            raise AccessDenied('Access denied')
+        if owner is None and self.db.execute('SELECT 1' + SCOPED + ' AND f.person_id=? LIMIT 1', (library, person)).fetchone() is None:
             raise AccessDenied('Access denied')
         row = self._row(person)
         if row is None:
@@ -65,15 +71,18 @@ class People:
         pattern = '%' + query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
         with self.access._transaction():
             self.access._require(token, library, 'library.people.manage')
-            sql = '''SELECT p.id,substr(coalesce(p.display_name,''),1,128),p.updated_at,
-                length(coalesce(p.display_name,'')),count(*)
-                FROM persons p JOIN face_detections f ON f.person_id=p.id
+            sql = '''WITH visible AS (SELECT f.person_id,count(*) n FROM face_detections f
                 JOIN assets a ON a.id=f.asset_id JOIN access_asset_libraries l ON l.asset_id=a.id
-                WHERE l.library_id=? AND (a.status IS NULL OR a.status='active')
-                AND coalesce(p.display_name,'') LIKE ? ESCAPE '\\' GROUP BY p.id'''
-            total = self.db.execute('SELECT count(*) FROM (' + sql + ')', (library, pattern)).fetchone()[0]
+                WHERE l.library_id=? AND (a.status IS NULL OR a.status='active') GROUP BY f.person_id)
+                SELECT p.id,substr(coalesce(p.display_name,''),1,128),p.updated_at,
+                length(coalesce(p.display_name,'')),coalesce(v.n,0)
+                FROM persons p LEFT JOIN visible v ON v.person_id=p.id
+                LEFT JOIN access_person_libraries owned ON owned.person_id=p.id
+                WHERE (owned.library_id=? OR (owned.library_id IS NULL AND v.n>0))
+                AND coalesce(p.display_name,'') LIKE ? ESCAPE '\\' '''
+            total = self.db.execute('SELECT count(*) FROM (' + sql + ')', (library, library, pattern)).fetchone()[0]
             rows = self.db.execute(sql + ' ORDER BY coalesce(p.display_name,\'\') COLLATE NOCASE,p.id LIMIT 25 OFFSET ?',
-                                   (library, pattern, (page-1)*25)).fetchall()
+                                   (library, library, pattern, (page-1)*25)).fetchall()
             return {'library_id': library, 'page': page, 'page_size': 25, 'total': total,
                     'items': [self._present(row[:4], library, row[4]) for row in rows]}
 
@@ -128,9 +137,11 @@ class People:
 
     def _present_face(self, row, library):
         person = self._row(row[2]) if row[2] is not None else None
+        owner = self.db.execute('SELECT library_id FROM access_person_libraries WHERE person_id=?', (row[2],)).fetchone()
+        foreign = owner is not None and owner[0] != library
         return {'id': str(row[0]), 'asset_id': str(row[1]),
-                'person_id': str(row[2]) if row[2] is not None else None,
-                'display_name': person[1] if person else None,
+                'person_id': str(row[2]) if row[2] is not None and not foreign else None,
+                'display_name': person[1] if person and not foreign else None,
                 'revision': self._face_revision(row, library),
                 'can_assign': row[2] is None or (person is not None and self._exclusive(row[2], library))}
 
@@ -161,27 +172,60 @@ class People:
             if (not hmac.compare_digest(body['revision'], self._face_revision(row, library)) or
                     not hmac.compare_digest(body['person_revision'], self._revision(target, library))):
                 raise TransportError(409, 'Assignment changed; review again')
-            # Global legacy face writers are not library-scoped. Never race known
-            # queued/in-flight jobs or enqueue propagation from this protected UI.
-            if self.db.execute("""SELECT 1 FROM tasks WHERE state IN ('pending','running')
-                AND type IN ('face','face_embed','person_cluster','person_recluster','person_label_propagate') LIMIT 1""").fetchone():
-                raise TransportError(409, 'Face processing active; review later')
-            if row[2] == person and row[3] == 'manual':
-                return self._present_face(row, library)
-            self.db.execute("UPDATE face_detections SET person_id=?,label_source='manual',label_score=NULL WHERE id=?",
-                            (person, face))
-            self.db.execute('''INSERT INTO face_assignment_events(face_id,asset_id,old_person_id,new_person_id,
-                old_label_source,new_label_source,old_label_score,new_label_score,source,reason,actor)
-                VALUES (?,?,?,?,?,'manual',?,NULL,'manual','protected.owner.assign',?)''',
-                (face, row[1], row[2], person, row[3], row[4], member['account_id']))
-            for affected in {row[2], person} - {None}:
-                # Face vectors remain valid; person aggregates no longer represent
-                # membership. Invalidate pointers/status only, never delete files.
-                self.db.execute('''UPDATE persons SET face_count=(SELECT count(*) FROM face_detections WHERE person_id=?),
-                    embedding_path=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?''', (affected, affected))
-                self.db.execute("UPDATE person_embedding_artifacts SET status='stale' WHERE person_id=?", (affected,))
-            self.access._audit(member['account_id'], 'face.assign.' + str(face), library)
-            return self._present_face(self._face(face, library), library)
+            return self._mutate_face(member, library, row, person)
+
+    def change(self, token, library, face, body, *, create=False):
+        if not re.fullmatch('[0-9a-f]{64}', body['revision']):
+            raise TransportError(400, 'Invalid revision')
+        name = body.get('display_name', '')
+        if create and (not name.strip() or name != name.strip() or len(name)>128 or
+                       any(ord(c)<32 or ord(c)==127 or 0xD800<=ord(c)<=0xDFFF for c in name)):
+            raise TransportError(400, 'Invalid name')
+        with self.access._transaction(write=True):
+            member = self.access._require(token, library, 'library.people.manage')
+            row = self._face(face, library)
+            if row[2] is not None and not self._exclusive(row[2], library):
+                raise AccessDenied('Access denied')
+            if not hmac.compare_digest(body['revision'], self._face_revision(row, library)):
+                raise TransportError(409, 'Assignment changed; review again')
+            person = None
+            if create:
+                person = self.db.execute('INSERT INTO persons(display_name,face_count) VALUES(?,0)', (name,)).lastrowid
+                self.db.execute('INSERT INTO access_person_libraries VALUES(?,?,?,1)', (person,library,member['account_id']))
+                self.access._audit(member['account_id'], 'person.create.' + str(person), library)
+            return self._mutate_face(member, library, row, person)
+
+    def create_for_face(self, token, library, face, body):
+        return self.change(token, library, face, body, create=True)
+
+    def unassign(self, token, library, face, body):
+        return self.change(token, library, face, body)
+
+    def _mutate_face(self, member, library, row, person):
+        face = row[0]
+        # Global legacy face writers are not library-scoped. Never race known
+        # queued/in-flight jobs or enqueue propagation from this protected UI.
+        if self.db.execute("""SELECT 1 FROM tasks WHERE state IN ('pending','running')
+            AND type IN ('face','face_embed','person_cluster','person_recluster','person_label_propagate') LIMIT 1""").fetchone():
+            raise TransportError(409, 'Face processing active; review later')
+        if row[2] == person and row[3] == 'manual':
+            return self._present_face(row, library)
+        self.db.execute("UPDATE face_detections SET person_id=?,label_source='manual',label_score=NULL WHERE id=?",
+                        (person, face))
+        self.db.execute('''INSERT INTO face_assignment_events(face_id,asset_id,old_person_id,new_person_id,
+            old_label_source,new_label_source,old_label_score,new_label_score,source,reason,actor)
+            VALUES (?,?,?,?,?,'manual',?,NULL,'manual','protected.owner.assign',?)''',
+            (face, row[1], row[2], person, row[3], row[4], member['account_id']))
+        for affected in {row[2], person} - {None}:
+            self.db.execute('INSERT OR IGNORE INTO access_person_libraries VALUES(?,?,?,1)',
+                            (affected,library,member['account_id']))
+            # Face vectors remain valid; person aggregates no longer represent
+            # membership. Invalidate pointers/status only, never delete files.
+            self.db.execute('''UPDATE persons SET face_count=(SELECT count(*) FROM face_detections WHERE person_id=?),
+                embedding_path=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?''', (affected, affected))
+            self.db.execute("UPDATE person_embedding_artifacts SET status='stale' WHERE person_id=?", (affected,))
+        self.access._audit(member['account_id'], 'face.assign.' + str(face), library)
+        return self._present_face(self._face(face, library), library)
 
 
 def _call(runtime, action, *args):
@@ -233,4 +277,22 @@ async def assign(face_id: str, request: Request):
     query = _query(request, {'library'})
     body = await _body(request, {'person_id', 'revision', 'person_revision'})
     return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'assign', token,
+        query['library'], _integer(face_id, 2**63-1), body))
+
+
+@router.post('/admin/faces/{face_id}/new-person')
+async def create_person(face_id: str, request: Request):
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library'})
+    body = await _body(request, {'revision','display_name'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'create_for_face', token,
+        query['library'], _integer(face_id, 2**63-1), body))
+
+
+@router.post('/admin/faces/{face_id}/unassign')
+async def unassign(face_id: str, request: Request):
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library'})
+    body = await _body(request, {'revision'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'unassign', token,
         query['library'], _integer(face_id, 2**63-1), body))

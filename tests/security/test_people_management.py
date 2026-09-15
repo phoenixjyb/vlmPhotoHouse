@@ -145,6 +145,44 @@ class PeopleTests(unittest.TestCase):
                 VALUES(1,'synthetic','test',2,'private-centroid','active'),(7,'synthetic','test',2,'private-target','shadow')''')
             db.commit()
 
+    def test_new_person_unassign_and_orphan_selection_keep_owned_name(self):
+        self.assignment_fixture();revision=self.assignment_body(face=12)['revision']
+        path='/admin/faces/12/new-person?library=family-a';body={'display_name':'小朋友','revision':revision}
+        created=self.client.post(path,headers={'Authorization':'Bearer '+self.owner},json=body)
+        self.assertEqual(created.status_code,200);person=created.json()['person_id']
+        self.assertEqual(self.client.post(path,headers={'Authorization':'Bearer '+self.owner},json=body).status_code,409)
+        response=self.client.post('/admin/faces/12/unassign?library=family-a',headers={'Authorization':'Bearer '+self.owner},json={'revision':created.json()['revision']})
+        self.assertEqual(response.status_code,200);self.assertIsNone(response.json()['person_id'])
+        retained=self.person(int(person));self.assertEqual(retained['display_name'],'小朋友');self.assertEqual(retained['face_count'],0)
+        self.assertEqual(self.assign(self.assignment_body(face=12,target=int(person)),face=12).status_code,200)
+        self.assertEqual(self.get('/admin/people?library=family-b',self.f.other_token).json()['total'],2)
+
+    def test_unassignment_retains_old_person_and_refuses_shared_and_stale(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision'];headers={'Authorization':'Bearer '+self.owner}
+        path='/admin/faces/11/unassign?library=family-a'
+        self.assertEqual(self.client.post(path,headers=headers,json={'revision':revision}).status_code,200)
+        self.assertEqual(self.person()['face_count'],0)
+        self.assertEqual(self.client.post(path,headers=headers,json={'revision':revision}).status_code,409)
+        self.assertEqual(self.client.post('/admin/faces/41/unassign?library=family-a',headers=headers,json={'revision':revision}).status_code,401)
+
+    def test_person_owned_elsewhere_is_not_disclosed_after_asset_moves(self):
+        self.assignment_fixture()
+        with self.f.connection() as db:
+            owner=db.execute("SELECT bootstrap_operator FROM access_libraries WHERE id='family-b'").fetchone()[0]
+            db.execute('INSERT INTO access_person_libraries VALUES(1,?,?,1)',('family-b',owner));db.commit()
+        result=self.get('/admin/assets/101/faces?library=family-a').json()['items'][0]
+        self.assertIsNone(result['person_id']);self.assertIsNone(result['display_name']);self.assertFalse(result['can_assign'])
+        self.assertNotIn('Alice',self.get().text)
+
+    def test_new_person_creation_rolls_back_when_face_jobs_active(self):
+        self.assignment_fixture();revision=self.assignment_body(face=12)['revision']
+        self.f.mutate("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES('face','running',1,0,'{}')")
+        response=self.client.post('/admin/faces/12/new-person?library=family-a',headers={'Authorization':'Bearer '+self.owner},json={'revision':revision,'display_name':'Must not persist'})
+        self.assertEqual(response.status_code,409)
+        with self.f.connection() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM persons WHERE display_name='Must not persist'").fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM access_person_libraries').fetchone()[0],0)
+
     def assignment_body(self, face=11, target=7):
         record=next(item for item in self.get('/admin/assets/101/faces?library=family-a').json()['items'] if item['id']==str(face))
         return {'person_id':str(target),'revision':record['revision'],'person_revision':self.person(target)['revision']}

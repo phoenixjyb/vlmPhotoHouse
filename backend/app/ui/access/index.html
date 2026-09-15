@@ -26,6 +26,7 @@
       </div>
     </section>
     <section id="library" hidden>
+      <details id="albums-panel" class="access-panel"><summary data-i18n="albums">Family albums</summary><p class="fine" data-i18n="albumPrivacy">Saved in this library, not automatically published to TV.</p><button id="album-create" class="primary" type="button" hidden data-i18n="newAlbum">Create album</button><p id="album-status" role="status"></p><div id="album-list"></div><nav id="album-pages" class="pagination" hidden><button id="album-previous" class="quiet" type="button" data-i18n="previous">Previous</button><span id="album-page-label"></span><button id="album-next" class="quiet" type="button" data-i18n="next">Next</button></nav></details>
       <div class="library-heading"><div><p class="eyebrow" data-i18n="yourLibrary">YOUR FAMILY LIBRARY</p><h1 data-i18n="gallery">Little moments. Lasting memories.</h1></div><button id="logout" class="quiet" type="button" data-i18n="signOut">Sign out</button></div>
       <div class="toolbar"><label for="library-select" data-i18n="libraryLabel">Library</label><select id="library-select"></select><button id="refresh" class="quiet" type="button" data-i18n="refresh">Refresh</button><span id="account-label" class="muted"></span></div>
       <details id="people-panel" class="access-panel" hidden><summary data-i18n="managePeople">Manage people · Owner</summary><p class="fine" data-i18n="peopleHelp">Review saved names and faces in this library. Renaming does not merge people or change face assignments.</p><form id="people-search" class="people-search"><label for="people-query" data-i18n="findPerson">Find a saved name</label><input id="people-query" type="search" maxlength="128" autocomplete="off"><button class="quiet" type="submit" data-i18n="search">Search</button></form><p id="people-status" role="status" aria-live="polite"></p><div id="people-list"></div><nav id="people-pages" class="pagination" hidden><button id="people-previous" class="quiet" type="button" data-i18n="previous">Previous</button><span id="people-page-label"></span><button id="people-next" class="quiet" type="button" data-i18n="next">Next</button></nav></details>
@@ -44,6 +45,7 @@
       <section id="story-history" hidden aria-label="Story history"></section>
     </section>
     <details class="ai-descriptions"><summary data-i18n="aiAndLegacy">AI descriptions and earlier caption edits</summary><div id="captions"></div><p class="fine" data-i18n="captionNote">Generated descriptions may be inaccurate. Original downloads require separate permission.</p></details><a id="original" class="quiet" hidden data-i18n="download">Download original</a></dialog>
+  <dialog id="album-editor" aria-label="Album editor"></dialog>
   <footer data-i18n="footer">PhotoHouse · Shared by invitation</footer>
 </body>
 </html>

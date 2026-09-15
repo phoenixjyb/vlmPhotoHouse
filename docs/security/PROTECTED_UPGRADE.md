@@ -31,7 +31,7 @@ do not use them to configure this release.
    only the locked CPU wheels in a new environment. Run `pip check` and
    `check_access_environment.py --target windows-amd64 --profile runtime` with
    isolated Python. Never reuse the GPU environment or install ML requirements.
-3. Initialize a new synthetic database at schema `c7f4a9e2b610`. Provision an
+3. Initialize a new synthetic database at schema `d8e5b2f7a904`. Provision an
    explicitly selected synthetic owner/library and finite generated previews.
    Invite viewers by phone-bound invitation; keep all original grants off.
    Protect all credentials privately. Never put them in task arguments or logs.

@@ -1,5 +1,9 @@
 # Owner people review and safe renaming
 
+Follow-up: [library management](LIBRARY_MANAGEMENT.md) retains explicitly owned
+zero-face people. Legacy unowned orphans still need a reviewed import; the
+original active-face-only directory contract below describes the earlier slice.
+
 Local source slice, 2026-09-15. This extends the protected WebUI; it is not a
 deployment or completion of the legacy management-tool transition.
 
