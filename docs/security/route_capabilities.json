@@ -3,6 +3,7 @@
   "status": "ACTIVE ENTRYPOINT CLOSED BY DEFAULT / RETIRED AND STANDALONE GAPS EXPLICIT",
   "base_commit": "932263504ac5fcc3ed178e951991619d8ee87049",
   "capabilities": {
+    "library.people.manage": "Current approved owner in the selected active library. Scoped saved-name and face review; audited revision-bound rename only when all known faces belong to that library. No reassignment, merge, embedding, original-byte or job grant.",
     "story.write": "Current contributor or owner membership. Contributors edit only their own stories; owners may moderate. Parent and child library scope, atomic revision checks, idempotent saves, CSRF for cookies. No AI caption or TV publication grant.",
     "public.ui": "Anonymous, code-only UI shell/assets/redirects; never embedded library data. Redirect parameters are untrusted and may contain private search text.",
     "library.read": "Verified principal plus current approved membership in the selected library. Viewer/contributor/owner; system operator has no implicit membership.",
@@ -46,6 +47,7 @@
       "source": "backend/app/access/members.py",
       "expression": "router = APIRouter(route_class=MemberRoute)"
     },
+    {"source":"backend/app/access/people.py","expression":"router = APIRouter(route_class=LibraryRoute)"},
     {
       "source": "backend/app/access/stories.py",
       "expression": "router = APIRouter(route_class=LibraryRoute)"
@@ -186,6 +188,7 @@
       "source": "backend/app/main.py",
       "expression": "app.include_router(member_router)"
     },
+    {"source":"backend/app/main.py","expression":"app.include_router(people_router)"},
     {
       "source": "backend/app/main.py",
       "expression": "app.include_router(story_router)"
@@ -272,6 +275,9 @@
     }
   ],
   "routes": [
+    {"source":"backend/app/access/people.py","owner":"router","method":"GET","path":"/admin/people","handler":"people","surface":"photohouse","scope":"Active mapped faces in the selected library","capabilities":["library.people.manage"],"current_control":"Current owner check before data queries; scoped name search and 25-row pages; no biometric vectors or global counts","gap":"Local synthetic acceptance; not deployed"},
+    {"source":"backend/app/access/people.py","owner":"router","method":"GET","path":"/admin/people/{person_id}/faces","handler":"faces","surface":"photohouse","scope":"Person faces in the selected active library","capabilities":["library.people.manage"],"current_control":"Owner and parent scope in one transaction; 25 protected crop references per page","gap":"No face assignment or model changes"},
+    {"source":"backend/app/access/people.py","owner":"router","method":"PUT","path":"/admin/people/{person_id}","handler":"rename","surface":"photohouse","scope":"Visible person with no faces outside selected library","capabilities":["library.people.manage"],"current_control":"Owner, current mapping, HMAC revision, atomic rename and audit, CSRF for cookies","gap":"Shared/unmapped people need separate ownership review; no merge or reassignment"},
     {"source":"backend/app/access/stories.py","owner":"router","method":"GET","path":"/assets/{asset_id}/stories","handler":"list_stories","surface":"photohouse","scope":"Selected active library and active mapped parent asset","capabilities":["library.read"],"current_control":"Current membership and parent scope in one transaction; five whole stories per page; no-store","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},
     {"source":"backend/app/access/stories.py","owner":"router","method":"POST","path":"/assets/{asset_id}/stories","handler":"create_story","surface":"photohouse","scope":"Selected active library and mapped active asset","capabilities":["story.write"],"current_control":"Authenticated author, contributor/owner, CSRF for cookies, bounded body, atomic history and idempotency","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},
     {"source":"backend/app/access/stories.py","owner":"router","method":"PUT","path":"/stories/{story_id}","handler":"update_story","surface":"photohouse","scope":"Selected library, story and mapped active parent","capabilities":["story.write"],"current_control":"Owner or original author contributor; mandatory revision, atomic history and idempotency; CSRF for cookies","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},

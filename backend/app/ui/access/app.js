@@ -13,6 +13,9 @@
   Object.assign(words.en,{storyDeleteError:'Removal not confirmed. Retry Remove story to confirm the same request.',storyCurrent:'Your earlier save was confirmed. A newer version is now shown.'});
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
+  const peopleState={page:1,total:0,load:0,query:''};
+  Object.assign(words.en,{managePeople:'Manage people · Owner',peopleHelp:'Review saved names and faces in this library. Renaming does not merge people or change face assignments.',findPerson:'Find a saved name',peopleEmpty:'No matching saved names. Unassigned faces and names not linked to this library are not included yet.',personName:'Display name',unnamedPerson:'Unnamed person',reviewFaces:'Review faces',saveName:'Save name',nameSaved:'Name saved.',nameConflict:'This person changed. Review the refreshed record before editing again.',nameUnavailable:'Name editing needs a separate ownership review for this record.',facesCount:'faces in this library',moreFaces:'More faces',nameShortened:'Long existing name: preview shortened.',nameSaveFailed:'Save not confirmed. Refresh the record before trying again.'});
+  Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
   function resetStoryEditor(){
@@ -58,6 +61,7 @@
     $('created-code').value=''; $('invitation-result').hidden=true; state.invite=null;
     $('accept-code').value=''; $('invite-phone').value='';
     state.memberGeneration++;$('member-list').replaceChildren();$('member-pages').hidden=true;
+    peopleState.load++;$('people-list').replaceChildren();$('people-pages').hidden=true;$('people-status').textContent='';
   }
   function invalidate() {
     state.generation++;
@@ -84,7 +88,8 @@
   function showAuth() {
     storyState.search=null;storyState.suspended=null;$('search-text').value='';$('search-source').value='all';
     state.profile=null;state.csrf=null;state.library=null;state.locked=false;
-    $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;
+    $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
+    peopleState.page=1;peopleState.query='';$('people-query').value='';
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -246,6 +251,7 @@
       $('page-label').textContent=`${t('page')} ${state.page} ${t('of')} ${pages} · ${result.total} ${t('photos')}`;
       status('');
       if(!$('members-panel').hidden&&$('members-panel').open)void loadMembers();
+      if(!$('people-panel').hidden&&$('people-panel').open)void loadPeople();
       return true;
     } catch(error) {await failure(error,epoch);return false;}
   }
@@ -254,6 +260,7 @@
     try {
       const profile=await request('/auth/session',{epoch});
       if(stale(epoch))return;
+      if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';}
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
       const available=profile.memberships.filter(m=>m.available===true);
@@ -263,6 +270,7 @@
       $('library-select').value=state.library||'';
       $('owner-panel').hidden=!available.some(m=>m.library_id===state.library&&m.role==='owner');
       $('members-panel').hidden=$('owner-panel').hidden;
+      $('people-panel').hidden=$('owner-panel').hidden;
       if(!state.library) {$('empty').hidden=false;$('empty').textContent=t('noLibrary');status('');}
       else if(load) return await loadGallery();
       return true;
@@ -380,6 +388,75 @@
       $('member-page-label').textContent=`${t('page')} ${state.memberPage} ${t('of')} ${pages}`;
     } catch(error) {await failure(error,epoch);}
   }
+  async function loadPeople(){
+    if(state.locked||$('people-panel').hidden)return;
+    const epoch=state.generation,library=state.library,load=++peopleState.load;
+    $('people-list').replaceChildren();$('people-pages').hidden=true;$('people-status').textContent=t('loading');
+    const current=()=>!stale(epoch)&&load===peopleState.load&&library===state.library;
+    try{
+      const result=await request(libraryPath('/admin/people',{page:String(peopleState.page),q:peopleState.query}),{epoch});
+      if(!current())return;
+      peopleState.total=result.total;$('people-status').textContent=result.total?'':t('peopleEmpty');
+      for(const person of result.items){
+        const row=document.createElement('article');row.className='person-card';row.dataset.personId=person.id;
+        const title=document.createElement('h3');title.textContent=person.display_name||`${t('unnamedPerson')} ${person.id}`;
+        const count=document.createElement('small');count.textContent=`${person.face_count} ${t('facesCount')}`;row.append(title,count);
+        if(person.name_truncated){const note=document.createElement('p');note.className='fine';note.textContent=t('nameShortened');row.append(note);}
+        if(person.can_rename){
+          const form=document.createElement('form');form.className='person-name-form';
+          const label=document.createElement('label');label.htmlFor=`person-name-${person.id}`;label.textContent=t('personName');
+          const input=document.createElement('input');input.id=label.htmlFor;input.value=person.name_truncated?'':person.display_name;input.maxLength=128;input.required=true;input.autocomplete='off';
+          const save=document.createElement('button');save.type='submit';save.className='quiet';save.textContent=t('saveName');
+          form.append(label,input,save);row.append(form);
+          form.addEventListener('submit',async event=>{
+            event.preventDefault();if(!current()||state.locked||state.busy||!row.isConnected)return;
+            const name=input.value.trim();if(!name)return;
+            state.busy=true;save.disabled=true;input.disabled=true;
+            try{
+              await request(libraryPath(`/admin/people/${person.id}`),{method:'PUT',body:{display_name:name,revision:person.revision},epoch});
+              if(current()){await loadPeople();if(!stale(epoch))$('people-status').textContent=t('nameSaved');}
+            }catch(error){
+              if(!current())return;
+              if(error.status===409){await loadPeople();if(!stale(epoch))$('people-status').textContent=t('nameConflict');}
+              else if(error.status===401||error.status===403)await failure(error,epoch);
+              else $('people-status').textContent=t('nameSaveFailed');
+            }finally{state.busy=false;save.disabled=false;input.disabled=false;}
+          });
+        }else{const note=document.createElement('p');note.className='fine';note.textContent=t('nameUnavailable');row.append(note);}
+        const faces=document.createElement('div');faces.className='person-faces';
+        const review=document.createElement('button');review.type='button';review.className='quiet';review.textContent=t('reviewFaces');
+        let facePage=0;
+        review.addEventListener('click',async()=>{
+          if(!current()||state.locked||!row.isConnected)return;review.disabled=true;
+          try{
+            const result=await request(libraryPath(`/admin/people/${person.id}/faces`,{page:String(facePage+1)}),{epoch});
+            if(!current()||!row.isConnected)return;facePage=result.page;
+            for(const face of result.items){
+              const button=document.createElement('button');button.type='button';button.className='face-review';
+              const image=document.createElement('img');image.alt=`${person.display_name||t('unnamedPerson')} · ${face.id}`;
+              image.src=libraryPath(`/faces/${face.id}/crop`);image.loading='lazy';
+              image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+              button.append(image);faces.append(button);
+              button.addEventListener('click',async()=>{
+                if(!current()||state.locked||!abandonStory())return;
+                try{const detail=await request(libraryPath(`/assets/detail/${face.asset_id}`),{epoch});if(current())await openAsset(detail.asset);}
+                catch(error){await failure(error,epoch);}
+              });
+            }
+            review.hidden=facePage*25>=result.total;review.textContent=t('moreFaces');
+          }catch(error){await failure(error,epoch);}finally{review.disabled=false;}
+        });
+        row.append(faces,review);$('people-list').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('people-pages').hidden=result.total===0;
+      $('people-previous').disabled=peopleState.page===1;$('people-next').disabled=peopleState.page>=pages;
+      $('people-page-label').textContent=`${t('page')} ${peopleState.page} ${t('of')} ${pages}`;
+    }catch(error){if(current()){$('people-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
+  $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open)void loadPeople();});
+  $('people-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;peopleState.query=$('people-query').value.trim();peopleState.page=1;void loadPeople();});
+  $('people-previous').addEventListener('click',()=>{if(!state.busy&&peopleState.page>1){peopleState.page--;void loadPeople();}});
+  $('people-next').addEventListener('click',()=>{if(!state.busy&&peopleState.page*25<peopleState.total){peopleState.page++;void loadPeople();}});
   const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('photohouse-session'):null;
   if(channel)channel.onmessage=()=>{if(!state.locked&&!state.busy){suspendDraft();if(document.hidden)invalidate();else void restoreWithDraft();}};
   $('auth-form').addEventListener('submit',event=>{void signIn(event);});
@@ -387,7 +464,7 @@
   $('register-tab').addEventListener('click',()=>setMode('register'));
   $('logout').addEventListener('click',()=>{void signOut();});
   $('refresh').addEventListener('click',()=>{if(!state.locked&&abandonStory()){state.page=1;void restore();}});
-  $('library-select').addEventListener('change',()=>{if(state.locked||!abandonStory()){$('library-select').value=state.library||'';return;}storyState.search=null;storyState.suspended=null;$('search-text').value='';state.library=$('library-select').value;state.page=1;state.memberPage=1;void restore();});
+  $('library-select').addEventListener('change',()=>{if(state.locked||!abandonStory()){$('library-select').value=state.library||'';return;}storyState.search=null;storyState.suspended=null;$('search-text').value='';peopleState.page=1;peopleState.query='';$('people-query').value='';state.library=$('library-select').value;state.page=1;state.memberPage=1;void restore();});
   $('previous').addEventListener('click',()=>{if(state.page>1){state.page--;void loadGallery();}});
   $('next').addEventListener('click',()=>{if(state.page*24<state.total){state.page++;void loadGallery();}});
   $('members-panel').addEventListener('toggle',()=>{if($('members-panel').open)void loadMembers();});

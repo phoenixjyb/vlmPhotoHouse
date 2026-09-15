@@ -9,6 +9,7 @@ from .access.media import router as media_router
 from .access.library import router as library_router
 from .access.members import router as member_router
 from .access.stories import router as story_router
+from .access.people import router as people_router
 from .access.boundary import ClosedBoundary
 from .routers.ui import router as ui_router
 
@@ -22,6 +23,7 @@ def create_app(*, access_runtime=None, media_runtime=None):
     app.include_router(library_router)
     app.include_router(member_router)
     app.include_router(story_router)
+    app.include_router(people_router)
     app.include_router(ui_router)
     app.add_middleware(ClosedBoundary, routes=app.routes)
     return app

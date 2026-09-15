@@ -32,6 +32,14 @@ try:
         (originals,), derived).build_app(clock=lambda:fixture.now),
         base_url='https://photohouse.test',client=('192.0.2.20',23456))
     fixture.addCleanup(fixture.client.close)
+    (derived/'faces/256').mkdir(parents=True)
+    with fixture.connection() as db:
+        for person,name in [(1,'Alice'),(2,'Shared person'),*[(i,f'Person {i:02}') for i in range(10,37)]]:
+            db.execute('INSERT INTO persons(id,display_name,face_count) VALUES(?,?,1)',(person,name))
+            db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(?,101,?,0,0,1,1)',(person,person))
+            Image.new('RGB',(100,100),'#b6c7b0').save(derived/f'faces/256/{person}.jpg')
+        db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(99,201,2,0,0,1,1)')
+        db.commit()
     print(json.dumps({'ready':True}),flush=True)
     for line in sys.stdin:
         message=json.loads(line)
@@ -40,7 +48,9 @@ try:
         if message.get('command')=='mutate':
             # Strict synthetic scenarios; no caller-supplied SQL or file paths.
             scenario=message['scenario']
-            if scenario=='china-login':
+            if scenario=='person-name-html':
+                fixture.mutate("UPDATE persons SET display_name=?,updated_at='changed-by-test' WHERE id=1",('<img src=x onerror="window.syntheticXSS=true">',))
+            elif scenario=='china-login':
                 fixture.mutate("UPDATE access_accounts SET phone_login='+8610000000000' WHERE id=?", (fixture.member_id,))
             elif scenario=='international-login':
                 fixture.mutate("UPDATE access_accounts SET phone_login='+12025550102' WHERE id=?", (fixture.member_id,))

@@ -21,7 +21,7 @@ FILES = tuple(sorted([
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
-        'boundary','service','bootstrap','stories','story_schema')),
+        'boundary','service','bootstrap','stories','story_schema','people')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
