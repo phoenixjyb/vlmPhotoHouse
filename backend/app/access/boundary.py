@@ -43,6 +43,10 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method == 'GET' and re.fullmatch(r'/admin/assets/[0-9]+/faces', path):
+            return True
+        if method == 'POST' and re.fullmatch(r'/admin/faces/[0-9]+/assignment', path):
+            return True
         if method == 'GET' and (path == '/admin/people' or re.fullmatch(r'/admin/people/[0-9]+/faces', path)):
             return True
         if method == 'PUT' and re.fullmatch(r'/admin/people/[0-9]+', path):

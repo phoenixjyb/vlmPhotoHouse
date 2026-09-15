@@ -11,4 +11,6 @@
 .person-faces{display:flex;gap:.7rem;flex-wrap:wrap;margin:.8rem 0}
 .face-review{padding:0;width:5rem;height:5rem;overflow:hidden;border-radius:1rem}
 .face-review img{width:100%;height:100%;object-fit:cover}
+.face-label-card{padding:1rem 0;border-top:1px solid var(--line);overflow-wrap:anywhere}.assignment-crop{width:5rem;height:5rem;object-fit:cover;border-radius:1rem}.face-picker{padding:1rem;background:#efe3d6;border-radius:.75rem;margin-top:1rem}.person-choice{display:block;width:100%;text-align:left;margin:.5rem 0;white-space:normal;overflow-wrap:anywhere}.face-picker .pagination{flex-wrap:wrap;gap:.5rem}
+.assignment-review:not(:empty){border-top:1px solid #cfc2b4;padding:1rem 0}.face-confirm{display:flex;gap:.75rem;flex-wrap:wrap}
 @media(max-width:540px){.person-name-form label,.people-search label{flex-basis:100%}.person-name-form input,.people-search input{min-width:0;width:100%}}

@@ -28,6 +28,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const PASSWORD='Synthetic family passphrase!';
 const MEMBER='+12025550102';
 let hold=null,abortLogout=false,loseStorySave=false,loseStoryDelete=false;
+let loseFaceSave=false;
 const external=[],errors=[],checks=[];let syntheticFetchMetadata=0;
 function checkpoint(name){checks.push(name);console.log('PASS '+name);}
 function delayNext(predicate){
@@ -55,6 +56,7 @@ async function context(browser){
     const response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
     if(loseStorySave&&request.method()==='POST'&&url.pathname.endsWith('/stories')){loseStorySave=false;await route.abort();return;}
     if(loseStoryDelete&&request.method()==='DELETE'&&url.pathname.startsWith('/stories/')){loseStoryDelete=false;await route.abort();return;}
+    if(loseFaceSave&&request.method()==='POST'&&url.pathname.endsWith('/assignment')){loseFaceSave=false;await route.abort();return;}
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
     const outputHeaders={...response.headers};delete outputHeaders['content-length'];delete outputHeaders['content-encoding'];
     try {await route.fulfill({status:response.status,headers:outputHeaders,body:Buffer.from(response.body,'base64')});}
@@ -131,6 +133,7 @@ let browser;
   assert.match(await page.locator('#captions').textContent(),/<img src=x/);
   assert.equal(await page.locator('#captions img').count(),0);assert.equal(await page.evaluate(()=>window.syntheticXSS),undefined);
   assert.equal(await page.locator('#original').isVisible(),false);
+  assert.equal(await page.locator('#face-panel').isVisible(),false);
   await page.locator('#close-viewer').click();
   checkpoint('Captions render as text and viewer cannot download originals');
   const oldViewer=delayNext(url=>url.pathname==='/assets/101/captions');
@@ -209,6 +212,63 @@ let browser;
   await owner.locator('.person-card').first().waitFor();
   checkpoint('Delayed people search cannot replace newer results or reappear after logout');
   await owner.locator('#people-panel summary').click();
+  await owner.locator('.asset').filter({hasText:'102'}).click();
+  await owner.locator('#face-panel summary').click();
+  const face=owner.locator('[data-face-id="200"]');await face.waitFor();
+  await face.locator('img').evaluate(img=>img.decode());
+  assert.equal(await face.locator('h4').textContent(),'Unassigned');
+  await face.getByRole('button',{name:'Choose a person',exact:true}).click();
+  await owner.locator('.person-choice').first().waitFor();
+  assert.equal(await owner.locator('.person-choice').count(),25);
+  await owner.locator('.face-picker').getByRole('button',{name:'Next',exact:true}).click();
+  assert.equal(await owner.getByRole('button',{name:'Shared person · 2',exact:true}).isDisabled(),true);
+  await owner.getByRole('button',{name:'Person 36 · 36',exact:true}).click();
+  assert.equal(await face.locator('h4').textContent(),'Unassigned');
+  await owner.locator('.assignment-review img').evaluate(img=>img.decode());
+  await owner.screenshot({path:path.join(artifacts,'face-assignment-confirm-desktop.png')});
+  await owner.getByRole('button',{name:'Confirm assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.getElementById('face-status').textContent.startsWith('Assignment saved'));
+  assert.equal(await face.locator('h4').textContent(),'Person 36');
+  checkpoint('Owner reviews a face, pages through saved people and explicitly confirms assignment');
+  async function chooseTen(){
+    await face.getByRole('button',{name:'Choose a person',exact:true}).click();
+    await owner.locator('.face-picker input').fill('Person 10');await owner.locator('.face-picker form button').click();
+    await owner.getByRole('button',{name:'Person 10 · 10',exact:true}).click();
+  }
+  await chooseTen();await mutate('face-assignment-changed');
+  await owner.getByRole('button',{name:'Confirm assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('.face-picker')?.textContent.includes('The face or person changed'));
+  await owner.locator('#face-refresh').click();await face.waitFor();
+  assert.equal(await face.locator('h4').textContent(),'Person 36');
+  await chooseTen();loseFaceSave=true;
+  await owner.getByRole('button',{name:'Confirm assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('.face-picker')?.textContent.includes('Save not confirmed'));
+  assert.equal(await owner.getByRole('button',{name:'Confirm assignment',exact:true}).count(),0);
+  await owner.locator('#face-refresh').click();await face.waitFor();
+  assert.equal(await face.locator('h4').textContent(),'Person 10');
+  checkpoint('Stale face correction is refused; lost save response requires fresh assignment readback');
+  const delayedFaces=delayNext(url=>url.pathname==='/admin/assets/102/faces');
+  await owner.locator('#face-refresh').click();await delayedFaces.seen;
+  await owner.locator('#close-viewer').click();await owner.locator('.asset').filter({hasText:'101'}).click();
+  await owner.locator('#face-panel summary').click();await owner.locator('.face-label-card').first().waitFor();
+  delayedFaces.release();await pause(150);
+  assert.equal(await owner.locator('[data-face-id="200"]').count(),0);
+  assert.equal(await owner.locator('.face-label-card').count(),25);
+  await owner.locator('#face-next').click();await owner.locator('[data-face-id="36"]').waitFor();
+  assert.equal(await owner.locator('.face-label-card').count(),4);
+  await owner.locator('#close-viewer').click();
+  await owner.setViewportSize({width:390,height:844});await owner.locator('#language').click();
+  await owner.locator('.asset').filter({hasText:'102'}).click();await owner.locator('#face-panel summary').click();await face.waitFor();
+  await face.getByRole('button',{name:'选择人物',exact:true}).click();
+  await owner.locator('.face-picker input').fill('Person 36');await owner.locator('.face-picker form button').click();
+  await owner.getByRole('button',{name:'Person 36 · 36',exact:true}).click();
+  await owner.locator('.assignment-review img').evaluate(img=>img.decode());
+  await owner.screenshot({path:path.join(artifacts,'face-assignment-confirm-mobile-zh.png')});
+  assert(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert(await owner.locator('#viewer').evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth));
+  await owner.locator('#close-viewer').click();await owner.locator('#language').click();await owner.setViewportSize({width:1200,height:900});
+  await owner.locator('.asset').first().waitFor();
+  checkpoint('Face pages discard closed-viewer responses; Chinese narrow-screen confirmation renders');
   await owner.locator('#owner-panel summary').click();
   await owner.locator('#invite-phone').fill('+12025550103');await owner.locator('#invite-form button').click();
   await owner.locator('#created-code').waitFor({state:'visible'});

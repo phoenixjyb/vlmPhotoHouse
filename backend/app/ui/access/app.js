@@ -14,6 +14,11 @@
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
   const peopleState={page:1,total:0,load:0,query:''};
+  const faceState={page:1,total:0,load:0};
+  Object.assign(words.en,{closeSelection:'Close selection'});
+  Object.assign(words.zh,{closeSelection:'关闭选择面板'});
+  Object.assign(words.en,{assignFaces:'Review face assignments · Owner',assignHelp:'Choose an existing person for one face. No automatic propagation or new person is created.',unassigned:'Unassigned',choosePerson:'Choose a person',confirmAssignment:'Confirm assignment',assignmentReview:'Assign this face to',assignmentSaved:'Assignment saved. Other faces were not changed.',assignmentConflict:'The face or person changed, or face processing is active. Refresh and review before trying again.',assignmentFailed:'Save not confirmed. Refresh and review this face before trying again.',assignmentUnavailable:'This assignment needs a separate ownership review.',noFaces:'No detected faces on this asset.',selectPerson:'Select this person'});
+  Object.assign(words.zh,{assignFaces:'查看人脸归属 · 主人',assignHelp:'为一张人脸选择已保存的人物。不会自动传播标签或创建新人物。',unassigned:'未分配',choosePerson:'选择人物',confirmAssignment:'确认归属',assignmentReview:'将这张人脸分配给',assignmentSaved:'已保存归属，其他人脸未更改。',assignmentConflict:'人脸或人物已更改，或人脸处理正在进行。请刷新并重新确认。',assignmentFailed:'尚未确认保存成功，请刷新并核对此人脸后再试。',assignmentUnavailable:'此归属需要另行确认权限。',noFaces:'此照片暂无已检测的人脸。',selectPerson:'选择此人'});
   Object.assign(words.en,{managePeople:'Manage people · Owner',peopleHelp:'Review saved names and faces in this library. Renaming does not merge people or change face assignments.',findPerson:'Find a saved name',peopleEmpty:'No matching saved names. Unassigned faces and names not linked to this library are not included yet.',personName:'Display name',unnamedPerson:'Unnamed person',reviewFaces:'Review faces',saveName:'Save name',nameSaved:'Name saved.',nameConflict:'This person changed. Review the refreshed record before editing again.',nameUnavailable:'Name editing needs a separate ownership review for this record.',facesCount:'faces in this library',moreFaces:'More faces',nameShortened:'Long existing name: preview shortened.',nameSaveFailed:'Save not confirmed. Refresh the record before trying again.'});
   Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
@@ -48,6 +53,7 @@
     status(statusKey);
   }
   function closeViewer() {
+    faceState.load++;faceState.page=1;$('face-list').replaceChildren();$('face-panel').hidden=true;$('face-panel').open=false;$('face-status').textContent='';$('face-pages').hidden=true;
     storyState.asset=null;storyState.load++;storyState.history++;storyState.loading=false;storyState.deletes.clear();resetStoryEditor();
     $('story-list').replaceChildren();$('story-history').replaceChildren();$('story-history').hidden=true;$('story-add').hidden=true;$('story-more').hidden=true;storyStatus('');
     state.viewerGeneration++;
@@ -108,6 +114,7 @@
     const epoch=state.generation;
     closeViewer(); storyState.asset=item;storyState.page=1; const viewerGeneration=state.viewerGeneration; $('viewer').showModal(); $('viewer-title').textContent=assetLabel(item);
     void loadStories();
+    $('face-panel').hidden=state.profile?.memberships.find(member=>member.library_id===state.library&&member.available)?.role!=='owner';
     try {
       const detail=await request(libraryPath(`/assets/detail/${item.id}`),{epoch});
       const captions=await request(libraryPath(`/assets/${item.id}/captions`),{epoch});
@@ -388,6 +395,85 @@
       $('member-page-label').textContent=`${t('page')} ${state.memberPage} ${t('of')} ${pages}`;
     } catch(error) {await failure(error,epoch);}
   }
+  async function loadAssetFaces(){
+    if(state.locked||$('face-panel').hidden||!storyState.asset)return;
+    const epoch=state.generation,viewer=state.viewerGeneration,load=++faceState.load,asset=storyState.asset.id;
+    const current=()=>!stale(epoch)&&viewer===state.viewerGeneration&&load===faceState.load&&$('viewer').open;
+    $('face-list').replaceChildren();$('face-pages').hidden=true;$('face-status').textContent=t('loading');
+    try{
+      const result=await request(libraryPath(`/admin/assets/${asset}/faces`,{page:String(faceState.page)}),{epoch});
+      if(!current())return;faceState.total=result.total;$('face-status').textContent=result.total?'':t('noFaces');
+      for(const face of result.items){
+        const row=document.createElement('article');row.className='face-label-card';row.dataset.faceId=face.id;
+        const image=document.createElement('img');image.className='assignment-crop';image.alt=`${t('reviewFaces')} ${face.id}`;image.src=libraryPath(`/faces/${face.id}/crop`);image.loading='lazy';
+        image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+        const name=document.createElement('h4');name.textContent=face.display_name||(face.person_id?`${t('unnamedPerson')} ${face.person_id}`:t('unassigned'));
+        row.append(image,name);
+        if(!face.can_assign){const note=document.createElement('p');note.textContent=t('assignmentUnavailable');row.append(note);}
+        else row.append(storyButton('choosePerson',()=>{
+          if(!current()||state.busy)return;
+          // One picker per viewer; no previous person's selection survives opening another.
+          $('face-list').querySelectorAll('.face-picker').forEach(node=>node.remove());
+          const picker=document.createElement('section');picker.className='face-picker';row.append(picker);
+          const form=document.createElement('form');form.className='people-search';
+          const label=document.createElement('label');label.htmlFor=`face-query-${face.id}`;label.textContent=t('findPerson');
+          const input=document.createElement('input');input.id=label.htmlFor;input.type='search';input.maxLength=128;input.autocomplete='off';
+          const search=document.createElement('button');search.type='submit';search.className='quiet';search.textContent=t('search');
+          const results=document.createElement('div'),review=document.createElement('div'),notice=document.createElement('p');notice.setAttribute('role','status');review.className='assignment-review';
+          const nav=document.createElement('nav');nav.className='pagination';
+          let page=1,query='',serial=0;
+          const active=()=>current()&&picker.isConnected;
+          async function find(){
+            const attempt=++serial;results.replaceChildren();review.replaceChildren();nav.replaceChildren();notice.textContent=t('loading');
+            try{
+              const found=await request(libraryPath('/admin/people',{q:query,page:String(page)}),{epoch});
+              if(!active()||attempt!==serial)return;notice.textContent=found.total?'':t('peopleEmpty');
+              for(const person of found.items){
+                const choice=document.createElement('button');choice.type='button';choice.className='quiet person-choice';
+                choice.textContent=`${person.display_name||t('unnamedPerson')} · ${person.id}`;choice.disabled=!person.can_rename;
+                choice.addEventListener('click',()=>{
+                  if(!active()||state.busy||attempt!==serial)return;
+                  const text=document.createElement('p');text.textContent=`${t('assignmentReview')}: ${person.display_name||t('unnamedPerson')} · ${person.id}?`;
+                  const confirm=storyButton('confirmAssignment',async()=>{
+                    if(!active()||state.busy||attempt!==serial)return;
+                    state.busy=true;confirm.disabled=true;
+                    try{
+                      await request(libraryPath(`/admin/faces/${face.id}/assignment`),{method:'POST',epoch,body:{person_id:person.id,revision:face.revision,person_revision:person.revision}});
+                      if(active()){await loadAssetFaces();if(!stale(epoch)&&viewer===state.viewerGeneration)$('face-status').textContent=t('assignmentSaved');}
+                    }catch(error){
+                      if(active()){
+                        // Ambiguous writes require fresh server readback; never retry automatically.
+                        serial++;review.replaceChildren();results.replaceChildren();nav.replaceChildren();
+                        notice.textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');
+                        if(error.status===401||error.status===403)await failure(error,epoch);
+                      }
+                    }finally{state.busy=false;}
+                  });
+                  const preview=image.cloneNode();preview.loading='eager';
+                  const actions=document.createElement('div');actions.className='face-confirm';actions.append(confirm,storyButton('cancel',()=>review.replaceChildren()));
+                  review.replaceChildren(preview,text,actions);confirm.focus();
+                });results.append(choice);
+              }
+              const previous=storyButton('previous',()=>{if(!state.busy){page--;void find();}}),next=storyButton('next',()=>{if(!state.busy){page++;void find();}});
+              previous.disabled=page===1;next.disabled=page*25>=found.total;
+              const position=document.createElement('span');position.textContent=`${t('page')} ${page} ${t('of')} ${Math.max(1,Math.ceil(found.total/25))}`;
+              nav.append(previous,position,next);
+            }catch(error){if(active()&&attempt===serial){notice.textContent=t(errorStatus(error));await failure(error,epoch);}}
+          }
+          form.append(label,input,search);picker.append(form,notice,results,nav,review,storyButton('closeSelection',()=>picker.remove()));
+          form.addEventListener('submit',event=>{event.preventDefault();if(!state.busy&&active()){query=input.value.trim();page=1;void find();}});
+          void find();input.focus();
+        }));
+        $('face-list').append(row);
+      }
+      $('face-pages').hidden=result.total===0;$('face-previous').disabled=faceState.page===1;$('face-next').disabled=faceState.page*25>=result.total;
+      $('face-page-label').textContent=`${t('page')} ${faceState.page} ${t('of')} ${Math.max(1,Math.ceil(result.total/25))}`;
+    }catch(error){if(current()){$('face-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
+  $('face-panel').addEventListener('toggle',()=>{if($('face-panel').open)void loadAssetFaces();});
+  $('face-refresh').addEventListener('click',()=>{if(!state.busy)void loadAssetFaces();});
+  $('face-previous').addEventListener('click',()=>{if(!state.busy&&faceState.page>1){faceState.page--;void loadAssetFaces();}});
+  $('face-next').addEventListener('click',()=>{if(!state.busy&&faceState.page*25<faceState.total){faceState.page++;void loadAssetFaces();}});
   async function loadPeople(){
     if(state.locked||$('people-panel').hidden)return;
     const epoch=state.generation,library=state.library,load=++peopleState.load;

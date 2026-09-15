@@ -135,5 +135,117 @@ class PeopleTests(unittest.TestCase):
         for method,path in [('POST','/admin/people'),('DELETE','/admin/people/1'),('PUT','/admin/faces/11')]:
             self.assertEqual(self.client.request(method,path,json={}).status_code,403)
 
+    def assignment_fixture(self):
+        with self.f.connection() as db:
+            db.execute("INSERT INTO persons(id,display_name,face_count,embedding_path) VALUES(7,'家人 Seven',1,'private-person-vector')")
+            db.execute('''INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h)
+                VALUES(71,102,7,0,0,1,1),(12,101,NULL,0,0,1,1)''')
+            db.execute("UPDATE face_detections SET label_source='dnn',label_score=0.8 WHERE id=11")
+            db.execute('''INSERT INTO person_embedding_artifacts(person_id,model,model_version,dim,storage_path,status)
+                VALUES(1,'synthetic','test',2,'private-centroid','active'),(7,'synthetic','test',2,'private-target','shadow')''')
+            db.commit()
+
+    def assignment_body(self, face=11, target=7):
+        record=next(item for item in self.get('/admin/assets/101/faces?library=family-a').json()['items'] if item['id']==str(face))
+        return {'person_id':str(target),'revision':record['revision'],'person_revision':self.person(target)['revision']}
+
+    def assign(self, body, face=11, token=None, library='family-a'):
+        return self.client.post(f'/admin/faces/{face}/assignment?library={library}',
+            headers={'Authorization':'Bearer '+(token or self.owner)},json=body)
+
+    def test_asset_face_review_scoped_and_paginated(self):
+        self.assignment_fixture()
+        result=self.get('/admin/assets/101/faces?library=family-a');self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json()['total'],2)
+        self.assertIsNone(result.json()['items'][1]['person_id'])
+        for forbidden in ('embedding','bbox','private-vector','label_score'):
+            self.assertNotIn(forbidden,result.text)
+        for asset in (103,201,999,777):
+            self.assertEqual(self.get(f'/admin/assets/{asset}/faces?library=family-a').status_code,401)
+        self.assertEqual(self.get('/admin/assets/101/faces?library=family-a',self.f.member_token).status_code,401)
+        with self.f.connection() as db:
+            for face in range(100,130):
+                db.execute('INSERT INTO face_detections(id,asset_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(?,101,0,0,1,1)',(face,))
+            db.commit()
+        first=self.get('/admin/assets/101/faces?library=family-a').json()
+        second=self.get('/admin/assets/101/faces?library=family-a&page=2').json()
+        self.assertEqual((first['total'],len(first['items']),len(second['items'])),(32,25,7))
+        self.assertEqual(len({item['id'] for item in first['items']+second['items']}),32)
+
+    def test_assignment_atomic_history_counts_aggregate_invalidation_no_gpu_jobs(self):
+        self.assignment_fixture();body=self.assignment_body()
+        response=self.assign(body);self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['person_id'],'7')
+        with self.f.connection() as db:
+            self.assertEqual(db.execute('SELECT person_id,label_source,label_score,embedding_path FROM face_detections WHERE id=11').fetchone(),(7,'manual',None,'private-vector'))
+            self.assertEqual(db.execute('SELECT id,face_count,embedding_path FROM persons WHERE id IN (1,7) ORDER BY id').fetchall(),[(1,0,None),(7,2,None)])
+            self.assertEqual(db.execute('SELECT status,storage_path FROM person_embedding_artifacts ORDER BY person_id').fetchall(),[('stale','private-centroid'),('stale','private-target')])
+            event=db.execute('SELECT old_person_id,new_person_id,old_label_source,new_label_source,old_label_score,actor FROM face_assignment_events WHERE face_id=11').fetchone()
+            self.assertEqual(event[:5],(1,7,'dnn','manual',0.8));self.assertTrue(event[5])
+            self.assertEqual(db.execute("SELECT count(*) FROM access_audit WHERE action='face.assign.11'").fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT count(*) FROM tasks').fetchone()[0],0)
+            self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(),[])
+        self.assertEqual(self.assign(body).status_code,409)
+
+    def test_unassigned_face_can_join_existing_scoped_person(self):
+        self.assignment_fixture()
+        self.assertEqual(self.assign(self.assignment_body(face=12),face=12).status_code,200)
+
+    def test_assignment_requires_fresh_face_and_target_name(self):
+        self.assignment_fixture();body=self.assignment_body()
+        self.f.mutate("UPDATE persons SET display_name='changed',updated_at='later' WHERE id=7")
+        self.assertEqual(self.assign(body).status_code,409)
+        body=self.assignment_body();self.f.mutate("UPDATE face_detections SET bbox_x=0.3 WHERE id=11")
+        self.assertEqual(self.assign(body).status_code,409)
+        body=self.assignment_body();self.f.mutate("INSERT INTO face_assignment_events(face_id,source) VALUES(11,'manual')")
+        self.assertEqual(self.assign(body).status_code,409)
+
+    def test_assignment_source_target_scope_and_authorization_rechecked(self):
+        self.assignment_fixture();body=self.assignment_body()
+        for token in (self.f.member_token,self.f.other_token,'a'*43):
+            self.assertEqual(self.assign(body,token=token).status_code,401)
+        for target in (2,3,4,5,6,999):
+            self.assertEqual(self.assign({**body,'person_id':str(target)}).status_code,401)
+        for face in (21,31,41,61,999):
+            self.assertEqual(self.assign(body,face=face).status_code,401)
+        self.f.mutate('UPDATE face_detections SET person_id=7 WHERE id=31')
+        self.assertEqual(self.assign(body).status_code,401)
+        self.f.mutate('UPDATE face_detections SET person_id=3 WHERE id=31')
+        self.f.mutate("UPDATE access_memberships SET role='viewer' WHERE library_id='family-a'")
+        self.assertEqual(self.assign(body).status_code,401)
+
+    def test_assignment_refuses_face_jobs_but_does_not_stop_caption_work(self):
+        self.assignment_fixture();body=self.assignment_body()
+        for kind in ('face','face_embed','person_cluster','person_recluster','person_label_propagate'):
+            for state in ('pending','running'):
+                self.f.mutate('INSERT INTO tasks(id,type,state,priority,retry_count,payload_json) VALUES(1,?,?,1,0,\'{}\')',(kind,state))
+                self.assertEqual(self.assign(body).status_code,409)
+                self.f.mutate('DELETE FROM tasks WHERE id=1')
+        self.f.mutate("INSERT INTO tasks(id,type,state,priority,retry_count,payload_json) VALUES(1,'caption','running',1,0,'{}')")
+        self.assertEqual(self.assign(body).status_code,200)
+        with self.f.connection() as db:
+            self.assertEqual(db.execute('SELECT type,state FROM tasks').fetchall(),[('caption','running')])
+
+    def test_assignment_audit_or_history_failure_rolls_back_every_change(self):
+        self.assignment_fixture();body=self.assignment_body()
+        for table in ('access_audit','face_assignment_events','person_embedding_artifacts'):
+            operation='UPDATE' if table=='person_embedding_artifacts' else 'INSERT'
+            self.f.mutate(f"CREATE TRIGGER refuse_assignment BEFORE {operation} ON {table} BEGIN SELECT RAISE(ABORT,'synthetic'); END")
+            self.assertEqual(self.assign(body).status_code,503)
+            with self.f.connection() as db:
+                self.assertEqual(db.execute('SELECT person_id FROM face_detections WHERE id=11').fetchone(),(1,))
+                self.assertEqual(db.execute('SELECT count(*) FROM face_assignment_events').fetchone()[0],0)
+                self.assertEqual(db.execute('SELECT face_count,embedding_path FROM persons WHERE id=1').fetchone(),(999,'private-embedding-path'))
+            self.f.mutate('DROP TRIGGER refuse_assignment')
+
+    def test_assignment_cookie_csrf_and_strict_body(self):
+        self.assignment_fixture();body=self.assignment_body()
+        for change in ({'revision':'bad'},{'person_id':7},{'person_id':'0'},{'create_new':True},{'person_revision':None}):
+            self.assertEqual(self.assign({**body,**change}).status_code,400)
+        self.client.cookies.set(COOKIE,self.owner)
+        path='/admin/faces/11/assignment?library=family-a'
+        self.assertEqual(self.client.post(path,json=body).status_code,403)
+        self.assertEqual(self.client.post(path,json=body,headers={'Origin':'https://photohouse.test','X-CSRF-Token':csrf_token(self.owner)}).status_code,200)
+
 
 if __name__=='__main__': unittest.main()

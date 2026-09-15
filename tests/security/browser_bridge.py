@@ -39,6 +39,8 @@ try:
             db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(?,101,?,0,0,1,1)',(person,person))
             Image.new('RGB',(100,100),'#b6c7b0').save(derived/f'faces/256/{person}.jpg')
         db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(99,201,2,0,0,1,1)')
+        db.execute('INSERT INTO face_detections(id,asset_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(200,102,0,0,1,1)')
+        Image.new('RGB',(100,100),'#d2ad89').save(derived/'faces/256/200.jpg')
         db.commit()
     print(json.dumps({'ready':True}),flush=True)
     for line in sys.stdin:
@@ -50,6 +52,8 @@ try:
             scenario=message['scenario']
             if scenario=='person-name-html':
                 fixture.mutate("UPDATE persons SET display_name=?,updated_at='changed-by-test' WHERE id=1",('<img src=x onerror="window.syntheticXSS=true">',))
+            elif scenario=='face-assignment-changed':
+                fixture.mutate("UPDATE face_detections SET label_source='dnn',label_score=0.2 WHERE id=200")
             elif scenario=='china-login':
                 fixture.mutate("UPDATE access_accounts SET phone_login='+8610000000000' WHERE id=?", (fixture.member_id,))
             elif scenario=='international-login':

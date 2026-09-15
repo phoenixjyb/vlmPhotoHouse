@@ -79,3 +79,7 @@ caption-worker change, push, merge or deployment was performed for this slice.
 Live full-size mapping/performance, actual credentials/TLS, and family-device
 acceptance remain separate gates. Face assignment, new-person creation, merging,
 album management and the protected WebUI cutover are **not implemented here**.
+
+Follow-up: [protected single-face assignment](OWNER_FACE_ASSIGNMENT.md) is now
+implemented locally in a separate slice. Its atomic aggregate invalidation and
+additional worker-isolation gates do not change this original rename contract.

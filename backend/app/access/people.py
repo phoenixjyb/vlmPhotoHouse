@@ -1,6 +1,6 @@
-"""Owner-only, library-scoped people review and conservative name editing.
+"""Owner-only, library-scoped people review and explicit manual corrections.
 
-No face reassignment, merge, embedding update, media write or legacy API import.
+No merge, vector/media write, automatic propagation or legacy API import.
 Unmapped/orphan people require an explicit future ownership/import workflow.
 """
 import hashlib
@@ -109,6 +109,80 @@ class People:
             count = self.db.execute('SELECT count(*)' + SCOPED + ' AND f.person_id=?', (library, person)).fetchone()[0]
             return self._present(self._row(person), library, count)
 
+    def _face(self, face, library):
+        row = self.db.execute('''SELECT f.id,f.asset_id,f.person_id,f.label_source,f.label_score,
+            f.created_at,f.bbox_x,f.bbox_y,f.bbox_w,f.bbox_h''' + SCOPED + ' AND f.id=?',
+            (library, face)).fetchone()
+        if row is None:
+            raise AccessDenied('Access denied')
+        return row
+
+    def _face_revision(self, row, library):
+        key = self.db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone()[0]
+        last = self.db.execute('SELECT coalesce(max(id),0) FROM face_assignment_events WHERE face_id=?',
+                               (row[0],)).fetchone()[0]
+        person = self._row(row[2]) if row[2] is not None else None
+        name_revision = self._revision(person, library) if person else None
+        return hmac.new(key, b'PhotoHouse face assignment v1\0' +
+                        json.dumps([library, row, last, name_revision]).encode(), hashlib.sha256).hexdigest()
+
+    def _present_face(self, row, library):
+        person = self._row(row[2]) if row[2] is not None else None
+        return {'id': str(row[0]), 'asset_id': str(row[1]),
+                'person_id': str(row[2]) if row[2] is not None else None,
+                'display_name': person[1] if person else None,
+                'revision': self._face_revision(row, library),
+                'can_assign': row[2] is None or (person is not None and self._exclusive(row[2], library))}
+
+    def asset_faces(self, token, library, asset, page):
+        with self.access._transaction():
+            self.access._require(token, library, 'library.people.manage')
+            if self.db.execute('''SELECT 1 FROM assets a JOIN access_asset_libraries l ON l.asset_id=a.id
+                WHERE a.id=? AND l.library_id=? AND (a.status IS NULL OR a.status='active')''',
+                (asset, library)).fetchone() is None:
+                raise AccessDenied('Access denied')
+            total = self.db.execute('SELECT count(*) FROM face_detections WHERE asset_id=?', (asset,)).fetchone()[0]
+            ids = self.db.execute('SELECT id FROM face_detections WHERE asset_id=? ORDER BY id LIMIT 25 OFFSET ?',
+                                  (asset, (page-1)*25)).fetchall()
+            return {'asset_id': str(asset), 'library_id': library, 'page': page, 'page_size': 25, 'total': total,
+                    'items': [self._present_face(self._face(face, library), library) for face, in ids]}
+
+    def assign(self, token, library, face, body):
+        person = _integer(body['person_id'], 2**63-1)
+        if any(not re.fullmatch('[0-9a-f]{64}', body[key]) for key in ('revision', 'person_revision')):
+            raise TransportError(400, 'Invalid revision')
+        with self.access._transaction(write=True):
+            member = self.access._require(token, library, 'library.people.manage')
+            row = self._face(face, library)
+            target = self._person(person, library)
+            if not self._exclusive(person, library) or (row[2] is not None and
+                    (self._row(row[2]) is None or not self._exclusive(row[2], library))):
+                raise AccessDenied('Access denied')
+            if (not hmac.compare_digest(body['revision'], self._face_revision(row, library)) or
+                    not hmac.compare_digest(body['person_revision'], self._revision(target, library))):
+                raise TransportError(409, 'Assignment changed; review again')
+            # Global legacy face writers are not library-scoped. Never race known
+            # queued/in-flight jobs or enqueue propagation from this protected UI.
+            if self.db.execute("""SELECT 1 FROM tasks WHERE state IN ('pending','running')
+                AND type IN ('face','face_embed','person_cluster','person_recluster','person_label_propagate') LIMIT 1""").fetchone():
+                raise TransportError(409, 'Face processing active; review later')
+            if row[2] == person and row[3] == 'manual':
+                return self._present_face(row, library)
+            self.db.execute("UPDATE face_detections SET person_id=?,label_source='manual',label_score=NULL WHERE id=?",
+                            (person, face))
+            self.db.execute('''INSERT INTO face_assignment_events(face_id,asset_id,old_person_id,new_person_id,
+                old_label_source,new_label_source,old_label_score,new_label_score,source,reason,actor)
+                VALUES (?,?,?,?,?,'manual',?,NULL,'manual','protected.owner.assign',?)''',
+                (face, row[1], row[2], person, row[3], row[4], member['account_id']))
+            for affected in {row[2], person} - {None}:
+                # Face vectors remain valid; person aggregates no longer represent
+                # membership. Invalidate pointers/status only, never delete files.
+                self.db.execute('''UPDATE persons SET face_count=(SELECT count(*) FROM face_detections WHERE person_id=?),
+                    embedding_path=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?''', (affected, affected))
+                self.db.execute("UPDATE person_embedding_artifacts SET status='stale' WHERE person_id=?", (affected,))
+            self.access._audit(member['account_id'], 'face.assign.' + str(face), library)
+            return self._present_face(self._face(face, library), library)
+
 
 def _call(runtime, action, *args):
     with runtime.connection_factory() as db:
@@ -143,3 +217,20 @@ async def rename(person_id: str, request: Request):
     body = await _body(request, {'display_name', 'revision'})
     return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'rename', token,
         query['library'], _integer(person_id, 2**63-1), body))
+
+
+@router.get('/admin/assets/{asset_id}/faces')
+async def asset_faces(asset_id: str, request: Request):
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library', 'page'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'asset_faces', token,
+        query['library'], _integer(asset_id, 2**63-1), _integer(query.get('page', '1'), 100000)))
+
+
+@router.post('/admin/faces/{face_id}/assignment')
+async def assign(face_id: str, request: Request):
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library'})
+    body = await _body(request, {'person_id', 'revision', 'person_revision'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'assign', token,
+        query['library'], _integer(face_id, 2**63-1), body))
