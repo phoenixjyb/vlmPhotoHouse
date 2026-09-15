@@ -59,7 +59,12 @@ def _caption_model_allowed_for_auto_tag(model_name: str | None) -> bool:
     return model_filter in str(model_name or '').lower()
 
 class TaskExecutor:
-    def __init__(self, session_factory=None, settings=None):
+    def __init__(self, session_factory=None, settings=None, *, caption_only=False):
+        if type(caption_only) is not bool:
+            raise TypeError('caption_only must be explicit boolean')
+        if caption_only and (session_factory is None or settings is None):
+            raise TypeError('Caption-only executor requires explicit dependencies')
+        self._caption_only = caption_only
         # Allow tests to instantiate without wiring by pulling from app.main lazily
         if session_factory is None or settings is None:
             try:
@@ -81,6 +86,10 @@ class TaskExecutor:
         # New multi-worker control
         self._workers: list[threading.Thread] = []
         self._stop_event = threading.Event()
+        # The standalone caption worker must not initialize embedding models or
+        # indexes. Default mixed-worker initialization remains unchanged.
+        if caption_only:
+            return
         global INDEX_SINGLETON, VIDEO_INDEX_SINGLETON, VIDEO_SEG_INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
             EMBED_SERVICE = EmbeddingService(self.settings.embed_model_image, self.settings.embed_model_text, EMBED_DIM, getattr(self.settings,'embed_device','cpu'))
@@ -130,18 +139,20 @@ class TaskExecutor:
         """
         # Fetch candidate id first (simple query) then attempt guarded update
         now = datetime.utcnow()
-        candidate = session.execute(
-            select(Task.id).where(
+        query = select(Task.id).where(
                 Task.state=='pending',
                 (Task.scheduled_at==None) | (Task.scheduled_at <= now)
-            ).order_by(Task.priority, Task.id).limit(1)
-        ).scalar_one_or_none()
+            )
+        if self._caption_only:
+            query = query.where(Task.type == 'caption')
+        candidate = session.execute(query.order_by(Task.priority, Task.id).limit(1)).scalar_one_or_none()
         if candidate is None:
             return None
         # Optimistic claim
         now = datetime.utcnow()
         updated = session.execute(
-            text("UPDATE tasks SET state='running', started_at=:now WHERE id=:tid AND state='pending'").bindparams(now=now, tid=candidate)
+            text("UPDATE tasks SET state='running', started_at=:now WHERE id=:tid AND state='pending'"
+                 + (" AND type='caption'" if self._caption_only else '')).bindparams(now=now, tid=candidate)
         )
         if updated.rowcount != 1:  # lost race
             session.rollback()
@@ -154,7 +165,8 @@ class TaskExecutor:
             task = self._claim_next_task(session)
             if not task:
                 # maybe enqueue dim backfill batch periodically
-                self._maybe_enqueue_dim_backfill(session)
+                if not self._caption_only:
+                    self._maybe_enqueue_dim_backfill(session)
                 # update gauges (pending / running) periodically when idle
                 try:
                     pending = session.query(Task).filter(Task.state=='pending').count()

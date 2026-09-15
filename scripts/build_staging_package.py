@@ -41,7 +41,8 @@ FILES = tuple(sorted([
     'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
     'docs/security/CPU_ENVIRONMENT.md', 'docs/security/PROTECTED_UPGRADE.md',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
-    'docs/security/DATABASE_PREPARATION.md', 'docs/security/FULLSIZE_REHEARSAL.md', 'docs/security/OWNER_RECOVERY.md', 'docs/FAMILY_STORIES.md',
+    'docs/security/DATABASE_PREPARATION.md', 'docs/security/FULLSIZE_REHEARSAL.md',
+    'docs/security/CAPTION_WORKER.md', 'docs/security/OWNER_RECOVERY.md', 'docs/FAMILY_STORIES.md',
 ]))
 
 

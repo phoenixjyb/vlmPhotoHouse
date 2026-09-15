@@ -11,7 +11,7 @@ except Exception:  # pragma: no cover
 
 def _load_local_env_files() -> None:
     """Load repo-local env files without overriding already-exported variables."""
-    if load_dotenv is None:
+    if load_dotenv is None or os.getenv('PHOTOHOUSE_NO_DOTENV') == '1':
         return
     here = Path(__file__).resolve()
     backend_root = here.parent.parent

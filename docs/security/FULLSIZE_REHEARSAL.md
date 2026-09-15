@@ -114,3 +114,5 @@ These checks do **not** qualify queue startup, real inference, GPU behavior,
 protected HTTP/TLS traffic, or a worker-only service. The installed worker still
 belongs to the legacy API process. A separately qualified worker-only lifecycle
 and private owner password setup remain prerequisites to controlled cutover.
+The next source slice adds a [caption-only launcher](CAPTION_WORKER.md); its
+isolated lifecycle qualification does not replace live deployment acceptance.
