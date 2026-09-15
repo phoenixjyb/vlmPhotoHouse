@@ -88,8 +88,8 @@ def serve_existing(source, kind, config, server_run=None, delivery_args=()):
     scripts = source / 'scripts'
     sys.path.insert(0, str(scripts))
     entry = scripts / {'v1': 'home_feed_app.py', 'v2': 'home_catalog_app.py',
-                       'v3': 'home_originals_app.py'}[kind]
-    if delivery_args and kind != 'v3':
+                       'v3': 'home_originals_app.py', 'v3-search': 'home_search_app.py'}[kind]
+    if delivery_args and kind not in ('v3', 'v3-search'):
         raise ValueError('Original delivery arguments require v3')
     spec = importlib.util.spec_from_file_location('_home_background_entry', entry)
     module = importlib.util.module_from_spec(spec)
@@ -104,7 +104,7 @@ def serve_existing(source, kind, config, server_run=None, delivery_args=()):
             raise ValueError('Unexpected serving policy')
         return server_run(app, **dict(options, log_config=None))
 
-    if kind in ('v2', 'v3'):
+    if kind in ('v2', 'v3', 'v3-search'):
         return module.main(['--config', str(config), '--serve', *delivery_args], server_run=bounded_run)
     configuration, options = module.load_config(config)
     module.serve(configuration, options, server_run=bounded_run)
@@ -120,17 +120,22 @@ def write_receipt(path, value):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, required=True)
-    parser.add_argument('--kind', choices=('v1', 'v2', 'v3'), required=True)
+    parser.add_argument('--kind', choices=('v1', 'v2', 'v3', 'v3-search'), required=True)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--log-dir', type=Path, required=True)
     parser.add_argument('--sources', type=Path)
     parser.add_argument('--sources-sha256')
     parser.add_argument('--original-root', type=Path, action='append')
     parser.add_argument('--cache', type=Path)
+    parser.add_argument('--calendar-enabled',action='store_true')
+    parser.add_argument('--tag-index', type=Path)
+    parser.add_argument('--tag-sha256')
+    parser.add_argument('--discovery-index', type=Path)
+    parser.add_argument('--discovery-sha256')
     parser.add_argument('--allow-originals', action='store_true')
     args = parser.parse_args(argv)
     delivery_args = []
-    if args.kind == 'v3':
+    if args.kind in ('v3', 'v3-search'):
         if not all((args.sources, args.sources_sha256, args.original_root, args.cache)):
             parser.error('v3 requires sources, checksum, original roots and cache')
         delivery_args = ['--sources', str(args.sources), '--sources-sha256', args.sources_sha256,
@@ -141,6 +146,19 @@ def main(argv=None):
             delivery_args.append('--allow-originals')
     elif any((args.sources, args.sources_sha256, args.original_root, args.cache, args.allow_originals)):
         parser.error('Original delivery arguments require v3')
+    if args.kind == 'v3-search':
+        if not args.discovery_index or not args.discovery_sha256:
+            parser.error('Search requires an explicit metadata index and checksum')
+        delivery_args += ['--discovery-index',str(args.discovery_index),'--discovery-sha256',args.discovery_sha256]
+    elif args.discovery_index or args.discovery_sha256:
+        parser.error('Discovery arguments require v3-search')
+    if args.tag_index or args.tag_sha256:
+        if args.kind != 'v3-search' or not args.tag_index or not args.tag_sha256:
+            parser.error('Tag lookup requires explicit v3-search tag index and checksum')
+        delivery_args += ['--tag-index',str(args.tag_index),'--tag-sha256',args.tag_sha256]
+    if args.calendar_enabled:
+        if args.kind != 'v3-search' or not args.tag_index or not args.tag_sha256: parser.error('Calendar requires the tag index')
+        delivery_args.append('--calendar-enabled')
     configure_logging(args.log_dir)
     window = console_window()
     receipt = {'pid': os.getpid(), 'parent_pid': os.getppid(),
