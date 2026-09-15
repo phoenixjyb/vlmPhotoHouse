@@ -33,6 +33,7 @@ FILES = tuple(sorted([
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/check_access_environment.py', 'scripts/rehearse_fullsize_database.py',
+    'scripts/apply_access_schema.py', 'docs/security/SCHEMA_APPLICATION.md',
     'backend/app/photo_delivery.py', 'backend/app/home_feed.py',
     'scripts/home_media_worker.py', 'scripts/home_preparation_resources.py',
     'backend/requirements-home-preparation.lock',
