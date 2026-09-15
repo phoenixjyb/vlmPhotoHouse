@@ -64,6 +64,11 @@ class InventoryTests(unittest.TestCase):
         inventory['routes'][0]['capabilities'] = ['home.discovery.read']
         self.assertTrue(any('Home discovery exception' in e for e in validate(self.discovered, inventory)))
 
+    def test_home_discovery_delivery_exception_cannot_expand_other_surfaces(self):
+        inventory = copy.deepcopy(self.inventory)
+        inventory['routes'][0]['capabilities'] = ['home.discovery.delivery.read']
+        self.assertTrue(any('Home discovery delivery exception' in e for e in validate(self.discovered, inventory)))
+
     def scan_snippet(self, text):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

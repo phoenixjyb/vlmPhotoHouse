@@ -62,6 +62,14 @@ class BackgroundTests(unittest.TestCase):
                 background.main(['--source-root', '.', '--kind', 'v3', '--config', 'config', '--log-dir', 'logs'])
             logging_setup.assert_not_called()
 
+    def test_search_kind_requires_index_and_old_kinds_reject_it(self):
+        base=['--source-root','.','--config','config','--log-dir','logs','--sources','index',
+              '--sources-sha256','a'*64,'--original-root','originals','--cache','cache']
+        with patch.object(background,'configure_logging') as setup:
+            with self.assertRaises(SystemExit):background.main(base+['--kind','v3-search'])
+            with self.assertRaises(SystemExit):background.main(base+['--kind','v3','--discovery-index','metadata','--discovery-sha256','b'*64])
+            setup.assert_not_called()
+
     def test_rejects_changed_access_logging_policy(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory); (source/'scripts').mkdir()

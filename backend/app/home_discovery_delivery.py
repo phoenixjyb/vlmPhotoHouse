@@ -4,6 +4,7 @@ The frozen discovery/v1 implementation and examples remain unchanged. Version 2
 uses its same filter semantics and immutable metadata admission, returning v3
 items from the exact same publication as the media child.
 """
+import asyncio
 import json
 import threading
 from pathlib import Path
@@ -15,6 +16,14 @@ from .home_feed import Configuration, HomeBoundary, Refused, number, parameters,
 from .home_originals import SourceIndex, create_home_originals
 
 PREFIX = '/home/discovery/v2/'
+BODY_SECONDS = 5
+
+async def read_body(request):
+    raw = bytearray()
+    async for part in request.stream():
+        if len(raw) + len(part) > 16384: raise Refused(413, 'request_too_large')
+        raw.extend(part)
+    return raw
 
 class DeliveryIndex(DiscoveryIndex):
     def __init__(self, sources, index_path, index_sha256):
@@ -55,6 +64,7 @@ def create_home_discovery_delivery(config, sources, cache, index_path: Path, ind
     index = DeliveryIndex(sources, index_path, index_sha256)
     app=FastAPI(openapi_url=None,docs_url=None,redoc_url=None,redirect_slashes=False)
     slots=threading.BoundedSemaphore(2)
+    body_slots=threading.BoundedSemaphore(2)
 
     def perform(action):
         if not slots.acquire(blocking=False):return JSONResponse({'error':'busy'},status_code=429,headers={'Retry-After':'2'})
@@ -84,10 +94,15 @@ def create_home_discovery_delivery(config, sources, cache, index_path: Path, ind
         if (request.query_params or request.headers.getlist('content-type')!=['application/json']
                 or 'range' in request.headers or 'if-range' in request.headers):
             return JSONResponse({'error':'invalid_request'},status_code=400)
-        raw=bytearray()
-        async for part in request.stream():
-            if len(raw)+len(part)>16384:return JSONResponse({'error':'request_too_large'},status_code=413)
-            raw.extend(part)
+        if not body_slots.acquire(blocking=False):
+            return JSONResponse({'error':'busy'},status_code=429,headers={'Retry-After':'2'})
+        try:
+            raw=await asyncio.wait_for(read_body(request),timeout=BODY_SECONDS)
+        except asyncio.TimeoutError:
+            return JSONResponse({'error':'request_timeout'},status_code=408)
+        except Refused as error:
+            return JSONResponse({'error':error.code},status_code=error.status)
+        finally: body_slots.release()
         try:body=json.loads(raw,object_pairs_hook=unique)
         except (ValueError,Refused,RecursionError):return JSONResponse({'error':'invalid_request'},status_code=400)
         return await run_in_threadpool(perform,lambda:index.query(body))

@@ -86,6 +86,40 @@ class DeliveryDiscoveryTests(unittest.TestCase):
         control=json.loads((self.pub/'control.json').read_text());control['enabled']=False
         (self.pub/'control.json').write_text(json.dumps(control))
         self.assertEqual(self.search().status_code,403);self.assertEqual(self.client.get('/home/v3/catalog').status_code,403)
+    def test_slow_body_slots_timeout_and_release(self):
+        import asyncio
+        from starlette.requests import Request
+        import app.home_discovery_delivery as delivery
+        endpoint=next(r.endpoint for r in self.app.discovery.routes if r.path.endswith('/search'))
+        async def check():
+            async def receive():
+                await asyncio.sleep(10)
+                return {'type':'http.request','body':b'', 'more_body':False}
+            def request():return Request({'type':'http','method':'POST','path':'/home/discovery/v2/search','query_string':b'', 'headers':[(b'content-type',b'application/json')]},receive)
+            with patch.object(delivery,'BODY_SECONDS',0.03):
+                a=asyncio.create_task(endpoint(request()));b=asyncio.create_task(endpoint(request()))
+                await asyncio.sleep(0.01)
+                self.assertEqual((await endpoint(request())).status_code,429)
+                self.assertEqual([r.status_code for r in await asyncio.gather(a,b)],[408,408])
+        asyncio.run(check())
+        self.assertEqual(self.search().status_code,200)
+
+    def test_explicit_launcher_preserves_policy_and_rejects_bad_index(self):
+        from home_search_app import main
+        from home_feed_app import load_config
+        calls=[]
+        args=['--config',str(self.root/'config.json'),'--sources',str(self.source_path),
+            '--sources-sha256',self.sources.sha256,'--source-root',str(self.originals),
+            '--cache',str(self.root/'cache'),'--allow-originals','--discovery-index',str(self.pub/'discovery.json'),
+            '--discovery-sha256',self.discovery_sha,'--serve']
+        options={'access_log':False,'proxy_headers':False,'host':'192.168.40.1','port':18444}
+        with patch('home_search_app.load_config',return_value=(self.config,options)):
+            self.assertEqual(main(args,server_run=lambda app,**kw:calls.append((app,kw))),0)
+            self.assertEqual(calls[0][1],options)
+            self.assertEqual(len(calls),1)
+            args[-2]='0'*64
+            self.assertEqual(main(args,server_run=lambda *a,**kw:self.fail('Bad pin served')),2)
+
     def test_committed_examples_match_actual_producer(self):
         expected=json.loads((ROOT/'docs/security/home-discovery-delivery-examples-v2.json').read_text())
         for field in ('people','tags','locations'):
