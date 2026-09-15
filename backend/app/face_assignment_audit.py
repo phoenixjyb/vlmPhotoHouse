@@ -1,31 +1,16 @@
 from __future__ import annotations
 
-import logging
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from .db import FaceAssignmentEvent, FaceDetection
 
-logger = logging.getLogger(__name__)
-_AUDIT_TABLE_READY = False
-
-
 def _ensure_audit_table(session: Session) -> bool:
-    global _AUDIT_TABLE_READY
-    if _AUDIT_TABLE_READY:
-        return True
-    try:
-        bind = session.get_bind()
-        if bind is None:
-            return False
-        insp = inspect(bind)
-        if not insp.has_table('face_assignment_events'):
-            FaceAssignmentEvent.__table__.create(bind=bind, checkfirst=True)
-        _AUDIT_TABLE_READY = True
-        return True
-    except Exception:
-        logger.exception("Failed to ensure face_assignment_events table")
-        return False
+    # Inspect the caller's connection, never a cached result from another DB and
+    # never a second engine connection that can interfere with its transaction.
+    if not inspect(session.connection()).has_table('face_assignment_events'):
+        raise ValueError('Migrated face assignment audit schema required')
+    return True
 
 
 def record_face_assignment_event(

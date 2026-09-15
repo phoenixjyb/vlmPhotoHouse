@@ -99,23 +99,25 @@ existing records in the replacement UI. Do not use ad-hoc SQL or bypass the old 
 protection boundary to make them visible.
 
 Automatic face workers are another separate gate. Known queued/running face jobs
-block protected corrections, but the legacy clustering/reclustering/propagation
-implementations are not qualified to preserve every manual negative/unassignment
-or respect the new ownership boundaries. Do not enable those workers with this
-release until reviewed and tested; the source-only caption runner accepts the new
+block protected corrections. The [scoped assignment implementation](SCOPED_FACE_WORKER.md)
+now replaces the unsafe legacy clustering/reclustering/propagation paths locally;
+native runtime, qualified queue production and versioned-vector readiness remain
+unproven. Do not enable those workers with this release until the
+[qualification gates](FACE_WORKER_QUALIFICATION.md) pass. The source-only caption runner accepts the new
 revision but this is not a native caption-worker compatibility result. Caption-only
 operation and face inference must be qualified separately.
 
-The 2026-09-15 read-only worker audit confirmed concrete incompatibilities:
+The 2026-09-15 read-only audit of the prior worker source confirmed concrete incompatibilities:
 `person_cluster` and `person_label_propagate` can select manually unassigned faces;
 `person_recluster` can overwrite positive manual labels too. Candidate/reference
 pools are global, automatically created people lack explicit ownership, and partial
 reclustering resets global counts. Legacy audit/dependency initialization also
-contains runtime DDL. The next worker slice must preserve every manual label
+contained runtime DDL. The replacement worker must preserve every manual label
 (including a null person), require explicit library-scoped candidates and owned
 targets, recompute affected counts from actual rows, and require migrated audit
-schema. Existing worker tests do not collect in the CPU-minimal access environment;
-protected API tests are not worker qualification.
+schema. The new isolated child-process checks exercise actual `TaskExecutor`
+dispatch under a separate local dependency environment. CPU-minimal environments
+skip those checks explicitly; protected API tests alone are not worker qualification.
 
 ## Evidence
 

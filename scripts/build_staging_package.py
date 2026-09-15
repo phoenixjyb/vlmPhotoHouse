@@ -48,6 +48,7 @@ FILES = tuple(sorted([
     'docs/security/OWNER_PEOPLE_REVIEW.md', 'docs/security/OWNER_FACE_ASSIGNMENT.md',
     'docs/security/OWNER_SETUP_GATE.md', 'docs/security/LIBRARY_MANAGEMENT.md',
     'docs/security/MANAGEMENT_IMPORT.md',
+    'docs/security/SCOPED_FACE_WORKER.md', 'docs/security/FACE_WORKER_QUALIFICATION.md',
 ]))
 
 

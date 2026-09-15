@@ -45,6 +45,7 @@ DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_RO
 ( DERIVED_DIR / 'person_embeddings').mkdir(parents=True, exist_ok=True)
 THUMB_SIZES = [256, 1024]
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
+FACE_ASSIGNMENT_TASK_TYPES = ('person_cluster', 'person_recluster', 'person_label_propagate')
 
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
@@ -59,12 +60,13 @@ def _caption_model_allowed_for_auto_tag(model_name: str | None) -> bool:
     return model_filter in str(model_name or '').lower()
 
 class TaskExecutor:
-    def __init__(self, session_factory=None, settings=None, *, caption_only=False):
-        if type(caption_only) is not bool:
-            raise TypeError('caption_only must be explicit boolean')
-        if caption_only and (session_factory is None or settings is None):
-            raise TypeError('Caption-only executor requires explicit dependencies')
+    def __init__(self, session_factory=None, settings=None, *, caption_only=False, face_assignment_only=False):
+        if type(caption_only) is not bool or type(face_assignment_only) is not bool or (caption_only and face_assignment_only):
+            raise TypeError('Exclusive worker mode must be explicit boolean')
+        if (caption_only or face_assignment_only) and (session_factory is None or settings is None):
+            raise TypeError('Restricted executor requires explicit dependencies')
         self._caption_only = caption_only
+        self._face_assignment_only = face_assignment_only
         # Allow tests to instantiate without wiring by pulling from app.main lazily
         if session_factory is None or settings is None:
             try:
@@ -88,7 +90,7 @@ class TaskExecutor:
         self._stop_event = threading.Event()
         # The standalone caption worker must not initialize embedding models or
         # indexes. Default mixed-worker initialization remains unchanged.
-        if caption_only:
+        if caption_only or face_assignment_only:
             return
         global INDEX_SINGLETON, VIDEO_INDEX_SINGLETON, VIDEO_SEG_INDEX_SINGLETON, EMBED_SERVICE, EMBED_DIM, FACE_CLUSTER_DIST_THRESHOLD
         if EMBED_SERVICE is None:
@@ -145,6 +147,8 @@ class TaskExecutor:
             )
         if self._caption_only:
             query = query.where(Task.type == 'caption')
+        elif self._face_assignment_only:
+            query = query.where(Task.type.in_(FACE_ASSIGNMENT_TASK_TYPES))
         candidate = session.execute(query.order_by(Task.priority, Task.id).limit(1)).scalar_one_or_none()
         if candidate is None:
             return None
@@ -152,7 +156,8 @@ class TaskExecutor:
         now = datetime.utcnow()
         updated = session.execute(
             text("UPDATE tasks SET state='running', started_at=:now WHERE id=:tid AND state='pending'"
-                 + (" AND type='caption'" if self._caption_only else '')).bindparams(now=now, tid=candidate)
+                 + (" AND type='caption'" if self._caption_only else
+                    " AND type IN ('person_cluster','person_recluster','person_label_propagate')" if self._face_assignment_only else '')).bindparams(now=now, tid=candidate)
         )
         if updated.rowcount != 1:  # lost race
             session.rollback()
@@ -165,7 +170,7 @@ class TaskExecutor:
             task = self._claim_next_task(session)
             if not task:
                 # maybe enqueue dim backfill batch periodically
-                if not self._caption_only:
+                if not self._caption_only and not self._face_assignment_only:
                     self._maybe_enqueue_dim_backfill(session)
                 # update gauges (pending / running) periodically when idle
                 try:
@@ -902,431 +907,22 @@ class TaskExecutor:
             m.face_embeddings_generated.inc()
         except Exception:
             pass
-        auto_cluster_enabled = os.getenv('FACE_AUTO_CLUSTER_ENABLED', 'false').lower() in ('1', 'true', 'yes')
-        if auto_cluster_enabled:
-            pending_cluster = session.query(Task).filter(Task.type=='person_cluster', Task.state=='pending').first()
-            if not pending_cluster:
-                unassigned_faces = session.query(FaceDetection).filter(FaceDetection.person_id==None, FaceDetection.embedding_path!=None).count()
-                if unassigned_faces >= 5:
-                    session.add(Task(type='person_cluster', priority=180, payload_json={}))
-                    session.commit()
-            # Possibly schedule a full recluster occasionally when number of persons grows
-            persons_count = session.query(Person).count()
-            if persons_count and persons_count % 25 == 0:
-                existing_recluster = session.query(Task).filter(Task.type=='person_recluster', Task.state=='pending').first()
-                if not existing_recluster:
-                    session.add(Task(type='person_recluster', priority=250, payload_json={}))
-                    session.commit()
+        # Embedding completion carries neither library-owner authority nor reviewed
+        # artifact provenance. Never synthesize an unscoped assignment job here.
+        # A separately qualified producer must submit the explicit scoped payload.
         return str(emb_path)
 
     def _handle_person_cluster(self, session: Session, task: Task):
-        # Incremental centroid clustering using cosine distance
-        # Load existing persons and their centroids
-        persons = session.query(Person).all()
-        person_centroids = {}
-        for p in persons:
-            if p.embedding_path and os.path.exists(p.embedding_path):
-                vec = np.load(p.embedding_path).astype('float32')
-                # normalize
-                n = np.linalg.norm(vec)
-                if n > 0:
-                    vec /= n
-                person_centroids[p.id] = vec
-        # Fetch unassigned faces with embeddings
-        faces = session.query(FaceDetection).filter(
-            FaceDetection.person_id == None,
-            FaceDetection.embedding_path != None
-        ).limit(500).all()
-        if not faces:
-            return 0
-        new_persons_created = 0
-        assignments = 0
-        for face in faces:
-            if not face.embedding_path or not os.path.exists(face.embedding_path):
-                continue
-            fvec = np.load(face.embedding_path).astype('float32')
-            n = np.linalg.norm(fvec)
-            if n > 0:
-                fvec /= n
-            # Find best existing person
-            best_pid = None
-            best_dist = 1e9
-            for pid, cvec in person_centroids.items():
-                dist = 1.0 - float(np.dot(fvec, cvec))
-                if dist < best_dist:
-                    best_dist = dist
-                    best_pid = pid
-            if best_pid is not None and best_dist <= FACE_CLUSTER_DIST_THRESHOLD:
-                # assign to best person
-                person = next(p for p in persons if p.id == best_pid)
-                # update centroid (weighted average then renormalize)
-                old_centroid = person_centroids[best_pid]
-                new_centroid = (old_centroid * person.face_count + fvec) / (person.face_count + 1)
-                n2 = np.linalg.norm(new_centroid)
-                if n2 > 0:
-                    new_centroid /= n2
-                person_centroids[best_pid] = new_centroid
-                # persist centroid update
-                if person.embedding_path:
-                    np.save(person.embedding_path, new_centroid.astype('float32'))
-                else:
-                    emb_path = DERIVED_DIR / 'person_embeddings' / f'{person.id}.npy'
-                    np.save(emb_path, new_centroid.astype('float32'))
-                    person.embedding_path = str(emb_path)
-                person.face_count += 1
-                old_person_id = int(face.person_id) if face.person_id is not None else None
-                old_label_source = getattr(face, 'label_source', None)
-                old_label_score = getattr(face, 'label_score', None)
-                face.person_id = person.id
-                face.label_source = 'dnn'  # type: ignore[attr-defined]
-                face.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
-                record_face_assignment_event(
-                    session,
-                    face=face,
-                    source='dnn',
-                    reason='worker.person_cluster',
-                    actor='worker',
-                    task_id=int(task.id),
-                    old_person_id=old_person_id,
-                    new_person_id=int(person.id),
-                    old_label_source=old_label_source,
-                    new_label_source='dnn',
-                    old_label_score=float(old_label_score) if old_label_score is not None else None,
-                    new_label_score=float(1.0 - best_dist),
-                )
-                assignments += 1
-            else:
-                # create new person
-                person = Person(face_count=1)
-                session.add(person)
-                session.flush()  # get id
-                emb_path = DERIVED_DIR / 'person_embeddings' / f'{person.id}.npy'
-                np.save(emb_path, fvec.astype('float32'))
-                person.embedding_path = str(emb_path)
-                person_centroids[person.id] = fvec
-                old_person_id = int(face.person_id) if face.person_id is not None else None
-                old_label_source = getattr(face, 'label_source', None)
-                old_label_score = getattr(face, 'label_score', None)
-                face.person_id = person.id
-                face.label_source = 'dnn'  # type: ignore[attr-defined]
-                face.label_score = 1.0  # type: ignore[attr-defined]
-                record_face_assignment_event(
-                    session,
-                    face=face,
-                    source='dnn',
-                    reason='worker.person_cluster_new',
-                    actor='worker',
-                    task_id=int(task.id),
-                    old_person_id=old_person_id,
-                    new_person_id=int(person.id),
-                    old_label_source=old_label_source,
-                    new_label_source='dnn',
-                    old_label_score=float(old_label_score) if old_label_score is not None else None,
-                    new_label_score=1.0,
-                )
-                persons.append(person)
-                new_persons_created += 1
-                assignments += 1
-        session.commit()
-        return {'assigned_faces': assignments, 'new_persons': new_persons_created}
+        from .scoped_face_worker import run_scoped_assignment
+        return run_scoped_assignment(session, task, embedding_root=DERIVED_DIR)
 
     def _handle_person_recluster(self, session: Session, task: Task):
-        """Full recluster from scratch using current face embeddings.
-
-        Strategy: fetch up to batch limit unassigned + assigned faces, compute embeddings, perform simple online reassignment.
-        Existing persons are cleared (face_count reset) but preserved IDs to maintain references; could optionally merge small clusters.
-        """
-        limit = getattr(self.settings, 'face_recluster_batch_limit', 2000)
-        # If cancel requested early, short circuit
-        session.refresh(task)
-        if task.cancel_requested:
-            task.progress_current = 0
-            task.progress_total = 0
-            task.state = 'canceled'
-            session.commit()
-            return {'faces': 0, 'persons': session.query(Person).count(), 'canceled': True}
-
-        faces = session.query(FaceDetection).filter(FaceDetection.embedding_path!=None).limit(limit).all()
-        if not faces:
-            return {'faces': 0, 'persons': 0}
-        # load embeddings
-        embs = []
-        face_objs = []
-        for f in faces:
-            try:
-                vec = np.load(f.embedding_path).astype('float32') if f.embedding_path else None
-                if vec is None:
-                    continue
-                n = np.linalg.norm(vec)
-                if n>0: vec /= n
-                embs.append(vec)
-                face_objs.append(f)
-            except Exception:
-                continue
-        if not embs:
-            return {'faces':0, 'persons':0}
-        # reset persons mapping
-        persons = session.query(Person).all()
-        for p in persons:
-            p.face_count = 0
-        person_centroids: dict[int, np.ndarray] = {}
-        # simple online clustering
-        new_persons = 0
-        # set total for progress
-        task.progress_total = len(face_objs)
-        session.commit()
-        # optional artificial delay per face for testing (env var)
-        per_face_sleep = float(os.getenv('PERSON_RECLUSTER_PER_FACE_SLEEP','0') or '0')
-        for idx, (f, vec) in enumerate(zip(face_objs, embs), start=1):
-            # cancellation check
-            if task.cancel_requested:
-                task.state = 'canceled'
-                session.commit()
-                return {'faces': idx-1, 'persons': len(persons), 'new_persons': new_persons, 'canceled': True}
-            best_pid = None
-            best_dist = 1e9
-            for pid, cvec in person_centroids.items():
-                dist = 1.0 - float(np.dot(vec, cvec))
-                if dist < best_dist:
-                    best_dist = dist
-                    best_pid = pid
-            if best_pid is not None and best_dist <= FACE_CLUSTER_DIST_THRESHOLD:
-                # assign
-                old_person_id = int(f.person_id) if f.person_id is not None else None
-                old_label_source = getattr(f, 'label_source', None)
-                old_label_score = getattr(f, 'label_score', None)
-                f.person_id = best_pid
-                f.label_source = 'dnn'  # type: ignore[attr-defined]
-                f.label_score = float(1.0 - best_dist)  # type: ignore[attr-defined]
-                record_face_assignment_event(
-                    session,
-                    face=f,
-                    source='dnn',
-                    reason='worker.person_recluster',
-                    actor='worker',
-                    task_id=int(task.id),
-                    old_person_id=old_person_id,
-                    new_person_id=int(best_pid),
-                    old_label_source=old_label_source,
-                    new_label_source='dnn',
-                    old_label_score=float(old_label_score) if old_label_score is not None else None,
-                    new_label_score=float(1.0 - best_dist),
-                )
-                p = next(p for p in persons if p.id == best_pid)
-                # update centroid
-                new_c = (person_centroids[best_pid]*p.face_count + vec) / (p.face_count+1)
-                n2 = np.linalg.norm(new_c)
-                if n2>0: new_c /= n2
-                person_centroids[best_pid] = new_c
-                p.face_count +=1
-            else:
-                # create new person
-                p = Person(face_count=1)
-                session.add(p)
-                session.flush()
-                emb_path = DERIVED_DIR / 'person_embeddings' / f'{p.id}.npy'
-                np.save(emb_path, vec.astype('float32'))
-                p.embedding_path = str(emb_path)
-                person_centroids[p.id] = vec
-                old_person_id = int(f.person_id) if f.person_id is not None else None
-                old_label_source = getattr(f, 'label_source', None)
-                old_label_score = getattr(f, 'label_score', None)
-                f.person_id = p.id
-                f.label_source = 'dnn'  # type: ignore[attr-defined]
-                f.label_score = 1.0  # type: ignore[attr-defined]
-                record_face_assignment_event(
-                    session,
-                    face=f,
-                    source='dnn',
-                    reason='worker.person_recluster_new',
-                    actor='worker',
-                    task_id=int(task.id),
-                    old_person_id=old_person_id,
-                    new_person_id=int(p.id),
-                    old_label_source=old_label_source,
-                    new_label_source='dnn',
-                    old_label_score=float(old_label_score) if old_label_score is not None else None,
-                    new_label_score=1.0,
-                )
-                persons.append(p)
-                new_persons +=1
-            # update progress
-            task.progress_current = idx
-            if idx % 25 == 0 or idx == task.progress_total:
-                session.commit()
-            if per_face_sleep > 0:
-                time.sleep(per_face_sleep)
-        session.commit()
-        return {'faces': len(face_objs), 'persons': len(persons), 'new_persons': new_persons}
+        from .scoped_face_worker import run_scoped_assignment
+        return run_scoped_assignment(session, task, embedding_root=DERIVED_DIR)
 
     def _handle_person_label_propagate(self, session: Session, task: Task):
-        """Propagate newly-manual labels to similar unassigned faces (DNN assignment).
-
-        This is a targeted auto-assign pass:
-        - references use only manual-labeled faces
-        - candidates are only unassigned faces
-        - assignment requires score + margin thresholds
-        - only target person_ids are assignable
-        """
-        payload = task.payload_json or {}
-        raw_ids = payload.get('person_ids') or []
-        target_person_ids: set[int] = set()
-        for v in raw_ids:
-            try:
-                target_person_ids.add(int(v))
-            except Exception:
-                continue
-        if not target_person_ids:
-            return {'assigned': 0, 'reason': 'no_target_person_ids'}
-
-        score_threshold = float(payload.get('score_threshold', os.getenv('PERSON_LABEL_PROPAGATE_SCORE_THRESHOLD', '0.82')))
-        margin = float(payload.get('margin', os.getenv('PERSON_LABEL_PROPAGATE_MARGIN', '0.015')))
-        min_ref_faces = int(payload.get('min_ref_faces', os.getenv('PERSON_LABEL_PROPAGATE_MIN_REF_FACES', '2')))
-        max_scan = int(payload.get('max_scan', os.getenv('PERSON_LABEL_PROPAGATE_MAX_SCAN', '0')))
-        commit_every = int(payload.get('commit_every', 200))
-
-        data_root = Path(os.getenv('VLM_DATA_ROOT', r'E:\VLM_DATA'))
-
-        def _resolve_emb_path(ep: str) -> Path:
-            p = Path(ep)
-            if p.is_absolute():
-                return p
-            ep_norm = ep.replace("\\", "/")
-            if ep_norm.lower().startswith("derived/"):
-                return data_root / ep_norm
-            return Path(ep)
-
-        # Build manual reference centroids for all persons (for competition/margin),
-        # while only allowing assignments to target persons.
-        ref_rows = (
-            session.query(FaceDetection.person_id, FaceDetection.embedding_path)
-            .filter(FaceDetection.person_id != None)
-            .filter(FaceDetection.embedding_path != None)
-            .filter(FaceDetection.label_source == 'manual')
-            .all()
-        )
-        by_person: dict[int, list[np.ndarray]] = {}
-        for pid, ep in ref_rows:
-            if pid is None or not ep:
-                continue
-            p = _resolve_emb_path(str(ep))
-            if not p.exists():
-                continue
-            try:
-                v = np.load(p).astype('float32')
-                n = float(np.linalg.norm(v))
-                if n > 0:
-                    v = v / n
-            except Exception:
-                continue
-            by_person.setdefault(int(pid), []).append(v)
-
-        centroids: dict[int, np.ndarray] = {}
-        for pid, vecs in by_person.items():
-            if len(vecs) < min_ref_faces:
-                continue
-            c = np.mean(np.stack(vecs), axis=0).astype('float32')
-            n = float(np.linalg.norm(c))
-            if n > 0:
-                c = c / n
-            centroids[pid] = c
-
-        target_with_ref = sorted(pid for pid in target_person_ids if pid in centroids)
-        if not target_with_ref:
-            return {'assigned': 0, 'reason': 'no_target_centroids', 'targets': sorted(target_person_ids)}
-
-        q = (
-            session.query(FaceDetection)
-            .filter(FaceDetection.person_id == None)
-            .filter(FaceDetection.embedding_path != None)
-            .order_by(FaceDetection.id.asc())
-        )
-        if max_scan > 0:
-            q = q.limit(max_scan)
-        candidates = q.all()
-
-        scanned = 0
-        assigned = 0
-        affected: set[int] = set()
-
-        for face in candidates:
-            scanned += 1
-            ep = face.embedding_path
-            if not ep:
-                continue
-            p = _resolve_emb_path(str(ep))
-            if not p.exists():
-                continue
-            try:
-                v = np.load(p).astype('float32')
-                n = float(np.linalg.norm(v))
-                if n > 0:
-                    v = v / n
-            except Exception:
-                continue
-
-            scores = sorted(
-                [(float(np.dot(v, c)), pid) for pid, c in centroids.items()],
-                reverse=True,
-            )
-            if not scores:
-                continue
-            best_score, best_pid = scores[0]
-            second_score = scores[1][0] if len(scores) > 1 else -1.0
-            gap = best_score - second_score
-
-            if best_pid not in target_person_ids:
-                continue
-            if best_score < score_threshold or gap < margin:
-                continue
-
-            old_person_id = int(face.person_id) if face.person_id is not None else None
-            old_label_source = getattr(face, 'label_source', None)
-            old_label_score = getattr(face, 'label_score', None)
-            face.person_id = int(best_pid)
-            face.label_source = 'dnn'  # type: ignore[attr-defined]
-            face.label_score = float(best_score)  # type: ignore[attr-defined]
-            record_face_assignment_event(
-                session,
-                face=face,
-                source='dnn',
-                reason='worker.person_label_propagate',
-                actor='worker',
-                task_id=int(task.id),
-                old_person_id=old_person_id,
-                new_person_id=int(best_pid),
-                old_label_source=old_label_source,
-                new_label_source='dnn',
-                old_label_score=float(old_label_score) if old_label_score is not None else None,
-                new_label_score=float(best_score),
-            )
-            assigned += 1
-            affected.add(int(best_pid))
-
-            if assigned % max(20, commit_every) == 0:
-                session.commit()
-
-        # SessionLocal uses autoflush=False; flush person_id updates before counting.
-        session.flush()
-        for pid in sorted(affected):
-            cnt = (
-                session.query(FaceDetection.id)
-                .filter(FaceDetection.person_id == pid)
-                .count()
-            )
-            p_obj = session.get(Person, pid)
-            if p_obj is not None:
-                p_obj.face_count = int(cnt)
-        session.commit()
-        return {
-            'assigned': assigned,
-            'scanned': scanned,
-            'targets': sorted(target_person_ids),
-            'targets_with_ref': target_with_ref,
-            'score_threshold': score_threshold,
-            'margin': margin,
-            'min_ref_faces': min_ref_faces,
-        }
+        from .scoped_face_worker import run_scoped_assignment
+        return run_scoped_assignment(session, task, embedding_root=DERIVED_DIR)
 
     def _handle_dim_backfill(self, session: Session, task: Task):
         asset_id = task.payload_json.get('asset_id') if task.payload_json else None

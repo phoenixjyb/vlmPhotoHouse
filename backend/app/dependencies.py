@@ -58,6 +58,10 @@ def ensure_db():
     _rebind_if_needed()
     try:
         insp = inspect(engine)
+        # Legacy initialization is not a migration path for protected libraries.
+        # Refuse before any fallback DDL, even if their schema is incomplete.
+        if any(name.startswith('access_') for name in insp.get_table_names()):
+            raise RuntimeError('Protected database requires explicit migrated runtime')
         if not insp.has_table('assets'):
             Base.metadata.create_all(bind=engine)
         # Fallback: if tasks table exists but new progress columns missing (e.g., older test DB before migration), add them for SQLite.
