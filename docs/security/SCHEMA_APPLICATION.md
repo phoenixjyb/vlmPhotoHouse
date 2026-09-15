@@ -51,3 +51,22 @@ Protected serving, legacy route isolation and media mapping remain distinct gate
 Tests use only synthetic catalogs and cover default read-only behavior, successful
 preservation, empty grants, refused running/WAL/stale/repeated targets, explicit
 shutdown confirmation, a racing writer, and rollback after DDL/data-change/timeouts.
+
+## Qualification receipt — 2026-09-15
+
+The 14 focused tests passed on Mac and native Windows CPython 3.12 (4.303 seconds
+on Windows). The full Mac security suite ran 664 tests: 659 passed and five skipped.
+An immutable 70-file source package from `049c05fac58543f6c70a3f21af36531055c1be0f`
+was hash-verified and extracted separately on Windows; existing releases stayed
+unchanged. Against a disposable 955,658,240-byte historical catalog copy, the actual
+application command completed in 152.83 seconds, preserving all 15 pre-existing
+data tables and 802,360 rows. Its synthetic offline preparation changed one running
+task to pending only in that disposable copy before generating the matching backup.
+It created no accounts or mappings. A mid-run memory observation showed about
+70.4 MiB peak working set at that instant; this is not a whole-run memory ceiling.
+
+No live schema migration, service pause, password entry or traffic switch occurred.
+The serving legacy schema remained `d2b7e4f6a901`, with independent caption progress.
+Real cutover must resolve the user-facing transition: the current protected entry
+point does not include legacy face-assignment and album-management routes, while
+leaving the legacy unauthenticated UI accessible would bypass protected login.
