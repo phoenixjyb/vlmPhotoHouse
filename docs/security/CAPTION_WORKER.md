@@ -193,3 +193,108 @@ it must not silently clear it during API startup. Host-specific task identities,
 stop path, configuration, receipts and prior API scheduler XML are retained in
 the private deployment handoff. No new timed/wake triggers or live-monitoring
 automation were installed. Boot/wake remains a separate untested gate.
+
+## Protected d8 cutover: installed-worker incompatibility
+
+Do not reuse the above `26c65da` launcher unchanged after migration to
+`d8e5b2f7a904`. Its revision allowlist contains only `d2b7e4f6a901` and
+`c7f4a9e2b610`. Caption/task columns remaining compatible does **not** mean that
+the executable can start: selecting d8 is refused, and keeping an older
+`--expected-revision` also fails against the actual d8 database. Never alter the
+database ledger or weaken this check to make an older worker start.
+
+The installed handover supervisor also pins the older revision/artifact and
+checks the legacy API health before launching. The protected API has a different
+readiness contract. Updating the worker package alone will therefore not complete
+the transition. Prepare a separate, hash-verified worker package with d8 support
+and a reviewed supervisor with the actual target revision, preserved private
+settings, independent readiness checks and explicit writer fencing. Do not
+retain an unauthenticated legacy API merely to satisfy its old health dependency.
+
+Before switching, qualify the replacement package under the actual Windows
+service principal, including synthetic d8 queue execution, real isolated photo
+and video input, graceful drain and duplicate-start refusal. Review old API
+startup tasks and boot/resume hooks so they cannot restore a bypass route or
+silently clear a stop request. The current source fixture targets d8, but Mac
+tests do not qualify the installed Windows supervisor or a live restart.
+
+## API-independent supervisor (local implementation)
+
+`scripts/supervise_caption_worker.py` is a separate, standard-library launcher.
+It does not enter the protected WebUI package or change the fixed 15-file caption
+artifact. Deploy/review its own source hash separately from the worker archive.
+Use the qualified **worker** interpreter, not the minimal protected environment:
+
+```text
+python -I -B scripts/supervise_caption_worker.py
+  --config ABS_PRIVATE_SUPERVISOR_JSON --config-sha256 REVIEWED_64_HEX_SHA256
+```
+
+Default execution verifies configuration/package/policy pins and performs read-only
+queue preflight. It creates no lock, receipt or task, contacts no service and imports
+no application/model modules. It only compiles the hash-verified stdlib launcher.
+It refuses a retained stop file even in preflight; it never removes one.
+
+The private JSON has exactly these fields:
+
+| Field | Required value |
+| --- | --- |
+| `format_version` | Integer `1` |
+| `worker_root` | Existing extracted immutable caption package directory |
+| `worker_commit` | Full reviewed 40-character lowercase commit SHA |
+| `manifest_sha256` | SHA-256 of the exact manifest bytes |
+| `database`, `expected_revision` | Existing catalog and exact supported revision |
+| `derived`, `temporary` | Existing worker-owned output/temp directories |
+| `stop_file` | Absent retained-stop path, outside source/media/temp |
+| `caption_url` | Explicit HTTP loopback model endpoint accepted by the worker |
+| `environment_json`, `environment_sha256` | Existing reviewed policy file and its hash |
+| `receipt_directory` | Existing private directory separate from source/media/temp |
+
+All non-version values are strings; all paths are explicit canonical local paths.
+The supervisor refuses duplicate/unknown fields, aliases, mismatched hashes and
+unmanifested files including `.env` and bytecode. Configuration and manifest hashes
+must come from independent review, not from untrusted content in the same directory.
+Private policy values are never printed or stored in the receipts.
+
+Execution additionally requires `--execute --writers-fenced`. This flag is an
+operator assertion after independently fencing legacy/other writers, **not a
+mechanism that stops or detects them**. It refuses running captions and any pending
+or running non-caption tasks at startup. That query is a startup check, not a
+continuous monitor or a guarantee against another writer enqueueing later.
+
+The supervisor verifies inputs twice before execution, then calls the verified
+runner in the same dedicated process. There is no parent/child output pipe, child
+restart, API health requirement, HTTP listener, task retry/repair, sleep command or
+scheduled-task installation. Qwen3 readiness, schema preflight, kernel lock,
+signal handling, synchronous drain and queue policy remain the worker's own gates.
+The worker rechecks its stop file after acquiring the lock before configuring any
+provider. `--once` is forwarded only for execution and still means at most one
+claim attempt, not a particular asset or one successful caption.
+
+Raw Python stdout/stderr and native output on descriptors 1/2 are discarded during
+worker execution, never buffered in memory. A private exclusively-created
+`<run-id>.started.json` and `<run-id>.result.json` contain only bounded summaries
+(each at most 2 KiB), timestamps and process/source/revision identifiers. A started
+receipt is not proof of queue activation. Missing, partial or failed result output
+never proves a clean drain. Do not blindly restart after such a result; inspect
+the actual process, retained stop request and queue boundary. Receipt write failure
+before startup refuses execution. No receipt overwrite, pruning or auto-restart is
+performed; retained-file housekeeping is an independent operator action. Inherited
+logging handlers or libraries opening their own files are not controlled by this
+stdout/stderr policy; use a fresh process and qualify actual host logging.
+
+The package directory, private policy, config and launcher must be protected by
+reviewed host ACLs against replacement during execution. Hashes establish the
+checked bytes, not filesystem immutability: imported backend modules and prompt/
+policy files are read from disk later. Rechecking before startup does not defeat
+an actor who can rewrite the trusted release. Dependency/interpreter provenance,
+actual service-principal access, disk/memory limits and old startup-task fencing
+remain operational qualification gates. No Windows ACL or SYSTEM acceptance is
+claimed by the Mac tests.
+
+Run `tests.security.test_caption_supervisor` with the separate worker test
+dependencies. It covers immutable package/config checks, read-only behavior,
+startup refusal, small receipts, suppressed native output, and seven synthetic
+d8 scenarios through the actual packaged worker: drain, user edit, retry, idle,
+unready provider, absent fencing assertion and tagging. It does not use real
+photos/videos, GPU inference, a live catalog or a Windows service.

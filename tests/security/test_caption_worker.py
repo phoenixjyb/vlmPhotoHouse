@@ -59,6 +59,35 @@ class CaptionWorkerTests(unittest.TestCase):
         with self.assertRaises(worker.Refused):
             worker.preflight(self.db, 'd2b7e4f6a901')
 
+    def test_each_supported_revision_requires_exact_read_only_selection(self):
+        revisions = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904')
+        self.assertEqual(worker.REVISIONS, revisions)
+        for actual in revisions:
+            with closing(sqlite3.connect(self.db)) as db:
+                db.execute('UPDATE alembic_version SET version_num=?', (actual,))
+                db.commit()
+            before = self.db.read_bytes()
+            for selected in revisions:
+                with self.subTest(actual=actual, selected=selected):
+                    if actual == selected:
+                        result = worker.preflight(self.db, selected)
+                        self.assertEqual(result['revision'], actual)
+                        self.assertFalse(result['activated'])
+                    else:
+                        with self.assertRaises(worker.Refused):
+                            worker.preflight(self.db, selected)
+                    self.assertEqual(before, self.db.read_bytes())
+
+    def test_migrated_schema_does_not_bypass_running_caption_gate(self):
+        with closing(sqlite3.connect(self.db)) as db:
+            db.execute("UPDATE alembic_version SET version_num='d8e5b2f7a904'")
+            db.execute("INSERT INTO tasks VALUES ('caption','running')")
+            db.commit()
+        before = self.db.read_bytes()
+        with self.assertRaises(worker.Refused):
+            worker.preflight(self.db, 'd8e5b2f7a904')
+        self.assertEqual(before, self.db.read_bytes())
+
     def test_unknown_revision_refuses(self):
         with self.assertRaises(worker.Refused):
             worker.preflight(self.db, 'unknown')
@@ -115,6 +144,24 @@ class CaptionWorkerTests(unittest.TestCase):
         executor = Mock()
         self.assertEqual(worker.drain_loop(executor, threading.Event(), stopfile), 0)
         executor.run_once.assert_not_called()
+
+    def test_stop_arriving_at_lock_acquisition_prevents_configuration(self):
+        from contextlib import contextmanager
+        path = self.root/'reviewed.json'; path.write_text('{}')
+        stopfile = self.root/'stop'
+        args = worker.argparse.Namespace(database=str(self.db), derived=str(self.root),
+            temporary=str(self.root), stop_file=str(stopfile), caption_url='http://127.0.0.1:1',
+            environment_json=str(path), expected_revision='c7f4a9e2b610', execute=True,
+            legacy_worker_stopped=True, once=False)
+        @contextmanager
+        def arriving_stop(database):
+            stopfile.touch()
+            yield
+        with patch.object(worker, 'worker_lock', side_effect=arriving_stop), \
+             patch.object(worker, 'configure_process') as configure:
+            with self.assertRaises(worker.Refused): worker.run(args)
+        configure.assert_not_called()
+        self.assertTrue(stopfile.exists())
 
     def test_stop_drains_inflight_before_return_and_no_next_claim(self):
         entered, finish, stop = threading.Event(), threading.Event(), threading.Event()

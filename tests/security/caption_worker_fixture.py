@@ -10,6 +10,7 @@ from unittest.mock import patch
 root, work = Path(sys.argv[1]), Path(sys.argv[2])
 mode = sys.argv[3]
 migration_root = Path(sys.argv[4]) if len(sys.argv)>4 else root
+supervisor_path = Path(sys.argv[5]) if len(sys.argv)>5 else None
 work.mkdir()  # exclusively new fixture directory
 sys.path.insert(0, str(root/'backend'))
 from sqlalchemy import create_engine
@@ -35,7 +36,7 @@ with Session(engine) as session:
                       model='old', user_edited=mode=='edited')
     task = Task(type='caption', state='pending', priority=100,
                 payload_json={'asset_id':asset.id, 'replace_generated':True})
-    other = Task(type='embed', state='pending', priority=1, payload_json={})
+    other = Task(type='embed', state='finished' if supervisor_path else 'pending', priority=1, payload_json={})
     from datetime import datetime, timedelta
     future = Task(type='caption', state='pending', priority=0,
                   scheduled_at=datetime.utcnow()+timedelta(days=1), payload_json={})
@@ -64,6 +65,27 @@ class Provider:
         return generated
 
 configure = worker.configure_process
+if supervisor_path:
+    import hashlib
+    spec = importlib.util.spec_from_file_location('fixture_supervisor', supervisor_path)
+    supervisor = importlib.util.module_from_spec(spec); spec.loader.exec_module(supervisor)
+    for name in ('derived', 'tmp', 'receipts'): (work/name).mkdir()
+    config_path = work/'supervisor.json'
+    manifest = json.loads((root/'manifest.json').read_bytes())
+    config_path.write_text(json.dumps(dict(format_version=1, worker_root=str(root),
+        worker_commit=manifest['source_commit'],
+        manifest_sha256=hashlib.sha256((root/'manifest.json').read_bytes()).hexdigest(),
+        database=str(database), expected_revision=args.expected_revision,
+        derived=str(work/'derived'), temporary=str(work/'tmp'), receipt_directory=str(work/'receipts'),
+        stop_file=str(stopfile), caption_url=args.caption_url, environment_json=str(environment),
+        environment_sha256=hashlib.sha256(environment.read_bytes()).hexdigest())))
+    supervisor_args = supervisor.argparse.Namespace(config=str(config_path),
+        config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(), execute=True,
+        writers_fenced=mode!='unconfirmed', once=mode!='drain')
+    # Fixture construction imported metadata. Execution below must use the package
+    # anew, exactly as a dedicated supervisor process does, not migration imports.
+    for name in list(sys.modules):
+        if name == 'app' or name.startswith('app.'): del sys.modules[name]
 with ExitStack() as guards:
     for target in ('socket.socket.connect','socket.socket.bind','subprocess.Popen','os.system'):
         guards.enter_context(patch(target, side_effect=AssertionError('External I/O forbidden')))
@@ -83,7 +105,21 @@ with ExitStack() as guards:
         guards.enter_context(patch.object(tasks.TaskExecutor, '_load_caption_image', return_value=Image.new('RGB',(32,32),'red')))
         guards.enter_context(patch.object(caption_service, 'get_caption_provider', return_value=Provider()))
     guards.enter_context(patch.object(worker, 'configure_process', side_effect=configured))
-    if mode in ('unready','unconfirmed'):
+    if supervisor_path:
+        original_verified = supervisor.verified_worker
+        def verified(config):
+            candidate = original_verified(config)
+            guards.enter_context(patch.object(candidate, 'configure_process', side_effect=configured))
+            return candidate
+        guards.enter_context(patch.object(supervisor, 'verified_worker', side_effect=verified))
+        if mode=='unconfirmed':
+            try: supervisor.supervise(supervisor_args)
+            except supervisor.Refused: pass
+            else: raise AssertionError('Expected independent fencing gate')
+        else:
+            result = supervisor.supervise(supervisor_args)
+            assert result['clean_drain_confirmed']==(mode!='unready')
+    elif mode in ('unready','unconfirmed'):
         try: worker.run(args)
         except worker.Refused: pass
         else: raise AssertionError('Expected fail-closed startup')
@@ -92,7 +128,7 @@ with ExitStack() as guards:
         assert result['drained']
 
 with sqlite3.connect(database) as db:
-    assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[3],)).fetchone()==('pending',)
+    assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[3],)).fetchone()==('finished' if supervisor_path else 'pending',)
     assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[4],)).fetchone()==('pending',)
     assert db.execute('SELECT count(*) FROM tasks').fetchone()[0]==(2 if mode=='idle' else 3)
     assert db.execute('SELECT version_num FROM alembic_version').fetchone()==('d8e5b2f7a904',)
@@ -116,7 +152,7 @@ with sqlite3.connect(database) as db:
         assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[2],)).fetchone()==('pending',)
     assert db.execute('PRAGMA foreign_key_check').fetchall()==[]
 assert 'app.main' not in sys.modules and 'app.dependencies' not in sys.modules and 'torch' not in sys.modules
-if mode=='idle':
+if mode=='idle' and not supervisor_path:
     # The optional mode must not change the default mixed executor's claim path.
     from app import tasks, config
     from types import SimpleNamespace

@@ -197,6 +197,8 @@ def run(args):
     if os.path.lexists(stop_file):
         raise Refused('Stop request is already present')
     with worker_lock(database):
+        if os.path.lexists(stop_file):
+            raise Refused('Stop request arrived before startup')
         preflight(database, args.expected_revision)
         configure_process(database, derived, temporary, endpoint, values)
         sys.path.insert(0, str(ROOT/'backend'))
