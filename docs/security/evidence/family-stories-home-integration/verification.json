@@ -1,0 +1,40 @@
+{
+  "source_commit": "0a6e036489dd8af5d0e0d7c0afcc82f3675258b4",
+  "parents": {
+    "family_stories": "2ad064fb845fc077bb4ecfdb38494023022e3c0a",
+    "home_calendar_master": "2cd9932bb244b8a1c36e4fae2fc9c6604ed4efd2"
+  },
+  "inventory_routes": 185,
+  "security": {
+    "run": 592,
+    "passed": 588,
+    "skipped_windows": 4,
+    "seconds": 134.727
+  },
+  "migration_tests_passed": 13,
+  "browser_scenarios_passed": 22,
+  "package": {
+    "source_commit": "0a6e036489dd8af5d0e0d7c0afcc82f3675258b4",
+    "source_files": 65,
+    "zip_sha256": "d4d055b382626989a57be7fb13b0f4657826976968d19198d9a9b81847d7bd29",
+    "bytes": 1806092,
+    "deployed": false
+  },
+  "package_smoke": {
+    "passed": true,
+    "migration_revision": "c7f4a9e2b610",
+    "asgi_checks": 7,
+    "operator_commands": 9,
+    "database_preparation_commands": 8,
+    "listeners_opened": false,
+    "live_data_accessed": false
+  },
+  "log_sha256": {
+    "photohouse-merged-backend-security.log": "4e5e86317bcaaffcad7b4a0822837f2da28fbc0bf13e4ab287f3af99b28785b3",
+    "photohouse-merged-backend-migrations.log": "3e25f8cd6f56b56f3b83819d7314ee493dc134b38e6db219a5c6aede34af8fbd",
+    "photohouse-merged-backend-browser.log": "918762ac68856834022b5eaaaf687c9fee6233db4f87237c3f6012913e148408",
+    "photohouse-merged-package-smoke.log": "778fb1bd2f2884425e8a83d13ee3f2954ad3053bc664b5324d83b4b11e2a01ab"
+  },
+  "runtime_deployed": false,
+  "original_owner_worktrees_changed": false
+}
