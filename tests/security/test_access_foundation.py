@@ -281,6 +281,24 @@ class AccessFoundationTests(unittest.TestCase):
 
 
 class CredentialTests(unittest.TestCase):
+    def test_password_hash_boundaries_without_composition_rules(self):
+        # Boundary validation is independent of the deliberately expensive KDF.
+        # Passwords are length-bounded only: no trimming or composition policy.
+        with patch('access.credentials._derive', return_value=b'x' * 32):
+            for password in ('a' * 7, 'a' * 129):
+                with self.subTest(length=len(password)), self.assertRaises(ValueError):
+                    hash_password(password)
+            for password in ('a' * 8, 'a' * 128, '       a'):
+                with self.subTest(length=len(password), value=password):
+                    encoded = hash_password(password)
+                    self.assertTrue(encoded.startswith('scrypt$'))
+
+    def test_eight_character_password_real_scrypt_roundtrip(self):
+        password = 'a b c d '
+        encoded = hash_password(password)
+        self.assertTrue(verify_password(password, encoded))
+        self.assertFalse(verify_password(password.rstrip(), encoded))
+
     def test_real_scrypt_roundtrip_and_unique_salt(self):
         first, second = hash_password(PASSWORD), hash_password(PASSWORD)
         self.assertNotEqual(first, second)

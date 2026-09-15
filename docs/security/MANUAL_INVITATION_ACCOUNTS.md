@@ -75,7 +75,7 @@ serialized in a SQLite write transaction: only one account/membership is created
 A stale invitation cannot undo a later owner decision. Explicitly re-inviting a
 revoked member is a new owner approval; old codes cannot restore revoked access.
 
-Passwords accept 15–128 characters without composition rules or silent trimming.
+Passwords accept 8–128 characters without composition rules or silent trimming.
 They use per-password random salt and scrypt with N=131072, r=8, p=1 (128 MiB work
 memory, 256 MiB implementation limit), using Python/OpenSSL's maintained primitive.
 Unknown-account password checks use the same KDF path. Corrupt/unsupported hash

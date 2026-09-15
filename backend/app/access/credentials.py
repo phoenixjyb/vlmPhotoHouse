@@ -26,8 +26,8 @@ def phone_login(value: str) -> str:
 
 
 def hash_password(password: str) -> str:
-    if not isinstance(password, str) or not 15 <= len(password) <= 128:
-        raise ValueError('Use a password or passphrase of 15 to 128 characters')
+    if not isinstance(password, str) or not 8 <= len(password) <= 128:
+        raise ValueError('Use a password or passphrase of 8 to 128 characters')
     salt = secrets.token_bytes(16)
     derived = _derive(password, salt)
     return f'scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${salt.hex()}${derived.hex()}'

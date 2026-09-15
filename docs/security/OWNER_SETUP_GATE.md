@@ -30,7 +30,7 @@ not in this document or example fixtures.
 4. Prepare a fresh post-schema matching backup and unexpired `plan-owner`; validate
    and review it using `scripts/provision_access.py`. Only then execute `apply`
    interactively on Windows. It prompts twice with echo disabled, refuses insecure
-   input fallback, and stores a password hash. Use a unique 15–128-character
+   input fallback, and stores a password hash. Use a unique 8–128-character
    passphrase. The operator tool does not choose or output the password.
 5. Review/apply the selected asset-to-library mapping separately. Bootstrap creates
    no session, asset mapping or automatic original-download grant. The owner must
