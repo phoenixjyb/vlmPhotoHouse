@@ -280,10 +280,19 @@
     $('password').autocomplete=mode==='register'?'new-password':'current-password';
     $('password').minLength=mode==='register'?15:1;$('password').value='';$('code').value='';translate();
   }
+  // UI convenience only: transport and stored identities remain explicit E.164.
+  function phoneForRequest(value) {
+    const compact=value.replace(/[ ()-]/g,'');
+    if(/^\+[1-9][0-9]{7,14}$/.test(compact))return compact;
+    if(/^[0-9]{11}$/.test(compact))return '+86'+compact;
+    return null;
+  }
+  Object.assign(words.en, {phoneHelp:'China (+86) is the default. For another country, enter + and its country code.',invalidPhone:'Enter an 11-digit number, or a full international number starting with +.'});
+  Object.assign(words.zh, {phoneHelp:'默认中国区号 +86，无需输入。其他国家请填写以 + 和国家区号开头的完整号码。',invalidPhone:'请输入 11 位号码，或以 + 和国家区号开头的完整号码。'});
   async function signIn(event) {
     event.preventDefault();if(state.busy)return;
-    const phone=$('phone').value,password=$('password').value;
-    if(!/^\+[1-9][0-9]{7,14}$/.test(phone.replace(/[ ()-]/g,''))) {status('invalidPhone');return;}
+    const phone=phoneForRequest($('phone').value),password=$('password').value;
+    if(!phone) {status('invalidPhone');return;}
     if(state.mode==='register'&&(Array.from(password).length<15||Array.from(password).length>128)){status('invalidPassword');return;}
     state.busy=true;$('auth-submit').disabled=true;translate();const epoch=invalidate();
     const body={phone,password,transport:'web'};if(state.mode==='register')body.code=$('code').value;
@@ -303,10 +312,13 @@
     finally {state.busy=false;}
   }
   async function invite(event) {
-    event.preventDefault();if(state.busy||state.locked)return;state.busy=true;const epoch=state.generation;
+    event.preventDefault();if(state.busy||state.locked)return;
+    const phone=phoneForRequest($('invite-phone').value);
+    if(!phone){status('invalidPhone');return;}
+    state.busy=true;const epoch=state.generation;
     const library=state.library;
     try {
-      const result=await request(`/libraries/${encodeURIComponent(library)}/invitations`,{method:'POST',body:{phone:$('invite-phone').value},epoch});
+      const result=await request(`/libraries/${encodeURIComponent(library)}/invitations`,{method:'POST',body:{phone},epoch});
       state.invite={code:result.code,library};$('created-code').value=result.code;$('invitation-result').hidden=false;status('');
     } catch(error){await failure(error,epoch);}finally{state.busy=false;}
   }

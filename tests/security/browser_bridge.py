@@ -40,7 +40,11 @@ try:
         if message.get('command')=='mutate':
             # Strict synthetic scenarios; no caller-supplied SQL or file paths.
             scenario=message['scenario']
-            if scenario=='revoke-member':
+            if scenario=='china-login':
+                fixture.mutate("UPDATE access_accounts SET phone_login='+8610000000000' WHERE id=?", (fixture.member_id,))
+            elif scenario=='international-login':
+                fixture.mutate("UPDATE access_accounts SET phone_login='+12025550102' WHERE id=?", (fixture.member_id,))
+            elif scenario=='revoke-member':
                 fixture.mutate("UPDATE access_memberships SET status='revoked' WHERE account_id=?",(fixture.member_id,))
             elif scenario=='restore-member':
                 fixture.mutate("UPDATE access_memberships SET status='approved' WHERE account_id=?",(fixture.member_id,))

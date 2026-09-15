@@ -1,5 +1,9 @@
 # Offline database preparation
 
+For bounded, disk-backed preparation of larger/WAL libraries, see
+[Full-size copy-only rehearsal](FULLSIZE_REHEARSAL.md). It is a separate tool;
+the limits and offline-only guarantees of the commands below are unchanged.
+
 `scripts/prepare_access_database.py` implements four explicit local commands.
 Only disposable synthetic databases have been tested. The tool does not connect
 to a service, load models, read media, consult environment database settings or
