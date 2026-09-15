@@ -30,3 +30,7 @@ For a source fix, complete relevant tests and inspect the affected UI where
 applicable. Report fixtures, API checks, live GPU/runtime state and real phone/TV
 navigation or playback separately. Deployment, restarts, scheduled jobs and
 publication remain specific external actions, not automatic post-test steps.
+
+## Codex collaboration
+
+Astra owns PhotoHouse ambiguity, API/UI contracts, access boundaries, authority, review and integration. Prefer Luna for useful independent slices when the model and delegation are available; honor explicit model choices and keep small tasks with the owner. Luna may handle a scoped source fix, discovery, documentation update or relevant check with exact paths and a concise evidence report. Suitable slices include tracing a selected-photo TV route, reviewing protected phone/library authorization, running affected API tests, or inspecting the changed UI flow. Keep one writer per artifact and preserve originals, credentials and runtime data. Family/device acceptance remains separate evidence. Existing project constraints and authorization requirements still apply.
