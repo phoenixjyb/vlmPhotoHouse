@@ -156,3 +156,40 @@ caption exceptions, policy/HTTP/queue retries and tag settings. Setting the word
 cap to zero explicitly implements the user's no-hard-cap preference (the bilingual
 path already bypassed truncation). Do not silently replace missing settings with
 unreviewed values or treat a config file/manifest as proof of activation.
+
+## Windows runtime acceptance — 2026-09-15
+
+The separate worker artifact from commit
+`26c65daab6b99a9d053009cdc0d2f544861d5f5d` passed real photo and short-video
+inference under the Windows SYSTEM principal against an isolated migrated catalog.
+The photo handler completed in 62.25 seconds and the video in 28.45 seconds.
+An in-flight stop request drained after the first task, a concurrent duplicate
+was refused, and a fresh worker completed the second task. Original-file hashes
+and production assets/captions/tasks/tags/asset_tags fingerprints matched before
+and after the isolated test. These are two-sample runtime checks, not full-library
+quality, sustained throughput, boot/wake or physical-device acceptance.
+
+Following a separately backed-up safe queue boundary, the existing API was
+restarted with its supported `-DisableInlineWorker` option. An on-demand SYSTEM
+task now owns the separate caption worker; the API startup wrapper requests it
+only after healthy API/database readiness with the inline worker disabled.
+The supervisor checks artifact/config hashes and refuses non-caption pending or
+running work at startup. It does not add an owner for other task families.
+
+At 15:33 China time the handover controller completed successfully after two live
+batch successes (12,410 to 12,412); the separate worker remained running. The API
+and Qwen3 service were healthy, the Mac WebUI returned HTTP 200, all 8,364 temporary
+pending schedule holds were restored, and the 157 failed / 15 dead jobs were not
+requeued. The live schema remained `d2b7e4f6a901`. No model service restart,
+protected WebUI activation, owner provisioning or database migration occurred.
+
+Operational interpretation: API `worker_enabled=false` is now expected and is
+**not** evidence that captioning is paused. Verify the separate worker task,
+process and database progress. API shutdown alone no longer drains captioning.
+Before sleep, migration or rollback, request the separate worker's retained stop
+file and verify its exit and the queue boundary, then drain other writers.
+Future resume must deliberately clear that exact request after authorization;
+it must not silently clear it during API startup. Host-specific task identities,
+stop path, configuration, receipts and prior API scheduler XML are retained in
+the private deployment handoff. No new timed/wake triggers or live-monitoring
+automation were installed. Boot/wake remains a separate untested gate.
