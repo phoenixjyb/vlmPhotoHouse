@@ -21,7 +21,7 @@ FILES = tuple(sorted([
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
-        'boundary','service','bootstrap','stories','story_schema','people','management_schema','albums','management_import')),
+        'boundary','service','bootstrap','stories','story_schema','people','management_schema','albums','management_import','face_jobs')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -49,6 +49,7 @@ FILES = tuple(sorted([
     'docs/security/OWNER_SETUP_GATE.md', 'docs/security/LIBRARY_MANAGEMENT.md',
     'docs/security/MANAGEMENT_IMPORT.md',
     'docs/security/SCOPED_FACE_WORKER.md', 'docs/security/FACE_WORKER_QUALIFICATION.md',
+    'backend/app/scoped_face_worker.py', 'docs/security/FACE_JOB_CONTROL.md',
 ]))
 
 

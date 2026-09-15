@@ -43,6 +43,9 @@ class _PlanState:
 
     def _state(self, operation, target):
         db = self.access.db
+        if operation == 'enqueue_face_assignment':
+            from .face_jobs import face_job_state
+            return face_job_state(self, target)
         if operation == 'import_management_ownership':
             from .management_import import management_state
             return management_state(self, target)
@@ -116,6 +119,15 @@ class _PlanState:
             raise PlanRejected('Duplicate asset selection')
         return self._plan('assign_unmapped_assets',{'library_id':_library(library_id),
             'operator_account_id':operator_account_id,'asset_ids':[str(item) for item in sorted(asset_ids)]})
+
+    def face_job(self, *, kind, payload, quiescence_reference):
+        from ..scoped_face_worker import KINDS, _payload
+        if kind not in KINDS:
+            raise PlanRejected('Invalid face operation')
+        p = _payload(payload, kind)
+        return self._plan('enqueue_face_assignment', {'kind':kind, 'payload':p,
+            'library_id':p['library_id'], 'operator_account_id':p['operator_account_id'],
+            'quiescence_reference':quiescence_reference})
 
     def management(self, *, library_id, operator_account_id, person_ids, album_ids,
                    include_orphan_people, include_empty_albums, quiescence_reference):

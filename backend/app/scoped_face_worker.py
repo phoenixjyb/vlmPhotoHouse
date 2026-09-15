@@ -107,7 +107,7 @@ def _vector(root, path, checksum, dimension):
         raise AssignmentRefused('Vector artifact unavailable or invalid') from None
 
 
-def run_scoped_assignment(session, task, *, embedding_root, clock=time.time):
+def run_scoped_assignment(session, task, *, embedding_root, clock=time.time, commit=True):
     if task.type not in KINDS:
         raise AssignmentRefused('Unsupported assignment job')
     p = _payload(task.payload_json, task.type)
@@ -132,7 +132,8 @@ def run_scoped_assignment(session, task, *, embedding_root, clock=time.time):
     try:
         with session.begin_nested():
             result = _run(session, task, p, root, clock, deadline)
-        session.commit()
+        if commit:
+            session.commit()
         session.expire_all()
         return result
     except AssignmentRefused:
@@ -141,6 +142,36 @@ def run_scoped_assignment(session, task, *, embedding_root, clock=time.time):
         raise AssignmentRefused('Scoped assignment failed; batch rolled back') from None
     finally:
         raw.set_progress_handler(None, 0)
+
+
+def assignment_selection(rows, p, kind):
+    """Same bounded metadata selection for private planning and execution."""
+    # Reject whole shared identities, not merely the foreign faces of their pool.
+    owned_rows = rows('''SELECT o.person_id,o.revision,o.creator_id FROM access_person_libraries o
+        WHERE o.library_id=:library AND NOT EXISTS (
+            SELECT 1 FROM face_detections f LEFT JOIN access_asset_libraries s ON s.asset_id=f.asset_id
+            WHERE f.person_id=o.person_id AND (s.library_id IS NULL OR s.library_id<>:library))
+        ORDER BY o.person_id LIMIT 1001''', library=p['library_id'])
+    owned = {row[0] for row in owned_rows}
+    if len(owned) > 1000 or not set(p['person_ids']) <= owned:
+        raise AssignmentRefused('Target ownership or people budget invalid')
+    # Loading a legacy Person.embedding_path would reintroduce a global centroid.
+    base = '''SELECT f.id,f.asset_id,f.person_id,f.label_source,f.label_score,e.storage_path,e.vector_checksum,a.hash_sha256
+        FROM face_detections f JOIN assets a ON a.id=f.asset_id
+        JOIN access_asset_libraries s ON s.asset_id=a.id
+        JOIN face_embedding_artifacts e ON e.face_id=f.id
+        WHERE s.library_id=:library AND (a.status IS NULL OR a.status='active')
+        AND e.model=:model AND e.model_version=:version AND e.dim=:dim
+        AND e.alignment IS :alignment AND e.status=:status '''
+    params = dict(library=p['library_id'], model=p['embedding_model'], version=p['embedding_version'],
+                  dim=p['embedding_dim'], alignment=p['embedding_alignment'], status=p['embedding_status'])
+    refs = rows(base + " AND f.label_source='manual' AND f.person_id IS NOT NULL ORDER BY f.id LIMIT 2001", **params)
+    if len(refs) > 2000:
+        raise AssignmentRefused('Reference budget exceeded')
+    candidates = rows(base + " AND (f.label_source IS NULL OR f.label_source<>'manual') "
+        + (" AND (f.person_id IS NULL OR f.label_source='dnn') " if kind == 'person_recluster' else ' AND f.person_id IS NULL ')
+        + ' ORDER BY f.id LIMIT :limit', limit=p['max_faces'], **params)
+    return owned_rows, refs, candidates
 
 
 def _run(session, task, p, root, clock, deadline):
@@ -177,27 +208,8 @@ def _run(session, task, p, root, clock, deadline):
             actor=p['operator_account_id'], library=p['library_id'], now=int(clock())).first():
             raise AssignmentRefused('Current library owner and operator required')
     authority()
-    # Reject whole shared identities, not merely the foreign faces of their pool.
-    owned = set(execute('''SELECT o.person_id FROM access_person_libraries o
-        WHERE o.library_id=:library AND NOT EXISTS (
-            SELECT 1 FROM face_detections f LEFT JOIN access_asset_libraries s ON s.asset_id=f.asset_id
-            WHERE f.person_id=o.person_id AND (s.library_id IS NULL OR s.library_id<>:library))
-        ORDER BY o.person_id LIMIT 1001''', library=p['library_id']).scalars())
-    if len(owned) > 1000 or not set(p['person_ids']) <= owned:
-        raise AssignmentRefused('Target ownership or people budget invalid')
-    # Loading a legacy Person.embedding_path would reintroduce a global centroid.
-    base = '''SELECT f.id,f.asset_id,f.person_id,f.label_source,f.label_score,e.storage_path,e.vector_checksum
-        FROM face_detections f JOIN assets a ON a.id=f.asset_id
-        JOIN access_asset_libraries s ON s.asset_id=a.id
-        JOIN face_embedding_artifacts e ON e.face_id=f.id
-        WHERE s.library_id=:library AND (a.status IS NULL OR a.status='active')
-        AND e.model=:model AND e.model_version=:version AND e.dim=:dim
-        AND e.alignment IS :alignment AND e.status=:status '''
-    params = dict(library=p['library_id'], model=p['embedding_model'], version=p['embedding_version'],
-                  dim=p['embedding_dim'], alignment=p['embedding_alignment'], status=p['embedding_status'])
-    refs = execute(base + " AND f.label_source='manual' AND f.person_id IS NOT NULL ORDER BY f.id LIMIT 2001", **params).all()
-    if len(refs) > 2000:
-        raise AssignmentRefused('Reference budget exceeded')
+    owned_rows, refs, candidates = assignment_selection(lambda sql, **params: execute(sql, **params).all(), p, task.type)
+    owned = {row[0] for row in owned_rows}
     sums, counts = {}, {}
     for ref in refs:
         budget()
@@ -208,9 +220,6 @@ def _run(session, task, p, root, clock, deadline):
         sums[pid] = [a + b for a, b in zip(sums.get(pid, [0.] * len(vector)), vector)]
         counts[pid] = counts.get(pid, 0) + 1
     centroids = {pid: _unit(values) for pid, values in sums.items() if counts[pid] >= p['min_ref_faces']}
-    candidates = execute(base + " AND (f.label_source IS NULL OR f.label_source<>'manual') "
-        + (" AND (f.person_id IS NULL OR f.label_source='dnn') " if task.type == 'person_recluster' else ' AND f.person_id IS NULL ')
-        + ' ORDER BY f.id LIMIT :limit', limit=p['max_faces'], **params).all()
     assigned, created, affected = 0, 0, set()
     for face in candidates:
         budget()

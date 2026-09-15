@@ -19,7 +19,7 @@ import time
 import uuid
 import warnings
 
-from .credentials import hash_password
+from .credentials import hash_password, verify_password
 from .provisioning import PlanRejected, _PlanState, _json
 from .runtime import ExistingDatabase
 
@@ -141,14 +141,14 @@ def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
     if target_id == backup_id:
         raise PlanRejected('A separate backup is required')
     with ExistingDatabase(database, read_only=True)() as db:
-        if restore_out is not None or envelope['plan']['operation']=='import_management_ownership':
+        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment'):
             _offline_restore_source(database, db)
         state = state_type(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
             snapshot = _snapshot(db)
     with ExistingDatabase(backup, read_only=True)() as source:
-        if restore_out is not None or envelope['plan']['operation']=='import_management_ownership':
+        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment'):
             _offline_restore_source(backup, source)
         source.execute('BEGIN')
         with _restore_target(restore_out, source) as restored:
@@ -185,7 +185,9 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
     # Detach caller-owned containers before any prompt or wait.
     envelope = json.loads(_json(envelope))
     management = envelope['plan']['operation']=='import_management_ownership'
-    if management and all_writers_stopped is not True:
+    face_job = envelope['plan']['operation']=='enqueue_face_assignment'
+    offline = management or face_job
+    if offline and all_writers_stopped is not True:
         raise PlanRejected('Independent all-writer shutdown confirmation required')
     if plan_digest(envelope) != review.plan_digest:
         raise PlanRejected('Plan changed during review')
@@ -193,14 +195,25 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
         raise PlanRejected('Database target changed')
     # Preflight before prompting; this result is deliberately not trusted for writes.
     with ExistingDatabase(review.database, read_only=True)() as db:
-        if management: _offline_restore_source(review.database, db)
+        if offline: _offline_restore_source(review.database, db)
         state = _PlanState(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
+            if face_job:
+                owner_hash = db.execute('SELECT password_hash FROM access_accounts WHERE id=?',
+                    (envelope['plan']['target']['operator_account_id'],)).fetchone()[0]
     encoded = _owner_password() if envelope['plan']['operation'] == 'bootstrap_owner' else None
+    if face_job:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', getpass.GetPassWarning)
+            password = getpass.getpass('Existing owner password: ')
+        authenticated = verify_password(password, owner_hash)
+        del password
+        if not authenticated:
+            raise PlanRejected('Owner authentication failed')
     try:
         with ExistingDatabase(review.database)() as db:
-            if management: _offline_restore_source(review.database, db)
+            if offline: _offline_restore_source(review.database, db)
             state = _PlanState(db, clock=clock)
             with state.access._transaction(write=True):
                 if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
@@ -213,7 +226,7 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                 if _snapshot(db) != review.snapshot_digest:
                     raise PlanRejected('Database changed; review a fresh backup')
                 with ExistingDatabase(review.backup, read_only=True)() as backup:
-                    if management: _offline_restore_source(review.backup, backup)
+                    if offline: _offline_restore_source(review.backup, backup)
                     backup.execute('BEGIN')
                     if _snapshot(backup) != review.snapshot_digest:
                         raise PlanRejected('Reviewed backup changed')
@@ -233,8 +246,11 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                     asset_ids = []
                 else:
                     actor = target['operator_account_id']
-                    asset_ids = [] if management else target['asset_ids']
-                    if management:
+                    asset_ids = [] if offline else target['asset_ids']
+                    if face_job:
+                        from .face_jobs import enqueue
+                        task_id = enqueue(state, target)
+                    elif management:
                         from .management_import import apply_management
                         apply_management(state,target)
                     else:
@@ -251,6 +267,9 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                 if management:
                     receipt.update(person_ids=target['person_ids'],album_ids=target['album_ids'],
                                    quiescence_reference=target['quiescence_reference'])
+                if face_job:
+                    from .face_jobs import seal_receipt
+                    seal_receipt(state, receipt, envelope, task_id)
                 db.execute('INSERT INTO access_provisioning_receipts VALUES (?,?,?)',
                            (plan['plan_id'], review.plan_digest, _json(receipt).decode()))
                 state.access._audit(actor, 'offline.' + plan['operation'], library,
@@ -259,6 +278,10 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                     from .management_import import management_state
                     if management_state(state,target,imported=True)!=plan['expected']:
                         raise PlanRejected('Imported ownership or reviewed state changed')
+                if face_job:
+                    from .face_jobs import verify_queued
+                    verify_queued(state, plan_id=plan['plan_id'], digest=review.plan_digest,
+                                  task_id=task_id, database_identity=review.database_identity)
                 if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
                     raise PlanRejected('Database target changed')
                 if not plan['created_at'] <= state.access._now() < plan['expires_at']:

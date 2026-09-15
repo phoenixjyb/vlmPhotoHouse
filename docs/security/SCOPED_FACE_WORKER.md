@@ -99,10 +99,13 @@ runtime wiring. Old unprotected startup behavior is not otherwise replaced.
 
 ## Remaining delivery gates
 
-No protected HTTP route, face scheduler/launcher or authenticated enqueue flow was
-added. The protected WebUI source package and caption-only worker remain separate;
-this module must not be mounted into the protected HTTP process. An explicit face
-worker launch/package/producer must be reviewed before live use. Existing face
+The follow-on [private job control](FACE_JOB_CONTROL.md) adds authenticated offline
+enqueueing and a single-task launcher; no protected HTTP route or recurring face
+scheduler is added. The launcher uses `commit=False` so batch changes and task
+completion share its outer transaction. The default core call retains its existing
+commit behavior for legacy handlers. The protected WebUI and caption-only worker
+remain separate; this module must not be mounted into the protected HTTP process.
+Native launch/package/producer qualification remains required before live use. Existing face
 detection and embedding production must separately qualify versioned artifact
 registration, provider availability, storage ACLs and bounded runtime behavior.
 Legacy queues and family media were not inspected or changed for this slice.
