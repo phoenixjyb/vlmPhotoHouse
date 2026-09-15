@@ -1,0 +1,541 @@
+{
+  "facets_people": {
+    "version": 2,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "people",
+    "page": 1,
+    "page_size": 50,
+    "total": 2,
+    "has_more": false,
+    "items": [
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ]
+  },
+  "facets_tags": {
+    "version": 2,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "tags",
+    "page": 1,
+    "page_size": 50,
+    "total": 2,
+    "has_more": false,
+    "items": [
+      {
+        "id": 301,
+        "label": "Park / 公园",
+        "kind": "scene",
+        "asset_count": 2,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 2,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 302,
+        "label": "Favorite / 收藏",
+        "kind": "custom",
+        "asset_count": 2,
+        "provenance_counts": {
+          "manual": 2,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      }
+    ]
+  },
+  "facets_locations": {
+    "version": 2,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "locations",
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "has_more": false,
+    "items": [
+      {
+        "id": 401,
+        "label": "Example Region / 示例地区",
+        "asset_count": 3,
+        "provenance": "reviewed_region"
+      }
+    ]
+  },
+  "search_request": {
+    "revision": 7,
+    "page": 1,
+    "page_size": 50,
+    "filters": {}
+  },
+  "search_response": {
+    "version": 2,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "filter_fingerprint": "44847343220de20fcf1cdf7a7536de863e0fc6913a4fb5efa85caf2fdb6509ce",
+    "page": 1,
+    "page_size": 50,
+    "total": 4,
+    "has_more": false,
+    "items": [
+      {
+        "id": 104,
+        "kind": "video",
+        "label": "Synthetic video",
+        "width": null,
+        "height": null,
+        "previews": {
+          "grid": {
+            "state": "unavailable",
+            "reason": "not_prepared"
+          },
+          "display": {
+            "state": "unavailable",
+            "reason": "not_prepared"
+          }
+        },
+        "video": {
+          "state": "direct",
+          "mime": "video/mp4",
+          "video_codec": "h264",
+          "audio_codec": "aac",
+          "width": 320,
+          "height": 180,
+          "duration_ms": 500,
+          "bytes": 24336,
+          "url": "/home/v3/assets/104/video?revision=1"
+        },
+        "originals_allowed": true,
+        "original": null
+      },
+      {
+        "id": 103,
+        "kind": "photo",
+        "label": "Synthetic photo",
+        "width": null,
+        "height": null,
+        "previews": {
+          "grid": {
+            "state": "on_demand",
+            "url": "/home/v3/assets/103/preview?variant=grid&revision=1"
+          },
+          "display": {
+            "state": "on_demand",
+            "url": "/home/v3/assets/103/preview?variant=display&revision=1"
+          }
+        },
+        "video": null,
+        "originals_allowed": true,
+        "original": {
+          "mime": "image/jpeg",
+          "bytes": 632,
+          "width": 8,
+          "height": 8,
+          "url": "/home/v3/assets/103/original?revision=1"
+        }
+      },
+      {
+        "id": 102,
+        "kind": "video",
+        "label": "Synthetic video",
+        "width": null,
+        "height": null,
+        "previews": {
+          "grid": {
+            "state": "unavailable",
+            "reason": "not_prepared"
+          },
+          "display": {
+            "state": "unavailable",
+            "reason": "not_prepared"
+          }
+        },
+        "video": {
+          "state": "ready",
+          "mime": "video/mp4",
+          "video_codec": "h264",
+          "audio_codec": "aac",
+          "width": 320,
+          "height": 180,
+          "duration_ms": 500,
+          "bytes": 24336,
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "url": "/home/v3/assets/102/video?revision=1"
+        },
+        "originals_allowed": false,
+        "original": null
+      },
+      {
+        "id": 101,
+        "kind": "photo",
+        "label": "Synthetic photo",
+        "width": 8,
+        "height": 8,
+        "previews": {
+          "grid": {
+            "state": "ready",
+            "width": 8,
+            "height": 8,
+            "bytes": 632,
+            "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+            "url": "/home/v3/assets/101/preview?variant=grid&revision=1"
+          },
+          "display": {
+            "state": "ready",
+            "width": 8,
+            "height": 8,
+            "bytes": 632,
+            "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+            "url": "/home/v3/assets/101/preview?variant=display&revision=1"
+          }
+        },
+        "video": null,
+        "originals_allowed": false,
+        "original": null
+      }
+    ]
+  }
+}
