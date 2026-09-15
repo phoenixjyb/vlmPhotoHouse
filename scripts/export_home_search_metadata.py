@@ -26,7 +26,9 @@ MAX_BYTES = 64 * 1024**2
 MAX_SECONDS = 120
 
 
-def build(database, catalog_path, revision, *, tag_lookup=False):
+def build(database, catalog_path, revision, *, tag_lookup=False, people_review=None, people_approval=None):
+    if bool(people_review) != bool(people_approval):raise ValueError('people_review_pair_required')
+    reviewed_people=[];pinned_people=[];people_review_sha=None
     start = time.monotonic()
     def budget():
         if time.monotonic() - start > MAX_SECONDS:
@@ -45,7 +47,7 @@ def build(database, catalog_path, revision, *, tag_lookup=False):
         db.set_progress_handler(lambda: int(time.monotonic() - start > MAX_SECONDS), 1000)
         db.execute('BEGIN')
         definitions = {name:(kind,sql) for name,kind,sql in db.execute("SELECT name,type,sql FROM sqlite_master WHERE type IN ('table','view')")}
-        required = ('assets','captions','tags','asset_tags','asset_tag_blocks')
+        required = ('assets','captions','tags','asset_tags','asset_tag_blocks') + (('persons','face_detections') if people_review else ())
         if any(t not in definitions or definitions[t][0] != 'table' or not (definitions[t][1] or '').lstrip().upper().startswith('CREATE TABLE') for t in required): raise ValueError('schema_not_table')
         # No caller-provided SQL; deny mutation, extension/function execution and attachment.
         db.set_authorizer(lambda action, a, b, name, trigger: sqlite3.SQLITE_OK if action in
@@ -91,6 +93,9 @@ def build(database, catalog_path, revision, *, tag_lookup=False):
             if (aid,tid) in duplicates: tag_exclusions['conflicting'] += 1; continue
             if tid not in tags: tag_exclusions['missing_tag'] += 1; continue
             rows[aid]['tags'].append(dict(id=tid,source=source_map.get(source,'unknown'))); used.add(tid)
+        if people_review:
+            from home_people_review import approved_people
+            reviewed_people,pinned_people,people_review_sha=approved_people(db,rows,digest,people_review,people_approval,budget)
         db.execute('ROLLBACK')
     # Never truncate a tag roster or claim incomplete tag matching as complete.
     tag_overflow = len(used) > (10000 if tag_lookup else 5000)
@@ -99,7 +104,7 @@ def build(database, catalog_path, revision, *, tag_lookup=False):
         used = set()
         for row in rows.values(): row['tags'] = []
     index = dict(version=2 if tag_lookup else 1,revision=revision,catalog_revision=catalog['revision'],catalog_sha256=digest,
-        enabled_filters=['caption','date','media'] + (['tags'] if used else []),people=[],pinned_person_ids=[],
+        enabled_filters=['caption','date','media'] + (['tags'] if used else []) + (['people'] if reviewed_people else []),people=reviewed_people,pinned_person_ids=pinned_people,
         tags=[tags[i] for i in sorted(used)],locations=[],assets=[rows[i] for i in sorted(rows)])
     if tag_lookup:
         from app.home_tag_discovery import validate_tag_index
@@ -113,7 +118,7 @@ def build(database, catalog_path, revision, *, tag_lookup=False):
         metadata_with_values={k:sum(bool(r[f]) for r in rows.values()) for k,f in
             [('caption','caption_text'),('date','taken_day'),('tags','tags')]},
         caption_states=dict(captions),tag_exclusions=dict(tag_exclusions),
-        people_enabled=False,locations_enabled=False,unresolved_shortcuts=7,
+        people_enabled=bool(reviewed_people),people_review_sha256=people_review_sha,locations_enabled=False,unresolved_shortcuts=max(0,7-len(pinned_people)),
         tags_enabled=bool(used),unpublished_tag_count=unpublished_tags,tag_roster_overflow=tag_overflow,
         rows_scanned=dict(scanned),elapsed_seconds=round(time.monotonic()-start,3))
     return output,dict(policy='home-search-tags-2' if tag_lookup else 'home-search-metadata-1',catalog_sha256=digest,
@@ -125,12 +130,13 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('database','catalog','output'): p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--revision',type=int,required=True)
+    p.add_argument('--people-review',type=Path);p.add_argument('--people-approval',type=Path)
     p.add_argument('--tag-lookup',action='store_true')
     a=p.parse_args()
     try:
         direct_path(a.output)
         if a.output.exists() or a.output.is_symlink() or not a.output.parent.is_dir(): raise ValueError('output_collision')
-        raw,report=build(a.database,a.catalog,a.revision,tag_lookup=a.tag_lookup)
+        raw,report=build(a.database,a.catalog,a.revision,tag_lookup=a.tag_lookup,people_review=a.people_review,people_approval=a.people_approval)
         with a.output.open('xb') as f: a.output.chmod(0o600); f.write(raw)
         print(json.dumps(report));return 0
     except Exception:

@@ -74,7 +74,7 @@ class BackgroundTests(unittest.TestCase):
         base=['--source-root','.','--config','config','--log-dir','logs','--sources','index',
               '--sources-sha256','a'*64,'--original-root','originals','--cache','cache']
         with patch.object(background,'configure_logging') as setup:
-            for flags in (['--kind','v3','--tag-index','tags','--tag-sha256','c'*64],
+            for flags in (['--kind','v3-search','--discovery-index','legacy','--discovery-sha256','b'*64,'--calendar-enabled'],['--kind','v3','--tag-index','tags','--tag-sha256','c'*64],
                           ['--kind','v3-search','--discovery-index','legacy','--discovery-sha256','b'*64,'--tag-index','tags']):
                 with self.assertRaises(SystemExit):background.main(base+flags)
             setup.assert_not_called()

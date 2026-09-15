@@ -17,6 +17,7 @@ def main(argv=None,server_run=None):
     p.add_argument('--source-root',type=Path,action='append',required=True)
     p.add_argument('--cache',type=Path,required=True)
     p.add_argument('--discovery-index',type=Path,required=True);p.add_argument('--discovery-sha256',required=True)
+    p.add_argument('--calendar-enabled',action='store_true')
     p.add_argument('--tag-index',type=Path);p.add_argument('--tag-sha256')
     p.add_argument('--allow-originals',action='store_true')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--check',action='store_true');mode.add_argument('--serve',action='store_true')
@@ -28,10 +29,13 @@ def main(argv=None,server_run=None):
         metadata=DeliveryIndex(sources,a.discovery_index,a.discovery_sha256)
         metadata.load()
         if bool(a.tag_index) != bool(a.tag_sha256): raise ValueError('Both tag inputs required')
+        if a.calendar_enabled and not a.tag_index: raise ValueError('Calendar requires a tag index')
         if a.tag_index:
             from app.home_tag_discovery import TagIndex,create_home_tag_discovery
             TagIndex(sources,a.tag_index,a.tag_sha256).load()
-            app=create_home_tag_discovery(config,sources,cache,a.tag_index,a.tag_sha256,a.discovery_index,a.discovery_sha256)
+            from app.home_calendar import create_home_calendar
+            factory=create_home_calendar if a.calendar_enabled else create_home_tag_discovery
+            app=factory(config,sources,cache,a.tag_index,a.tag_sha256,a.discovery_index,a.discovery_sha256)
         else:
             app=create_home_discovery_delivery(config,sources,cache,a.discovery_index,a.discovery_sha256)
         if a.check:
