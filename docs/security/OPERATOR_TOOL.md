@@ -1,5 +1,32 @@
 # Offline provisioning tool and source package
 
+## Full-size owner/asset review option
+
+`review` and `apply` now accept `--restore-out ABS_NEW_PRIVATE_FILE`. This replaces
+only the temporary in-memory restoration check with an exclusively created disk
+copy. It does not bypass full logical backup comparison, plan/authority references,
+fresh cross-command review digest, password confirmation, transaction revalidation,
+expiry or receipts. Default behavior without this flag is unchanged. Recovery
+commands have not adopted this option.
+
+Disk mode requires offline DELETE-journal target and backup without sidecars, at
+most 2 GiB each, and a trusted direct local output directory with space for two
+database sizes plus 256 MiB. Host ACLs, temporary-file placement and memory/time
+supervision must be checked separately. Outputs contain private authentication and
+library data and remain after success or failure; never publish them or overwrite
+them on retry. `review` and `apply` each require a **different new restore file**.
+
+The cross-command digest continues to bind target, backup, their identities and
+logical contents, selected plan and review references. Disposable restore storage
+location does not change that authorization evidence. The apply invocation rebuilds
+and checks the restore itself; it never trusts a serialized restore receipt.
+Owner passwords still require protected interactive input; no password argument,
+default owner, new session or original-download grant was added.
+
+Use the ordinary reviewed workflow below, adding `--restore-out` to both its
+`review` and `apply` commands. This is not authorization to provision a real owner
+on a rehearsal database or to replace the currently serving database.
+
 2026-09-11. Local implementation following the Android repin to `87a60b4`.
 The operator command is `scripts/provision_access.py`. It wraps the existing
 reviewed services; it changes no HTTP API, migration, account policy or Android

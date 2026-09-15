@@ -2,8 +2,9 @@
 """Offline owner/asset provisioning for an independently authorized local operator.
 
 Explicit existing database, private request/plan files, separate backup, exact
-reviewed digest and audit references only. No service control, migration, backup
-creation, service cutover, environment discovery or HTTP interface.
+reviewed digest and audit references only. An optional new disk file holds the
+restore verification. No service control, migration, source-backup creation,
+service cutover, environment discovery or HTTP interface.
 Owner recovery requires a separate sealed review and protected password entry.
 """
 import argparse
@@ -115,6 +116,9 @@ def parser():
                 command.add_argument('--reviewed-plan-digest', required=True)
                 command.add_argument('--authority-reference', required=True)
                 command.add_argument('--restore-reference', required=True)
+                if name in ('review', 'apply'):
+                    command.add_argument('--restore-out', type=Path,
+                        help='New private disk restore file for this invocation; no overwrite')
                 if name in ('apply', 'apply-recovery'):
                     command.add_argument('--review-digest', required=True)
     return result
@@ -170,9 +174,12 @@ def execute(args, *, clock=time.time):
         return result | {'plan_digest': plan_digest(envelope)}
     # A saved review is never deserialized. Both commands construct a fresh local
     # review; only the distinct apply command can call the write service.
+    restore_options = {}
+    if not recovery and getattr(args, 'restore_out', None) is not None:
+        restore_options['restore_out'] = selected_path(args.restore_out)
     review = reviewer(database=database, backup=selected_path(args.backup), envelope=envelope,
         reviewed_plan_digest=args.reviewed_plan_digest, authority_reference=args.authority_reference,
-        restore_reference=args.restore_reference, clock=clock)
+        restore_reference=args.restore_reference, clock=clock, **restore_options)
     if args.command in ('review', 'review-recovery'):
         return {'backup_reviewed': True, 'applied': False, 'plan_id': envelope['plan']['plan_id'],
                 'operation': envelope['plan']['operation'], 'plan_digest': review.plan_digest,

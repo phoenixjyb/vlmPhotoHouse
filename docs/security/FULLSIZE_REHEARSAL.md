@@ -69,8 +69,10 @@ Actual rollout still needs a reviewed pause/drain of **every** database writer,
 a fresh backup at the safe boundary, qualified provisioning at full database size,
 worker-only compatibility with the new schema, TLS and ingress isolation, owner
 password entry, explicit asset mapping and a rollback plan that preserves writes
-after activation. The older provisioning tool still performs an in-memory backup
-review; this rehearsal does not silently raise or bypass its limits. Do not serve
+after activation. Owner/asset provisioning can now use an explicit new disk restore
+file for each review/apply invocation; see [Operator tool](OPERATOR_TOOL.md). The
+default and recovery workflows remain in-memory. This rehearsal does not silently
+raise or bypass those limits. Do not serve
 a quarantined copy through the legacy unauthenticated HTTP entry point.
 
 The WebUI defaults bare 11-digit phone inputs to +86 for sign-in, invitation-based
@@ -78,3 +80,37 @@ registration and owner invitations. Full international numbers starting with +
 remain supported. The server and stored identities still require explicit E.164;
 API/operator clients must normalize deliberately. No phone number or password is
 hard-coded in source and no SMS verification is implied.
+
+## Bounded native qualification (2026-09-15)
+
+On a private Windows copy of the 955,658,240-byte catalog, the actual operator CLI
+completed plan, disk-backed review, apply with an independent disk restore, and
+receipt lookup. Only a fictional owner was created, then disabled with its library
+closed and the admission key rotated. No asset mapping, session or original-media
+grant was created. The run took 154 seconds with about 172 MiB peak sampled memory.
+The source and live databases were not updated.
+
+`tests/security/fullsize_provisioning_canary.py` implements that copy-only check.
+It requires an already quarantined source and a new private working directory.
+It is not an owner-setup shortcut: its fictional password injection belongs only
+to the offline test. Real setup retains the operator's private password prompt.
+
+`tests/security/legacy_caption_schema_canary.py` then exercised the **installed**
+legacy ORM and caption handler against the migrated offline copy. It bypasses
+executor initialization, supplies a generated image and fake bilingual Qwen3
+provider, and forbids network/process calls and other SQLite targets. AI refresh,
+preservation of a user-edited caption, separate stories and revision history, and
+unchanged task counts passed. Unique synthetic identifiers retain failed-attempt
+evidence without overwriting fixtures. The successful run took 2.5 seconds with
+about 79 MiB peak sampled memory and did not import Torch.
+
+The first handler attempt exceeded its 384 MiB test-process watchdog; a repeat with
+test-local numeric-library thread counts set to one stayed below that budget.
+This is not a diagnosis or fix of production memory use. A second attempt exposed
+a mismatched mock model label; only the fixture was corrected, preserving the
+production Qwen3/bilingual validation gate. Failed receipts are retained privately.
+
+These checks do **not** qualify queue startup, real inference, GPU behavior,
+protected HTTP/TLS traffic, or a worker-only service. The installed worker still
+belongs to the legacy API process. A separately qualified worker-only lifecycle
+and private owner password setup remain prerequisites to controlled cutover.

@@ -3,12 +3,14 @@
 The caller must already have independent local database authority. Review references
 record that external decision; they are not credentials or an authorization system.
 """
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 import getpass
 import hashlib
 import hmac
 import json
+import os
+import shutil
 from pathlib import Path
 import re
 import sqlite3
@@ -72,8 +74,8 @@ class ApplyReview:
 
 
 def review_backup(*, database, backup, envelope, reviewed_plan_digest,
-                  authority_reference, restore_reference, clock=time.time):
-    """Verify a separately supplied backup and rehearse restoring it in memory.
+                  authority_reference, restore_reference, clock=time.time, restore_out=None):
+    """Verify a separate backup and restore in memory or a fresh explicit disk file.
 
     The references attest to independently reviewed authority and the operational
     restore procedure. This rehearsal verifies SQLite content, not disaster recovery.
@@ -81,11 +83,51 @@ def review_backup(*, database, backup, envelope, reviewed_plan_digest,
     """
     return _review_backup(database=database, backup=backup, envelope=envelope,
         reviewed_plan_digest=reviewed_plan_digest, authority_reference=authority_reference,
-        restore_reference=restore_reference, clock=clock, state_type=_PlanState)
+        restore_reference=restore_reference, clock=clock, state_type=_PlanState,
+        restore_out=restore_out)
+
+
+@contextmanager
+def _restore_target(path, source):
+    """An explicit fresh disk copy, or the unchanged small-database memory path.
+
+    Disk output is private operator evidence, retained even on failure. The caller
+    owns host ACLs and resource supervision. Never accept an existing scratch file.
+    """
+    if path is None:
+        with closing(sqlite3.connect(':memory:')) as db:
+            yield db
+        return
+    if (not isinstance(path, Path) or not path.is_absolute() or '..' in path.parts
+            or path.anchor.startswith(('//', '\\\\')) or path.parent.resolve(strict=True) != path.parent
+            or any(os.path.lexists(str(path)+suffix) for suffix in ('-wal', '-shm', '-journal'))):
+        raise PlanRejected('Explicit new private restore path required')
+    size = source.execute('PRAGMA page_count').fetchone()[0] * source.execute('PRAGMA page_size').fetchone()[0]
+    if size > 2 * 1024**3 or shutil.disk_usage(path.parent).free < 2 * size + 256 * 1024**2:
+        raise PlanRejected('Disk restore resource review required')
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0)
+    with os.fdopen(os.open(path, flags, 0o600), 'r+b') as reserved:
+        identity = _identity(path)
+        with closing(sqlite3.connect(path.as_uri()+'?mode=rw', uri=True, timeout=3)) as db:
+            db.execute('PRAGMA cache_size=-8192'); db.execute('PRAGMA temp_store=FILE')
+            db.execute('PRAGMA mmap_size=0'); db.execute('PRAGMA synchronous=FULL')
+            yield db
+        os.fsync(reserved.fileno())
+        if _identity(path) != identity:
+            raise PlanRejected('Disk restore identity changed')
+
+
+def _offline_restore_source(path, db):
+    if (any(os.path.lexists(str(path)+suffix) for suffix in ('-wal', '-shm', '-journal'))
+            or db.execute('PRAGMA journal_mode').fetchone()[0] != 'delete'):
+        raise PlanRejected('Disk review requires offline rollback-journal inputs')
+    size = db.execute('PRAGMA page_count').fetchone()[0] * db.execute('PRAGMA page_size').fetchone()[0]
+    if size > 2 * 1024**3:
+        raise PlanRejected('Disk review size budget exceeded')
 
 
 def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
-                   authority_reference, restore_reference, clock, state_type):
+                   authority_reference, restore_reference, clock, state_type, restore_out=None):
     """Shared internal backup verification; public callers fix the plan validator."""
     authority_reference = _reference(authority_reference)
     restore_reference = _reference(restore_reference)
@@ -99,15 +141,20 @@ def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
     if target_id == backup_id:
         raise PlanRejected('A separate backup is required')
     with ExistingDatabase(database, read_only=True)() as db:
+        if restore_out is not None:
+            _offline_restore_source(database, db)
         state = state_type(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
             snapshot = _snapshot(db)
-    with ExistingDatabase(backup, read_only=True)() as source, closing(sqlite3.connect(':memory:')) as restored:
+    with ExistingDatabase(backup, read_only=True)() as source:
+        if restore_out is not None:
+            _offline_restore_source(backup, source)
         source.execute('BEGIN')
-        source.backup(restored)
-        if _snapshot(source) != snapshot or _snapshot(restored) != snapshot:
-            raise PlanRejected('Backup does not match the reviewed database')
+        with _restore_target(restore_out, source) as restored:
+            source.backup(restored)
+            if _snapshot(source) != snapshot or _snapshot(restored) != snapshot:
+                raise PlanRejected('Backup does not match the reviewed database')
     if _identity(database) != target_id or _identity(backup) != backup_id:
         raise PlanRejected('Database target changed')
     return ApplyReview(database, target_id, backup, backup_id, snapshot, digest,
