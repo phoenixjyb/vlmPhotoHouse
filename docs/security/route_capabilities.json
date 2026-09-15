@@ -24,7 +24,10 @@
     "home.discovery.read": "Anonymous reviewed metadata discovery on the explicit home LAN, bound to the exact visible v2 catalog snapshot; reviewed person assignments and coarse regions only, provenance-aware tags, no live DB/model/legacy/biometric or raw GPS access.",
     "home.catalog.read": "Deliberately anonymous full visible-catalog TV publication. Explicit LAN peer admission; prepared JPEG/MP4 only, no account, original, live DB, operator or public-ingress grant.",
     "home.feed.read": "Deliberately anonymous selected home feed. Any reachable client in the explicit LAN peer allowlist can read published metadata and prepared derivatives; no account, pairing, original or operator grant.",
-    "home.originals.read": "Explicit v3 home LAN selected-source policy, pinned to the published catalog. Raw bytes require launcher allow-originals; never authorizes phone or arbitrary filesystem access."
+    "home.originals.read": "Explicit v3 home LAN selected-source policy, pinned to the published catalog. Raw bytes require launcher allow-originals; never authorizes phone or arbitrary filesystem access.",
+    "home.calendar.read": "Explicit calendar metadata and existing cover descriptors for the same pinned Home snapshot; no new media, identity or audience grant.",
+    "home.discovery.tags.read": "Anonymous tag-name lookup over an explicitly pinned v2 metadata index, same reviewed Home media publication and actual LAN audience. No new media or identity grant.",
+    "home.discovery.delivery.read": "Anonymous reviewed discovery for the exact Home catalog and source index, preserving v3 media capabilities; no identity inference, account grant or live database access."
   },
   "topology": [
     {
@@ -52,6 +55,14 @@
       "expression": "router = APIRouter(route_class=AccessRoute)"
     },
     {
+      "source": "backend/app/home_calendar.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/home_calendar.py",
+      "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
+    },
+    {
       "source": "backend/app/home_catalog.py",
       "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
     },
@@ -68,6 +79,14 @@
       "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
     },
     {
+      "source": "backend/app/home_discovery_delivery.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/home_discovery_delivery.py",
+      "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
+    },
+    {
       "source": "backend/app/home_feed.py",
       "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
     },
@@ -81,6 +100,14 @@
     },
     {
       "source": "backend/app/home_originals.py",
+      "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
+    },
+    {
+      "source": "backend/app/home_tag_discovery.py",
+      "expression": "app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None, redirect_slashes=False)"
+    },
+    {
+      "source": "backend/app/home_tag_discovery.py",
       "expression": "app.add_middleware(HomeBoundary, config=config, routes=app.routes, reviewed=reviewed)"
     },
     {
@@ -423,7 +450,12 @@
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "GET", "path": "/home/v3/assets/{asset_id}/video", "handler": "video", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "HEAD", "path": "/home/v3/assets/{asset_id}/video", "handler": "video", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
     {"source": "backend/app/home_originals.py", "owner": "app", "method": "GET", "path": "/home/v3/catalog", "handler": "catalog", "surface": "home-originals", "capabilities": ["home.originals.read"], "scope": "Published selected IDs plus pinned private source index; approved LAN peers only.", "current_control": "HTTPS/Host/peer and handler allowlist; current publication control; source descriptor identity and bounded Range; one guarded preview worker; no client paths or credentials.", "gap": "Opt-in source candidate. No Windows rollout or physical playback acceptance; original files retain embedded metadata and can be saved."},
-{"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/discovery/v1/facets", "handler": "facets", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
-    {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/discovery/v1/search", "handler": "search", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."}
+    {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "GET", "path": "/libraries/{library_id}/discovery/v1/facets", "handler": "facets", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
+    {"source": "backend/app/access/discovery_transport.py", "owner": "router", "method": "POST", "path": "/libraries/{library_id}/discovery/v1/search", "handler": "search", "surface": "protected-discovery-candidate", "scope": "Current approved library membership, scoped reviewed index and active mapped assets", "capabilities": ["library.read"], "current_control": "Candidate-only exact handler registration; shared bearer/cookie/CSRF policy, bounded JSON and authorization before provider/source disclosure; read snapshot checks binding/fingerprint.", "gap": "Candidate synthetic source only. Default app unchanged; no approved real index producer, live wiring, prepared derivative capability, Android import or physical acceptance."},
+    {"source": "backend/app/home_calendar.py", "owner": "app", "method": "GET", "path": "/home/discovery/v3/calendar", "handler": "calendar_view", "surface": "home-calendar", "capabilities": ["home.calendar.read"], "scope": "Exact immutable tag/search index and source-policy publication; recorded dates only.", "current_control": "Explicit TLS/Host/actual-peer boundary, no credentials, two worker slots, bounded 12-bucket pages and 512 KiB responses, revision and metadata binding, no-store.", "gap": "Native resource and device acceptance are separate. No inferred dates, identities or newly granted media."},
+    {"source": "backend/app/home_tag_discovery.py", "owner": "app", "method": "GET", "path": "/home/discovery/v3/facets", "handler": "facets", "surface": "home-tag-discovery", "capabilities": ["home.discovery.tags.read"], "scope": "Hash-bound index v2 and exact existing Home media/source policy; discovery v3 only.", "current_control": "Direct HTTPS/Host/actual-peer boundary, 10000-tag cap, 128-byte literal query, 100-item pages, revision binding, separate two-slot body/matching admission, 16 KiB/five-second body and 512 KiB response limits; no-store.", "gap": "Native resource qualification and family/device acceptance remain deployment gates; no automatic people mappings or taxonomy inference."},
+    {"source": "backend/app/home_tag_discovery.py", "owner": "app", "method": "POST", "path": "/home/discovery/v3/search", "handler": "search", "surface": "home-tag-discovery", "capabilities": ["home.discovery.tags.read"], "scope": "Hash-bound index v2 and exact existing Home media/source policy; discovery v3 only.", "current_control": "Direct HTTPS/Host/actual-peer boundary, 10000-tag cap, 128-byte literal query, 100-item pages, revision binding, separate two-slot body/matching admission, 16 KiB/five-second body and 512 KiB response limits; no-store.", "gap": "Native resource qualification and family/device acceptance remain deployment gates; no automatic people mappings or taxonomy inference."},
+    {"source": "backend/app/home_discovery_delivery.py", "owner": "app", "method": "GET", "path": "/home/discovery/v2/facets", "handler": "facets", "surface": "home-discovery-delivery", "capabilities": ["home.discovery.delivery.read"], "scope": "Only hash-bound reviewed metadata and existing v3 media for one shared publication and source policy.", "current_control": "Explicit direct HTTPS/Host/actual-peer boundary; immutable index/catalog binding; two body admission slots, 16 KiB and five-second body limits; separate matching slots/deadline; no-store and revision-bound pagination.", "gap": "Real metadata coverage, resource qualification and device acceptance are separate deployment evidence. People and regions require reviewed mappings; no automatic updates or inference."},
+    {"source": "backend/app/home_discovery_delivery.py", "owner": "app", "method": "POST", "path": "/home/discovery/v2/search", "handler": "search", "surface": "home-discovery-delivery", "capabilities": ["home.discovery.delivery.read"], "scope": "Only hash-bound reviewed metadata and existing v3 media for one shared publication and source policy.", "current_control": "Explicit direct HTTPS/Host/actual-peer boundary; immutable index/catalog binding; two body admission slots, 16 KiB and five-second body limits; separate matching slots/deadline; no-store and revision-bound pagination.", "gap": "Real metadata coverage, resource qualification and device acceptance are separate deployment evidence. People and regions require reviewed mappings; no automatic updates or inference."}
   ]
 }

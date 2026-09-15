@@ -1,0 +1,206 @@
+{
+  "years": {
+    "version": 1,
+    "revision": 7,
+    "catalog_revision": 1,
+    "binding": "7d90586410c23d6b69463687963e591cb00416b3e0ec5296bfc9aabcd667bdf4",
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "level": "year",
+    "year": null,
+    "month": null,
+    "page": 1,
+    "page_size": 12,
+    "total": 2,
+    "has_more": false,
+    "dated_assets": 3,
+    "undated_assets": 1,
+    "items": [
+      {
+        "key": "2026",
+        "from_date": "2026-01-01",
+        "through_date": "2026-12-31",
+        "count": 2,
+        "cover": {
+          "id": 101,
+          "kind": "photo",
+          "label": "Synthetic photo",
+          "width": 8,
+          "height": 8,
+          "previews": {
+            "grid": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=grid&revision=1"
+            },
+            "display": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=display&revision=1"
+            }
+          },
+          "video": null,
+          "originals_allowed": false,
+          "original": null
+        }
+      },
+      {
+        "key": "2025",
+        "from_date": "2025-01-01",
+        "through_date": "2025-12-31",
+        "count": 1,
+        "cover": {
+          "id": 103,
+          "kind": "photo",
+          "label": "Synthetic photo",
+          "width": null,
+          "height": null,
+          "previews": {
+            "grid": {
+              "state": "on_demand",
+              "url": "/home/v3/assets/103/preview?variant=grid&revision=1"
+            },
+            "display": {
+              "state": "on_demand",
+              "url": "/home/v3/assets/103/preview?variant=display&revision=1"
+            }
+          },
+          "video": null,
+          "originals_allowed": true,
+          "original": {
+            "mime": "image/jpeg",
+            "bytes": 632,
+            "width": 8,
+            "height": 8,
+            "url": "/home/v3/assets/103/original?revision=1"
+          }
+        }
+      }
+    ]
+  },
+  "months": {
+    "version": 1,
+    "revision": 7,
+    "catalog_revision": 1,
+    "binding": "7d90586410c23d6b69463687963e591cb00416b3e0ec5296bfc9aabcd667bdf4",
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "level": "month",
+    "year": 2026,
+    "month": null,
+    "page": 1,
+    "page_size": 12,
+    "total": 2,
+    "has_more": false,
+    "dated_assets": 3,
+    "undated_assets": 1,
+    "items": [
+      {
+        "key": "2026-05",
+        "from_date": "2026-05-01",
+        "through_date": "2026-05-31",
+        "count": 1,
+        "cover": null
+      },
+      {
+        "key": "2026-01",
+        "from_date": "2026-01-01",
+        "through_date": "2026-01-31",
+        "count": 1,
+        "cover": {
+          "id": 101,
+          "kind": "photo",
+          "label": "Synthetic photo",
+          "width": 8,
+          "height": 8,
+          "previews": {
+            "grid": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=grid&revision=1"
+            },
+            "display": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=display&revision=1"
+            }
+          },
+          "video": null,
+          "originals_allowed": false,
+          "original": null
+        }
+      }
+    ]
+  },
+  "days": {
+    "version": 1,
+    "revision": 7,
+    "catalog_revision": 1,
+    "binding": "7d90586410c23d6b69463687963e591cb00416b3e0ec5296bfc9aabcd667bdf4",
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "level": "day",
+    "year": 2026,
+    "month": 1,
+    "page": 1,
+    "page_size": 12,
+    "total": 1,
+    "has_more": false,
+    "dated_assets": 3,
+    "undated_assets": 1,
+    "items": [
+      {
+        "key": "2026-01-02",
+        "from_date": "2026-01-02",
+        "through_date": "2026-01-02",
+        "count": 1,
+        "cover": {
+          "id": 101,
+          "kind": "photo",
+          "label": "Synthetic photo",
+          "width": 8,
+          "height": 8,
+          "previews": {
+            "grid": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=grid&revision=1"
+            },
+            "display": {
+              "state": "ready",
+              "width": 8,
+              "height": 8,
+              "bytes": 632,
+              "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+              "url": "/home/v3/assets/101/preview?variant=display&revision=1"
+            }
+          },
+          "video": null,
+          "originals_allowed": false,
+          "original": null
+        }
+      }
+    ]
+  }
+}

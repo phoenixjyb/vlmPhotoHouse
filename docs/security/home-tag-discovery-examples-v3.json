@@ -1,0 +1,2082 @@
+{
+  "facets_people": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "people",
+    "page": 1,
+    "page_size": 50,
+    "total": 2,
+    "has_more": false,
+    "items": [
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "query": ""
+  },
+  "facets_tags": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "tags",
+    "page": 1,
+    "page_size": 50,
+    "total": 6003,
+    "has_more": true,
+    "items": [
+      {
+        "id": 301,
+        "label": "Park / 公园",
+        "kind": "scene",
+        "asset_count": 2,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 2,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 302,
+        "label": "Favorite / 收藏",
+        "kind": "custom",
+        "asset_count": 2,
+        "provenance_counts": {
+          "manual": 2,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1000,
+        "label": "Synthetic tag 1000",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1001,
+        "label": "Synthetic tag 1001",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1002,
+        "label": "Synthetic tag 1002",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1003,
+        "label": "Synthetic tag 1003",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1004,
+        "label": "Synthetic tag 1004",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1005,
+        "label": "Synthetic tag 1005",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1006,
+        "label": "Synthetic tag 1006",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1007,
+        "label": "Synthetic tag 1007",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1008,
+        "label": "Synthetic tag 1008",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1009,
+        "label": "Synthetic tag 1009",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1010,
+        "label": "Synthetic tag 1010",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1011,
+        "label": "Synthetic tag 1011",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1012,
+        "label": "Synthetic tag 1012",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1013,
+        "label": "Synthetic tag 1013",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1014,
+        "label": "Synthetic tag 1014",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1015,
+        "label": "Synthetic tag 1015",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1016,
+        "label": "Synthetic tag 1016",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1017,
+        "label": "Synthetic tag 1017",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1018,
+        "label": "Synthetic tag 1018",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1019,
+        "label": "Synthetic tag 1019",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1020,
+        "label": "Synthetic tag 1020",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1021,
+        "label": "Synthetic tag 1021",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1022,
+        "label": "Synthetic tag 1022",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1023,
+        "label": "Synthetic tag 1023",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1024,
+        "label": "Synthetic tag 1024",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1025,
+        "label": "Synthetic tag 1025",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1026,
+        "label": "Synthetic tag 1026",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1027,
+        "label": "Synthetic tag 1027",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1028,
+        "label": "Synthetic tag 1028",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1029,
+        "label": "Synthetic tag 1029",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1030,
+        "label": "Synthetic tag 1030",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1031,
+        "label": "Synthetic tag 1031",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1032,
+        "label": "Synthetic tag 1032",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1033,
+        "label": "Synthetic tag 1033",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1034,
+        "label": "Synthetic tag 1034",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1035,
+        "label": "Synthetic tag 1035",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1036,
+        "label": "Synthetic tag 1036",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1037,
+        "label": "Synthetic tag 1037",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1038,
+        "label": "Synthetic tag 1038",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1039,
+        "label": "Synthetic tag 1039",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1040,
+        "label": "Synthetic tag 1040",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1041,
+        "label": "Synthetic tag 1041",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1042,
+        "label": "Synthetic tag 1042",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1043,
+        "label": "Synthetic tag 1043",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1044,
+        "label": "Synthetic tag 1044",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1045,
+        "label": "Synthetic tag 1045",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1046,
+        "label": "Synthetic tag 1046",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1047,
+        "label": "Synthetic tag 1047",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      }
+    ],
+    "query": ""
+  },
+  "facets_locations": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "locations",
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "has_more": false,
+    "items": [
+      {
+        "id": 401,
+        "label": "Example Region / 示例地区",
+        "asset_count": 3,
+        "provenance": "reviewed_region"
+      }
+    ],
+    "query": ""
+  },
+  "tags_page2": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "tags",
+    "page": 2,
+    "page_size": 50,
+    "total": 6003,
+    "has_more": true,
+    "items": [
+      {
+        "id": 1048,
+        "label": "Synthetic tag 1048",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1049,
+        "label": "Synthetic tag 1049",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1050,
+        "label": "Synthetic tag 1050",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1051,
+        "label": "Synthetic tag 1051",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1052,
+        "label": "Synthetic tag 1052",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1053,
+        "label": "Synthetic tag 1053",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1054,
+        "label": "Synthetic tag 1054",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1055,
+        "label": "Synthetic tag 1055",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1056,
+        "label": "Synthetic tag 1056",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1057,
+        "label": "Synthetic tag 1057",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1058,
+        "label": "Synthetic tag 1058",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1059,
+        "label": "Synthetic tag 1059",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1060,
+        "label": "Synthetic tag 1060",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1061,
+        "label": "Synthetic tag 1061",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1062,
+        "label": "Synthetic tag 1062",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1063,
+        "label": "Synthetic tag 1063",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1064,
+        "label": "Synthetic tag 1064",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1065,
+        "label": "Synthetic tag 1065",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1066,
+        "label": "Synthetic tag 1066",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1067,
+        "label": "Synthetic tag 1067",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1068,
+        "label": "Synthetic tag 1068",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1069,
+        "label": "Synthetic tag 1069",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1070,
+        "label": "Synthetic tag 1070",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1071,
+        "label": "Synthetic tag 1071",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1072,
+        "label": "Synthetic tag 1072",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1073,
+        "label": "Synthetic tag 1073",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1074,
+        "label": "Synthetic tag 1074",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1075,
+        "label": "Synthetic tag 1075",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1076,
+        "label": "Synthetic tag 1076",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1077,
+        "label": "Synthetic tag 1077",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1078,
+        "label": "Synthetic tag 1078",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1079,
+        "label": "Synthetic tag 1079",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1080,
+        "label": "Synthetic tag 1080",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1081,
+        "label": "Synthetic tag 1081",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1082,
+        "label": "Synthetic tag 1082",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1083,
+        "label": "Synthetic tag 1083",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1084,
+        "label": "Synthetic tag 1084",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1085,
+        "label": "Synthetic tag 1085",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1086,
+        "label": "Synthetic tag 1086",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1087,
+        "label": "Synthetic tag 1087",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1088,
+        "label": "Synthetic tag 1088",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1089,
+        "label": "Synthetic tag 1089",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1090,
+        "label": "Synthetic tag 1090",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1091,
+        "label": "Synthetic tag 1091",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1092,
+        "label": "Synthetic tag 1092",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1093,
+        "label": "Synthetic tag 1093",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1094,
+        "label": "Synthetic tag 1094",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1095,
+        "label": "Synthetic tag 1095",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1096,
+        "label": "Synthetic tag 1096",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      },
+      {
+        "id": 1097,
+        "label": "Synthetic tag 1097",
+        "kind": "scene",
+        "asset_count": 0,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 0,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      }
+    ],
+    "query": ""
+  },
+  "tags_lake": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "capabilities": {
+      "filters": {
+        "people": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "date": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "locations": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "media": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 4,
+          "assets_without_values": 0
+        },
+        "tags": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "caption": {
+          "enabled": true,
+          "reason": null,
+          "assets_with_values": 3,
+          "assets_without_values": 1
+        },
+        "themes": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        },
+        "topics": {
+          "enabled": false,
+          "reason": "no_reviewed_taxonomy",
+          "assets_with_values": 0,
+          "assets_without_values": 4
+        }
+      },
+      "catalog_assets": 4,
+      "indexed_assets": 4,
+      "index_complete": true,
+      "metadata_completeness": "not_inferred",
+      "tag_generation_completeness": "unknown",
+      "date_basis": "recorded_taken_at_calendar_date",
+      "location_basis": "reviewed_coarse_region",
+      "people_basis": "reviewed_assignments",
+      "caption_match": "nfkc_casefold_literal_phrase",
+      "filter_join": "and",
+      "people_modes": [
+        "any",
+        "all"
+      ],
+      "tag_modes": [
+        "any",
+        "all"
+      ],
+      "captured_date_bounds": {
+        "from": "2025-12-01",
+        "to": "2026-05-05"
+      }
+    },
+    "pinned_person_ids": [
+      202,
+      201
+    ],
+    "pinned_people": [
+      {
+        "id": 202,
+        "label": "Sample Child / 示例儿童",
+        "aliases": [
+          "Sample Child",
+          "示例儿童"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      },
+      {
+        "id": 201,
+        "label": "Sample Adult / 示例成人",
+        "aliases": [
+          "Sample Adult",
+          "示例成人"
+        ],
+        "asset_count": 2,
+        "provenance": "reviewed_assignments"
+      }
+    ],
+    "facet": "tags",
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "has_more": false,
+    "items": [
+      {
+        "id": 8999,
+        "label": "Lake / 湖",
+        "kind": "scene",
+        "asset_count": 1,
+        "provenance_counts": {
+          "manual": 0,
+          "caption": 1,
+          "image": 0,
+          "caption_image": 0,
+          "rule": 0,
+          "unknown": 0
+        }
+      }
+    ],
+    "query": "湖"
+  },
+  "search_request": {
+    "revision": 7,
+    "page": 1,
+    "page_size": 50,
+    "filters": {
+      "tags": {
+        "ids": [
+          8999
+        ],
+        "match": "all"
+      }
+    }
+  },
+  "search_response": {
+    "version": 3,
+    "revision": 7,
+    "catalog_revision": 1,
+    "library": {
+      "id": "synthetic-library",
+      "title": "Synthetic / 合成"
+    },
+    "filter_fingerprint": "3f3e1b557dd28d0073ded3e4054983ec65b34f9c93080319fa2fa23b3b13779c",
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "has_more": false,
+    "items": [
+      {
+        "id": 103,
+        "kind": "photo",
+        "label": "Synthetic photo",
+        "width": null,
+        "height": null,
+        "previews": {
+          "grid": {
+            "state": "on_demand",
+            "url": "/home/v3/assets/103/preview?variant=grid&revision=1"
+          },
+          "display": {
+            "state": "on_demand",
+            "url": "/home/v3/assets/103/preview?variant=display&revision=1"
+          }
+        },
+        "video": null,
+        "originals_allowed": true,
+        "original": {
+          "mime": "image/jpeg",
+          "bytes": 632,
+          "width": 8,
+          "height": 8,
+          "url": "/home/v3/assets/103/original?revision=1"
+        }
+      }
+    ]
+  }
+}
