@@ -141,14 +141,14 @@ def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
     if target_id == backup_id:
         raise PlanRejected('A separate backup is required')
     with ExistingDatabase(database, read_only=True)() as db:
-        if restore_out is not None:
+        if restore_out is not None or envelope['plan']['operation']=='import_management_ownership':
             _offline_restore_source(database, db)
         state = state_type(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
             snapshot = _snapshot(db)
     with ExistingDatabase(backup, read_only=True)() as source:
-        if restore_out is not None:
+        if restore_out is not None or envelope['plan']['operation']=='import_management_ownership':
             _offline_restore_source(backup, source)
         source.execute('BEGIN')
         with _restore_target(restore_out, source) as restored:
@@ -172,7 +172,7 @@ def _owner_password():
     return hash_password(first)
 
 
-def apply_reviewed(envelope, *, review, clock=time.time):
+def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=False):
     """Apply exactly one plan and receipt in one BEGIN IMMEDIATE transaction.
 
     No password argument, settings discovery, HTTP endpoint, backup creation or
@@ -184,18 +184,23 @@ def apply_reviewed(envelope, *, review, clock=time.time):
     _reference(review.restore_reference)
     # Detach caller-owned containers before any prompt or wait.
     envelope = json.loads(_json(envelope))
+    management = envelope['plan']['operation']=='import_management_ownership'
+    if management and all_writers_stopped is not True:
+        raise PlanRejected('Independent all-writer shutdown confirmation required')
     if plan_digest(envelope) != review.plan_digest:
         raise PlanRejected('Plan changed during review')
     if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
         raise PlanRejected('Database target changed')
     # Preflight before prompting; this result is deliberately not trusted for writes.
     with ExistingDatabase(review.database, read_only=True)() as db:
+        if management: _offline_restore_source(review.database, db)
         state = _PlanState(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
     encoded = _owner_password() if envelope['plan']['operation'] == 'bootstrap_owner' else None
     try:
         with ExistingDatabase(review.database)() as db:
+            if management: _offline_restore_source(review.database, db)
             state = _PlanState(db, clock=clock)
             with state.access._transaction(write=True):
                 if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
@@ -208,6 +213,7 @@ def apply_reviewed(envelope, *, review, clock=time.time):
                 if _snapshot(db) != review.snapshot_digest:
                     raise PlanRejected('Database changed; review a fresh backup')
                 with ExistingDatabase(review.backup, read_only=True)() as backup:
+                    if management: _offline_restore_source(review.backup, backup)
                     backup.execute('BEGIN')
                     if _snapshot(backup) != review.snapshot_digest:
                         raise PlanRejected('Reviewed backup changed')
@@ -227,9 +233,13 @@ def apply_reviewed(envelope, *, review, clock=time.time):
                     asset_ids = []
                 else:
                     actor = target['operator_account_id']
-                    asset_ids = target['asset_ids']
-                    db.executemany('INSERT INTO access_asset_libraries(asset_id,library_id) VALUES (?,?)',
-                                   ((int(item), library) for item in asset_ids))
+                    asset_ids = [] if management else target['asset_ids']
+                    if management:
+                        from .management_import import apply_management
+                        apply_management(state,target)
+                    else:
+                        db.executemany('INSERT INTO access_asset_libraries(asset_id,library_id) VALUES (?,?)',
+                                       ((int(item), library) for item in asset_ids))
                 receipt = {'version': 1, 'plan_id': plan['plan_id'], 'plan_digest': review.plan_digest,
                            'operation': plan['operation'], 'actor_account_id': actor,
                            'library_id': library, 'asset_ids': asset_ids, 'applied_at': state.access._now(),
@@ -238,10 +248,17 @@ def apply_reviewed(envelope, *, review, clock=time.time):
                            'backup_snapshot_digest': review.snapshot_digest,
                            'database_identity': list(review.database_identity),
                            'reviewed_state': plan['expected'], 'originals_granted': False}
+                if management:
+                    receipt.update(person_ids=target['person_ids'],album_ids=target['album_ids'],
+                                   quiescence_reference=target['quiescence_reference'])
                 db.execute('INSERT INTO access_provisioning_receipts VALUES (?,?,?)',
                            (plan['plan_id'], review.plan_digest, _json(receipt).decode()))
                 state.access._audit(actor, 'offline.' + plan['operation'], library,
                                     actor if encoded is not None else None)
+                if management:
+                    from .management_import import management_state
+                    if management_state(state,target,imported=True)!=plan['expected']:
+                        raise PlanRejected('Imported ownership or reviewed state changed')
                 if _identity(review.database) != review.database_identity or _identity(review.backup) != review.backup_identity:
                     raise PlanRejected('Database target changed')
                 if not plan['created_at'] <= state.access._now() < plan['expires_at']:

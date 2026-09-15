@@ -40,6 +40,12 @@ It uses the existing `receipt` lookup. It is separate from creating a new owner.
 
 ## Authority and effects
 
+The separate [management import workflow](MANAGEMENT_IMPORT.md) adds
+`plan-management` for explicitly selected unowned people and draft albums. It uses
+the same validate/review/apply/receipt commands, with an additional independent
+all-writer shutdown confirmation for application. It does not migrate a database,
+create accounts or rewrite legacy records.
+
 This is a tool for an independently authorized local database administrator.
 Plan seals, digests, CLI flags and audit references are not authentication or
 approval. The operator must first confirm the exact host, existing database,

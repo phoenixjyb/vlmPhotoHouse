@@ -89,12 +89,14 @@ Requalify source package, migration/backup/restore, owner and asset provisioning
 service account and protected serving on Windows before cutover.
 
 Legacy unowned orphan people and existing albums remain preserved but unclaimed.
-Their ownership import is **not yet implemented or authorized by a guessed
-library match**. Before transition, inventory them privately and explicitly review
-the selected library, IDs, mixed-library contents, creator and backup. The final
-import must be transactional and audited; do not use ad-hoc SQL or bypass the old
-UI protection boundary to make them visible. This remains a cutover blocker if
-the family needs those existing records in the replacement UI.
+Their [explicit offline ownership import](MANAGEMENT_IMPORT.md) is now implemented
+locally through sealed planning, backup review and atomic ownership/audit/receipt
+application. It never authorizes a guessed library match. Before transition,
+inventory them privately and explicitly review the selected library, IDs,
+mixed-library contents, creator, stopped writers and backup. Native qualification
+and an authorized live import remain cutover gates if the family needs those
+existing records in the replacement UI. Do not use ad-hoc SQL or bypass the old UI
+protection boundary to make them visible.
 
 Automatic face workers are another separate gate. Known queued/running face jobs
 block protected corrections, but the legacy clustering/reclustering/propagation
@@ -103,6 +105,17 @@ or respect the new ownership boundaries. Do not enable those workers with this
 release until reviewed and tested; the source-only caption runner accepts the new
 revision but this is not a native caption-worker compatibility result. Caption-only
 operation and face inference must be qualified separately.
+
+The 2026-09-15 read-only worker audit confirmed concrete incompatibilities:
+`person_cluster` and `person_label_propagate` can select manually unassigned faces;
+`person_recluster` can overwrite positive manual labels too. Candidate/reference
+pools are global, automatically created people lack explicit ownership, and partial
+reclustering resets global counts. Legacy audit/dependency initialization also
+contains runtime DDL. The next worker slice must preserve every manual label
+(including a null person), require explicit library-scoped candidates and owned
+targets, recompute affected counts from actual rows, and require migrated audit
+schema. Existing worker tests do not collect in the CPU-minimal access environment;
+protected API tests are not worker qualification.
 
 ## Evidence
 

@@ -94,6 +94,29 @@ with ExitStack() as guards:
             operator('apply-recovery',*recovery_args,'--review-digest',reviewed['review_digest'])
         assert operator('receipt','--database',recovered,'--plan-id',planned['plan_id'],
             '--reviewed-plan-digest',planned['plan_digest'])['receipt_found']
+        from app.access.runtime import ExistingDatabase
+        from app.access import management_import
+        assert Path(management_import.__file__).resolve().is_relative_to(root)
+        with ExistingDatabase(recovered)() as connection:
+            connection.execute("INSERT INTO persons(id,display_name,face_count) VALUES (91,'Synthetic orphan',0)")
+            connection.commit()
+        with redirect_stdout(io.StringIO()):
+            assert prepare_access_database.main(['backup','--database',str(recovered),
+                '--out',str(data/'management-backup.sqlite')])==0
+        request=data/'management-request.json';plan=data/'management-plan.json'
+        request.write_text(json.dumps({'operator_account_id':applied['actor_account_id'],
+            'library_id':'synthetic-family','person_ids':[91],'album_ids':[],
+            'include_orphan_people':True,'include_empty_albums':False,
+            'quiescence_reference':'synthetic-stopped-workers'}))
+        planned=operator('plan-management','--database',recovered,'--request',request,'--out',plan)
+        operator('validate','--database',recovered,'--plan',plan)
+        management_args=['--database',recovered,'--plan',plan,'--backup',data/'management-backup.sqlite',
+            '--reviewed-plan-digest',planned['plan_digest'],'--authority-reference','synthetic-authority',
+            '--restore-reference','synthetic-restore']
+        reviewed=operator('review',*management_args)
+        operator('apply',*management_args,'--review-digest',reviewed['review_digest'],'--all-writers-stopped')
+        assert operator('receipt','--database',recovered,'--plan-id',planned['plan_id'],
+            '--reviewed-plan-digest',planned['plan_digest'])['receipt_found']
 print(json.dumps({'package_smoke':'pass','synthetic_migration_revision':REQUIRED_REVISION,
-    'asgi_checks':7,'operator_commands':9,'database_preparation_commands':8,
+    'asgi_checks':7,'operator_commands':14,'database_preparation_commands':9,
     'listeners_opened':False,'live_data_accessed':False}))

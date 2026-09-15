@@ -43,6 +43,9 @@ class _PlanState:
 
     def _state(self, operation, target):
         db = self.access.db
+        if operation == 'import_management_ownership':
+            from .management_import import management_state
+            return management_state(self, target)
         if operation == 'bootstrap_owner':
             if set(target) != {'phone_login','library_id'}:
                 raise PlanRejected('Invalid plan')
@@ -113,6 +116,17 @@ class _PlanState:
             raise PlanRejected('Duplicate asset selection')
         return self._plan('assign_unmapped_assets',{'library_id':_library(library_id),
             'operator_account_id':operator_account_id,'asset_ids':[str(item) for item in sorted(asset_ids)]})
+
+    def management(self, *, library_id, operator_account_id, person_ids, album_ids,
+                   include_orphan_people, include_empty_albums, quiescence_reference):
+        from .management_import import MAX_ENTITIES
+        for ids in (person_ids,album_ids):
+            if not isinstance(ids,list) or len(ids)>MAX_ENTITIES or any(type(item) is not int for item in ids) or len(set(ids))!=len(ids):
+                raise PlanRejected('Explicit unique integer entity IDs required')
+        return self._plan('import_management_ownership',{'library_id':_library(library_id),
+            'operator_account_id':operator_account_id,'person_ids':[str(i) for i in sorted(person_ids)],
+            'album_ids':[str(i) for i in sorted(album_ids)],'include_orphan_people':include_orphan_people,
+            'include_empty_albums':include_empty_albums,'quiescence_reference':quiescence_reference})
 
     def _validate_in_transaction(self, envelope):
         """Caller owns the snapshot or write reservation for all checks and effects."""
