@@ -92,5 +92,54 @@
     "push_merge": false,
     "mobile_repository_edits": false,
     "network_listener": false
+  },
+  "source_commit": "97e9cc4eaa2c0ff34aa60837e84099c017927ef1",
+  "source_package": {
+    "source_commit": "97e9cc4eaa2c0ff34aa60837e84099c017927ef1",
+    "source_files": 65,
+    "zip_sha256": "b3ac3a4b991bbb2f781d1298bf6da2224dcb82ac34c0a7636dbcf10727064600",
+    "bytes": 1806092,
+    "deployed": false,
+    "smoke": {
+      "package_smoke": "pass",
+      "synthetic_migration_revision": "c7f4a9e2b610",
+      "asgi_checks": 7,
+      "operator_commands": 9,
+      "database_preparation_commands": 8,
+      "listeners_opened": false,
+      "live_data_accessed": false
+    }
+  },
+  "changed_files": [
+    "backend/app/access/boundary.py",
+    "backend/app/access/metadata.py",
+    "backend/app/access/runtime.py",
+    "backend/app/access/service.py",
+    "backend/app/access/stories.py",
+    "backend/app/access/story_schema.py",
+    "backend/app/access/transport.py",
+    "backend/app/main.py",
+    "backend/app/ui/access/app.js",
+    "backend/app/ui/access/index.html",
+    "backend/app/ui/access/styles.css",
+    "backend/migrations/versions/c7f4a9e2b610_family_stories.py",
+    "docs/FAMILY_STORIES.md",
+    "docs/FAMILY_STORIES_HANDOFF.md",
+    "docs/FAMILY_STORIES_REVIEW.md",
+    "docs/security/DATABASE_PREPARATION.md",
+    "docs/security/OPERATOR_TOOL.md",
+    "docs/security/PROTECTED_UPGRADE.md",
+    "docs/security/evidence/family-stories-review/verification.json",
+    "docs/security/route_capabilities.json",
+    "scripts/build_staging_package.py",
+    "tests/security/test_closed_application.py",
+    "tests/security/test_family_stories.py",
+    "tests/security/test_orm_migrations.py",
+    "tests/security/test_staging_package.py",
+    "tests/security/test_web_browser.cjs"
+  ],
+  "screenshots": {
+    "family-story-editor-desktop.png": "a41080a754118929b427ec8fe5c6f56c9698b1959b9802cc299f3e184ae6de52",
+    "family-story-mobile-zh.png": "351ebed7c6c866443af40d5693761fd219654661d94eab04dec3bc7c5b5ecfbc"
   }
 }

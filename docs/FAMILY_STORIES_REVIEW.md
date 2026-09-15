@@ -7,6 +7,26 @@ The local `origin/master` ref matched this base at review time; no remote fetch 
 live deployment-lineage check ran. Concurrent Home discovery/calendar development
 is a separate branch and is not silently included in this source candidate.
 
+## Immutable local source and package
+
+Source commit: `97e9cc4eaa2c0ff34aa60837e84099c017927ef1`.
+The follow-up evidence commit adds this receipt and the inspected synthetic images;
+no production source changed after qualification.
+
+Source ZIP: 1,806,092 bytes, 65 exact allowlisted Git files, SHA-256
+`b3ac3a4b991bbb2f781d1298bf6da2224dcb82ac34c0a7636dbcf10727064600`.
+Private local path:
+`/Users/yanbo/.openclawy/private/photohouse-family-stories-review-20260915/source.zip`.
+Every archive member matched the manifest and selected commit. A fresh-process smoke
+against its extracted source passed seven ASGI checks, nine synthetic operator
+commands and eight synthetic database-preparation commands at `c7f4a9e2b610`.
+The archive contains source only, with no installed dependencies or private config.
+No network listener or live data access was used.
+
+The committed aggregate receipt lists the implementation's changed files. Runtime
+modules, WebUI, migration, inventory, packaging, tests and operator documentation
+changed; caption worker/input-preparation code and mobile worktrees did not.
+
 ## Review findings and repairs
 
 - A successful removal whose response was lost received a fresh mutation UUID on
