@@ -141,17 +141,17 @@ def credentials_from_request(request, *, allow_query=False):
     return token, mode
 
 
-async def _body(request, fields):
+async def _body(request, fields, *, max_body=MAX_BODY):
     if _single(request, 'content-encoding') is not None:
         raise TransportError(400, 'Invalid request')
     if (_single(request, 'content-type') or '').split(';')[0].strip().lower() != 'application/json':
         raise TransportError(400, 'Invalid request')
     length = _single(request, 'content-length')
-    if length is not None and (not length.isascii() or not length.isdecimal() or int(length) > MAX_BODY):
+    if length is not None and (not length.isascii() or not length.isdecimal() or int(length) > max_body):
         raise TransportError(413, 'Request too large')
     raw = bytearray()
     async for chunk in request.stream():
-        if len(raw) + len(chunk) > MAX_BODY:
+        if len(raw) + len(chunk) > max_body:
             raise TransportError(413, 'Request too large')
         raw.extend(chunk)
     def unique(pairs):

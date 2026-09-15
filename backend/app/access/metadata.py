@@ -81,4 +81,6 @@ def migration_metadata(legacy_metadata):
         Column('plan_id', Text, primary_key=True, nullable=False),
         Column('plan_digest', Text, nullable=False, unique=True),
         Column('receipt', Text, nullable=False))
+    from .story_schema import add_story_tables
+    add_story_tables(metadata)
     return metadata

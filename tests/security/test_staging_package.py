@@ -24,6 +24,10 @@ class StagingPackageTests(unittest.TestCase):
             for name in package.FILES:
                 self.assertEqual(hashlib.sha256(archive.read(name)).hexdigest(),manifest['files'][name])
             self.assertIn('backend/app/ui/photohouse-icon.png',archive.namelist())
+            self.assertEqual(manifest['migration_revision'], 'c7f4a9e2b610')
+            for name in ('backend/app/access/stories.py', 'backend/app/access/story_schema.py',
+                         'backend/migrations/versions/c7f4a9e2b610_family_stories.py'):
+                self.assertIn(name, archive.namelist())
             self.assertNotIn('backend/app/config.py',archive.namelist())
             self.assertNotIn('backend/app/legacy_main.py',archive.namelist())
             self.assertFalse(any(name.endswith(('.sqlite','.pem','.env','.pt')) for name in archive.namelist()))

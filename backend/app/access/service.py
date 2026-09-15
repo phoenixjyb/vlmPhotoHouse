@@ -293,6 +293,8 @@ class AccessService:
             return member
         if capability == 'library.members.manage' and member['role'] == 'owner':
             return member
+        if capability == 'story.write' and member['role'] in {'owner', 'contributor'}:
+            return member
         # Upload/curation/destruction/voice grants remain disabled in the first release.
         raise AccessDenied('Access denied')
 

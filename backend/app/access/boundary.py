@@ -8,6 +8,7 @@ from .transport import PRIVACY_HEADERS, router as account_router
 from .media import router as media_router
 from .library import router as library_router
 from .members import router as member_router
+from .stories import router as story_router
 from ..routers.ui import router as ui_router
 
 
@@ -22,7 +23,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, library_router, member_router, ui_router)
+                for router in (account_router, media_router, library_router, member_router, story_router, ui_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -41,6 +42,14 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method in {'GET', 'POST'} and re.fullmatch(r'/assets/[0-9]+/stories', path):
+            return True
+        if method in {'PUT', 'DELETE'} and re.fullmatch(r'/stories/[0-9a-f-]{36}', path):
+            return True
+        if method == 'GET' and re.fullmatch(r'/stories/[0-9a-f-]{36}/history', path):
+            return True
+        if method == 'POST' and path == '/library/search':
+            return True
         if (method, path) in cls.ACCOUNT or (method == 'GET' and path in cls.UI):
             return True
         if method == 'POST' and re.fullmatch(r'/libraries/[^/]+/invitations(?:/cancel)?', path):

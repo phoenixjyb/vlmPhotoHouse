@@ -1,0 +1,145 @@
+{
+  "date": "2026-09-15",
+  "base": "470f42cf6ea0cc9c1a0885d1e7f8da0eb99c2eca",
+  "branch": "codex/family-stories",
+  "environment": {
+    "python": "3.13.15",
+    "fastapi": "0.135.2",
+    "starlette": "1.3.1",
+    "sqlalchemy": "2.0.52",
+    "pillow": "11.3.0",
+    "runtime": "disposable Mac source-test venv"
+  },
+  "full_security": {
+    "run": 557,
+    "passed": 553,
+    "skipped_windows": 4,
+    "seconds": 136.986,
+    "failures": 0
+  },
+  "focused_stories": {
+    "passed": 38
+  },
+  "migrations": {
+    "passed": 13,
+    "seconds": 0.557
+  },
+  "malformed_unicode_manual_raw_json": {
+    "passed": 5,
+    "statuses": [
+      400,
+      400,
+      400,
+      400,
+      400
+    ]
+  },
+  "inventory_entries": 180,
+  "browser": {
+    "checks": [
+      "Public sign-in shell has CSP and no anonymous photos",
+      "Phone/password login uses HttpOnly cookie and scoped gallery",
+      "Server denies sibling cookie embedding when same-origin signals are absent",
+      "Captions render as text and viewer cannot download originals",
+      "Delayed closed viewer cannot overwrite a newer asset",
+      "English/Chinese gallery fits a narrow mobile viewport",
+      "Owner manually creates phone-bound invitation; registration joins as viewer",
+      "Owner revocation requires fresh review and stops the member next read",
+      "Cancelled invitation cannot register or disclose photos",
+      "Long bilingual story survives a lost save response without duplication; text is not HTML",
+      "Concurrent edits require explicit comparison; all three revisions survive",
+      "Saved stories reload and are searchable in Chinese; narrow Chinese viewer renders",
+      "Viewer can read family stories but cannot edit or read restricted history",
+      "Background clears private DOM; same-account revalidation restores draft; history can seed a new draft",
+      "Lost delete response retries the same mutation and keeps one tombstone revision",
+      "Repeated More clicks cannot skip an in-flight story page",
+      "Delayed history for another story cannot replace the selected history",
+      "Delayed gallery response cannot cross a library switch",
+      "Logout revokes cookie and discards delayed private responses",
+      "Failed logout keeps photos hidden and supports explicit retry",
+      "Membership revocation removes available libraries and photos",
+      "Expired session cookie clears and returning login succeeds"
+    ],
+    "externalRequests": [],
+    "pageErrors": [],
+    "browser": "151.0.7922.34",
+    "syntheticFetchMetadataRequests": 183,
+    "transportLimitation": "DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.",
+    "evidence": "Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only"
+  },
+  "log_sha256": {
+    "security-final": "1e64611c5606c802956e06f1844cebbe230b14d72b423a4f812f87d3614342e5",
+    "api-after": "069f5b8bd8e665af5e7f486675673ada50576cce37b657be4ae002b394b0c659",
+    "migration": "4fe05fba1d7b34ecaa056616c1e07d416b623eefb28adb5921886bce28c44b9c",
+    "browser-final": "67f3718157358f7e202299d87c2d44fa1452ef1d152c0e46cbd8035063406153",
+    "surrogates": "8812b34ffe24c864042cd060d65733e19cafcf0592e14843b41fb314ac6a4dd8",
+    "inventory": "4c013bd920a719ed5e6f0ec2c284a480941d424e308d9477e56f63b88c420487"
+  },
+  "limits": {
+    "story_utf8_bytes": 65536,
+    "title_utf8_bytes": 512,
+    "byline_utf8_bytes": 256,
+    "story_request_json_bytes": 524288,
+    "story_response_json_bytes": 3145728,
+    "stories_per_page": 5,
+    "history_rows_per_page_plus_current_story": 5
+  },
+  "external_actions": {
+    "windows_access": false,
+    "real_database_media": false,
+    "models": false,
+    "deployment": false,
+    "push_merge": false,
+    "mobile_repository_edits": false,
+    "network_listener": false
+  },
+  "source_commit": "97e9cc4eaa2c0ff34aa60837e84099c017927ef1",
+  "source_package": {
+    "source_commit": "97e9cc4eaa2c0ff34aa60837e84099c017927ef1",
+    "source_files": 65,
+    "zip_sha256": "b3ac3a4b991bbb2f781d1298bf6da2224dcb82ac34c0a7636dbcf10727064600",
+    "bytes": 1806092,
+    "deployed": false,
+    "smoke": {
+      "package_smoke": "pass",
+      "synthetic_migration_revision": "c7f4a9e2b610",
+      "asgi_checks": 7,
+      "operator_commands": 9,
+      "database_preparation_commands": 8,
+      "listeners_opened": false,
+      "live_data_accessed": false
+    }
+  },
+  "changed_files": [
+    "backend/app/access/boundary.py",
+    "backend/app/access/metadata.py",
+    "backend/app/access/runtime.py",
+    "backend/app/access/service.py",
+    "backend/app/access/stories.py",
+    "backend/app/access/story_schema.py",
+    "backend/app/access/transport.py",
+    "backend/app/main.py",
+    "backend/app/ui/access/app.js",
+    "backend/app/ui/access/index.html",
+    "backend/app/ui/access/styles.css",
+    "backend/migrations/versions/c7f4a9e2b610_family_stories.py",
+    "docs/FAMILY_STORIES.md",
+    "docs/FAMILY_STORIES_HANDOFF.md",
+    "docs/FAMILY_STORIES_REVIEW.md",
+    "docs/security/DATABASE_PREPARATION.md",
+    "docs/security/OPERATOR_TOOL.md",
+    "docs/security/PROTECTED_UPGRADE.md",
+    "docs/security/evidence/family-stories-review/verification.json",
+    "docs/security/route_capabilities.json",
+    "scripts/build_staging_package.py",
+    "tests/security/test_closed_application.py",
+    "tests/security/test_family_stories.py",
+    "tests/security/test_orm_migrations.py",
+    "tests/security/test_staging_package.py",
+    "tests/security/test_web_browser.cjs"
+  ],
+  "screenshots": {
+    "family-story-editor-desktop.png": "a41080a754118929b427ec8fe5c6f56c9698b1959b9802cc299f3e184ae6de52",
+    "family-story-mobile-zh.png": "351ebed7c6c866443af40d5693761fd219654661d94eab04dec3bc7c5b5ecfbc"
+  }
+}

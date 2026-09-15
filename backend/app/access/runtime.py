@@ -14,12 +14,12 @@ import time
 from .media import MediaRuntime
 from .transport import AccessRuntime
 
-REQUIRED_REVISION = 'b6e3f9a5c721'
+REQUIRED_REVISION = 'c7f4a9e2b610'
 REQUIRED_TABLES = frozenset({
     'assets', 'captions', 'face_detections', 'access_accounts', 'access_sessions',
     'access_operators', 'access_libraries', 'access_memberships', 'access_invitations',
     'access_asset_libraries', 'access_audit', 'access_admission_key', 'access_attempts',
-    'access_kdf_slot', 'access_provisioning_receipts',
+    'access_kdf_slot', 'access_provisioning_receipts', 'access_stories', 'access_story_revisions',
 })
 
 

@@ -19,10 +19,11 @@ from app.db import Base
 from app.access.metadata import migration_metadata
 
 PRE_ACCESS = 'd2b7e4f6a901'
-ACCESS_HEAD = 'b6e3f9a5c721'
+ACCESS_HEAD = 'c7f4a9e2b610'
 ACCESS_TABLES = {'access_accounts', 'access_sessions', 'access_operators', 'access_libraries',
     'access_memberships', 'access_invitations', 'access_asset_libraries', 'access_audit',
-    'access_admission_key', 'access_attempts', 'access_kdf_slot', 'access_provisioning_receipts'}
+    'access_admission_key', 'access_attempts', 'access_kdf_slot', 'access_provisioning_receipts',
+    'access_stories', 'access_story_revisions'}
 
 
 def config():
@@ -188,6 +189,46 @@ class OrmMigrationTests(unittest.TestCase):
         self.assertEqual(missing, {'tags', 'asset_tags', 'asset_tag_blocks', 'video_segments'})
         columns = {c['name'] for c in inspect(self.engine).get_columns('assets')}
         self.assertFalse({'duration_sec', 'fps'} & columns)
+
+    def test_story_upgrade_preserves_legacy_user_edits_and_ai_provenance(self):
+        self.upgrade('b6e3f9a5c721')
+        with self.engine.begin() as connection:
+            connection.exec_driver_sql("INSERT INTO assets(id,path,hash_sha256,status) VALUES (101,'synthetic/photo.jpg','hash','active')")
+            connection.exec_driver_sql("""INSERT INTO captions(id,asset_id,text,model,user_edited,superseded)
+                VALUES (1,101,'Original AI text','qwen3',0,0),(2,101,'奶奶写的旧描述','legacy',1,0)""")
+            before = connection.exec_driver_sql('SELECT * FROM captions ORDER BY id').all()
+        self.upgrade()
+        with self.engine.connect() as connection:
+            self.assertEqual(connection.exec_driver_sql('SELECT * FROM captions ORDER BY id').all(), before)
+            self.assertEqual(connection.exec_driver_sql('SELECT count(*) FROM access_stories').scalar_one(), 0)
+
+    def test_story_downgrade_refuses_before_changing_schema_or_revision(self):
+        self.upgrade()
+        with self.engine.connect() as connection:
+            before = connection.exec_driver_sql("SELECT type,name,sql FROM sqlite_master ORDER BY type,name").all()
+        with self.assertRaisesRegex(RuntimeError, 'reviewed offline backup restoration'):
+            with self.engine.begin() as connection:
+                cfg = config(); cfg.attributes['connection'] = connection
+                command.downgrade(cfg, 'b6e3f9a5c721')
+        with self.engine.connect() as connection:
+            self.assertEqual(connection.exec_driver_sql("SELECT type,name,sql FROM sqlite_master ORDER BY type,name").all(), before)
+            self.assertEqual(connection.exec_driver_sql('SELECT version_num FROM alembic_version').scalar_one(), ACCESS_HEAD)
+
+    def test_interrupted_story_upgrade_rolls_back_both_tables_and_revision(self):
+        self.upgrade('b6e3f9a5c721')
+        def fail(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().startswith('CREATE TABLE access_story_revisions'):
+                raise RuntimeError('Synthetic story migration interruption')
+        event.listen(self.engine, 'before_cursor_execute', fail)
+        try:
+            with self.assertRaisesRegex(RuntimeError, 'Synthetic story migration interruption'):
+                self.upgrade()
+        finally:
+            event.remove(self.engine, 'before_cursor_execute', fail)
+        with self.engine.connect() as connection:
+            self.assertEqual(connection.exec_driver_sql('SELECT version_num FROM alembic_version').scalar_one(), 'b6e3f9a5c721')
+            self.assertNotIn('access_stories', inspect(connection).get_table_names())
+            self.assertNotIn('access_story_revisions', inspect(connection).get_table_names())
 
 
 if __name__ == '__main__':

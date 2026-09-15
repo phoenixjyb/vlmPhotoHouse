@@ -54,7 +54,7 @@ class ImportIsolationTests(unittest.TestCase):
                 main = importlib.import_module(prefix + '.main')
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
-                self.assertEqual(len(main.app.routes), 26)
+                self.assertEqual(len(main.app.routes), 32)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)
@@ -165,9 +165,10 @@ class ClosedApplicationTests(unittest.TestCase):
         actual = [(method, route.path) for route in self.app.routes for method in route.methods]
         self.assertEqual(len(actual), len(set(actual)))
         self.assertEqual(set(actual), expected)
-        self.assertEqual(len(actual), 26)
+        self.assertEqual(len(actual), 32)
         for method, path in actual:
-            sample = re.sub(r'\{[^}]+\}', '1', path)
+            sample = path.replace('{story_id}', '11111111-1111-4111-8111-111111111111')
+            sample = re.sub(r'\{[^}]+\}', '1', sample)
             self.assertTrue(ClosedBoundary.allowed(method, sample))
 
     def test_every_retired_route_is_denied_or_replaced_by_a_protected_route(self):
