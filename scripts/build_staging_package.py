@@ -21,7 +21,7 @@ FILES = tuple(sorted([
     *('backend/app/access/'+name+'.py' for name in (
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
-        'boundary','service','bootstrap')),
+        'boundary','service','bootstrap','stories','story_schema')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -29,7 +29,7 @@ FILES = tuple(sorted([
         '6f2a8c1d9b7e_embedding_metadata','7c1c2d4e5f6a_task_timing_columns',
         '8a2f1c3d4b5e_captions_multi_variants','9b1e7d2a5c6f_caption_status_and_variant_meta',
         'a1c9d4e5f8b2_face_assignment_events','a5d2e8f4b610_legacy_read_schema',
-        'b6e3f9a5c721_offline_receipts','c4e7a2d9f1b3_versioned_face_embeddings',
+        'b6e3f9a5c721_offline_receipts','c7f4a9e2b610_family_stories','c4e7a2d9f1b3_versioned_face_embeddings',
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/check_access_environment.py',
@@ -41,7 +41,7 @@ FILES = tuple(sorted([
     'backend/requirements-access-test.in', 'backend/requirements-access-test.lock',
     'docs/security/CPU_ENVIRONMENT.md', 'docs/security/PROTECTED_UPGRADE.md',
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
-    'docs/security/DATABASE_PREPARATION.md', 'docs/security/OWNER_RECOVERY.md',
+    'docs/security/DATABASE_PREPARATION.md', 'docs/security/OWNER_RECOVERY.md', 'docs/FAMILY_STORIES.md',
 ]))
 
 
@@ -72,7 +72,7 @@ def package_bytes(commit, files):
     if set(files) != set(FILES):
         raise ValueError('Exact source allowlist required')
     manifest = {'format_version':1,'source_commit':commit,'artifact_kind':'source_only_not_deployed',
-        'migration_revision':'b6e3f9a5c721','dependencies_included':False,'private_configuration_included':False,
+        'migration_revision':'c7f4a9e2b610','dependencies_included':False,'private_configuration_included':False,
         'files':{name:hashlib.sha256(files[name]).hexdigest() for name in FILES}}
     output=io.BytesIO()
     with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_STORED) as archive:

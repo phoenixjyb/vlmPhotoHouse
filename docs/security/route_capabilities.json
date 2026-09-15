@@ -3,6 +3,7 @@
   "status": "ACTIVE ENTRYPOINT CLOSED BY DEFAULT / RETIRED AND STANDALONE GAPS EXPLICIT",
   "base_commit": "932263504ac5fcc3ed178e951991619d8ee87049",
   "capabilities": {
+    "story.write": "Current contributor or owner membership. Contributors edit only their own stories; owners may moderate. Parent and child library scope, atomic revision checks, idempotent saves, CSRF for cookies. No AI caption or TV publication grant.",
     "public.ui": "Anonymous, code-only UI shell/assets/redirects; never embedded library data. Redirect parameters are untrusted and may contain private search text.",
     "library.read": "Verified principal plus current approved membership in the selected library. Viewer/contributor/owner; system operator has no implicit membership.",
     "media.original.read": "Separate explicit original-byte grant AND library.read, including inline preview, download=true and every Range/conditional retry. Role alone is insufficient.",
@@ -41,6 +42,10 @@
     {
       "source": "backend/app/access/members.py",
       "expression": "router = APIRouter(route_class=MemberRoute)"
+    },
+    {
+      "source": "backend/app/access/stories.py",
+      "expression": "router = APIRouter(route_class=LibraryRoute)"
     },
     {
       "source": "backend/app/access/transport.py",
@@ -156,6 +161,10 @@
     },
     {
       "source": "backend/app/main.py",
+      "expression": "app.include_router(story_router)"
+    },
+    {
+      "source": "backend/app/main.py",
       "expression": "app.include_router(ui_router)"
     },
     {
@@ -236,6 +245,12 @@
     }
   ],
   "routes": [
+    {"source":"backend/app/access/stories.py","owner":"router","method":"GET","path":"/assets/{asset_id}/stories","handler":"list_stories","surface":"photohouse","scope":"Selected active library and active mapped parent asset","capabilities":["library.read"],"current_control":"Current membership and parent scope in one transaction; five whole stories per page; no-store","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},
+    {"source":"backend/app/access/stories.py","owner":"router","method":"POST","path":"/assets/{asset_id}/stories","handler":"create_story","surface":"photohouse","scope":"Selected active library and mapped active asset","capabilities":["story.write"],"current_control":"Authenticated author, contributor/owner, CSRF for cookies, bounded body, atomic history and idempotency","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},
+    {"source":"backend/app/access/stories.py","owner":"router","method":"PUT","path":"/stories/{story_id}","handler":"update_story","surface":"photohouse","scope":"Selected library, story and mapped active parent","capabilities":["story.write"],"current_control":"Owner or original author contributor; mandatory revision, atomic history and idempotency; CSRF for cookies","gap":"Local synthetic acceptance only; runtime migration and deployment not performed"},
+    {"source":"backend/app/access/stories.py","owner":"router","method":"DELETE","path":"/stories/{story_id}","handler":"delete_story","surface":"photohouse","scope":"Selected library, story and mapped active parent","capabilities":["story.write"],"current_control":"Versioned tombstone, never media deletion; owner or original author contributor; CSRF for cookies","gap":"History retained; this is not permanent erasure. Runtime migration and deployment not performed"},
+    {"source":"backend/app/access/stories.py","owner":"router","method":"GET","path":"/stories/{story_id}/history","handler":"story_history","surface":"photohouse","scope":"Selected library, story and mapped active parent","capabilities":["story.write"],"current_control":"Restricted owner/original author contributor history, five whole revisions per page, no-store","gap":"Runtime migration and deployment not performed"},
+    {"source":"backend/app/access/stories.py","owner":"router","method":"POST","path":"/library/search","handler":"search_stories","surface":"photohouse","scope":"Current visible stories and captions within selected library before ranking/counting","capabilities":["library.read"],"current_control":"Parameterized literal matching, bounded query, result and SQL deadline; excludes history and deleted content; CSRF for cookies","gap":"No semantic index or TV projection; live library performance unverified"},
     {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/invitations/accept", "handler": "accept_invitation", "surface": "photohouse", "capabilities": ["account.invitation.accept"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Current session/phone, invitation and membership revision checked atomically; cookie Origin and CSRF required. Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
     {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/login", "handler": "login", "surface": "photohouse", "capabilities": ["account.login"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Durable pre-KDF admission; actual password check; HTTPS and explicit native/web transport; web login requires configured Origin. Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
     {"source": "backend/app/access/transport.py", "owner": "router", "method": "POST", "path": "/auth/logout", "handler": "logout", "surface": "photohouse", "capabilities": ["account.self"], "scope": "Own account/session or explicitly selected library invitation; no media access.", "current_control": "Strict transport parsing; cookie Origin and session-bound CSRF; durable idempotent session revocation and cookie deletion. Cookie reads require same-origin Fetch Metadata or configured Origin; native bearer remains separate.", "gap": "Synthetic ASGI, migrated SQLite, explicit adapter and browser-contract evidence only. No live migration/mapping, TLS/proxy, actual Fetch Metadata/CORP network enforcement, Windows filesystem or mobile device acceptance."},
