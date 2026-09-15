@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 root, work = Path(sys.argv[1]), Path(sys.argv[2])
 mode = sys.argv[3]
+migration_root = Path(sys.argv[4]) if len(sys.argv)>4 else root
 work.mkdir()  # exclusively new fixture directory
 sys.path.insert(0, str(root/'backend'))
 from sqlalchemy import create_engine
@@ -20,9 +21,13 @@ from app.db import Asset, Caption, Task
 database = work/'fixture.sqlite'
 engine = create_engine('sqlite:///'+database.as_posix())
 with engine.begin() as connection:
-    cfg = Config(); cfg.set_main_option('script_location', str(root/'backend/migrations'))
+    cfg = Config(); cfg.set_main_option('script_location', str(migration_root/'backend/migrations'))
     cfg.attributes['connection'] = connection
-    command.upgrade(cfg, 'head')
+    import app
+    # Only fixture construction may use migration metadata outside the artifact.
+    # Remove the fallback package path before importing or starting worker code.
+    with patch.object(app, '__path__', [str(root/'backend/app'), str(migration_root/'backend/app')]):
+        command.upgrade(cfg, 'head')
 with Session(engine) as session:
     asset = Asset(path='synthetic-never-read.jpg', hash_sha256='fixture', status='active', mime='image/jpeg')
     session.add(asset); session.flush()
@@ -41,6 +46,7 @@ with Session(engine) as session:
 engine.dispose()
 
 environment = work/'reviewed.json'; environment.write_text('{"CAPTION_WORD_LIMIT":"0","CAPTION_POLICY_MAX_RETRIES":"0"}')
+if mode=='tags': environment.write_text('{"CAPTION_WORD_LIMIT":"0","CAPTION_AUTO_TAG_ENABLE":"true"}')
 spec = importlib.util.spec_from_file_location('fixture_worker', root/'scripts/run_caption_worker.py')
 worker = importlib.util.module_from_spec(spec); spec.loader.exec_module(worker)
 stopfile = work/'stop'
@@ -100,6 +106,11 @@ with sqlite3.connect(database) as db:
         assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[2],)).fetchone()==('finished',)
     if mode=='retry':
         assert db.execute('SELECT state,retry_count FROM tasks WHERE id=?',(ids[2],)).fetchone()==('pending',1)
+    if mode=='tags':
+        assert db.execute('SELECT count(*) FROM asset_tags').fetchone()[0] > 0
+        assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[2],)).fetchone()==('finished',)
+    else:
+        assert db.execute('SELECT count(*) FROM asset_tags').fetchone()[0] == 0
     if mode in ('unready','unconfirmed'):
         assert not calls
         assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[2],)).fetchone()==('pending',)

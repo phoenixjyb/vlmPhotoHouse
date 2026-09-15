@@ -25,8 +25,10 @@ or import it into `app.main`. It does not serve HTTP or start a model server.
   It does not initialize embedding models/indexes, claim other task types, or
   enqueue idle dimension backfills. Default mixed-executor behavior is preserved.
 - Startup requires a healthy provider identifying as Qwen3 HTTP before claiming a
-  task. Inference uses the existing external loopback service. Stub fallback and
-  automatic caption-derived tagging are disabled for this migration worker.
+  task. Inference uses the existing external loopback service. Stub fallback is
+  disabled. Caption-derived tagging defaults off but can be explicitly enabled
+  through reviewed settings to preserve the live pipeline's search tags. It uses
+  the existing local tag extractor, not another model or task queue.
   Original media reads, video frame extraction and normal caption database writes
   still occur when real jobs run; this is not a read-only production worker.
 - The process ignores repository `.env` via `PHOTOHOUSE_NO_DOTENV=1` and removes
@@ -60,11 +62,13 @@ jobs. A processed claim can finish, retry or fail under existing policy; the
 reported count is **not** a count of successful captions.
 
 JSON is an object of string values. Allowed keys are listed in the launcher's
-`NUMBERS` and `TEXT` constants: caption prompt/profile/infant-care exceptions,
+`NUMBERS`, `TEXT` and `BOOLEANS` constants: caption prompt/profile/infant-care exceptions,
 word/variant/policy retry limits, HTTP retry/delay/timeout/image-edge settings, and
-queue retry/backoff settings. Unknown keys, duplicate keys, non-finite numbers and
+queue retry/backoff and caption-derived tagging settings. Booleans must be the
+strings `true` or `false`. Unknown keys, duplicate keys, non-finite numbers and
 out-of-range numbers are refused. No passwords or API tokens belong in this file.
-Omitted values retain the source handler defaults except word count (zero).
+Omitted values retain the source handler defaults except word count (zero) and
+caption-derived tagging (off).
 Before rollout, compare the complete private JSON with the current live worker's
 effective settings so exception lists, resize settings and retry budgets survive.
 
@@ -90,9 +94,10 @@ exit and the queue boundary, then account for every other writer.
 
 `tests/security/test_caption_worker.py` checks read-only preflight, path/revision/
 configuration refusal, lock exclusion/release, and drain behavior. With legacy
-test dependencies installed, it also runs six isolated processes against a real
+test dependencies installed, it also runs seven isolated processes against a real
 synthetic migrated SQLite database: caption commit + stop, user-edit preservation,
-retry, idle, unavailable provider, and missing shutdown confirmation. Future tasks
+retry, idle, unavailable provider, missing shutdown confirmation, and explicitly
+enabled caption-derived tagging. Future tasks
 and unrelated high-priority work stay pending. Embedding/index initialization,
 idle backfill, network/process I/O and API imports are guarded. Minimal protected
 test environments skip only that legacy-dependency integration test.
@@ -118,3 +123,36 @@ The source qualification is not live deployment or GPU acceptance. Before rollou
 4. Drain every database writer for fresh backup/migration. Complete private owner
    provisioning, reviewed asset mapping, TLS/legacy-ingress isolation and a
    post-activation write-preserving rollback plan before protected WebUI cutover.
+
+## Immutable worker candidate
+
+`scripts/build_caption_worker_package.py --commit FULL_LOCAL_COMMIT --out ABS_NEW_ZIP`
+builds a fixed 15-file worker-only source package. It accepts only regular Git
+blobs from an immutable commit, not the dirty working directory. It includes the
+caption prompt and local tag extractor, but excludes `.env`, private configuration,
+media, databases, migrations, Python environments, model weights and HTTP entry
+points. The manifest hashes every source file. Existing output is never overwritten.
+The protected WebUI package remains separate.
+
+The candidate incorporates the previously installed pre-upload resize change:
+EXIF orientation followed by aspect-preserving LANCZOS at the explicitly reviewed
+maximum edge (1536 for the verified installation), no upscaling, one prepared image
+reused across visual corrections, and permanent classification of exact legacy
+pixel-limit rejections. Original media is not modified. Original-image decoding
+is still full resolution; this does not impose a decoder memory bound or change
+the legacy loader's Pillow safety configuration.
+
+`tests/worker/test_caption_input_preparation.py` retains the 23 synthetic resize,
+provider-isolation, retry-classification, temporary-file and source-preservation
+checks from the recovered implementation. Run with separate worker dependencies,
+`PYTHONPATH=backend`, `PHOTOHOUSE_NO_DOTENV=1`, an explicit test `DERIVED_PATH`,
+and `pytest -o addopts= tests/worker/test_caption_input_preparation.py`.
+For package qualification, the fixture runner accepts an optional **test-only**
+migration source root; migrations and fixtures do not enter the worker artifact.
+
+Keep effective environment capture private on Windows. Compare the live process
+environment, unchanged-since-startup `.env` inputs and source defaults; preserve
+caption exceptions, policy/HTTP/queue retries and tag settings. Setting the word
+cap to zero explicitly implements the user's no-hard-cap preference (the bilingual
+path already bypassed truncation). Do not silently replace missing settings with
+unreviewed values or treat a config file/manifest as proof of activation.

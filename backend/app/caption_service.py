@@ -2,6 +2,7 @@
 import os
 import time
 import logging
+import re
 from functools import lru_cache
 from typing import Protocol, Optional
 from PIL import Image
@@ -32,10 +33,27 @@ class CaptionServiceTransientError(ConnectionError):
     """A retryable caption-service transport or server failure."""
 
 
+class CaptionInputError(ValueError):
+    """An invalid caption input that cannot be fixed by retrying the same bytes."""
+
+
+def _is_pixel_limit_rejection(response: httpx.Response) -> bool:
+    """Recognize the legacy server's deterministic Pillow error, not generic 500s."""
+    try:
+        detail = response.json().get('detail')
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return isinstance(detail, str) and re.fullmatch(
+        r'Image size \(\d+ pixels\) exceeds limit of \d+ pixels, '
+        r'could be decompression bomb DOS attack\.?', detail,
+    ) is not None
+
+
 class HTTPCaptionProvider:
     """HTTP-based caption provider that calls remote caption service."""
 
     supports_text_translation = True
+    supports_image_preparation = True
     
     def __init__(self, service_url: str = "http://127.0.0.1:8102"):
         self.service_url = service_url.rstrip('/')
@@ -56,15 +74,47 @@ class HTTPCaptionProvider:
                     logger.warning(f"Caption service health check failed: {response.status_code}")
         except httpx.RequestError as e:
             logger.warning(f"Caption service not immediately available: {e}")
+
+    def prepare_image(self, image: Image.Image) -> Image.Image:
+        """Resize an oriented caption copy; never mutate or cache the caller's image.
+
+        Match the Qwen server's LANCZOS/rounding algorithm before PNG encoding.
+        Other/unknown providers retain their existing input behavior. The task
+        prepares once, then reuses this image for all visual corrections.
+        """
+        if self.model_name != 'qwen3-vl-http':
+            return image
+        try:
+            edge = int(os.getenv('CAPTION_HTTP_MAX_IMAGE_EDGE', '1536'))
+        except ValueError as exc:
+            raise CaptionInputError('CAPTION_HTTP_MAX_IMAGE_EDGE must be an integer') from exc
+        if not 64 <= edge <= 8192:
+            raise CaptionInputError('CAPTION_HTTP_MAX_IMAGE_EDGE must be between 64 and 8192')
+        width, height = image.size
+        if width <= 0 or height <= 0:
+            raise CaptionInputError('Caption image dimensions must be positive')
+        longest = max(width, height)
+        if longest <= edge:
+            return image
+        scale = float(edge) / float(longest)
+        size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+        started = time.perf_counter()
+        resized = image.resize(size, Image.Resampling.LANCZOS)
+        logger.info('Caption input resized %sx%s -> %sx%s in %.3fs',
+                    width, height, *size, time.perf_counter() - started)
+        return resized
     
     def generate_caption(self, image: Image.Image, prompt: Optional[str] = None) -> str:
         """Generate caption using remote HTTP service."""
         tmp_path = None
+        prepared = image
         try:
+            # Also protect direct callers that do not go through TaskExecutor.
+            prepared = self.prepare_image(image)
             # Windows keeps NamedTemporaryFile handle open in-context; create a path then close it first.
             fd, tmp_path = tempfile.mkstemp(suffix='.png', dir=_caption_tmp_dir())
             os.close(fd)
-            image.save(tmp_path, format='PNG')
+            prepared.save(tmp_path, format='PNG')
             max_retries = max(1, int(os.getenv("CAPTION_HTTP_RETRIES", "2") or "2"))
             retry_delay = float(os.getenv("CAPTION_HTTP_RETRY_DELAY_SEC", "1.0") or "1.0")
             request_timeout = max(5.0, float(os.getenv("CAPTION_HTTP_TIMEOUT_SEC", "180") or "180"))
@@ -87,6 +137,8 @@ class HTTPCaptionProvider:
                     raise RuntimeError("Caption service returned empty caption")
 
                 detail = response.text
+                if _is_pixel_limit_rejection(response):
+                    raise CaptionInputError('Caption input exceeds the server pixel safety limit')
                 is_server_error = response.status_code >= 500
                 is_oom = ("out of memory" in detail.lower()) or ("cuda out of memory" in detail.lower())
                 error_type = CaptionServiceTransientError if is_server_error else RuntimeError
@@ -114,6 +166,8 @@ class HTTPCaptionProvider:
             logger.error(f"Caption generation error: {e}")
             raise
         finally:
+            if prepared is not image:
+                prepared.close()
             if tmp_path:
                 try:
                     os.unlink(tmp_path)

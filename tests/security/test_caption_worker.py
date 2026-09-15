@@ -86,11 +86,14 @@ class CaptionWorkerTests(unittest.TestCase):
         path = self.root/'env.json'
         for raw in ('{"CAPTION_PROVIDER":"stub"}', '{"CAPTION_WORD_LIMIT":"0","CAPTION_WORD_LIMIT":"1"}',
                     '{"CAPTION_HTTP_TIMEOUT_SEC":"nan"}', '{"CAPTION_HTTP_RETRIES":"0"}',
+                    '{"CAPTION_AUTO_TAG_ENABLE":"yes"}',
                     '{"CAPTION_WORD_LIMIT":0}'):
             path.write_text(raw)
             with self.subTest(raw=raw), self.assertRaises(worker.Refused): worker.reviewed_environment(path)
         path.write_text('{"CAPTION_WORD_LIMIT":"0"}')
         self.assertEqual(worker.reviewed_environment(path), {'CAPTION_WORD_LIMIT':'0'})
+        path.write_text('{"CAPTION_AUTO_TAG_ENABLE":"true"}')
+        self.assertEqual(worker.reviewed_environment(path), {'CAPTION_AUTO_TAG_ENABLE':'true'})
 
     def test_lock_excludes_second_worker_and_releases_on_exception(self):
         with self.assertRaisesRegex(RuntimeError, 'fixture'):
@@ -143,7 +146,7 @@ class CaptionWorkerTests(unittest.TestCase):
         ('numpy', 'imagehash', 'exifread', 'prometheus_client')),
         'Requires separate legacy worker test dependencies; protected runtime stays CPU-minimal')
     def test_actual_runner_queue_handler_and_drain_in_fresh_process(self):
-        for mode in ('drain', 'edited', 'retry', 'idle', 'unready', 'unconfirmed'):
+        for mode in ('drain', 'edited', 'retry', 'idle', 'unready', 'unconfirmed', 'tags'):
             with self.subTest(mode=mode):
                 result = subprocess.run([sys.executable, '-I', str(ROOT/'tests/security/caption_worker_fixture.py'),
                     str(ROOT), str(self.root/mode), mode], capture_output=True, text=True, timeout=40)

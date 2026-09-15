@@ -418,6 +418,11 @@ class TaskExecutor:
             from .caption_service import get_caption_provider
             prov = get_caption_provider()
             caption_image = self._load_caption_image(asset)
+            if getattr(prov, 'supports_image_preparation', False) is True:
+                prepared_image = prov.prepare_image(caption_image)
+                if prepared_image is not caption_image:
+                    caption_image.close()
+                    caption_image = prepared_image
             text = prov.generate_caption(caption_image, prompt=caption_prompt or None)
             text = neutralize_person_terms(text)
             model_name = prov.get_model_name()

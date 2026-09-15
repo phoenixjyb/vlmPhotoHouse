@@ -23,10 +23,13 @@ NUMBERS = {
     'CAPTION_POLICY_MAX_RETRIES': (0, 10, int), 'CAPTION_HTTP_RETRIES': (1, 10, int),
     'CAPTION_HTTP_TIMEOUT_SEC': (5, 1800, float), 'CAPTION_HTTP_RETRY_DELAY_SEC': (0, 60, float),
     'CAPTION_HTTP_MAX_IMAGE_EDGE': (64, 8192, int), 'MAX_TASK_RETRIES': (1, 100, int),
+    'CAPTION_AUTO_TAG_MAX_TAGS': (1, 100, int),
     'RETRY_BACKOFF_BASE_SECONDS': (0, 3600, float),
     'RETRY_BACKOFF_CAP_SECONDS': (0, 86400, float), 'RETRY_BACKOFF_JITTER': (0, 1, float),
 }
-TEXT = {'CAPTION_PROMPT', 'CAPTION_PROFILE', 'CAPTION_INFANT_CARE_ASSET_IDS'}
+TEXT = {'CAPTION_PROMPT', 'CAPTION_PROFILE', 'CAPTION_INFANT_CARE_ASSET_IDS',
+        'CAPTION_AUTO_TAG_TYPE', 'CAPTION_AUTO_TAG_SOURCE_MODEL_CONTAINS'}
+BOOLEANS = {'CAPTION_AUTO_TAG_ENABLE'}
 
 
 class Refused(ValueError):
@@ -63,11 +66,13 @@ def reviewed_environment(path):
     if len(raw) > 65536:
         raise Refused('Configuration too large')
     values = json.loads(raw, object_pairs_hook=unique)
-    if type(values) is not dict or not set(values) <= (NUMBERS.keys() | TEXT):
+    if type(values) is not dict or not set(values) <= (NUMBERS.keys() | TEXT | BOOLEANS):
         raise Refused('Unsupported worker configuration')
     for key, value in values.items():
         if type(value) is not str or '\x00' in value:
             raise Refused('Configuration values must be strings')
+        if key in BOOLEANS and value not in ('true', 'false'):
+            raise Refused('Boolean configuration must be true or false')
         if key in NUMBERS:
             low, high, kind = NUMBERS[key]
             number = kind(value)
@@ -166,12 +171,13 @@ def configure_process(database, derived, temporary, endpoint, values):
         'PHOTOHOUSE_NO_DOTENV': '1', 'DATABASE_URL': 'sqlite:///'+database.as_posix(),
         'DERIVED_PATH': str(derived), 'VLM_TMP_DIR': str(temporary),
         'CAPTION_PROVIDER': 'http', 'CAPTION_SERVICE_URL': endpoint, 'CAPTION_EXTERNAL_DIR': '',
-        'CAPTION_ENABLE_STUB_FALLBACK': 'false', 'CAPTION_AUTO_TAG_ENABLE': 'false',
+        'CAPTION_ENABLE_STUB_FALLBACK': 'false',
         'ENABLE_INLINE_WORKER': 'false', 'AUTO_MIGRATE': 'false', 'RUN_MODE': 'worker',
         'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1', 'MKL_NUM_THREADS': '1',
         'NUMEXPR_NUM_THREADS': '1', 'CUDA_VISIBLE_DEVICES': '',
     })
     os.environ.setdefault('CAPTION_WORD_LIMIT', '0')
+    os.environ.setdefault('CAPTION_AUTO_TAG_ENABLE', 'false')
 
 
 def run(args):
