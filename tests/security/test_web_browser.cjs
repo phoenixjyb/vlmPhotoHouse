@@ -30,7 +30,9 @@ const MEMBER='+12025550102';
 let hold=null,abortLogout=false,loseStorySave=false,loseStoryDelete=false;
 let loseFaceSave=false;
 let loseAlbumSave=false;
-const external=[],errors=[],checks=[];let syntheticFetchMetadata=0;
+let failNextPath=null;
+let assignmentPosts=0;
+const external=[],errors=[],checks=[],browserRequests=[];let syntheticFetchMetadata=0;
 function checkpoint(name){checks.push(name);console.log('PASS '+name);}
 function delayNext(predicate){
   let release,arrived;
@@ -42,6 +44,7 @@ async function context(browser){
   const ctx=await browser.newContext({viewport:{width:1200,height:900},serviceWorkers:'block'});
   await ctx.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
+    browserRequests.push({method:request.method(),path:url.pathname+url.search});
     if(url.origin!=='https://photohouse.test'){external.push(url.origin);await route.abort();return;}
     if(abortLogout&&url.pathname==='/auth/logout'){abortLogout=false;await route.abort();return;}
     const headers=await request.allHeaders();
@@ -55,8 +58,10 @@ async function context(browser){
     }
     delete headers['content-length']; // TestClient recalculates bytes forwarded on the pipe.
     const response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
+    if(failNextPath&&url.pathname===failNextPath){failNextPath=null;await route.abort();return;}
     if(loseStorySave&&request.method()==='POST'&&url.pathname.endsWith('/stories')){loseStorySave=false;await route.abort();return;}
     if(loseStoryDelete&&request.method()==='DELETE'&&url.pathname.startsWith('/stories/')){loseStoryDelete=false;await route.abort();return;}
+    if(request.method()==='POST'&&url.pathname.endsWith('/assignment'))assignmentPosts++;
     if(loseFaceSave&&request.method()==='POST'&&url.pathname.endsWith('/assignment')){loseFaceSave=false;await route.abort();return;}
     if(loseAlbumSave&&request.method()==='POST'&&url.pathname==='/admin/albums'){loseAlbumSave=false;await route.abort();return;}
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
@@ -215,7 +220,51 @@ let browser;
   checkpoint('Delayed people search cannot replace newer results or reappear after logout');
   await owner.locator('#people-panel summary').click();
   await owner.locator('.asset').filter({hasText:'102'}).click();
-  await owner.locator('#face-panel summary').click();
+
+  const photoViewer=owner.locator('#photo-viewer'),photoStage=owner.locator('#viewer-media'),photoImage=photoStage.locator('.viewer-surface img');
+  await photoViewer.waitFor({state:'visible'});await photoImage.evaluate(img=>img.decode());
+  assert.deepEqual(await photoImage.evaluate(img=>[img.naturalWidth,img.naturalHeight]),[400,300]);
+  assert.match(await owner.locator('#view-quality').textContent(),/Thumbnail preview/);
+  assert(await owner.evaluate(()=>{const s=document.getElementById('viewer-media');return s.scrollWidth===s.clientWidth&&s.scrollHeight===s.clientHeight;}));
+  await owner.screenshot({path:path.join(artifacts,'viewer-desktop-fit.png')});
+
+  await owner.locator('#view-actual').click();
+  assert.equal(await owner.locator('#view-scale').textContent(),'100%');
+  assert.deepEqual(await photoImage.evaluate(img=>[Math.round(img.getBoundingClientRect().width),Math.round(img.getBoundingClientRect().height)]),[400,300]);
+  assert.equal(await owner.locator('#view-actual').getAttribute('aria-pressed'),'true');
+  await owner.locator('#view-width').click();
+  const widthFit=await owner.evaluate(()=>{const s=document.getElementById('viewer-media'),img=s.querySelector('img');return {scale:parseFloat(document.getElementById('view-scale').textContent)/100,stage:[s.clientWidth,s.clientHeight],image:[img.getBoundingClientRect().width,img.getBoundingClientRect().height]};});
+  assert(Math.abs(widthFit.image[0]/widthFit.image[1]-4/3)<0.02);assert(Math.abs(widthFit.image[0]-widthFit.stage[0])<=1);
+  await owner.locator('#view-height').click();
+  const heightFit=await owner.evaluate(()=>{const s=document.getElementById('viewer-media'),img=s.querySelector('img');return {scale:parseFloat(document.getElementById('view-scale').textContent)/100,stage:[s.clientWidth,s.clientHeight],image:[img.getBoundingClientRect().width,img.getBoundingClientRect().height]};});
+  assert(Math.abs(heightFit.image[0]/heightFit.image[1]-4/3)<0.02);assert(Math.abs(heightFit.image[1]-heightFit.stage[1])<=1);
+  await owner.locator('#view-in').click({clickCount:8});
+  assert(await owner.evaluate(()=>{const s=document.getElementById('viewer-media');return s.scrollWidth>s.clientWidth&&s.scrollHeight>s.clientHeight;}));
+  await owner.screenshot({path:path.join(artifacts,'viewer-desktop-zoom-pan.png')});
+  const beforeDrag=await photoStage.evaluate(s=>[s.scrollLeft,s.scrollTop]);const box=await photoStage.boundingBox();
+  await owner.mouse.move(box.x+box.width/2,box.y+box.height/2);await owner.mouse.down();await owner.mouse.move(box.x+box.width/2-120,box.y+box.height/2-90);await owner.mouse.up();
+  const afterDrag=await photoStage.evaluate(s=>[s.scrollLeft,s.scrollTop]);assert(afterDrag[0]!==beforeDrag[0]||afterDrag[1]!==beforeDrag[1]);
+  await photoStage.evaluate(s=>{s.scrollLeft=(s.scrollWidth-s.clientWidth)/2;s.scrollTop=(s.scrollHeight-s.clientHeight)/2;});
+  const anchor={x:box.width*.7,y:box.height*.65};const beforeAnchor=await photoStage.evaluate((s,p)=>{const i=s.querySelector('img'),r=s.getBoundingClientRect(),ir=i.getBoundingClientRect(),scale=ir.width/i.naturalWidth;return [(p.x-(ir.left-r.left))/scale,(p.y-(ir.top-r.top))/scale];},anchor);
+  const beforeWheel=await owner.locator('#view-scale').textContent();await owner.mouse.move(box.x+anchor.x,box.y+anchor.y);await owner.mouse.wheel(0,-100);
+  await owner.waitForFunction(before=>document.getElementById('view-scale').textContent!==before,beforeWheel);
+  const afterWheel=await owner.locator('#view-scale').textContent();assert(Number.parseInt(afterWheel)>Number.parseInt(beforeWheel));assert(Number.parseInt(afterWheel)<=1600);
+  const afterAnchor=await photoStage.evaluate((s,p)=>{const i=s.querySelector('img'),r=s.getBoundingClientRect(),ir=i.getBoundingClientRect(),scale=ir.width/i.naturalWidth;return [(p.x-(ir.left-r.left))/scale,(p.y-(ir.top-r.top))/scale];},anchor);assert(Math.abs(afterAnchor[0]-beforeAnchor[0])<1&&Math.abs(afterAnchor[1]-beforeAnchor[1])<1);
+  await photoStage.dispatchEvent('wheel',{deltaY:100000,clientX:box.x+box.width/2,clientY:box.y+box.height/2});assert(Number.parseInt(await owner.locator('#view-scale').textContent())>=1);
+  await owner.locator('#view-in').click({clickCount:30});assert.equal(await owner.locator('#view-in').isDisabled(),true);
+  await photoStage.evaluate(s=>{const r=s.getBoundingClientRect();for(let i=0;i<20;i++)s.dispatchEvent(new WheelEvent('wheel',{deltaY:1000,clientX:r.left+r.width/2,clientY:r.top+r.height/2,cancelable:true}));});
+  assert.equal(await owner.locator('#view-scale').textContent(),'1%');assert.equal(await owner.locator('#view-out').isDisabled(),true);
+  await photoStage.focus();await photoStage.press('0');assert.equal(await owner.locator('#view-fit').getAttribute('aria-pressed'),'true');
+  await owner.locator('#view-fullscreen').click();await owner.waitForFunction(()=>document.fullscreenElement?.id==='photo-viewer');await owner.waitForFunction(()=>document.getElementById('view-fullscreen').textContent.includes('Exit fullscreen'));
+  await owner.screenshot({path:path.join(artifacts,'viewer-desktop-fullscreen.png')});
+  await owner.locator('#view-fullscreen').click();await owner.waitForFunction(()=>!document.fullscreenElement);
+  await owner.locator('#close-viewer').click();await owner.locator('.asset').filter({hasText:'102'}).click();await owner.locator('#photo-viewer').waitFor({state:'visible'});await photoStage.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await owner.locator('#view-fit').getAttribute('aria-pressed'),'true');assert.equal(await owner.locator('#view-scale').textContent(),`${await owner.evaluate(()=>{const s=document.getElementById('viewer-media'),i=s.querySelector('img');return Math.round(Math.min(s.clientWidth/i.naturalWidth,s.clientHeight/i.naturalHeight)*100);})}%`);
+  await owner.locator('#close-viewer').click();await owner.setViewportSize({width:390,height:844});await owner.locator('#language').click();await owner.locator('.asset').filter({hasText:'102'}).click();await owner.locator('#photo-viewer').waitFor({state:'visible'});await photoStage.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert(await owner.locator('#viewer').evaluate(d=>d.scrollWidth<=d.clientWidth));
+  await owner.screenshot({path:path.join(artifacts,'viewer-mobile-zh.png')});await owner.locator('#close-viewer').click();await owner.locator('#language').click();await owner.setViewportSize({width:1200,height:900});await owner.locator('.asset').filter({hasText:'102'}).click();await owner.locator('#face-panel summary').click();
+  checkpoint('Viewer fit modes preserve aspect ratio, native actual pixels, bounded zoom/pan, fullscreen, reset and narrow Chinese layout');
+
   const face=owner.locator('[data-face-id="200"]');await face.waitFor();
   await face.locator('img').evaluate(img=>img.decode());
   assert.equal(await face.locator('h4').textContent(),'Unassigned');
@@ -223,10 +272,15 @@ let browser;
   await owner.locator('.person-choice').first().waitFor();
   assert.equal(await owner.locator('.person-choice').count(),25);
   await owner.locator('.face-picker').getByRole('button',{name:'Next',exact:true}).click();
-  assert.equal(await owner.getByRole('button',{name:'Shared person · 2',exact:true}).isDisabled(),true);
+  const sharedChoice=owner.getByRole('button',{name:'Shared person · 2',exact:true});
+  const assignmentPostsBeforeRestricted=assignmentPosts;
+  assert.equal(await sharedChoice.isDisabled(),true);
+  assert.match(await sharedChoice.locator('xpath=..').locator('p').textContent(),/ownership needs review/i);
+  await sharedChoice.click({force:true});await pause(100);assert.equal(assignmentPosts,assignmentPostsBeforeRestricted);
   await owner.getByRole('button',{name:'Person 36 · 36',exact:true}).click();
   assert.equal(await face.locator('h4').textContent(),'Unassigned');
   await owner.locator('.assignment-review img').evaluate(img=>img.decode());
+  assert(await owner.locator('.assignment-review').evaluate(node=>{const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
   await owner.screenshot({path:path.join(artifacts,'face-assignment-confirm-desktop.png')});
   await owner.getByRole('button',{name:'Confirm assignment',exact:true}).click();
   await owner.waitForFunction(()=>document.getElementById('face-status').textContent.startsWith('Assignment saved'));
@@ -300,7 +354,10 @@ let browser;
   await owner.locator('.album-card').waitFor();assert.equal(await owner.locator('.album-card').count(),1);
   await page.locator('#albums-panel summary').click();await page.locator('.album-card').waitFor();
   assert.equal(await page.locator('#album-create').isVisible(),false);assert.equal(await page.getByRole('button',{name:'Edit album',exact:true}).count(),0);
-  await page.locator('.album-strip button').first().click();await page.locator('#viewer').waitFor({state:'visible'});await page.locator('#close-viewer').click();
+  await page.locator('.album-strip button').first().click();await page.locator('#viewer').waitFor({state:'visible'});await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await page.locator('#view-position').textContent(),'This album · 1 / 2');
+  assert.equal(await page.locator('#view-previous').isDisabled(),true);await page.locator('#view-next').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.match(await page.locator('#viewer-title').textContent(),/101/);assert.equal(await page.locator('#view-next').isDisabled(),true);await page.locator('#close-viewer').click();
   checkpoint('Owner builds a bilingual themed album with ordered photos and cover; creation retry is not duplicated; members can view');
   await owner.getByRole('button',{name:'Edit album',exact:true}).click();await owner.locator('#album-title').fill('Unsaved private draft');
   await owner.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
@@ -320,6 +377,8 @@ let browser;
   await owner.locator('#album-selected').getByRole('button',{name:'Remove',exact:true}).first().click();
   await owner.locator('#album-selected').getByRole('button',{name:'Remove',exact:true}).first().click();
   await owner.locator('#album-save').click();await owner.locator('#album-editor').waitFor({state:'hidden'});
+  // Closing the editor precedes the asynchronous album-list readback.
+  await owner.locator('.album-card').waitFor();
   assert.equal(await owner.locator('.album-card').count(),1);assert.equal(await owner.locator('.album-card img').count(),0);
   await owner.setViewportSize({width:390,height:844});await owner.locator('#language').click();await owner.locator('.album-card').waitFor();
   await owner.getByRole('button',{name:'编辑相册',exact:true}).click();await owner.locator('#album-title').scrollIntoViewIfNeeded();
@@ -482,6 +541,79 @@ let browser;
   assert.equal(await owner.locator('#story-history .story-card h4').textContent(),secondTitle);
   await owner.locator('#close-viewer').click();
   checkpoint('Delayed history for another story cannot replace the selected history');
+  await owner.locator('#search-text').fill('Page story 11');await owner.locator('#story-search button[type=submit]').click();
+  await owner.locator('.asset').waitFor();assert.equal(await owner.locator('.asset').count(),1);
+  await owner.locator('.asset').click();await owner.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await owner.locator('#view-position').textContent(),'This page · 1 / 1');
+  assert.equal(await owner.locator('#view-previous').isDisabled(),true);assert.equal(await owner.locator('#view-next').isDisabled(),true);
+  await owner.locator('#close-viewer').click();await owner.locator('#clear-search').click();await owner.locator('.asset').first().waitFor();
+  checkpoint('Search-result sequence is limited to the returned subset, not the entire library');
+  const preparedStart=browserRequests.length;await mutate('prepare-1024-thumbnail');
+  await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  const preparedRequests=browserRequests.slice(preparedStart);
+  assert(preparedRequests.some(item=>item.method==='HEAD'&&item.path.includes('/assets/101/thumbnail?')&&item.path.includes('size=1024')));
+  assert(preparedRequests.some(item=>item.method==='GET'&&item.path.includes('/assets/101/thumbnail?')&&item.path.includes('size=1024')));
+  await page.locator('#close-viewer').click();await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  const fallbackRequests=browserRequests.slice(preparedStart).filter(item=>item.path.includes('/assets/102/thumbnail'));
+  assert(fallbackRequests.some(item=>item.method==='HEAD'&&item.path.includes('size=1024')));
+  assert(fallbackRequests.some(item=>item.method==='GET'&&!item.path.includes('size=1024')));
+  await page.locator('#close-viewer').click();checkpoint('Prepared 1024 preview uses authorized HEAD/GET; missing 1024 falls back once to 256');
+  await mutate('thumbnail-head-503');await page.locator('.asset').filter({hasText:'101'}).click();await pause(150);
+  assert.equal(await page.locator('.viewer-surface img').count(),0);assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
+  await page.locator('#close-viewer').click();
+  const stalePreview=delayNext(url=>url.pathname==='/assets/101/thumbnail'&&url.searchParams.get('size')==='1024');
+  await page.locator('.asset').filter({hasText:'101'}).click();await stalePreview.seen;await page.locator('#close-viewer').click();stalePreview.release();await pause(150);
+  assert.equal(await page.locator('.viewer-surface img').count(),0);assert.equal(await page.locator('#viewer').isVisible(),false);
+  checkpoint('Preview HEAD 503 does not retry/fallback; stale HEAD after close cannot inject an image');
+  // Synthetic sequence contract: a gallery page is the sequence boundary.
+  await page.locator('.asset').first().waitFor();
+  await page.locator('.asset').filter({hasText:'101'}).click();
+  await page.locator('#photo-viewer').waitFor({state:'visible'});
+  await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 1 / 2');
+  assert.equal(await page.locator('#view-previous').isDisabled(),true);
+  assert.equal(await page.locator('#view-next').isDisabled(),false);
+  await page.locator('#view-next').click();await page.locator('#viewer-title').waitFor();
+  await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.match(await page.locator('#viewer-title').textContent(),/102/);
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
+  assert.equal(await page.locator('#view-next').isDisabled(),true);
+  await page.locator('#view-previous').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.match(await page.locator('#viewer-title').textContent(),/101/);
+  checkpoint('Gallery sequence exposes current-page order, position, and previous/next bounds');
+  await page.locator('#view-actual').click();
+  await page.locator('#view-fullscreen').click();await page.waitForFunction(()=>document.fullscreenElement?.id==='photo-viewer');
+  await page.locator('#view-next').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await page.evaluate(()=>document.fullscreenElement?.id),'photo-viewer');
+  assert.equal(await page.locator('#view-fit').getAttribute('aria-pressed'),'true');
+  await page.locator('#view-fullscreen').click();await page.waitForFunction(()=>!document.fullscreenElement);
+  checkpoint('Manual navigation resets fit mode and retains fullscreen across a step');
+  await page.locator('#close-viewer').click();
+  await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  if(page.clock&&typeof page.clock.install==='function')await page.clock.install();
+  await page.locator('#view-interval').selectOption('5000');await page.locator('#view-play').click();
+  assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'true');
+  if(page.clock&&typeof page.clock.fastForward==='function')await page.clock.fastForward(5000);else await pause(5200);
+  await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
+  if(page.clock&&typeof page.clock.fastForward==='function')await page.clock.fastForward(5000);else await pause(5200);
+  assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
+  await page.setViewportSize({width:1200,height:900});await page.locator('#language').click();
+  await page.screenshot({path:path.join(artifacts,'viewer-sequence-desktop-zh.png')});await page.locator('#language').click();
+  checkpoint('Slideshow advances after image load, stops at the final item, and supports interval control');
+  if(page.clock&&typeof page.clock.uninstall==='function')await page.clock.uninstall();
+  // A delayed next response must not repopulate a closed or changed viewer.
+  await page.locator('#close-viewer').click();await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  const delayedSequence=delayNext(url=>url.pathname==='/assets/detail/102');
+  await page.locator('#view-next').click();await delayedSequence.seen;await page.locator('#close-viewer').click();
+  delayedSequence.release();await pause(150);assert.equal(await page.locator('#viewer').isVisible(),false);
+  await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  failNextPath='/assets/detail/102';await page.locator('#view-next').click();await pause(150);
+  assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 1 / 2');
+  await page.locator('#close-viewer').click();
+  checkpoint('Closed, delayed, and failed sequence steps stop without repopulating or skipping items');
   await mutate('member-second-library');await page.locator('#refresh').click();
   await page.waitForFunction(()=>document.getElementById('library-select').options.length===2);
   const oldPage=delayNext(url=>url.pathname==='/assets'&&url.searchParams.get('library')==='family-a');

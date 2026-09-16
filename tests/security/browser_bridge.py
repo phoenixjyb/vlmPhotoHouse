@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 fixture = LibraryReadTests()
 LibraryReadTests.setUpClass()
+head_503 = False
 try:
     fixture.setUp()
     # Tiny generated JPEG fixtures, never real family media. Pillow is a test-only
@@ -78,10 +79,23 @@ try:
                     service=AccessService(db,clock=lambda:fixture.now)
                     code=service.invite(fixture.other_token,'family-b',MEMBER)
                     service.accept_invitation(fixture.member_token,code)
+            elif scenario=='prepare-1024-thumbnail':
+                from PIL import Image
+                (derived/'thumbnails/1024').mkdir(parents=True,exist_ok=True)
+                image=Image.open(derived/'thumbnails/256/101.jpg')
+                image.resize((1024,768)).save(derived/'thumbnails/1024/101.jpg')
+            elif scenario=='thumbnail-head-503':
+                head_503=True
             else:
                 raise ValueError('Unknown synthetic scenario')
             print(json.dumps({'id':message['id'],'ok':True}),flush=True);continue
         fixture.client.cookies.clear()
+        if (head_503 and message['method']=='HEAD' and
+                message['path'].startswith('/assets/101/thumbnail?') and
+                'size=1024' in message['path']):
+            head_503=False
+            print(json.dumps({'id':message['id'],'status':503,'headers':{},'body':''}),flush=True)
+            continue
         response=fixture.client.request(message['method'],message['path'],
             headers=message['headers'],content=base64.b64decode(message.get('body','')),
             follow_redirects=False)
