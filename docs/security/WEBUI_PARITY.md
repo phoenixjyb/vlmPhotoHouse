@@ -11,17 +11,18 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`f697fa8` + the viewer/gallery slice):
+Measured counts on this source (`edbb7d9`, the owner-tools slice plus its contract
+reissue):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Decorators under `backend/app/**` excluding `access/` |
-| Protected routes | 34 | Decorators under `backend/app/access/` |
-| Protected routes reachable from the protected UI | 32 | Route static segments matched against `access/app.js` |
+| Protected routes | 35 | Decorators under `backend/app/access/` |
+| Protected routes reachable from the protected UI | 33 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 111 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 44 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
-| Python security suite | 789 tests, 0 failures, 3 errors | `unittest discover -s tests/security`; the 3 errors are pre-existing and unrelated (see "Known-red tests") |
+| Protected control ids | 119 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 46 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Python security suite | 783 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -58,9 +59,9 @@ capability hiding behind a missing button.
 | Search: family stories and AI/earlier captions | `/search/captions` | `POST /library/search` | **PARITY** |
 | Search: local path / filename | `search-mode`, `library-result-meta` | none | **GAP·CONTRACT** |
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
-| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | owner-only `/admin/people?q=` | **GAP·CONTRACT** (member-visible person search needs a privacy decision) |
-| Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | none | **GAP·CONTRACT** |
-| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** |
+| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | owner-only `/admin/people?q=` | **GAP·CONTRACT** — decision taken 2026-09-16: open to members as names + thumbnails only; not yet implemented |
+| Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | none | **GAP·CONTRACT** — decision taken 2026-09-16: read-only catalog open to members; tag writes stay excluded; not yet implemented |
+| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** — decision taken 2026-09-16: open date/media filtering to members; not yet implemented |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | none | **GAP·CONTRACT** (needs a coarse-location privacy contract; raw location must not be copied) |
 | Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
 | Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | none | **GAP·CONTRACT** |
@@ -83,8 +84,8 @@ capability hiding behind a missing button.
 | People list, rename, search, pagination | `/persons`, `/persons/{id}/name`, `/search/person/*` | `/admin/people`, `PUT /admin/people/{id}` | **PARITY** (owner-only, library-scoped) |
 | Person asset and face crops | `/search/person/{id}`, `/faces/{id}/crop` | `/admin/people/{id}/faces`, `/faces/{id}/crop` | **PARITY** |
 | Attach or detach a face to a person | `/faces/{id}/assign`, `/faces/{id}/assign-stranger` | `/admin/faces/{id}/assignment`, `new-person`, `unassign` | **PARITY** |
-| Filter named vs unnamed people | `people-show-unnamed` | none — `/admin/people` accepts only `library, page, q` | **GAP·CONTRACT** |
-| Review unassigned faces as a worklist | `unassigned-faces`, `btn-unassigned-*` | none (per-asset face review only) | **GAP·CONTRACT** |
+| Filter named vs unnamed people | `people-show-unnamed` | `/admin/people?named=all\|named\|unnamed` | **PARITY** (owner-only) |
+| Review unassigned faces as a worklist | `unassigned-faces`, `btn-unassigned-*` | `GET /admin/faces` (25/page, library-scoped) | **PARITY** (owner-only) |
 | Merge people, delete people, delete faces, recluster | `/persons/merge`, `/persons/{id}/delete`, `DELETE /faces/{id}`, `/persons/recluster` | none | **EXCLUDED** (irreversible clustering mutations; need a separate reviewed design) |
 | Albums: list, compose, order, cover, bilingual title | `/albums/drafts*`, `album-*` | `/library-albums`, `/admin/albums` | **AHEAD** (library-owned, revision-bound) |
 | Album drafts as a separate object | `/albums/drafts`, `/albums/drafts/{id}` | — | **SUPERSEDED** by library-owned albums |
@@ -139,24 +140,74 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports 3 errors against this source. All three reproduce at `f697fa8`
-in a clean control worktree with no changes applied, and none touch the WebUI:
+The Python suite reports **3 failures** against this source (`783 passed, 3 failed,
+7 skipped` under `pytest tests/security`). All three reproduce at `f61028e` in a clean
+control worktree (`779 passed, 3 failed, 7 skipped`), with the *same three node ids*,
+and none touch the WebUI:
 
 - `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
-  process inspection is unavailable.
+  process inspection is unavailable (`/bin/ps` is blocked).
 - `test_home_media_profiles…test_large_baseline_jpeg_is_subsampled…` — environment
-  dependent.
+  dependent; same blocked `/bin/ps` resource observation.
 - `test_suppressed_ownership_repair…test_stale_audience_backup_expiry_and_schema_are_refused`
-  — passes in isolation and errors only in full-suite order; a pre-existing order
+  — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
+
+The 4 extra passes on this source are the owner-tools slice's new people-management
+tests. Because the *failure set* is identical on both sides, the slice and its contract
+reissue are behaviour-neutral with respect to everything else in the tree.
+
+## Closed in the owner-tools slice
+
+- `/admin/people?named=all|named|unnamed` — an owner-side filter over the existing
+  person directory. It is additive: `all` is the default and preserves the previous
+  response shape exactly, while an unrecognized value is refused with 400 rather than
+  silently treated as `all`.
+- `GET /admin/faces` — the unassigned-face worklist the legacy page called
+  `unassigned-faces`. Library-scoped, bounded at 25 rows per page, reusing the same
+  face presentation and assignment flow as the per-asset panel (`personPicker`), so
+  assigning from the worklist does not introduce a second assignment path.
+- Both are **owner-only** by nesting: the controls live inside `#people-panel`, which
+  is hidden unless the owner panel is shown (`#people-panel.hidden = owner-panel.hidden`).
+  The route itself is denied earlier, at the closed boundary — the authorization test
+  asserts a viewer, contributor, foreign-library and anonymous caller are refused
+  *before* any SQL runs.
+- The worklist intentionally does **not** reuse `.face-label-card`; it renders
+  `.unassigned-card`, so the per-asset panel's card count stays unambiguous.
+
+Two of these were the only GAP·CONTRACT rows in "People and albums" that needed no
+new privacy decision, which is why they could be closed first.
+
+## Owner decisions on member-facing gaps (2026-09-16)
+
+The owner reviewed which currently owner-only capabilities may be opened to ordinary
+library members. Three were approved in principle; **none is implemented yet**, and
+each still needs its own scoped slice, route and negative authorization tests before
+any UI is exposed:
+
+1. **Person names + thumbnails** — members may browse people by name and see face
+   thumbnails. This is deliberately narrower than legacy `/search/person/{id}`: no
+   face *vector* search, no cross-library person identity, and no raw biometric
+   artifact is exposed to a member. The person directory itself stays owner-only for
+   edits.
+2. **Date / media filtering** — members may narrow a library by date and media kind.
+   This is the facet model already designed in the discovery provider, which is still
+   the open dependency (who supplies `ReviewedIndex` in production).
+3. **Tags read-only catalog** — members may browse the tag catalog and tag-to-asset
+   results. Tag *writes* remain EXCLUDED.
+
+Everything else on the GAP·CONTRACT list either stays owner-only or stays excluded;
+no other row changed disposition as a result of this review.
 
 ## Recommended sequence
 
-1. **Date/media filtering** — the narrowest genuinely useful family gap, and the only
-   one whose contract is already designed (`discovery` facets `date`, `media`). Blocked
-   on deciding who supplies `ReviewedIndex` in production.
-2. **Member-visible person browsing** — needs a privacy decision: today person data is
-   owner-only and library-scoped on purpose.
+1. **Date/media filtering** — now unblocked on the *decision* (see above) and still the
+   narrowest genuinely useful family gap. The remaining dependency is the one it always
+   had: the facet contract is already designed (`discovery` facets `date`, `media`), but
+   production still needs an answer for who supplies `ReviewedIndex`.
+2. **Member-visible person browsing (names + thumbnails)** — the privacy decision is
+   taken; the work is now a scoped member-facing route plus the negative tests. Person
+   *editing* stays owner-only.
 3. **Tags catalog** — read-only tag browsing is the cheap half; tag writes stay excluded.
 4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
    provenance, quota, content handling and the contributor role.
