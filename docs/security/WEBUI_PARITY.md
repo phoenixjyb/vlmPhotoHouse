@@ -11,18 +11,18 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`edbb7d9`, the owner-tools slice plus its contract
-reissue):
+Measured counts on this source (`372db83`, the member people-directory slice plus its
+contract reissue):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Decorators under `backend/app/**` excluding `access/` |
-| Protected routes | 35 | Decorators under `backend/app/access/` |
-| Protected routes reachable from the protected UI | 33 | Route static segments matched against `access/app.js` |
+| Protected routes | 36 | Decorators under `backend/app/access/` |
+| Protected routes reachable from the protected UI | 34 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 119 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 46 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
-| Python security suite | 783 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
+| Protected control ids | 128 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 47 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Python security suite | 788 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -59,7 +59,7 @@ capability hiding behind a missing button.
 | Search: family stories and AI/earlier captions | `/search/captions` | `POST /library/search` | **PARITY** |
 | Search: local path / filename | `search-mode`, `library-result-meta` | none | **GAP·CONTRACT** |
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
-| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | owner-only `/admin/people?q=` | **GAP·CONTRACT** — decision taken 2026-09-16: open to members as names + thumbnails only; not yet implemented |
+| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails); photos-of-a-person and vector search absent | **GAP·CONTRACT** — the name+thumbnail half is now implemented; "all photos of this person" (`/search/person/{id}`) and face **vector** search are still not offered, deliberately |
 | Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | none | **GAP·CONTRACT** — decision taken 2026-09-16: read-only catalog open to members; tag writes stay excluded; not yet implemented |
 | Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** — decision taken 2026-09-16: open date/media filtering to members; not yet implemented |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | none | **GAP·CONTRACT** (needs a coarse-location privacy contract; raw location must not be copied) |
