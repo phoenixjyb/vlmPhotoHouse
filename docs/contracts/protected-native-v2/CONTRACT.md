@@ -1,12 +1,37 @@
-# Protected native profile 2.0.0-candidate.2
+# Protected native profile 2.0.0-candidate.3
 
-Backend source: `3d8cc8f9f5563c3d3c72f20869e4a8cdf4d38642`.
+Backend source: `37979480415ba50180804a9c8e2032ff826009ed`.
 Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.3
+
+`2.0.0-candidate.2` pinned source `3d8cc8f`. Closing the two owner-only people
+gaps in the protected WebUI adds one protected route, `GET /admin/faces`, so
+`backend/app/access/people.py` (route and service) and
+`backend/app/access/boundary.py` (the closed-boundary allowlist entry that lets
+the route through at all) both changed. The pinned `backend/app/**` closure count
+is unchanged at 99 files; two source hashes moved and none were added or removed.
+
+This reissue differs from the candidate.2 one in a way worth stating plainly: the
+previous slice added no route, this one does. That route is nevertheless **outside
+the wire surface this pack documents**. The 60 captured ASGI exchanges cover 28
+distinct paths and none of them is under `/admin/`; operator and owner management
+routes were never part of the native client profile. Re-capturing all 60 exchanges
+against the new source reproduced `cases.json` byte for byte except for the version
+string, which is the measurement, not an assumption. A client already tested
+against candidate.2 therefore needs no rework.
+
+The added route is owner-only and default-denied for every other account: it is
+reachable only through the closed boundary and requires the existing
+`library.people.manage` capability. It grants no new capability to any account that
+did not already hold one, and the pack's `client_profile_defaults` remain off.
+Candidate.2 was never adopted; this reissue supersedes it as the reviewed candidate
+and still requires explicit coordinator adoption.
 
 ## Reissue — 2.0.0-candidate.2
 
