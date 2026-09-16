@@ -38,7 +38,29 @@
       <details id="members-panel" class="access-panel" hidden><summary data-i18n="manageMembers">Review library members</summary><p data-i18n="revokeHelp">Revoking access stops future requests to this library. Files already downloaded cannot be recalled.</p><div id="member-list"></div><nav id="member-pages" class="pagination" hidden><button id="member-previous" class="quiet" type="button" data-i18n="previous">Previous</button><span id="member-page-label"></span><button id="member-next" class="quiet" type="button" data-i18n="next">Next</button></nav></details>
     </section>
   </main>
-  <dialog id="viewer"><button id="close-viewer" class="quiet close" type="button" data-i18n="close">Close</button><div id="viewer-media"></div><h2 id="viewer-title"></h2>
+  <dialog id="viewer"><button id="close-viewer" class="quiet close" type="button" data-i18n="close">Close</button>
+    <section id="photo-viewer" hidden>
+      <div id="viewer-sequence" class="viewer-controls" hidden>
+        <button id="view-previous" class="quiet" type="button" data-i18n="viewPrevious">Previous photo</button>
+        <span id="view-position" class="fine" aria-live="polite"></span>
+        <button id="view-next" class="quiet" type="button" data-i18n="viewNext">Next photo</button>
+        <button id="view-play" class="quiet" type="button" data-i18n="viewPlay" aria-pressed="false">Play slideshow</button>
+        <label for="view-interval" class="fine" data-i18n="viewInterval">Each preview</label>
+        <select id="view-interval"><option value="5000">5 s</option><option value="10000">10 s</option><option value="15000">15 s</option></select>
+      </div>
+      <div id="viewer-controls" class="viewer-controls" role="group" aria-label="Photo view">
+        <button id="view-fit" class="quiet" type="button" data-i18n="viewFit" aria-pressed="true">Fit</button>
+        <button id="view-width" class="quiet" type="button" data-i18n="viewWidth" aria-pressed="false">Fit width</button>
+        <button id="view-height" class="quiet" type="button" data-i18n="viewHeight" aria-pressed="false">Fit height</button>
+        <button id="view-actual" class="quiet" type="button" data-i18n="viewActual" aria-pressed="false">Actual size</button>
+        <button id="view-out" class="quiet" type="button" data-i18n="viewOut">Zoom out</button>
+        <output id="view-scale" aria-live="polite"></output>
+        <button id="view-in" class="quiet" type="button" data-i18n="viewIn">Zoom in</button>
+        <button id="view-fullscreen" class="quiet" type="button" data-i18n="viewFullscreen">Fullscreen</button>
+      </div>
+      <div id="viewer-media" tabindex="0" role="region" aria-label="Photo preview" aria-describedby="view-help view-quality"></div>
+      <p id="view-quality" class="fine" role="status"></p><p id="view-help" class="fine" data-i18n="viewHelp">Scroll to zoom; drag to pan. Keyboard: + / − zoom, arrows pan, 0 fits.</p>
+    </section><h2 id="viewer-title"></h2>
     <details id="face-panel" class="access-panel" hidden><summary data-i18n="assignFaces">Review face assignments · Owner</summary><p class="fine" data-i18n="assignHelp">Choose an existing person for one face. No automatic propagation or new person is created.</p><button id="face-refresh" class="quiet" type="button" data-i18n="refresh">Refresh</button><p id="face-status" role="status" aria-live="polite"></p><div id="face-list"></div><nav id="face-pages" class="pagination" hidden><button id="face-previous" class="quiet" type="button" data-i18n="previous">Previous</button><span id="face-page-label"></span><button id="face-next" class="quiet" type="button" data-i18n="next">Next</button></nav></details>
     <section class="family-stories" aria-labelledby="stories-heading"><p class="eyebrow" data-i18n="storyEyebrow">THE STORY BEHIND THE MOMENT</p><h3 id="stories-heading" data-i18n="familyStories">Family stories</h3><p class="fine" data-i18n="storyPrivacy">Shared with this library, not automatically published to TV.</p><p id="story-status" role="status" aria-live="polite"></p><div id="story-list"></div><button id="story-more" class="quiet" type="button" hidden data-i18n="moreStories">More stories</button><button id="story-add" class="primary" type="button" hidden data-i18n="addStory">Add your memory</button>
       <form id="story-form" hidden><label for="story-title" data-i18n="storyTitle">Title (optional)</label><input id="story-title"><label for="story-byline" data-i18n="storyByline">Written by (display name)</label><input id="story-byline" autocomplete="off"><label for="story-language" data-i18n="storyLanguage">Language of your story</label><select id="story-language"><option value="en">English</option><option value="zh">中文</option><option value="mixed">English + 中文</option><option value="und" data-i18n="otherLanguage">Other / unspecified</option></select><label for="story-text" data-i18n="storyText">What would you like to remember?</label><textarea id="story-text" rows="8" required></textarea><p class="fine" data-i18n="storyLimit">No word-count limit. Up to 64 KiB of text; longer entries are rejected, never shortened.</p><div class="story-actions"><button id="story-save" class="primary" type="submit" data-i18n="saveStory">Save story</button><button id="story-cancel" class="quiet" type="button" data-i18n="cancel">Cancel</button><button id="story-compare" class="quiet" type="button" hidden data-i18n="compareLatest">Compare latest version</button></div><div id="story-conflict"></div></form>
