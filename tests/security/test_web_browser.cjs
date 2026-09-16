@@ -720,6 +720,42 @@ let browser;
   // face, which changes directory counts and the worklist, and the owner session was
   // expired by an earlier checkpoint, so the owner signs in again here.
   await mutate('unnamed-cluster');
+  // Checked only once the unnamed cluster exists, so "the member never sees an unnamed
+  // cluster" is a real assertion instead of a vacuous one. The member view is narrower
+  // than the owner's: a name and one thumbnail each, and no control that changes a name.
+  // Absolute page-2 counts are avoided because earlier checkpoints create people.
+  await page.locator('#directory-panel > summary').click();
+  await page.locator('#directory-list .directory-card').first().waitFor();
+  const firstCard=page.locator('#directory-list .directory-card').first();
+  assert.equal(await firstCard.getAttribute('data-person-id'),'1');
+  assert.match(await firstCard.locator('img').getAttribute('src'),/^\/faces\/1\/crop\?library=family-a$/);
+  await firstCard.locator('img').evaluate(img=>img.decode());
+  assert.equal(await page.locator('#directory-list .directory-card').count(),25);
+  assert.equal(await page.locator('#directory-page-label').textContent(),'Page 1 of 2');
+  const shownNames=await page.locator('#directory-list .directory-card h3').allTextContents();
+  assert(shownNames.every(name=>name.length>0));
+  assert(shownNames.some(name=>/^Person \d\d$/.test(name)));
+  assert.equal(await page.locator('#directory-list .directory-card',{hasText:'Unnamed person'}).count(),0);
+  // A name stored as markup stays text: no heading has element children and no injected
+  // img[src=x] exists anywhere in the directory.
+  assert.equal(await page.locator('#directory-list h3').evaluateAll(nodes=>nodes.every(node=>node.children.length===0)),true);
+  assert.equal(await page.locator('#directory-list img[src="x"]').count(),0);
+  // The owner surfaces stay hidden while a member reads the directory.
+  assert.equal(await page.locator('#directory-list input').count(),0);
+  assert.equal(await page.locator('#people-panel').isVisible(),false);
+  assert.equal(await page.locator('#members-panel').isVisible(),false);
+  await page.locator('#directory-next').click();
+  await page.waitForFunction(()=>document.getElementById('directory-page-label').textContent==='Page 2 of 2');
+  const lastPage=await page.locator('#directory-list .directory-card').count();
+  assert(lastPage>=1&&lastPage<=24);
+  assert.equal(await page.locator('#directory-next').isDisabled(),true);
+  // An unnamed cluster would render as an empty heading, so a blank name on either page
+  // is exactly the leak this checkpoint exists to catch.
+  const lateNames=await page.locator('#directory-list .directory-card h3').allTextContents();
+  assert(lateNames.every(name=>name.length>0));
+  await page.screenshot({path:path.join(artifacts,'member-people-directory.png'),fullPage:true});
+  await page.locator('#directory-panel > summary').click();
+  checkpoint('Member browses the library people directory by name with thumbnails and no owner controls');
   await auth(owner,'+12025550100');
   await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();

@@ -65,6 +65,59 @@ class People:
                 'face_count': count, 'revision': self._revision(row, library),
                 'can_rename': self._exclusive(row[0], library)}
 
+    def _present_public(self, row, library):
+        # Member-visible summary. A name and one thumbnail, and nothing else: no
+        # revision, no rename affordance, no bbox, no vector or embedding state.
+        # thumbnail_url points at the existing member-scoped crop route, so the
+        # directory introduces no new media variant and no new byte-serving policy.
+        face = row[4]
+        return {'id': str(row[0]), 'display_name': row[1], 'name_truncated': row[2] > 128,
+                'face_count': row[3],
+                'thumbnail_url': f'/faces/{face}/crop?' + urlencode({'library': library}) if face else None}
+
+    def browse(self, token, library, page, query):
+        """Member-visible people directory: names and one face thumbnail each.
+
+        Strictly narrower than the owner view and narrower than legacy
+        `/search/person/{id}`:
+
+        - Gated on `library.read`, so any approved membership may read it rather
+          than the owner only. Nothing here writes.
+        - **Unnamed clusters are never returned.** An unnamed cluster is a
+          curation artifact with no name to browse by; the owner-facing `named`
+          filter is deliberately not exposed, because "find the unnamed cluster
+          so I can name it" is an owner task, not a member one.
+        - A person with no active face in *this* library is not listed, so a
+          person owned by another library can never surface here. That keeps the
+          no-cross-library-identity rule even when a shared legacy person record
+          happens to hold faces in two libraries.
+        - No name search beyond a bounded LIKE, and no vector/person filtering.
+        """
+        if len(query) > 128 or any(ord(c) < 32 for c in query):
+            raise TransportError(400, 'Invalid search')
+        pattern = '%' + query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+        with self.access._transaction():
+            self.access._require(token, library, 'library.read')
+            sql = '''WITH visible AS (SELECT f.person_id,count(*) n FROM face_detections f
+                JOIN assets a ON a.id=f.asset_id JOIN access_asset_libraries l ON l.asset_id=a.id
+                WHERE l.library_id=? AND (a.status IS NULL OR a.status='active') GROUP BY f.person_id)
+                SELECT p.id,substr(coalesce(p.display_name,''),1,128),length(coalesce(p.display_name,'')),v.n,
+                (SELECT f2.id FROM face_detections f2 JOIN assets a2 ON a2.id=f2.asset_id
+                 JOIN access_asset_libraries l2 ON l2.asset_id=a2.id
+                 WHERE l2.library_id=? AND (a2.status IS NULL OR a2.status='active')
+                 AND f2.person_id=p.id ORDER BY f2.id LIMIT 1)
+                FROM persons p JOIN visible v ON v.person_id=p.id
+                LEFT JOIN access_person_libraries owned ON owned.person_id=p.id
+                WHERE (owned.library_id IS NULL OR owned.library_id=?)
+                AND coalesce(p.display_name,'') <> ''
+                AND coalesce(p.display_name,'') LIKE ? ESCAPE '\\' '''
+            parameters = (library, library, library, pattern)
+            total = self.db.execute('SELECT count(*) FROM (' + sql + ')', parameters).fetchone()[0]
+            rows = self.db.execute(sql + ' ORDER BY coalesce(p.display_name,\'\') COLLATE NOCASE,p.id LIMIT 25 OFFSET ?',
+                                   parameters + ((page-1)*25,)).fetchall()
+            return {'library_id': library, 'page': page, 'page_size': 25, 'total': total,
+                    'items': [self._present_public(row, library) for row in rows]}
+
     def list(self, token, library, page, query, named='all'):
         if len(query) > 128 or any(ord(c) < 32 for c in query):
             raise TransportError(400, 'Invalid search')
@@ -260,6 +313,16 @@ def _call(runtime, action, *args):
             return getattr(People(AccessService(db, clock=runtime.clock)), action)(*args)
         finally:
             db.set_progress_handler(None, 0)
+
+
+@router.get('/people')
+async def browse(request: Request):
+    # Member-facing directory. Distinct from /admin/people on purpose: a member
+    # must not have to hold an owner capability to see who is in the library.
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library', 'page', 'q'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'browse', token,
+        query['library'], _integer(query.get('page', '1'), 100000), query.get('q', '')))
 
 
 @router.get('/admin/people')

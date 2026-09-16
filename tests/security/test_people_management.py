@@ -362,5 +362,115 @@ class PeopleTests(unittest.TestCase):
         self.assertEqual(self.assign({'person_id':'7','revision':record['revision'],
                                       'person_revision':person['revision']},face=12).status_code,409)
 
+    def directory(self, extra='', token=None):
+        return self.get('/people?library=family-a'+extra, token=token)
+
+    def raw(self, path, token=None):
+        headers = {} if token is None else {'Authorization': 'Bearer ' + token}
+        return self.client.get(path, headers=headers)
+
+    def own_person(self, person, library='family-a'):
+        # Give a person an explicit owning-library row, the way the offline repair does.
+        with self.f.connection() as db:
+            db.execute('''INSERT INTO access_person_libraries(person_id,library_id,creator_id,revision)
+                SELECT ?,?,m.account_id,1 FROM access_memberships m
+                WHERE m.library_id=? AND m.role='owner' LIMIT 1''', (person, library, library))
+            db.commit()
+
+    def test_member_directory_lists_named_people_without_owner_affordances(self):
+        response = self.directory(token=self.f.member_token)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['total'], 2)
+        self.assertEqual([(p['id'], p['display_name'], p['face_count']) for p in body['items']],
+                         [('1', 'Alice', 1), ('4', 'Shared', 1)])
+        # The row shape is exactly a name and one thumbnail. The thumbnail reuses the
+        # already member-scoped crop route, so no new media surface is introduced.
+        self.assertEqual(body['items'][0]['thumbnail_url'], '/faces/11/crop?library=family-a')
+        self.assertEqual([sorted(item) for item in body['items']],
+                         [['display_name', 'face_count', 'id', 'name_truncated', 'thumbnail_url']] * 2)
+        for forbidden in ('revision', 'can_rename', 'embedding', 'private-', 'bbox', 'label_score', 'vector'):
+            self.assertNotIn(forbidden, response.text)
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        # Every approved role may read the directory; none of them gains an edit.
+        self.assertEqual(self.directory(token=self.f.owner_token).status_code, 200)
+        self.f.mutate("UPDATE access_memberships SET role='contributor' WHERE account_id=?", (self.f.member_id,))
+        self.assertEqual(self.directory(token=self.f.member_token).status_code, 200)
+        self.assertEqual(self.client.post('/people?library=family-a',
+            headers={'Authorization': 'Bearer ' + self.f.member_token}).status_code, 403)
+
+    def test_member_directory_never_shows_unnamed_clusters_or_faceless_people(self):
+        self.assignment_fixture()
+        # An unnamed cluster, and a person this library owns with no face here.
+        self.f.mutate("INSERT INTO persons(id,display_name,face_count) VALUES(8,'',1)")
+        self.f.mutate('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h)'
+                      ' VALUES(81,101,8,0,0,1,1)')
+        self.own_person(5)
+        # The owner sees both: finding an unnamed cluster to name it is owner work.
+        self.assertEqual(self.get().json()['total'], 5)
+        self.assertEqual([p['id'] for p in
+                          self.get('/admin/people?library=family-a&named=unnamed').json()['items']], ['8'])
+        # The member sees neither, and never sees an empty name at all.
+        member = self.directory(token=self.f.member_token).json()
+        self.assertEqual(member['total'], 3)
+        self.assertEqual([p['id'] for p in member['items']], ['1', '4', '7'])
+        self.assertEqual([p['display_name'] for p in member['items']], ['Alice', 'Shared', '家人 Seven'])
+        self.assertNotIn('"8"', (member['items'][0]['id'], member['items'][1]['id'], member['items'][2]['id']))
+        # The owner-only filter cannot be smuggled in to widen the member view.
+        for value in ('named', 'unnamed', 'all'):
+            self.assertEqual(self.raw('/people?library=family-a&named=' + value,
+                                      self.f.member_token).status_code, 400)
+
+    def test_member_directory_is_library_scoped_and_refuses_owner_filters(self):
+        # A person owned by another library must not appear even when it holds a face here.
+        self.f.mutate('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h)'
+                      ' VALUES(91,101,2,0,0,1,1)')
+        self.own_person(2, 'family-b')
+        scoped = self.directory(token=self.f.member_token)
+        self.assertEqual([p['id'] for p in scoped.json()['items']], ['1', '4'])
+        self.assertNotIn('Foreign', scoped.text)
+        self.assertNotIn('private-', scoped.text)
+        # Membership, not identity: a foreign principal and an anonymous caller are refused.
+        for token in (self.f.other_token, 'a' * 43, None):
+            self.assertEqual(self.raw('/people?library=family-a', token).status_code, 401)
+        self.assertEqual(self.directory(token=self.f.member_token).status_code, 200)
+        # Unknown, duplicated and out-of-range parameters stay closed rather than ignored.
+        for path in ('/people', '/people?library=family-a&named=unnamed',
+                     '/people?library=family-a&page=0', '/people?library=family-a&page=100001',
+                     '/people?library=family-a&q=a&q=b', '/people?library=family-a&n=1',
+                     '/people?library=family-a&library=family-b'):
+            self.assertEqual(self.raw(path, self.f.member_token).status_code, 400)
+
+    def test_member_directory_denies_before_reading_persons(self):
+        for token in (self.f.other_token, 'a' * 43, None):
+            self.f.trace.clear()
+            self.assertEqual(self.raw('/people?library=family-a', token).status_code, 401)
+            self.assertFalse(any('FROM persons p' in sql for sql in self.f.trace))
+            self.assertFalse(any('access_person_libraries' in sql for sql in self.f.trace))
+        self.f.mutate("UPDATE access_memberships SET status='revoked' WHERE account_id=?", (self.f.member_id,))
+        self.f.trace.clear()
+        self.assertEqual(self.directory(token=self.f.member_token).status_code, 401)
+        self.assertFalse(any('FROM persons p' in sql for sql in self.f.trace))
+
+    def test_member_directory_pages_and_searches_literally_over_visible_people(self):
+        with self.f.connection() as db:
+            for i in range(100, 130):
+                db.execute('INSERT INTO persons(id,display_name,face_count) VALUES(?,?,1)', (i, 'Person ' + str(i)))
+                db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h)'
+                           ' VALUES(?,101,?,0,0,1,1)', (i, i))
+            db.commit()
+        first = self.directory(token=self.f.member_token).json()
+        second = self.directory('&page=2', token=self.f.member_token).json()
+        self.assertEqual((first['total'], len(first['items']), len(second['items'])), (32, 25, 7))
+        self.assertEqual(first['page_size'], 25)
+        self.assertEqual(len({p['id'] for p in first['items'] + second['items']}), 32)
+        # Every listed person carries a usable thumbnail, never a dangling one.
+        self.assertTrue(all(p['thumbnail_url'] for p in first['items'] + second['items']))
+        # Name search is literal, and cannot reach a person the list would not show.
+        self.rename('家人 Alice')
+        self.assertEqual(self.directory('&q=家人', token=self.f.member_token).json()['total'], 1)
+        for value in ('%', '_', 'does-not-exist', 'Foreign'):
+            self.assertEqual(self.directory('&q=' + value, token=self.f.member_token).json()['total'], 0)
+
 
 if __name__=='__main__': unittest.main()

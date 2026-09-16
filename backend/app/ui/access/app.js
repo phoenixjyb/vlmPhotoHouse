@@ -14,6 +14,7 @@
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
   const peopleState={page:1,total:0,load:0,query:'',named:'all'};
+  const directoryState={page:1,total:0,load:0,query:''};
   const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
   const albumState={page:1,total:0,load:0,draft:null};
@@ -37,6 +38,8 @@
   Object.assign(words.zh,{viewFilmstrip:'当前视图中的照片',viewFilmstripItem:'照片',goToPage:'跳转到页码',go:'前往',pageRange:'请输入有效范围内的页码。'});
   Object.assign(words.en,{peopleFilter:'Show',peopleAll:'Named and unnamed',peopleNamed:'Named only',peopleUnnamed:'Unnamed only',unassignedFaces:'Unassigned faces · Owner worklist',unassignedHelp:'Faces that no saved person claims yet, across this library. Assigning one keeps the rest of the list.',noUnassignedFaces:'No unassigned faces in this library.',sourcePhoto:'Photo',openPhoto:'Open this photo'});
   Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
+  Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
+  Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
   function resetStoryEditor(){
@@ -118,6 +121,8 @@
     $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
     peopleState.page=1;peopleState.query='';peopleState.named='all';$('people-query').value='';$('people-named').value='all';
     unassignedState.page=1;$('unassigned-list').replaceChildren();
+    directoryState.page=1;directoryState.query='';directoryState.total=0;
+    $('directory-query').value='';$('directory-list').replaceChildren();$('directory-status').textContent='';$('directory-pages').hidden=true;
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -400,6 +405,7 @@
       $('page-label').textContent=`${t('page')} ${state.page} ${t('of')} ${pages} · ${result.total} ${t('photos')}`;
       status('');
       if(!$('members-panel').hidden&&$('members-panel').open)void loadMembers();
+      if($('directory-panel').open)void loadDirectory();
       if(!$('people-panel').hidden&&$('people-panel').open)void loadPeople();
       $('album-create').hidden=state.profile?.memberships.find(m=>m.library_id===state.library&&m.available)?.role!=='owner';
       if($('albums-panel').open)void loadAlbums();
@@ -412,7 +418,7 @@
     try {
       const profile=await request('/auth/session',{epoch});
       if(stale(epoch))return;
-      if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';}
+      if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';directoryState.page=1;directoryState.query='';$('directory-query').value='';}
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
       const available=profile.memberships.filter(m=>m.available===true);
@@ -764,6 +770,38 @@
       $('people-page-label').textContent=`${t('page')} ${peopleState.page} ${t('of')} ${pages}`;
     }catch(error){if(current()){$('people-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
   }
+  // Member-facing people directory. Read-only by construction: the route returns a
+  // name, a count and one thumbnail, so there is nothing here to submit. The owner
+  // panel below is where names are actually managed.
+  async function loadDirectory(){
+    if(state.locked||!$('directory-panel').open)return;
+    const epoch=state.generation,library=state.library,load=++directoryState.load;
+    $('directory-list').replaceChildren();$('directory-pages').hidden=true;$('directory-status').textContent=t('loading');
+    const current=()=>!stale(epoch)&&load===directoryState.load&&library===state.library&&$('directory-panel').open;
+    try{
+      const result=await request(libraryPath('/people',{page:String(directoryState.page),q:directoryState.query}),{epoch});
+      if(!current())return;
+      directoryState.total=result.total;$('directory-status').textContent=result.total?'':t('noPeopleInLibrary');
+      for(const person of result.items){
+        const row=document.createElement('article');row.className='directory-card';row.dataset.personId=person.id;
+        const title=document.createElement('h3');title.textContent=person.display_name;
+        const count=document.createElement('small');count.textContent=`${person.face_count} ${t('facesCount')}`;
+        row.append(title,count);
+        // The server supplies the crop URL so the client never reconstructs one; only
+        // a same-origin path is accepted, so no unexpected origin can be loaded.
+        if(typeof person.thumbnail_url==='string'&&person.thumbnail_url.startsWith('/faces/')){
+          const image=document.createElement('img');image.className='directory-crop';image.loading='lazy';
+          image.alt=`${person.display_name} · ${t('facesCount')}`;
+          image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+          image.src=person.thumbnail_url;row.prepend(image);
+        }
+        $('directory-list').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('directory-pages').hidden=result.total===0;
+      $('directory-previous').disabled=directoryState.page===1;$('directory-next').disabled=directoryState.page>=pages;
+      $('directory-page-label').textContent=`${t('page')} ${directoryState.page} ${t('of')} ${pages}`;
+    }catch(error){if(current()){$('directory-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
   async function loadUnassignedFaces(){
     if(state.locked||$('people-panel').hidden||!$('unassigned-section').open)return;
     const epoch=state.generation,library=state.library,load=++unassignedState.load;
@@ -797,6 +835,10 @@
       $('unassigned-page-label').textContent=`${t('page')} ${unassignedState.page} ${t('of')} ${pages}`;
     }catch(error){if(current()){$('unassigned-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
   }
+  $('directory-panel').addEventListener('toggle',()=>{if($('directory-panel').open)void loadDirectory();});
+  $('directory-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;directoryState.query=$('directory-query').value.trim();directoryState.page=1;void loadDirectory();});
+  $('directory-previous').addEventListener('click',()=>{if(!state.busy&&directoryState.page>1){directoryState.page--;void loadDirectory();}});
+  $('directory-next').addEventListener('click',()=>{if(!state.busy&&directoryState.page*25<directoryState.total){directoryState.page++;void loadDirectory();}});
   $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open){void loadPeople();if($('unassigned-section').open)void loadUnassignedFaces();}});
   $('people-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;peopleState.query=$('people-query').value.trim();peopleState.page=1;void loadPeople();});
   $('people-named').addEventListener('change',()=>{if(state.busy||state.locked)return;peopleState.named=$('people-named').value;peopleState.page=1;void loadPeople();});
