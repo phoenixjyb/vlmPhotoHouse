@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '4022a57f56e6b2f976931a20569e15c879871d93'
+SOURCE = '3d8cc8f9f5563c3d3c72f20869e4a8cdf4d38642'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text())
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.1':
+    if manifest['contract_version'] != '2.0.0-candidate.2':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,

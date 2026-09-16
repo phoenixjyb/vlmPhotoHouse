@@ -1,7 +1,7 @@
 {
-  "contract_version": "2.0.0-candidate.1",
+  "contract_version": "2.0.0-candidate.2",
   "status": "candidate_requires_coordinator_adoption",
-  "backend_source_commit": "4022a57f56e6b2f976931a20569e15c879871d93",
+  "backend_source_commit": "3d8cc8f9f5563c3d3c72f20869e4a8cdf4d38642",
   "database_migration_head": "d8e5b2f7a904",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "client_profile_defaults": {
@@ -30,9 +30,10 @@
     "backend/app/access/members.py": "d04fe7891812b79b0f56aefed9974f2e101f11df054c008e927d2da77129adf6",
     "backend/app/access/metadata.py": "a9cd06343248dc6a4b0f86ecd9f07765bea6d4a1321178cb8cae244e1775a97e",
     "backend/app/access/owner_recovery.py": "a978677755d4c16f536000db575b4ea0221266ac00d77b899c69dd20699a1f07",
+    "backend/app/access/ownership_repair.py": "7ac69e511bfb8f39bfcf7124ca6edb1256817e6759618973f4bf3fc4e8324a1e",
     "backend/app/access/people.py": "534af82811151f656d79d830e5b510d32c096ef5e37c6ba358a86f97f39d4f81",
-    "backend/app/access/provisioning.py": "53588305fbffed73821b25d88357b1c0fadf68b9c2a5d5248b2615d9e39a38b1",
-    "backend/app/access/provisioning_apply.py": "421a93b6a64db9bdd214145be01784e9e78fda13fb914574ae28fc4f9fc71854",
+    "backend/app/access/provisioning.py": "9c7528f3f38f93801de5d4d1c87a87fc8cf70dfb8caa521dff5028f1709c5415",
+    "backend/app/access/provisioning_apply.py": "9f082a6b5ef26244fbb15f9de6699a261e60e02b61a56daa6223ec6842775a84",
     "backend/app/access/recovery.py": "66e6ca07e55c412ac1521defdbbe6112eabafd7a37d0c8fb28ec80ed2bb9fe97",
     "backend/app/access/runtime.py": "15fa940da8ece93d2ac8cb24229d9a5c857524c8c67cf292087776bc3fd742d3",
     "backend/app/access/schema.py": "2f58f47641a8afe752227d8db23a595db73cf6f81d6dfd0e6bd8a72077caba43",
@@ -111,12 +112,12 @@
     "tests/security/test_orm_migrations.py": "faa0655c2e2fd42fb3b6f0b0a9f270ba871d55cd7a76e58ae087a5523c37a68c"
   },
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "9f59ef34daab0b6d58fb0f54f9acd2d770f085951d1100d8b71ec0aebb5eea5a",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "21199916c031122852e1f3300bb1245026f1dbf04bc6d52c0f549e04db1587b4",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "61a1f3a6b53a683451efe83bc1bc7f31ccf50e96007ce50fc1bf750ce8237ea8",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "21a1b6179de21ea8f38b809bd4cb5edb433bf1b2468c2173b51fbb9260c88a01",
-    "docs/contracts/protected-native-v2/cases.json": "cb16cb611530fe4bd4d425d9db1c539543c298666e394a3ca81d5866c441b1d8",
-    "scripts/verify_protected_native_contract.py": "94fa629d49f32d03352d2b9bd11834a7c741f31c11ff7576ea95f37657cd41e1",
-    "tests/security/native_contract_v2_probe.py": "fef242dcf4eadbf57676a8a29256f162191d1fd28e63fc90b26bfb0cbb527434",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "e31fe6f794d1040f66771242a2749d7bbc19ec4294dfc8c6b2317cc394ccd21d",
+    "docs/contracts/protected-native-v2/cases.json": "d0f9cca8a7e81c34c8693bfe4c8411f73f60beda8f9a91642ad14f5b927a5625",
+    "scripts/verify_protected_native_contract.py": "7b566b7eb2a9834324ad2b728f489f8d58b153a1b95cebbc7226974a05c61182",
+    "tests/security/native_contract_v2_probe.py": "7ca899bc796791f32f9818968dbf7ee58ad25f484f6053d07ce40ccd41cca8bb",
     "tests/security/test_protected_native_contract.py": "151ded7458d534dc7bc8315abadc6f51096600fd353958b533e491b62fef6968"
   }
 }

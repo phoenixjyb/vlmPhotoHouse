@@ -1,11 +1,56 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.2 — reissue after the ownership-repair source slice
+
+Source baseline: `3d8cc8f9f5563c3d3c72f20869e4a8cdf4d38642`.
+Branch: `codex/suppressed-person-ownership-repair`.
+
+This reissue moves only the pinned source closure and the pack version. The
+offline suppressed-person ownership repair edits
+`backend/app/access/provisioning.py` and `backend/app/access/provisioning_apply.py`
+and adds `backend/app/access/ownership_repair.py`, all of which sit inside the
+pinned `backend/app/**` closure. It adds no route, migration, serializer or
+server response field, so the pack's wire surface is unchanged.
+
+```sh
+PYTHONPATH=tests/security:backend python -m unittest \
+  test_protected_native_contract test_access_foundation test_access_transport \
+  test_library_reads test_family_stories.FamilyStoryTests \
+  test_protected_photo_delivery test_closed_application
+```
+
+**134 tests passed in 17.967 seconds**, no skips — the same runner count as
+candidate.1, including seven contract tests and the complete replay comparison of
+60 captured ASGI exchanges. Synthetic and in-process; no network listener.
+
+`python3 scripts/verify_protected_native_contract.py`:
+`PASS 2.0.0-candidate.2: 60 cases; 99 source hashes; 7 payload hashes; profile
+defaults off`.
+
+**Wire neutrality was measured, not assumed.** `cases.json` was regenerated from a
+live capture against the new source and differs from the candidate.1 file by
+exactly one line — the version string. Every one of the 60 exchanges, including
+status codes, selected headers and normalized bodies, is identical. A client
+already tested against candidate.1 needs no rework.
+
+Closure moved 98 → 99: one added (`backend/app/access/ownership_repair.py`), two
+changed (`provisioning.py`, `provisioning_apply.py`), none removed. The database
+migration head remains `d8e5b2f7a904` and `backend/app/access/library.py` remains
+byte-identical to the frozen v1 backend, SHA-256
+`5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe`.
+
+The repair's own synthetic suite is 13 tests; the adjacent
+access/library/transport/management/face-job/schema batch is 111 tests. Both pass
+on this source.
+
+## 2.0.0-candidate.1 — initial pack
+
 Source baseline: `4022a57f56e6b2f976931a20569e15c879871d93`.
 Branch: `codex/protected-native-contract-v2`.
 Changes are contract documentation, synthetic wire cases, probe, replay tests and
 an offline hash verifier. Application/backend source is unchanged.
 
-## Checks
+### Checks
 
 Using the already available disposable Mac test environment (Python 3.13.15,
 FastAPI 0.135.2, Starlette 1.3.1, httpx 0.28.1, SQLAlchemy 2.0.52,
@@ -36,7 +81,7 @@ replay exposed a wall-clock default in synthetic caption data; the probe now
 sets deterministic fixture timestamps before calling the unchanged serializer.
 The final full-wire comparison passes without masking response date fields.
 
-## Boundaries
+### Boundaries
 
 The test environment emits a Starlette/httpx deprecation warning; no packages
 were installed or upgraded. Windows dependencies/runtime were not inspected.

@@ -77,14 +77,19 @@ staged-file allowlist printed
 round trip. Removing `ownership_repair.py` from that root fails the smoke, so the
 allowlist entry is load-bearing.
 
-## Known drift and remaining gates
+## Contract drift and remaining gates
 
-`scripts/verify_protected_native_contract.py` now fails with
-`Hash mismatch: backend/app/access/provisioning.py`; once that entry is re-pinned it
-will additionally report `Source closure has changed`, because the new module
-extends the pinned `backend/app/**` closure. Re-pinning and re-versioning the
-candidate pack is a coordinator adoption decision and was deliberately not taken
-here.
+The slice edits pinned contract source (`backend/app/access/provisioning.py`,
+`provisioning_apply.py`) and adds `backend/app/access/ownership_repair.py`, so the
+pack's `backend/app/**` closure moved from 98 to 99 files and two source hashes
+changed. The pack was therefore reissued as `2.0.0-candidate.2` by the commit that
+follows this one, using the same source-then-pack order as the original
+(`4022a57` committed before `97c5d62`). `cases.json` was regenerated from a live
+capture against this source and changed by exactly one line — the version string —
+so all 60 wire exchanges are provably unchanged and a client already tested
+against candidate.1 needs no rework. The reissued pack still reads
+`candidate_requires_coordinator_adoption`; adoption itself remains a coordinator
+decision rather than a slice-level one.
 
 The operation is source-complete and synthetically verified only. A live apply still
 requires the owner's exact-scope decision, a separate maintenance approval, a

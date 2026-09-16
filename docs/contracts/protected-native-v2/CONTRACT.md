@@ -1,12 +1,26 @@
-# Protected native profile 2.0.0-candidate.1
+# Protected native profile 2.0.0-candidate.2
 
-Backend source: `4022a57f56e6b2f976931a20569e15c879871d93`.
+Backend source: `3d8cc8f9f5563c3d3c72f20869e4a8cdf4d38642`.
 Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.2
+
+`2.0.0-candidate.1` pinned source `4022a57`. The offline suppressed-person
+ownership repair adds `backend/app/access/ownership_repair.py` and registers the
+new operation in the existing operator planner and apply paths, so the pinned
+`backend/app/**` closure moved from 98 to 99 files and two source hashes changed.
+
+That repair is operator tooling only: it adds no route, no migration and no
+server response field. Re-capturing all 60 ASGI exchanges against the new source
+reproduced `cases.json` byte for byte except for the version string. The wire
+contract is therefore unchanged, and a client already tested against candidate.1
+needs no rework. Candidate.1 was never adopted; this reissue supersedes it as the
+reviewed candidate and still requires explicit coordinator adoption.
 
 ## Adoption and evidence
 
