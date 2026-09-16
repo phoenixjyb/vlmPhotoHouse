@@ -11,8 +11,8 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`372db83`, the member people-directory slice plus its
-contract reissue):
+Measured counts on this source (`372db83`, the tip the member people-directory slice and
+its contract reissue produced; the ledger commit `2dde6ef` adds only this file):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports **3 failures** against this source (`783 passed, 3 failed,
+The Python suite reports **3 failures** against this source (`788 passed, 3 failed,
 7 skipped` under `pytest tests/security`). All three reproduce at `f61028e` in a clean
 control worktree (`779 passed, 3 failed, 7 skipped`), with the *same three node ids*,
 and none touch the WebUI:
@@ -153,9 +153,11 @@ and none touch the WebUI:
   — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
 
-The 4 extra passes on this source are the owner-tools slice's new people-management
-tests. Because the *failure set* is identical on both sides, the slice and its contract
-reissue are behaviour-neutral with respect to everything else in the tree.
+The extra passes on this source come from the two slices landed since the control: the
+owner-tools slice's new people-management tests (4) and the member people-directory
+slice's directory tests (5). Because the *failure set* is identical on both sides, both
+slices and their contract reissues are behaviour-neutral with respect to everything else
+in the tree.
 
 ## Closed in the owner-tools slice
 
@@ -178,14 +180,37 @@ reissue are behaviour-neutral with respect to everything else in the tree.
 Two of these were the only GAP·CONTRACT rows in "People and albums" that needed no
 new privacy decision, which is why they could be closed first.
 
+## Closed in the member people-directory slice
+
+- `GET /people` — the first *member-visible* people route. Gated on `library.read`, which
+  every approved role holds, so a viewer, contributor or member may use it while
+  `library.people.manage` (rename, assign) stays owner-only.
+- It is deliberately narrower than the legacy person-search surface it partially answers,
+  and each narrowing is a test rather than a comment:
+  - **named persons only** — a person with no `display_name` is omitted, so a member
+    cannot enumerate an unnamed face cluster the owner has not reviewed.
+  - **library-scoped** — the face count joins `access_asset_libraries`, so a person owned
+    by another library with no face in this one is neither returned nor probeable by id.
+  - **presentation only** — a row is exactly `{id, display_name, name_truncated,
+    face_count, thumbnail_url}`; no revision, rename affordance, bbox, vector or
+    embedding path crosses the boundary.
+  - the thumbnail reuses the existing member-scoped `/faces/{id}/crop?library=…` route
+    rather than adding a second media surface, and the page renders it only when the URL
+    starts with `/faces/`.
+- The route authorizes *before* reading `persons`: anonymous, foreign-library and revoked
+  callers are refused with no `FROM persons` SQL executed.
+- Still not offered, deliberately: "all photos of this person" (`/search/person/{id}`) and
+  face **vector** search.
+
 ## Owner decisions on member-facing gaps (2026-09-16)
 
 The owner reviewed which currently owner-only capabilities may be opened to ordinary
-library members. Three were approved in principle; **none is implemented yet**, and
-each still needs its own scoped slice, route and negative authorization tests before
-any UI is exposed:
+library members. Three were approved in principle, each still needing its own scoped
+slice, route and negative authorization tests before any UI is exposed. One is now
+implemented; two are not:
 
-1. **Person names + thumbnails** — members may browse people by name and see face
+1. **Person names + thumbnails** — **implemented** as `GET /people` (see "Closed in the
+   member people-directory slice"). Members may browse people by name and see face
    thumbnails. This is deliberately narrower than legacy `/search/person/{id}`: no
    face *vector* search, no cross-library person identity, and no raw biometric
    artifact is exposed to a member. The person directory itself stays owner-only for
@@ -201,14 +226,20 @@ no other row changed disposition as a result of this review.
 
 ## Recommended sequence
 
-1. **Date/media filtering** — now unblocked on the *decision* (see above) and still the
-   narrowest genuinely useful family gap. The remaining dependency is the one it always
-   had: the facet contract is already designed (`discovery` facets `date`, `media`), but
-   production still needs an answer for who supplies `ReviewedIndex`.
-2. **Member-visible person browsing (names + thumbnails)** — the privacy decision is
-   taken; the work is now a scoped member-facing route plus the negative tests. Person
-   *editing* stays owner-only.
+1. **Date/media filtering** — still the narrowest genuinely useful family gap, and still
+   carrying the one dependency it always had: the facet contract is designed
+   (`discovery` facets `date`, `media`), but production needs an answer for who supplies
+   `ReviewedIndex`. Until that is answered the only options are to pre-empt that contract
+   with a second, non-discovery filter surface, or to wait — which is a coordinator call,
+   not a slice.
+2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
+   member people-directory slice; see "Closed in the member people-directory slice").
+   Person *editing* stays owner-only.
 3. **Tags catalog** — read-only tag browsing is the cheap half; tag writes stay excluded.
+   Unlike item 1 this needs no provider: `tags` and `asset_tags` are already in the
+   protected read schema (`migrations/versions/a5d2e8f4b610_legacy_read_schema.py`) and
+   `access/discovery.py` already reads both scoped to a library, so a member-facing
+   catalog is a scoped read rather than a new contract.
 4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
    provenance, quota, content handling and the contributor role.
 5. **Album delete/archive**, then **TV publication** as a separate surface.
