@@ -101,6 +101,20 @@ try:
                     Image.open(source).save(derived/f'thumbnails/256/{asset_id}.jpg')
             elif scenario=='thumbnail-head-503':
                 head_503=True
+            elif scenario=='unnamed-cluster':
+                # An unnamed cluster is a real person row with no saved name, so the
+                # owner cannot find it by searching for a name. Both faces land on
+                # asset 102, whose face list no checkpoint counts, so this stays
+                # side-effect free for the asset-101 panel checks. Face 301 is the
+                # library's own unassigned worklist entry; face 200 is already used
+                # by the per-photo assignment checkpoints and is left alone.
+                with fixture.connection() as db:
+                    db.execute("INSERT INTO persons(id,display_name,face_count) VALUES(50,'',1)")
+                    db.execute('''INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h)
+                        VALUES(50,102,50,0,0,1,1),(301,102,NULL,0,0,1,1)''')
+                    db.commit()
+                Image.new('RGB',(100,100),'#c9b8a8').save(derived/'faces/256/50.jpg')
+                Image.new('RGB',(100,100),'#a8b8c9').save(derived/'faces/256/301.jpg')
             else:
                 raise ValueError('Unknown synthetic scenario')
             print(json.dumps({'id':message['id'],'ok':True}),flush=True);continue

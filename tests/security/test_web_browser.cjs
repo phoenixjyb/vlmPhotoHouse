@@ -158,7 +158,7 @@ let browser;
   checkpoint('English/Chinese gallery fits a narrow mobile viewport');
   const ownerContext=await context(browser),owner=await ownerContext.newPage();
   await auth(owner,'+12025550100');
-  await owner.locator('#people-panel summary').click();
+  await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();
   assert.equal(await owner.locator('.person-card').count(),25);
   await owner.locator('#people-next').click();
@@ -215,10 +215,10 @@ let browser;
   assert.equal(await owner.locator('.person-card').count(),0);
   assert.equal(await owner.locator('#people-panel').isVisible(),false);
   await auth(owner,'+12025550100');
-  await owner.locator('#people-panel summary').click();
+  await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();
   checkpoint('Delayed people search cannot replace newer results or reappear after logout');
-  await owner.locator('#people-panel summary').click();
+  await owner.locator('#people-panel > summary').click();
   await owner.locator('.asset').filter({hasText:'102'}).click();
 
   const photoViewer=owner.locator('#photo-viewer'),photoStage=owner.locator('#viewer-media'),photoImage=photoStage.locator('.viewer-surface img');
@@ -716,6 +716,53 @@ let browser;
   assert.equal(await page.locator('#next').isDisabled(),true);
   await page.screenshot({path:path.join(artifacts,'gallery-page-jump.png')});
   checkpoint('Gallery page jump accepts an in-range page and refuses an out-of-range one');
+  // Run last for the same reason: it adds an unnamed cluster and a fresh unassigned
+  // face, which changes directory counts and the worklist, and the owner session was
+  // expired by an earlier checkpoint, so the owner signs in again here.
+  await mutate('unnamed-cluster');
+  await auth(owner,'+12025550100');
+  await owner.locator('#people-panel > summary').click();
+  await owner.locator('.person-card').first().waitFor();
+  // 'all' is the default, so an unnamed cluster is included without asking for it.
+  assert.equal(await owner.locator('.person-card h3',{hasText:'Unnamed person 50'}).count(),1);
+  await owner.locator('#people-named').selectOption('unnamed');
+  await owner.waitForFunction(()=>document.getElementById('people-page-label').textContent==='Page 1 of 1');
+  assert.equal(await owner.locator('.person-card').count(),1);
+  assert.equal(await owner.locator('.person-card h3').textContent(),'Unnamed person 50');
+  await owner.locator('#people-named').selectOption('named');
+  await owner.waitForFunction(()=>document.querySelectorAll('.person-card').length===25);
+  assert.equal(await owner.locator('.person-card h3',{hasText:'Unnamed person'}).count(),0);
+  await owner.locator('#people-next').click();
+  await owner.waitForFunction(()=>document.getElementById('people-page-label').textContent==='Page 2 of 2');
+  const namedLastPage=await owner.locator('.person-card').count();
+  // The filter narrows, it does not mask: 'all' adds the unnamed cluster and nothing
+  // else. Absolute counts are deliberately avoided because earlier checkpoints create
+  // people of their own.
+  await owner.locator('#people-named').selectOption('all');
+  await owner.waitForFunction(()=>document.getElementById('people-page-label').textContent==='Page 1 of 2');
+  await owner.locator('#people-next').click();
+  await owner.waitForFunction(()=>document.getElementById('people-page-label').textContent==='Page 2 of 2');
+  assert.equal(await owner.locator('.person-card').count(),namedLastPage+1);
+  checkpoint('Owner directory separates named people from unnamed clusters');
+  await owner.locator('#unassigned-section summary').click();
+  await owner.locator('.unassigned-card').first().waitFor();
+  assert.equal(await owner.locator('.unassigned-card').count(),1);
+  assert.equal(await owner.locator('.unassigned-card h4').textContent(),'Unassigned · Photo 102');
+  await owner.locator('.unassigned-card img').evaluate(img=>img.decode());
+  // The nav follows the directory's own convention: it is hidden only when there is
+  // nothing to page through, so a single row still reports its one page.
+  assert.equal(await owner.locator('#unassigned-page-label').textContent(),'Page 1 of 1');
+  // The worklist row carries a live revision, so it is actionable in place.
+  await owner.locator('.unassigned-card').getByRole('button',{name:'Choose a person',exact:true}).click();
+  const worklistPicker=owner.locator('#unassigned-list .face-picker');
+  await worklistPicker.locator('input').fill('Person 10');
+  await worklistPicker.locator('form button').click();
+  await worklistPicker.locator('.person-choice').filter({hasText:'Person 10 · 10'}).click();
+  await worklistPicker.getByRole('button',{name:'Confirm assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.getElementById('unassigned-status').textContent.startsWith('Assignment saved'));
+  await owner.waitForFunction(()=>document.querySelectorAll('.unassigned-card').length===0);
+  await owner.locator('#unassigned-section summary').click();
+  checkpoint('Owner works the unassigned-face list and assigns without leaving it');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);

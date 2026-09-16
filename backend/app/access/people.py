@@ -65,9 +65,19 @@ class People:
                 'face_count': count, 'revision': self._revision(row, library),
                 'can_rename': self._exclusive(row[0], library)}
 
-    def list(self, token, library, page, query):
+    def list(self, token, library, page, query, named='all'):
         if len(query) > 128 or any(ord(c) < 32 for c in query):
             raise TransportError(400, 'Invalid search')
+        # Unnamed clusters are real persons with no saved name; the owner needs to
+        # find them without a name to search by. 'all' is the default so an existing
+        # client that sends no filter keeps seeing exactly what it saw before.
+        if named not in ('all', 'named', 'unnamed'):
+            raise TransportError(400, 'Invalid request')
+        shape = ''
+        if named == 'named':
+            shape = " AND coalesce(p.display_name,'') <> ''"
+        elif named == 'unnamed':
+            shape = " AND coalesce(p.display_name,'') = ''"
         pattern = '%' + query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
         with self.access._transaction():
             self.access._require(token, library, 'library.people.manage')
@@ -79,7 +89,7 @@ class People:
                 FROM persons p LEFT JOIN visible v ON v.person_id=p.id
                 LEFT JOIN access_person_libraries owned ON owned.person_id=p.id
                 WHERE (owned.library_id=? OR (owned.library_id IS NULL AND v.n>0))
-                AND coalesce(p.display_name,'') LIKE ? ESCAPE '\\' '''
+                AND coalesce(p.display_name,'') LIKE ? ESCAPE '\\' ''' + shape
             total = self.db.execute('SELECT count(*) FROM (' + sql + ')', (library, library, pattern)).fetchone()[0]
             rows = self.db.execute(sql + ' ORDER BY coalesce(p.display_name,\'\') COLLATE NOCASE,p.id LIMIT 25 OFFSET ?',
                                    (library, library, pattern, (page-1)*25)).fetchall()
@@ -157,6 +167,20 @@ class People:
                                   (asset, (page-1)*25)).fetchall()
             return {'asset_id': str(asset), 'library_id': library, 'page': page, 'page_size': 25, 'total': total,
                     'items': [self._present_face(self._face(face, library), library) for face, in ids]}
+
+    def unassigned(self, token, library, page):
+        # Owner worklist over faces that no person claims, scoped to one library.
+        # Same row shape as asset_faces so the review UI can reuse one assignment
+        # path: every row carries its own revision and can_assign decision.
+        with self.access._transaction():
+            self.access._require(token, library, 'library.people.manage')
+            total = self.db.execute('SELECT count(*)' + SCOPED + ' AND f.person_id IS NULL',
+                                    (library,)).fetchone()[0]
+            rows = self.db.execute('SELECT f.id' + SCOPED +
+                ' AND f.person_id IS NULL ORDER BY f.id LIMIT 25 OFFSET ?',
+                (library, (page-1)*25)).fetchall()
+            return {'library_id': library, 'page': page, 'page_size': 25, 'total': total,
+                    'items': [self._present_face(self._face(face, library), library) for face, in rows]}
 
     def assign(self, token, library, face, body):
         person = _integer(body['person_id'], 2**63-1)
@@ -241,9 +265,10 @@ def _call(runtime, action, *args):
 @router.get('/admin/people')
 async def people(request: Request):
     token, _ = credentials_from_request(request, allow_query=True)
-    query = _query(request, {'library', 'page', 'q'})
+    query = _query(request, {'library', 'page', 'q', 'named'})
     return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'list', token,
-        query['library'], _integer(query.get('page', '1'), 100000), query.get('q', '')))
+        query['library'], _integer(query.get('page', '1'), 100000), query.get('q', ''),
+        query.get('named', 'all')))
 
 
 @router.get('/admin/people/{person_id}/faces')
@@ -269,6 +294,14 @@ async def asset_faces(asset_id: str, request: Request):
     query = _query(request, {'library', 'page'})
     return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'asset_faces', token,
         query['library'], _integer(asset_id, 2**63-1), _integer(query.get('page', '1'), 100000)))
+
+
+@router.get('/admin/faces')
+async def unassigned(request: Request):
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library', 'page'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'unassigned', token,
+        query['library'], _integer(query.get('page', '1'), 100000)))
 
 
 @router.post('/admin/faces/{face_id}/assignment')

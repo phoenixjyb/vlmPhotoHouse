@@ -50,6 +50,8 @@ class ClosedBoundary:
         if method == 'POST' and re.fullmatch(r'/admin/faces/[0-9]+/(new-person|unassign)',path): return True
         if method == 'GET' and re.fullmatch(r'/admin/assets/[0-9]+/faces', path):
             return True
+        if method == 'GET' and path == '/admin/faces':
+            return True
         if method == 'POST' and re.fullmatch(r'/admin/faces/[0-9]+/assignment', path):
             return True
         if method == 'GET' and (path == '/admin/people' or re.fullmatch(r'/admin/people/[0-9]+/faces', path)):

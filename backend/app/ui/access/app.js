@@ -13,7 +13,8 @@
   Object.assign(words.en,{storyDeleteError:'Removal not confirmed. Retry Remove story to confirm the same request.',storyCurrent:'Your earlier save was confirmed. A newer version is now shown.'});
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
-  const peopleState={page:1,total:0,load:0,query:''};
+  const peopleState={page:1,total:0,load:0,query:'',named:'all'};
+  const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
   const albumState={page:1,total:0,load:0,draft:null};
   const photoState={image:null,surface:null,mode:'fit',scale:1,drag:null};
@@ -34,6 +35,8 @@
   Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
   Object.assign(words.en,{viewFilmstrip:'Photos in this view',viewFilmstripItem:'Photo',goToPage:'Go to page',go:'Go',pageRange:'Enter a page number between 1 and the last page.'});
   Object.assign(words.zh,{viewFilmstrip:'当前视图中的照片',viewFilmstripItem:'照片',goToPage:'跳转到页码',go:'前往',pageRange:'请输入有效范围内的页码。'});
+  Object.assign(words.en,{peopleFilter:'Show',peopleAll:'Named and unnamed',peopleNamed:'Named only',peopleUnnamed:'Unnamed only',unassignedFaces:'Unassigned faces · Owner worklist',unassignedHelp:'Faces that no saved person claims yet, across this library. Assigning one keeps the rest of the list.',noUnassignedFaces:'No unassigned faces in this library.',sourcePhoto:'Photo',openPhoto:'Open this photo'});
+  Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
   function resetStoryEditor(){
@@ -113,7 +116,8 @@
     storyState.search=null;storyState.suspended=null;$('search-text').value='';$('search-source').value='all';
     state.profile=null;state.csrf=null;state.library=null;state.locked=false;
     $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
-    peopleState.page=1;peopleState.query='';$('people-query').value='';
+    peopleState.page=1;peopleState.query='';peopleState.named='all';$('people-query').value='';$('people-named').value='all';
+    unassignedState.page=1;$('unassigned-list').replaceChildren();
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -602,6 +606,64 @@
   $('album-create').addEventListener('click',()=>editAlbum());
   $('album-previous').addEventListener('click',()=>{if(albumState.page>1){albumState.page--;void loadAlbums();}});
   $('album-next').addEventListener('click',()=>{if(albumState.page*10<albumState.total){albumState.page++;void loadAlbums();}});
+  function personPicker({face,image,current,epoch,onSaved,status,container}){
+    if(!current()||state.busy)return;
+    // One picker per viewer; no previous person's selection survives opening another.
+    container.querySelectorAll('.face-picker').forEach(node=>node.remove());
+    const picker=document.createElement('section');picker.className='face-picker';
+    const form=document.createElement('form');form.className='people-search';
+    const label=document.createElement('label');label.htmlFor=`face-query-${face.id}`;label.textContent=t('findPerson');
+    const input=document.createElement('input');input.id=label.htmlFor;input.type='search';input.maxLength=128;input.autocomplete='off';
+    const search=document.createElement('button');search.type='submit';search.className='quiet';search.textContent=t('search');
+    const results=document.createElement('div'),review=document.createElement('div'),notice=document.createElement('p');notice.setAttribute('role','status');review.className='assignment-review';
+    const nav=document.createElement('nav');nav.className='pagination';
+    let page=1,query='',serial=0;
+    const active=()=>current()&&picker.isConnected;
+    async function find(){
+      const attempt=++serial;results.replaceChildren();review.replaceChildren();nav.replaceChildren();notice.textContent=t('loading');
+      try{
+        const found=await request(libraryPath('/admin/people',{q:query,page:String(page)}),{epoch});
+        if(!active()||attempt!==serial)return;notice.textContent=found.total?t('assignmentChooseHelp'):t('peopleEmpty');
+        for(const person of found.items){
+          const choice=document.createElement('button');choice.type='button';choice.className='quiet person-choice';
+          choice.textContent=`${person.display_name||t('unnamedPerson')} · ${person.id}`;choice.disabled=!person.can_rename;
+          const option=document.createElement('div');option.className='person-choice-row';option.append(choice);
+          if(!person.can_rename){const reason=document.createElement('p');reason.className='fine';reason.id=`assignment-restricted-${face.id}-${person.id}`;reason.textContent=t('assignmentRestricted');choice.setAttribute('aria-describedby',reason.id);option.append(reason);}
+          choice.addEventListener('click',()=>{
+            if(!active()||state.busy||attempt!==serial)return;
+            const text=document.createElement('p');text.textContent=`${t('assignmentReview')}: ${person.display_name||t('unnamedPerson')} · ${person.id}?`;
+            const confirm=storyButton('confirmAssignment',async()=>{
+              if(!active()||state.busy||attempt!==serial)return;
+              state.busy=true;confirm.disabled=true;
+              try{
+                await request(libraryPath(`/admin/faces/${face.id}/assignment`),{method:'POST',epoch,body:{person_id:person.id,revision:face.revision,person_revision:person.revision}});
+                if(active()){await onSaved();if(!stale(epoch))status.textContent=t('assignmentSaved');}
+              }catch(error){
+                if(active()){
+                  // Ambiguous writes require fresh server readback; never retry automatically.
+                  serial++;review.replaceChildren();results.replaceChildren();nav.replaceChildren();
+                  notice.textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');
+                  if(error.status===401||error.status===403)await failure(error,epoch);
+                }
+              }finally{state.busy=false;}
+            });
+            const preview=image.cloneNode();preview.loading='eager';
+            const actions=document.createElement('div');actions.className='face-confirm';actions.append(confirm,storyButton('cancel',()=>review.replaceChildren()));
+            review.replaceChildren(preview,text,actions);review.scrollIntoView({block:'nearest'});confirm.focus();
+          });results.append(option);
+        }
+        const previous=storyButton('previous',()=>{if(!state.busy){page--;void find();}}),next=storyButton('next',()=>{if(!state.busy){page++;void find();}});
+        previous.disabled=page===1;next.disabled=page*25>=found.total;
+        const position=document.createElement('span');position.textContent=`${t('page')} ${page} ${t('of')} ${Math.max(1,Math.ceil(found.total/25))}`;
+        nav.append(previous,position,next);
+      }catch(error){if(active()&&attempt===serial){notice.textContent=t(errorStatus(error));await failure(error,epoch);}}
+    }
+    form.append(label,input,search);picker.append(form,notice,results,nav,review,storyButton('closeSelection',()=>picker.remove()));
+    form.addEventListener('submit',event=>{event.preventDefault();if(!state.busy&&active()){query=input.value.trim();page=1;void find();}});
+    void find();input.focus();
+    return picker;
+  }
+
   async function loadAssetFaces(){
     if(state.locked||$('face-panel').hidden||!storyState.asset)return;
     const epoch=state.generation,viewer=state.viewerGeneration,load=++faceState.load,asset=storyState.asset.id;
@@ -619,59 +681,8 @@
         if(!face.can_assign){const note=document.createElement('p');note.textContent=t('assignmentUnavailable');row.append(note);}
         else row.append(storyButton('choosePerson',()=>{
           if(!current()||state.busy)return;
-          // One picker per viewer; no previous person's selection survives opening another.
-          $('face-list').querySelectorAll('.face-picker').forEach(node=>node.remove());
-          const picker=document.createElement('section');picker.className='face-picker';row.append(picker);
-          const form=document.createElement('form');form.className='people-search';
-          const label=document.createElement('label');label.htmlFor=`face-query-${face.id}`;label.textContent=t('findPerson');
-          const input=document.createElement('input');input.id=label.htmlFor;input.type='search';input.maxLength=128;input.autocomplete='off';
-          const search=document.createElement('button');search.type='submit';search.className='quiet';search.textContent=t('search');
-          const results=document.createElement('div'),review=document.createElement('div'),notice=document.createElement('p');notice.setAttribute('role','status');review.className='assignment-review';
-          const nav=document.createElement('nav');nav.className='pagination';
-          let page=1,query='',serial=0;
-          const active=()=>current()&&picker.isConnected;
-          async function find(){
-            const attempt=++serial;results.replaceChildren();review.replaceChildren();nav.replaceChildren();notice.textContent=t('loading');
-            try{
-              const found=await request(libraryPath('/admin/people',{q:query,page:String(page)}),{epoch});
-              if(!active()||attempt!==serial)return;notice.textContent=found.total?t('assignmentChooseHelp'):t('peopleEmpty');
-              for(const person of found.items){
-                const choice=document.createElement('button');choice.type='button';choice.className='quiet person-choice';
-                choice.textContent=`${person.display_name||t('unnamedPerson')} · ${person.id}`;choice.disabled=!person.can_rename;
-                const option=document.createElement('div');option.className='person-choice-row';option.append(choice);
-                if(!person.can_rename){const reason=document.createElement('p');reason.className='fine';reason.id=`assignment-restricted-${face.id}-${person.id}`;reason.textContent=t('assignmentRestricted');choice.setAttribute('aria-describedby',reason.id);option.append(reason);}
-                choice.addEventListener('click',()=>{
-                  if(!active()||state.busy||attempt!==serial)return;
-                  const text=document.createElement('p');text.textContent=`${t('assignmentReview')}: ${person.display_name||t('unnamedPerson')} · ${person.id}?`;
-                  const confirm=storyButton('confirmAssignment',async()=>{
-                    if(!active()||state.busy||attempt!==serial)return;
-                    state.busy=true;confirm.disabled=true;
-                    try{
-                      await request(libraryPath(`/admin/faces/${face.id}/assignment`),{method:'POST',epoch,body:{person_id:person.id,revision:face.revision,person_revision:person.revision}});
-                      if(active()){await loadAssetFaces();if(!stale(epoch)&&viewer===state.viewerGeneration)$('face-status').textContent=t('assignmentSaved');}
-                    }catch(error){
-                      if(active()){
-                        // Ambiguous writes require fresh server readback; never retry automatically.
-                        serial++;review.replaceChildren();results.replaceChildren();nav.replaceChildren();
-                        notice.textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');
-                        if(error.status===401||error.status===403)await failure(error,epoch);
-                      }
-                    }finally{state.busy=false;}
-                  });
-                  const preview=image.cloneNode();preview.loading='eager';
-                  const actions=document.createElement('div');actions.className='face-confirm';actions.append(confirm,storyButton('cancel',()=>review.replaceChildren()));
-                  review.replaceChildren(preview,text,actions);review.scrollIntoView({block:'nearest'});confirm.focus();
-                });results.append(option);
-              }
-              const previous=storyButton('previous',()=>{if(!state.busy){page--;void find();}}),next=storyButton('next',()=>{if(!state.busy){page++;void find();}});
-              previous.disabled=page===1;next.disabled=page*25>=found.total;
-              const position=document.createElement('span');position.textContent=`${t('page')} ${page} ${t('of')} ${Math.max(1,Math.ceil(found.total/25))}`;
-              nav.append(previous,position,next);
-            }catch(error){if(active()&&attempt===serial){notice.textContent=t(errorStatus(error));await failure(error,epoch);}}
-          }
-          form.append(label,input,search);picker.append(form,notice,results,nav,review,storyButton('closeSelection',()=>picker.remove()));
-          form.addEventListener('submit',event=>{event.preventDefault();if(!state.busy&&active()){query=input.value.trim();page=1;void find();}});
-          void find();input.focus();
+          // One picker per viewer; a previous selection never survives opening another.
+          row.append(personPicker({face,image,current,epoch,onSaved:loadAssetFaces,status:$('face-status'),container:$('face-list')}));
         }));
         if(face.can_assign){
           async function changeFace(action,body){if(!current()||state.busy)return;state.busy=true;try{await request(libraryPath(`/admin/faces/${face.id}/${action}`),{method:'POST',body:{revision:face.revision,...body},epoch});if(current()){await loadAssetFaces();if(!stale(epoch))$('face-status').textContent=t('assignmentSaved');}}catch(error){if(current()){$('face-status').textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');if(error.status===401||error.status===403)await failure(error,epoch);}}finally{state.busy=false;}}
@@ -694,7 +705,7 @@
     $('people-list').replaceChildren();$('people-pages').hidden=true;$('people-status').textContent=t('loading');
     const current=()=>!stale(epoch)&&load===peopleState.load&&library===state.library;
     try{
-      const result=await request(libraryPath('/admin/people',{page:String(peopleState.page),q:peopleState.query}),{epoch});
+      const result=await request(libraryPath('/admin/people',{page:String(peopleState.page),q:peopleState.query,named:peopleState.named}),{epoch});
       if(!current())return;
       peopleState.total=result.total;$('people-status').textContent=result.total?'':t('peopleEmpty');
       for(const person of result.items){
@@ -753,10 +764,47 @@
       $('people-page-label').textContent=`${t('page')} ${peopleState.page} ${t('of')} ${pages}`;
     }catch(error){if(current()){$('people-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
   }
-  $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open)void loadPeople();});
+  async function loadUnassignedFaces(){
+    if(state.locked||$('people-panel').hidden||!$('unassigned-section').open)return;
+    const epoch=state.generation,library=state.library,load=++unassignedState.load;
+    const current=()=>!stale(epoch)&&load===unassignedState.load&&library===state.library&&$('people-panel').open;
+    $('unassigned-list').replaceChildren();$('unassigned-pages').hidden=true;$('unassigned-status').textContent=t('loading');
+    try{
+      const result=await request(libraryPath('/admin/faces',{page:String(unassignedState.page)}),{epoch});
+      if(!current())return;
+      unassignedState.total=result.total;$('unassigned-status').textContent=result.total?'':t('noUnassignedFaces');
+      for(const face of result.items){
+        const row=document.createElement('article');row.className='unassigned-card';row.dataset.faceId=face.id;
+        const image=document.createElement('img');image.className='assignment-crop';image.alt=`${t('unassigned')} ${face.id}`;image.src=libraryPath(`/faces/${face.id}/crop`);image.loading='lazy';
+        image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+        const source=document.createElement('h4');source.textContent=`${t('unassigned')} · ${t('sourcePhoto')} ${face.asset_id}`;
+        row.append(image,source);
+        // Assigning here keeps one assignment path: the same picker, revision and
+        // conflict rules as the per-photo review. The row leaves on the next load.
+        row.append(storyButton('openPhoto',async()=>{
+          if(!current()||state.locked||state.busy||!abandonStory())return;
+          try{const detail=await request(libraryPath(`/assets/detail/${face.asset_id}`),{epoch});if(current())await openAsset(detail.asset);}
+          catch(error){await failure(error,epoch);}
+        }));
+        row.append(storyButton('choosePerson',()=>{
+          if(!current()||state.busy)return;
+          row.append(personPicker({face,image,current,epoch,onSaved:loadUnassignedFaces,status:$('unassigned-status'),container:$('unassigned-list')}));
+        }));
+        $('unassigned-list').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('unassigned-pages').hidden=result.total===0;
+      $('unassigned-previous').disabled=unassignedState.page===1;$('unassigned-next').disabled=unassignedState.page>=pages;
+      $('unassigned-page-label').textContent=`${t('page')} ${unassignedState.page} ${t('of')} ${pages}`;
+    }catch(error){if(current()){$('unassigned-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
+  $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open){void loadPeople();if($('unassigned-section').open)void loadUnassignedFaces();}});
   $('people-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;peopleState.query=$('people-query').value.trim();peopleState.page=1;void loadPeople();});
+  $('people-named').addEventListener('change',()=>{if(state.busy||state.locked)return;peopleState.named=$('people-named').value;peopleState.page=1;void loadPeople();});
   $('people-previous').addEventListener('click',()=>{if(!state.busy&&peopleState.page>1){peopleState.page--;void loadPeople();}});
   $('people-next').addEventListener('click',()=>{if(!state.busy&&peopleState.page*25<peopleState.total){peopleState.page++;void loadPeople();}});
+  $('unassigned-section').addEventListener('toggle',()=>{if($('unassigned-section').open)void loadUnassignedFaces();});
+  $('unassigned-previous').addEventListener('click',()=>{if(!state.busy&&unassignedState.page>1){unassignedState.page--;void loadUnassignedFaces();}});
+  $('unassigned-next').addEventListener('click',()=>{if(!state.busy&&unassignedState.page*25<unassignedState.total){unassignedState.page++;void loadUnassignedFaces();}});
   const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('photohouse-session'):null;
   if(channel)channel.onmessage=()=>{if(!state.locked&&!state.busy){suspendDraft();if(document.hidden)invalidate();else void restoreWithDraft();}};
   $('auth-form').addEventListener('submit',event=>{void signIn(event);});

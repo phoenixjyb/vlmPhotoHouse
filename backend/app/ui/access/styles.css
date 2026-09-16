@@ -40,3 +40,11 @@
 #viewer-filmstrip img{display:block;width:3.5rem;height:3.5rem;object-fit:cover;border-radius:6px}
 .page-jump{display:flex;align-items:center;gap:6px}
 .page-jump input{width:5.5rem;min-width:0;flex:0 0 auto;padding:6px}
+
+/* Owner people panel: the named/unnamed filter stays one unit inside the wrapping
+   search form, and the nested worklist reads as subordinate to the directory. */
+.people-search .people-filter{display:flex;align-items:center;gap:.4rem;flex-wrap:nowrap}
+.people-search .people-filter label{flex-basis:auto}
+.people-section{margin-top:1rem;padding-left:1rem;border-left:2px solid var(--line)}
+.people-section summary{cursor:pointer;color:var(--accent)}
+#unassigned-list .unassigned-card{padding:1rem 0;border-top:1px solid var(--line);overflow-wrap:anywhere;display:flex;flex-direction:column;gap:.4rem;align-items:flex-start}

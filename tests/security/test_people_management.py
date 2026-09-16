@@ -286,4 +286,81 @@ class PeopleTests(unittest.TestCase):
         self.assertEqual(self.client.post(path,json=body,headers={'Origin':'https://photohouse.test','X-CSRF-Token':csrf_token(self.owner)}).status_code,200)
 
 
+    def test_name_filter_selects_named_and_unnamed_clusters(self):
+        self.assignment_fixture()
+        self.f.mutate("INSERT INTO persons(id,display_name,face_count) VALUES(8,'',1)")
+        self.f.mutate('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(81,101,8,0,0,1,1)')
+        every=self.get().json();self.assertEqual(every['total'],4)
+        named=self.get('/admin/people?library=family-a&named=named').json()
+        unnamed=self.get('/admin/people?library=family-a&named=unnamed').json()
+        self.assertEqual([p['id'] for p in named['items']],['1','4','7'])
+        self.assertEqual([p['id'] for p in unnamed['items']],['8'])
+        self.assertEqual(named['total'],3);self.assertEqual(unnamed['total'],1)
+        # The filter composes with the literal search instead of replacing it.
+        self.assertEqual(self.get('/admin/people?library=family-a&named=named&q=家人').json()['total'],1)
+        self.assertEqual(self.get('/admin/people?library=family-a&named=unnamed&q=家人').json()['total'],0)
+        # Unnamed rows stay nameless in the directory and cannot be renamed into shape.
+        self.assertEqual(unnamed['items'][0]['display_name'],'')
+        self.assertEqual(unnamed['items'][0]['face_count'],1)
+        for value in ('maybe','NAMED','1','0',''):
+            self.assertEqual(self.get('/admin/people?library=family-a&named='+value).status_code,400)
+        self.assertEqual(self.get('/admin/people?library=family-a&named=named&named=all').status_code,400)
+
+    def test_unassigned_worklist_is_scoped_bounded_and_hides_biometrics(self):
+        self.assignment_fixture()
+        result=self.get('/admin/faces?library=family-a');self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json()['total'],1)
+        self.assertEqual([item['id'] for item in result.json()['items']],['12'])
+        item=result.json()['items'][0]
+        self.assertEqual((item['asset_id'],item['person_id'],item['display_name']),('101',None,None))
+        self.assertTrue(item['can_assign']);self.assertRegex(item['revision'],'^[0-9a-f]{64}$')
+        for forbidden in ('embedding','bbox','private-vector','label_score'):
+            self.assertNotIn(forbidden,result.text)
+        self.assertEqual(result.headers['cache-control'],'no-store')
+        # A face on a foreign, unmapped or deleted asset is not this library's work.
+        for asset in (201,999,103):
+            self.f.mutate('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(?,?,NULL,0,0,1,1)',(asset+500,asset))
+        self.assertEqual(self.get('/admin/faces?library=family-a').json()['total'],1)
+        with self.f.connection() as db:
+            for face in range(200,230):
+                db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(?,101,NULL,0,0,1,1)',(face,))
+            db.commit()
+        first=self.get('/admin/faces?library=family-a').json()
+        second=self.get('/admin/faces?library=family-a&page=2').json()
+        self.assertEqual((first['total'],len(first['items']),len(second['items'])),(31,25,6))
+        self.assertEqual(len({item['id'] for item in first['items']+second['items']}),31)
+        for path in ('/admin/faces?library=family-a&unassigned=1','/admin/faces?library=family-a&page=0',
+                     '/admin/faces?library=family-a&named=unnamed','/admin/faces'):
+            self.assertEqual(self.get(path).status_code,400)
+        self.assertEqual(self.get('/admin/faces?library=family-b').status_code,401)
+
+    def test_unassigned_worklist_denies_before_reading_faces(self):
+        for token in (self.f.member_token,self.f.other_token,'a'*43):
+            self.f.trace.clear()
+            self.assertEqual(self.get('/admin/faces?library=family-a',token=token).status_code,401)
+            self.assertFalse(any('FROM face_detections' in sql for sql in self.f.trace))
+        self.f.mutate("UPDATE access_memberships SET role='contributor' WHERE account_id=?",(self.f.member_id,))
+        self.assertEqual(self.get('/admin/faces?library=family-a',token=self.f.member_token).status_code,401)
+        self.assertEqual(self.client.get('/admin/faces?library=family-a').status_code,401)
+
+    def test_assigning_from_the_worklist_clears_it_and_unassigning_returns_it(self):
+        self.assignment_fixture()
+        record=self.get('/admin/faces?library=family-a').json()['items'][0]
+        person=self.person(7)
+        response=self.assign({'person_id':'7','revision':record['revision'],
+                              'person_revision':person['revision']},face=12)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(self.get('/admin/faces?library=family-a').json()['total'],0)
+        back=self.client.post('/admin/faces/12/unassign?library=family-a',
+            headers={'Authorization':'Bearer '+self.owner},json={'revision':response.json()['revision']})
+        self.assertEqual(back.status_code,200)
+        worklist=self.get('/admin/faces?library=family-a').json()
+        self.assertEqual(worklist['total'],1)
+        self.assertEqual(worklist['items'][0]['person_id'],None)
+        # The worklist exposes a live revision, so a stale one from before the round trip is refused.
+        self.assertNotEqual(worklist['items'][0]['revision'],record['revision'])
+        self.assertEqual(self.assign({'person_id':'7','revision':record['revision'],
+                                      'person_revision':person['revision']},face=12).status_code,409)
+
+
 if __name__=='__main__': unittest.main()
