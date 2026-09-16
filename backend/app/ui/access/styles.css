@@ -52,3 +52,13 @@
 #directory-list .directory-card{margin:0;padding:.75rem;border:1px solid var(--line);border-radius:8px;width:9rem;overflow-wrap:anywhere}
 #directory-list .directory-card h3{margin:.5rem 0 .2rem;font-size:1rem}
 #directory-list .directory-crop{width:100%;height:7rem;object-fit:cover;border-radius:6px;background:var(--line)}
+/* Member tag catalog: read-only chips, plus the photos of the selected tag. Rows keep
+   their own classes so the owner-side card counts stay unambiguous. */
+#tag-list{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+#tag-list .tag-card{margin:0;padding:.4rem .6rem;border:1px solid var(--line);border-radius:999px;display:flex;align-items:center;gap:.5rem;overflow-wrap:anywhere}
+#tag-list .tag-card.tag-selected{border-color:var(--accent)}
+#tag-list .tag-name{padding:0;border:0;background:none;color:inherit;cursor:pointer}
+#tag-assets{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem}
+#tag-assets h4{flex-basis:100%;margin:0}
+#tag-assets .tag-asset-card{margin:0;padding:.75rem;border:1px solid var(--line);border-radius:8px;width:11rem;display:flex;flex-direction:column;gap:.5rem;align-items:flex-start}
+#tag-assets .tag-asset-crop{width:100%;height:8rem;object-fit:cover;border-radius:6px;background:var(--line)}

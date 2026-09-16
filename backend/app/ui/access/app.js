@@ -15,6 +15,7 @@
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
   const peopleState={page:1,total:0,load:0,query:'',named:'all'};
   const directoryState={page:1,total:0,load:0,query:''};
+  const tagState={page:1,total:0,load:0,query:'',tag:null,tagLoad:0,tagPage:1,tagTotal:0,open:null};
   const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
   const albumState={page:1,total:0,load:0,draft:null};
@@ -40,6 +41,8 @@
   Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
   Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
+  Object.assign(words.en,{tagsInLibrary:'Tags in this library',tagsHelp:'Tags already attached to photos in this library. Read-only: no tag can be added or removed here.',findTag:'Find a tag',noTagsInLibrary:'No tags in this library yet.',assetsCount:'photos',tagAssets:'Photos with this tag',noTaggedAssets:'No photo in this library carries this tag.',clearTag:'Close'});
+  Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
   function resetStoryEditor(){
@@ -123,6 +126,8 @@
     unassignedState.page=1;$('unassigned-list').replaceChildren();
     directoryState.page=1;directoryState.query='';directoryState.total=0;
     $('directory-query').value='';$('directory-list').replaceChildren();$('directory-status').textContent='';$('directory-pages').hidden=true;
+    tagState.page=1;tagState.query='';tagState.total=0;tagState.tag=null;tagState.tagPage=1;tagState.tagTotal=0;tagState.open=null;
+    $('tag-query').value='';$('tag-list').replaceChildren();$('tag-status').textContent='';$('tag-pages').hidden=true;$('tag-assets').replaceChildren();
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -406,6 +411,7 @@
       status('');
       if(!$('members-panel').hidden&&$('members-panel').open)void loadMembers();
       if($('directory-panel').open)void loadDirectory();
+      if($('tags-panel').open)void loadTags();
       if(!$('people-panel').hidden&&$('people-panel').open)void loadPeople();
       $('album-create').hidden=state.profile?.memberships.find(m=>m.library_id===state.library&&m.available)?.role!=='owner';
       if($('albums-panel').open)void loadAlbums();
@@ -418,7 +424,7 @@
     try {
       const profile=await request('/auth/session',{epoch});
       if(stale(epoch))return;
-      if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';directoryState.page=1;directoryState.query='';$('directory-query').value='';}
+      if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';directoryState.page=1;directoryState.query='';$('directory-query').value='';tagState.page=1;tagState.query='';tagState.tag=null;tagState.open=null;$('tag-query').value='';$('tag-assets').replaceChildren();}
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
       const available=profile.memberships.filter(m=>m.available===true);
@@ -802,6 +808,72 @@
       $('directory-page-label').textContent=`${t('page')} ${directoryState.page} ${t('of')} ${pages}`;
     }catch(error){if(current()){$('directory-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
   }
+  // Member-facing tag catalog. Read-only by construction: both routes are GET-only and
+  // the server returns a name plus a count of this library's own photos, so there is no
+  // add, rename or remove control here and nothing to submit.
+  async function loadTags(){
+    if(state.locked||!$('tags-panel').open)return;
+    const epoch=state.generation,library=state.library,load=++tagState.load;
+    $('tag-list').replaceChildren();$('tag-pages').hidden=true;$('tag-status').textContent=t('loading');
+    const current=()=>!stale(epoch)&&load===tagState.load&&library===state.library&&$('tags-panel').open;
+    try{
+      const result=await request(libraryPath('/tags',{page:String(tagState.page),q:tagState.query}),{epoch});
+      if(!current())return;
+      tagState.total=result.total;$('tag-status').textContent=result.total?'':t('noTagsInLibrary');
+      for(const tag of result.items){
+        const row=document.createElement('article');row.className='tag-card';row.dataset.tagId=tag.id;
+        if(tagState.open===tag.id)row.classList.add('tag-selected');
+        const button=document.createElement('button');button.type='button';button.className='quiet tag-name';
+        button.textContent=tag.name;
+        const count=document.createElement('small');count.textContent=`${tag.asset_count} ${t('assetsCount')}`;
+        row.append(button,count);
+        button.addEventListener('click',()=>{
+          if(state.busy||state.locked)return;
+          tagState.tag=tag.id;tagState.tagPage=1;
+          for(const other of $('tag-list').children)other.classList.remove('tag-selected');
+          row.classList.add('tag-selected');
+          void loadTagAssets();
+        });
+        $('tag-list').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('tag-pages').hidden=result.total===0;
+      $('tag-previous').disabled=tagState.page===1;$('tag-next').disabled=tagState.page>=pages;
+      $('tag-page-label').textContent=`${t('page')} ${tagState.page} ${t('of')} ${pages}`;
+    }catch(error){if(current()){$('tag-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
+  async function loadTagAssets(){
+    if(state.locked||tagState.tag===null||!$('tags-panel').open)return;
+    const epoch=state.generation,library=state.library,tag=tagState.tag,load=++tagState.tagLoad;
+    $('tag-assets').replaceChildren();
+    const current=()=>!stale(epoch)&&load===tagState.tagLoad&&tag===tagState.tag&&library===state.library;
+    try{
+      const result=await request(libraryPath(`/tags/${tag}/assets`,{page:String(tagState.tagPage)}),{epoch});
+      if(!current())return;
+      tagState.tagTotal=result.total;
+      const heading=document.createElement('h4');heading.textContent=t('tagAssets');
+      heading.append(' ',storyButton('clearTag',()=>{
+        tagState.tag=null;tagState.tagTotal=0;tagState.open=null;$('tag-assets').replaceChildren();void loadTags();
+      }));
+      $('tag-assets').append(heading);
+      if(!result.total){const empty=document.createElement('p');empty.className='fine';empty.textContent=t('noTaggedAssets');$('tag-assets').append(empty);}
+      for(const asset of result.items){
+        const row=document.createElement('article');row.className='tag-asset-card';row.dataset.assetId=asset.id;
+        // Only a same-origin thumbnail path is accepted, so no unexpected origin is loaded.
+        if(typeof asset.thumbnail_url==='string'&&asset.thumbnail_url.startsWith('/assets/')){
+          const image=document.createElement('img');image.className='tag-asset-crop';image.loading='lazy';
+          image.alt=`${t('tagAssets')} · ${asset.id}`;
+          image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+          image.src=asset.thumbnail_url;row.append(image);
+        }
+        row.append(storyButton('openPhoto',async()=>{
+          if(!current()||state.locked||state.busy||!abandonStory())return;
+          try{const detail=await request(libraryPath(`/assets/detail/${asset.id}`),{epoch});if(current())await openAsset(detail.asset);}
+          catch(error){await failure(error,epoch);}
+        }));
+        $('tag-assets').append(row);
+      }
+    }catch(error){if(current())await failure(error,epoch);}
+  }
   async function loadUnassignedFaces(){
     if(state.locked||$('people-panel').hidden||!$('unassigned-section').open)return;
     const epoch=state.generation,library=state.library,load=++unassignedState.load;
@@ -839,6 +911,10 @@
   $('directory-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;directoryState.query=$('directory-query').value.trim();directoryState.page=1;void loadDirectory();});
   $('directory-previous').addEventListener('click',()=>{if(!state.busy&&directoryState.page>1){directoryState.page--;void loadDirectory();}});
   $('directory-next').addEventListener('click',()=>{if(!state.busy&&directoryState.page*25<directoryState.total){directoryState.page++;void loadDirectory();}});
+  $('tags-panel').addEventListener('toggle',()=>{if($('tags-panel').open)void loadTags();});
+  $('tag-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;tagState.query=$('tag-query').value.trim();tagState.page=1;void loadTags();});
+  $('tag-previous').addEventListener('click',()=>{if(!state.busy&&tagState.page>1){tagState.page--;void loadTags();}});
+  $('tag-next').addEventListener('click',()=>{if(!state.busy&&tagState.page*25<tagState.total){tagState.page++;void loadTags();}});
   $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open){void loadPeople();if($('unassigned-section').open)void loadUnassignedFaces();}});
   $('people-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;peopleState.query=$('people-query').value.trim();peopleState.page=1;void loadPeople();});
   $('people-named').addEventListener('change',()=>{if(state.busy||state.locked)return;peopleState.named=$('people-named').value;peopleState.page=1;void loadPeople();});

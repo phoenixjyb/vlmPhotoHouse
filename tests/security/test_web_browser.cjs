@@ -756,6 +756,33 @@ let browser;
   await page.screenshot({path:path.join(artifacts,'member-people-directory.png'),fullPage:true});
   await page.locator('#directory-panel > summary').click();
   checkpoint('Member browses the library people directory by name with thumbnails and no owner controls');
+  // Read-only tag catalog. The panel is a sibling of the owner panels, so a member can open
+  // it at all; the counts are this library's own visible photos and nothing else.
+  await page.locator('#tags-panel > summary').click();
+  await page.locator('#tag-list .tag-card').first().waitFor();
+  assert.equal(await page.locator('#tags-panel').isVisible(),true);
+  assert.equal(await page.locator('#tag-list .tag-card').count(),2);
+  const tags=await page.locator('#tag-list .tag-card').allTextContents();
+  assert(tags.some(text=>text.includes('beach')&&text.includes('2')));
+  assert(tags.some(text=>text.includes('cake')&&text.includes('1')));
+  // A tag whose photos belong to another library, and a tag only on a deleted photo, are
+  // neither listed nor probeable: the server refuses them rather than answering empty.
+  const catalogText=await page.locator('#tag-list').textContent();
+  for(const hidden of ['foreign-only','deleted-only'])assert.equal(catalogText.includes(hidden),false);
+  await page.locator('#tag-list .tag-card',{hasText:'beach'}).getByRole('button').click();
+  await page.locator('#tag-assets .tag-asset-card').first().waitFor();
+  assert.equal(await page.locator('#tag-assets .tag-asset-card').count(),2);
+  await page.locator('#tag-assets .tag-asset-card img').first().evaluate(img=>img.decode());
+  // Read-only by construction: the only input and the only form in the panel are the
+  // search box and its submit, so there is no control that could add or remove a tag.
+  assert.equal(await page.locator('#tags-panel input').count(),1);
+  assert.equal(await page.locator('#tags-panel form').count(),1);
+  assert.equal(await page.locator('#tag-assets input').count(),0);
+  assert.equal(await page.locator('#tag-assets form').count(),0);
+  assert.equal(await page.locator('#people-panel').isVisible(),false);
+  await page.screenshot({path:path.join(artifacts,'member-tag-catalog.png'),fullPage:true});
+  await page.locator('#tags-panel > summary').click();
+  checkpoint('Member browses the read-only tag catalog and its photos without tag controls');
   await auth(owner,'+12025550100');
   await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();

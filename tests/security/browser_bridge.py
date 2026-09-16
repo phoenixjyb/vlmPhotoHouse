@@ -42,6 +42,13 @@ try:
         db.execute('INSERT INTO face_detections(id,asset_id,person_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(99,201,2,0,0,1,1)')
         db.execute('INSERT INTO face_detections(id,asset_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(200,102,0,0,1,1)')
         Image.new('RGB',(100,100),'#d2ad89').save(derived/'faces/256/200.jpg')
+        # Read-only tag catalog fixture. Only tags carrying a *visible* family-a photo may ever
+        # reach the member: 201 belongs to family-b and 103 is deleted, so those two are the
+        # negative controls the browser checkpoint asserts are absent.
+        for tag_id,name in ((1,'beach'),(2,'cake'),(3,'foreign-only'),(4,'deleted-only')):
+            db.execute('INSERT INTO tags(id,name,type) VALUES(?,?,?)',(tag_id,name,'caption-auto'))
+        for tag_id,asset in ((1,101),(1,102),(2,101),(3,201),(4,103)):
+            db.execute('INSERT INTO asset_tags(asset_id,tag_id,source) VALUES(?,?,?)',(asset,tag_id,'cap'))
         db.commit()
     print(json.dumps({'ready':True}),flush=True)
     for line in sys.stdin:
