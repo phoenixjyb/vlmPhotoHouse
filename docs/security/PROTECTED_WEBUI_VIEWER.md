@@ -22,6 +22,14 @@ Opening another asset resets zoom and pan. Closing, signing out, changing
 libraries, or hiding the page clears the media through the existing privacy
 lifecycle. Late image-load events cannot repopulate the closed viewer.
 
+Previous/next and slideshow are bounded to the loaded gallery page or album order;
+there is no cross-page fetch. A step commits to the requested item as soon as it is
+requested: the previous photo is dropped before the new detail is read, so a step
+that fails reports *that* item's error state rather than silently keeping the photo
+the user just left. A failed step stops the slideshow, does not advance past the
+requested item, does not retry, and stays recoverable with Previous. This is the
+covered behaviour — it is a deliberate choice, not an accident of ordering.
+
 ## Saved people that cannot be assigned
 
 Story editing is not proof of face-management permission. Face management is

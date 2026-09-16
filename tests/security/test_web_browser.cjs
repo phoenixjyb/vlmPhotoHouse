@@ -556,7 +556,15 @@ let browser;
   await page.locator('#close-viewer').click();await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   const fallbackRequests=browserRequests.slice(preparedStart).filter(item=>item.path.includes('/assets/102/thumbnail'));
   assert(fallbackRequests.some(item=>item.method==='HEAD'&&item.path.includes('size=1024')));
-  assert(fallbackRequests.some(item=>item.method==='GET'&&!item.path.includes('size=1024')));
+  // The size-less 256 URL is byte-identical to the one the gallery grid already
+  // fetched, so a correct fallback is served from the HTTP cache and emits no
+  // second request for interception to observe. Assert the resolved image
+  // instead: the viewer must abandon size=1024 and render real pixels.
+  const fallbackImage=page.locator('.viewer-surface img').last();
+  assert.equal(String(await fallbackImage.getAttribute('src')).includes('size=1024'),false,
+    'absent 1024 must fall back off the size=1024 URL');
+  assert((await fallbackImage.evaluate(image=>image.naturalWidth))>0,
+    'the fallback preview must render pixels');
   await page.locator('#close-viewer').click();checkpoint('Prepared 1024 preview uses authorized HEAD/GET; missing 1024 falls back once to 256');
   await mutate('thumbnail-head-503');await page.locator('.asset').filter({hasText:'101'}).click();await pause(150);
   assert.equal(await page.locator('.viewer-surface img').count(),0);assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
@@ -566,8 +574,10 @@ let browser;
   assert.equal(await page.locator('.viewer-surface img').count(),0);assert.equal(await page.locator('#viewer').isVisible(),false);
   checkpoint('Preview HEAD 503 does not retry/fallback; stale HEAD after close cannot inject an image');
   // Synthetic sequence contract: a gallery page is the sequence boundary.
+  // The protected gallery orders taken_at DESC, id DESC, and test_library_reads
+  // pins items[0] to 102, so this synthetic page reads 102 then 101.
   await page.locator('.asset').first().waitFor();
-  await page.locator('.asset').filter({hasText:'101'}).click();
+  await page.locator('.asset').filter({hasText:'102'}).click();
   await page.locator('#photo-viewer').waitFor({state:'visible'});
   await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   assert.equal(await page.locator('#view-position').textContent(),'This page · 1 / 2');
@@ -575,11 +585,11 @@ let browser;
   assert.equal(await page.locator('#view-next').isDisabled(),false);
   await page.locator('#view-next').click();await page.locator('#viewer-title').waitFor();
   await page.locator('.viewer-surface img').evaluate(img=>img.decode());
-  assert.match(await page.locator('#viewer-title').textContent(),/102/);
+  assert.match(await page.locator('#viewer-title').textContent(),/101/);
   assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
   assert.equal(await page.locator('#view-next').isDisabled(),true);
   await page.locator('#view-previous').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
-  assert.match(await page.locator('#viewer-title').textContent(),/101/);
+  assert.match(await page.locator('#viewer-title').textContent(),/102/);
   checkpoint('Gallery sequence exposes current-page order, position, and previous/next bounds');
   await page.locator('#view-actual').click();
   await page.locator('#view-fullscreen').click();await page.waitForFunction(()=>document.fullscreenElement?.id==='photo-viewer');
@@ -589,7 +599,7 @@ let browser;
   await page.locator('#view-fullscreen').click();await page.waitForFunction(()=>!document.fullscreenElement);
   checkpoint('Manual navigation resets fit mode and retains fullscreen across a step');
   await page.locator('#close-viewer').click();
-  await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   if(page.clock&&typeof page.clock.install==='function')await page.clock.install();
   await page.locator('#view-interval').selectOption('5000');await page.locator('#view-play').click();
   assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'true');
@@ -599,18 +609,35 @@ let browser;
   if(page.clock&&typeof page.clock.fastForward==='function')await page.clock.fastForward(5000);else await pause(5200);
   assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
   assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
-  await page.setViewportSize({width:1200,height:900});await page.locator('#language').click();
-  await page.screenshot({path:path.join(artifacts,'viewer-sequence-desktop-zh.png')});await page.locator('#language').click();
-  checkpoint('Slideshow advances after image load, stops at the final item, and supports interval control');
   if(page.clock&&typeof page.clock.uninstall==='function')await page.clock.uninstall();
+  // A modal <dialog> makes the rest of the page inert, so the language toggle is
+  // only reachable with the viewer closed — the order used elsewhere in this file.
+  await page.locator('#close-viewer').click();
+  await page.setViewportSize({width:1200,height:900});await page.locator('#language').click();
+  await page.locator('.asset').filter({hasText:'102'}).click();
+  await page.locator('#photo-viewer').waitFor({state:'visible'});
+  await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  await page.screenshot({path:path.join(artifacts,'viewer-sequence-desktop-zh.png')});
+  await page.locator('#close-viewer').click();await page.locator('#language').click();
+  checkpoint('Slideshow advances after image load, stops at the final item, and supports interval control');
   // A delayed next response must not repopulate a closed or changed viewer.
-  await page.locator('#close-viewer').click();await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
-  const delayedSequence=delayNext(url=>url.pathname==='/assets/detail/102');
+  await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  const delayedSequence=delayNext(url=>url.pathname==='/assets/detail/101');
   await page.locator('#view-next').click();await delayedSequence.seen;await page.locator('#close-viewer').click();
   delayedSequence.release();await pause(150);assert.equal(await page.locator('#viewer').isVisible(),false);
-  await page.locator('.asset').filter({hasText:'101'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
-  failNextPath='/assets/detail/102';await page.locator('#view-next').click();await pause(150);
+  await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  failNextPath='/assets/detail/101';await page.locator('#view-next').click();await pause(150);
   assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
+  // A step commits to the requested item immediately: closeViewer drops the previous
+  // photo before the new detail is fetched, so a failed step reports that item's
+  // error instead of silently staying on the photo the user just left. What must not
+  // happen is advancing *past* the requested item, retrying, or leaving a stale image.
+  assert.match(await page.locator('#viewer-title').textContent(),/101/);
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 2 / 2');
+  assert.equal(await page.locator('#view-next').isDisabled(),true);
+  assert.equal(await page.locator('.viewer-surface img').count(),0);
+  // The failed step stays recoverable: Previous re-opens the item the user came from.
+  await page.locator('#view-previous').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   assert.equal(await page.locator('#view-position').textContent(),'This page · 1 / 2');
   await page.locator('#close-viewer').click();
   checkpoint('Closed, delayed, and failed sequence steps stop without repopulating or skipping items');

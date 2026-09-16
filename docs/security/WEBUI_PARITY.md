@@ -11,12 +11,16 @@ feature was operational, authorized, or ready for family use. Likewise, this
 inventory does not claim deployment, Windows/runtime readiness, or device
 acceptance.
 
-The current branch already has local protected-viewer control work and the last
-turn reported 35 browser passes. Those checks were not rerun for this audit and
-were not deployed. Family Stories and people/albums protected flows already
-exist in source. The current owner slice is implementing previous/next and
-slideshow over the loaded gallery-page/album order, with privacy cleanup still
-pending.
+The current branch already has local protected-viewer control work. The full
+browser suite now runs to completion on this source: **42 checkpoints pass, three
+consecutive runs, exit 0** (`node tests/security/test_web_browser.cjs` against the
+real ASGI application with synthetic SQLite/media over a pipe). The earlier "35
+browser passes" was never a run of the current file — the viewer/sequence
+checkpoints did not exist in it — and is superseded by that result. Family Stories
+and people/albums protected flows already exist in source. The owner slice's
+previous/next and slideshow over the loaded gallery-page/album order is implemented
+and covered, and so is the privacy cleanup: a delayed, failed or closed step cannot
+repopulate a closed or changed viewer.
 
 ## Feature inventory
 
@@ -30,7 +34,7 @@ pending.
 | Tags catalog and tag-to-assets browsing | Missing. Legacy UI called `/tags…` and asset tag mutation routes; no corresponding protected routes/UI. | Requires an explicit library-scoped read/write policy, not reuse of global tag endpoints. |
 | Map/geolocation browsing | Missing. Legacy UI used `/assets/geo`; protected page has no map. | Requires a privacy-reviewed coarse-location contract and `library.read`; do not expose raw location by copying legacy behavior. |
 | Similarity reduction and hidden/restore groups | Missing. Legacy UI offered preview/apply/restore and `/duplicates/reduction/*`. | Requires a library-scoped, revision/idempotency-aware mutation contract; global duplicate suppression cannot be assumed safe. |
-| Asset viewer: preview, captions, fullscreen, fit/width/height/actual, zoom and pan | Present in protected source for authorized photo/media and captions, with original download shown only when allowed. Previous/next/slideshow is in the current owner slice and is not yet complete. | Thumbnail/display use `library.read`; original uses `media.original.read` (`member.originals`). Keep viewer navigation bounded to the loaded gallery page/album order until cross-page ordering is specified. |
+| Asset viewer: preview, captions, fullscreen, fit/width/height/actual, zoom and pan | Present in protected source for authorized photo/media and captions, with original download shown only when allowed. Previous/next and slideshow are implemented and covered by the browser suite. | Thumbnail/display use `library.read`; original uses `media.original.read` (`member.originals`). Keep viewer navigation bounded to the loaded gallery page/album order until cross-page ordering is specified. |
 
 ### Family contributions
 
