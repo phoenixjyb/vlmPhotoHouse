@@ -1,12 +1,42 @@
-# Protected native profile 2.0.0-candidate.3
+# Protected native profile 2.0.0-candidate.4
 
-Backend source: `37979480415ba50180804a9c8e2032ff826009ed`.
+Backend source: `99078f1d127d5577b2548cc202dc75593ce77ab3`.
 Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.4
+
+`2.0.0-candidate.3` pinned source `3797948`. Opening the people directory to
+ordinary library members adds one member-scoped read route, `GET /people`, so
+`backend/app/access/people.py` (route and service) and
+`backend/app/access/boundary.py` (the closed-boundary allowlist entry) both changed
+again. The pinned `backend/app/**` closure count is unchanged at 99 files; two
+source hashes moved and none were added or removed.
+
+Like candidate.3 and unlike candidate.2, this slice adds a route, and the route is
+again **outside the wire surface this pack documents**. The 60 captured ASGI
+exchanges cover 28 paths — accounts, gallery, asset detail, captions, stories,
+search, members, invitations, upload and voice — and none of them is `/people`,
+`/admin/*` or `/faces/*`. Member-visible people browsing is a protected-WebUI
+capability, not part of the native client profile. Re-capturing all 60 exchanges
+against the new source reproduced `cases.json` byte for byte except for the version
+string. A client already tested against candidate.3 needs no rework.
+
+The new route is narrower than the owner one it sits beside, which is worth stating
+because "member-visible" would otherwise read as "the owner view, loosened". It is
+gated on `library.read`, so every approved role may read it. It returns **only named
+persons**, so an unnamed clustering artifact is never exposed; a person with no
+active face in the selected library is omitted, so a person owned by another library
+cannot surface even when it holds faces in this one; and each row carries a name, a
+count and one thumbnail URL pointing at the already member-scoped crop route — no
+revision, no rename affordance, no vector, bbox or embedding field. Nothing about
+it is writable. The pack's `client_profile_defaults` remain off. Candidate.3 was
+never adopted; this reissue supersedes it as the reviewed candidate and still
+requires explicit coordinator adoption.
 
 ## Reissue — 2.0.0-candidate.3
 

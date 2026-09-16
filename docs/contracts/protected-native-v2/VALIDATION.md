@@ -1,5 +1,94 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.4 — reissue after the member people-directory source slice
+
+Source baseline: `99078f1d127d5577b2548cc202dc75593ce77ab3`.
+Branch: `master`, local and unpushed.
+
+This reissue moves the pinned source closure and the pack version. Opening the people
+directory to ordinary library members adds one member-scoped read route, `GET /people`,
+so `backend/app/access/people.py` (the route, the service method and a narrower
+presenter) and `backend/app/access/boundary.py` (the closed-boundary allowlist entry
+that admits it) both changed again.
+
+Like candidate.3, this slice adds a route, and the route is again outside the wire
+surface this pack documents. The 60 captured ASGI exchanges cover 28 paths — accounts,
+gallery, asset detail, captions, stories, search, members, invitations, upload and
+voice — and none of them is `/people`, `/admin/*` or `/faces/*`. Member-visible people
+browsing is a protected-WebUI capability, not part of the native client profile.
+
+**Wire neutrality was measured, not assumed.** `cases.json` was regenerated from a live
+capture against the new source and differs from the candidate.3 file by exactly one
+line — the version string. Every one of the 60 exchanges, including status codes,
+selected headers and normalized bodies, is identical. A client already tested against
+candidate.3 needs no rework.
+
+The new route is narrower than the owner route beside it, which matters because
+"member-visible" would otherwise read as "the owner view, loosened". It is gated on
+`library.read`, so every approved role may read it, and it returns **only named
+persons** — an unnamed clustering artifact is never exposed. A person with no active
+face in the selected library is omitted, so a person owned by another library cannot
+surface even when it holds faces in this one. Each row carries a name, a face count and
+one thumbnail URL pointing at the already member-scoped crop route; it carries no
+revision, no rename affordance and no vector, bbox or embedding field. Nothing in it is
+writable. Both narrowings are asserted, and both assertions were mutation-tested (see
+below).
+
+```sh
+PYTHONPATH=tests/security:backend python -m unittest \
+  test_protected_native_contract test_access_foundation test_access_transport \
+  test_library_reads test_family_stories.FamilyStoryTests \
+  test_protected_photo_delivery test_closed_application
+```
+
+**134 tests passed**, no skips — the same runner count as candidate.3, including seven
+contract tests and the complete replay comparison of 60 captured ASGI exchanges.
+Synthetic and in-process; no network listener.
+
+Wall-clock is deliberately not quoted as a comparison figure: this host was running an
+unrelated test suite in another session throughout (load average 14–19), so the same
+battery measured 41.7 s here against 17.6 s on an idle host for candidate.3. The count
+is the stable fact, not the elapsed time.
+
+`python3 scripts/verify_protected_native_contract.py`:
+`PASS 2.0.0-candidate.4: 60 cases; 99 source hashes; 7 payload hashes; profile
+defaults off`.
+
+Closure count is unchanged at 99: two changed (`boundary.py`, `people.py`), none added
+and none removed. All 99 source hashes were independently compared with
+`git show 99078f1:<path>` while building the manifest — 0 worktree mismatches and
+0 git-blob mismatches. The database migration head remains `d8e5b2f7a904` and
+`backend/app/access/library.py` remains byte-identical to the frozen v1 backend,
+SHA-256 `5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe`.
+
+The whole `tests/security` tree was run on both sides to attribute the failure set
+rather than count it: **788 passed / 3 failed / 7 skipped** on this source versus
+**783 passed / 3 failed / 7 skipped** at `33c42c6` in a clean control worktree. The
+three failing node ids are identical on both sides (the sandbox cannot inspect
+processes with `/bin/ps`, and one pre-existing full-suite order dependence), and the
+5 extra passes are this slice's new people-directory tests. The pack reissue itself
+adds no test outcome. Elapsed times for both runs are inflated by the unrelated host
+load described above and are not reported.
+
+The protected-WebUI browser suite is **47 checkpoints, exit 0** (was 46), one of them
+new: a plain viewer — not the owner — opens the directory, sees a real name and a
+decoding face thumbnail, pages to the end while every owner panel stays hidden, and
+sees no blank name on either page. That last assertion is the leak detector: an unnamed
+cluster renders as an empty heading.
+
+**Both narrowings were mutation-tested, so the tests are known to be able to fail.**
+Re-gating the route on `library.people.manage` made four tests fail. Removing the
+`display_name <> ''` clause leaked the unnamed cluster and failed both the Python test
+(`4 != 3`) and the browser checkpoint (the first card became person `50`, the unnamed
+cluster, instead of person `1`).
+
+Deploy gap: the payload allowlist is unchanged and the gap stays at **11 files
+(9 M, 2 A)** against the deployed `4022a57`. All five allowlisted files this slice
+changes (`access/boundary.py`, `access/people.py`, `ui/access/{app.js,index.html,styles.css}`)
+were already in the gap, so the bytes moved without the count moving — the same
+distinction candidate.3 recorded. The pack itself is not in the payload allowlist, so
+this reissue never moves the gap.
+
 ## 2.0.0-candidate.3 — reissue after the owner-tools source slice
 
 Source baseline: `37979480415ba50180804a9c8e2032ff826009ed`.
