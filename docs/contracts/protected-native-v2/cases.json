@@ -1,0 +1,1686 @@
+{
+  "contract_version": "2.0.0-candidate.1",
+  "synthetic_only": true,
+  "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
+  "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim",
+  "cases": [
+    {
+      "id": "anonymous_session",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "none",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "anonymous_library",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a",
+        "credential": "none",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "registration_requires_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/auth/register",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "Test1234",
+          "code": "00000000000000000000000000000000",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "owner_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/invitations",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "code": "11111111-22222222-33333333-44444444",
+          "expires_in": 86400
+        }
+      }
+    },
+    {
+      "id": "registration_password_7",
+      "request": {
+        "method": "POST",
+        "path": "/auth/register",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "aaaaaaa",
+          "code": "11111111-22222222-33333333-44444444",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "registration_password_129",
+      "request": {
+        "method": "POST",
+        "path": "/auth/register",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "code": "11111111-22222222-33333333-44444444",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "invited_registration_8",
+      "request": {
+        "method": "POST",
+        "path": "/auth/register",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "Test1234",
+          "code": "11111111-22222222-33333333-44444444",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "expires_in": 86400,
+          "access_token": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+          "token_type": "Bearer"
+        }
+      }
+    },
+    {
+      "id": "login_8",
+      "request": {
+        "method": "POST",
+        "path": "/auth/login",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "Test1234",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "expires_in": 86400,
+          "access_token": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+          "token_type": "Bearer"
+        }
+      }
+    },
+    {
+      "id": "native_login_rejects_origin",
+      "request": {
+        "method": "POST",
+        "path": "/auth/login",
+        "credential": "none",
+        "headers": {
+          "Origin": "https://photohouse.test"
+        },
+        "json": {
+          "phone": "+12025550105",
+          "password": "Test1234",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "invited_viewer_session",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "account_id": "00000000-0000-0000-0000-000000000004",
+          "phone_login": "+12025550105",
+          "memberships": [
+            {
+              "library_id": "family-a",
+              "status": "approved",
+              "role": "viewer",
+              "revision": 1,
+              "expires_at": null,
+              "originals": 0,
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bearer_rejects_origin",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Origin": "https://photohouse.test"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "viewer_cannot_invite",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-a/invitations",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "phone": "+12025550106"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "other_owner_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-b/invitations",
+        "credential": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "code": "22222222-33333333-44444444-55555555",
+          "expires_in": 86400
+        }
+      }
+    },
+    {
+      "id": "owner_cancel_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-b/invitations/cancel",
+        "credential": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "headers": {},
+        "json": {
+          "code": "22222222-33333333-44444444-55555555"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "id": "cancelled_invitation_denied",
+      "request": {
+        "method": "POST",
+        "path": "/auth/invitations/accept",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "code": "22222222-33333333-44444444-55555555"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "replacement_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/libraries/family-b/invitations",
+        "credential": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "code": "33333333-44444444-55555555-66666666",
+          "expires_in": 86400
+        }
+      }
+    },
+    {
+      "id": "existing_account_accepts_invitation",
+      "request": {
+        "method": "POST",
+        "path": "/auth/invitations/accept",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "code": "33333333-44444444-55555555-66666666"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "id": "accepted_second_library_session",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "account_id": "00000000-0000-0000-0000-000000000004",
+          "phone_login": "+12025550105",
+          "memberships": [
+            {
+              "library_id": "family-a",
+              "status": "approved",
+              "role": "viewer",
+              "revision": 1,
+              "expires_at": null,
+              "originals": 0,
+              "available": true
+            },
+            {
+              "library_id": "family-b",
+              "status": "approved",
+              "role": "viewer",
+              "revision": 1,
+              "expires_at": null,
+              "originals": 0,
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "owner_member_list",
+      "request": {
+        "method": "GET",
+        "path": "/libraries/family-a/members?page=1&page_size=10",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 10,
+          "total": 3,
+          "items": [
+            {
+              "account_id": "00000000-0000-0000-0000-000000000001",
+              "phone_login": "+12025550100",
+              "status": "approved",
+              "role": "owner",
+              "revision": "1",
+              "expires_at": null,
+              "available": true
+            },
+            {
+              "account_id": "00000000-0000-0000-0000-000000000002",
+              "phone_login": "+12025550102",
+              "status": "approved",
+              "role": "viewer",
+              "revision": "1",
+              "expires_at": null,
+              "available": true
+            },
+            {
+              "account_id": "00000000-0000-0000-0000-000000000004",
+              "phone_login": "+12025550105",
+              "status": "approved",
+              "role": "viewer",
+              "revision": "1",
+              "expires_at": null,
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_page_one",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&page=1&page_size=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 1,
+          "total": 2,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "102",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02",
+              "thumbnail_url": "/assets/102/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_page_two",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&page=2&page_size=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 2,
+          "page_size": 1,
+          "total": 2,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "101",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-01",
+              "thumbnail_url": "/assets/101/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_duplicate_query",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&page=1&page=2",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid request"
+        }
+      }
+    },
+    {
+      "id": "asset_detail",
+      "request": {
+        "method": "GET",
+        "path": "/assets/detail/101?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "originals_allowed": false,
+          "asset": {
+            "id": "101",
+            "kind": "image",
+            "width": 640,
+            "height": 480,
+            "duration_sec": null,
+            "taken_at": "2026-01-01",
+            "thumbnail_url": "/assets/101/thumbnail?library=family-a"
+          }
+        }
+      }
+    },
+    {
+      "id": "foreign_asset",
+      "request": {
+        "method": "GET",
+        "path": "/assets/detail/201?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "captions",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/captions?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "asset_id": "101",
+          "has_more": false,
+          "items": [
+            {
+              "id": "101",
+              "text": "caption-101",
+              "truncated": false,
+              "user_edited": false,
+              "created_at": "2026-01-01 00:00:00",
+              "updated_at": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cached_thumbnail",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/thumbnail?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store",
+          "accept-ranges": "bytes"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDqaKKK4DE//9k=",
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      }
+    },
+    {
+      "id": "thumbnail_head",
+      "request": {
+        "method": "HEAD",
+        "path": "/assets/101/thumbnail?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store",
+          "accept-ranges": "bytes"
+        },
+        "body": null
+      }
+    },
+    {
+      "id": "display_without_provider",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/display?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Photo delivery unavailable"
+        }
+      }
+    },
+    {
+      "id": "display_library_read",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/display?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDqaKKK4DE//9k=",
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      }
+    },
+    {
+      "id": "thumbnail_on_demand",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/thumbnail?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDqaKKK4DE//9k=",
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      }
+    },
+    {
+      "id": "original_without_grant",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "original_range",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=0-15"
+        }
+      },
+      "response": {
+        "status": 206,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store",
+          "content-range": "bytes 0-15/632",
+          "accept-ranges": "bytes"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "/9j/4AAQSkZJRgABAQAAAQ==",
+          "sha256": "a9daccaecd68e446d76070cc759afcfb3b85f593361f2ab8daf19004e2c687b9",
+          "bytes": 16
+        }
+      }
+    },
+    {
+      "id": "original_if_range_full",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=0-15",
+          "If-Range": "synthetic-weak-validator"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "image/jpeg",
+          "cache-control": "no-store",
+          "accept-ranges": "bytes"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDqaKKK4DE//9k=",
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      }
+    },
+    {
+      "id": "original_invalid_range",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=0-1,4-5"
+        }
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid range"
+        }
+      }
+    },
+    {
+      "id": "original_range_eof",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=999999-"
+        }
+      },
+      "response": {
+        "status": 416,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+          "content-range": "bytes */632"
+        },
+        "body": {
+          "detail": "Range not satisfiable"
+        }
+      }
+    },
+    {
+      "id": "missing_original",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 404,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Media unavailable"
+        }
+      }
+    },
+    {
+      "id": "story_create_1",
+      "request": {
+        "method": "POST",
+        "path": "/assets/101/stories?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "title": "Memory 1",
+          "text": "A family story. 奶奶的花园。",
+          "byline": "Synthetic author",
+          "language": "mixed",
+          "mutation_id": "00000000-0000-0000-0000-0000000000c9"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "title": "Memory 1",
+          "text": "A family story. 奶奶的花园。",
+          "language": "mixed",
+          "byline": "Synthetic author",
+          "author_id": "00000000-0000-0000-0000-000000000001",
+          "revision": 1,
+          "created_at": 2000000000,
+          "updated_at": 2000000000,
+          "asset_id": "101",
+          "deleted": false,
+          "can_edit": true,
+          "can_view_history": true,
+          "source": "family"
+        }
+      }
+    },
+    {
+      "id": "story_list_page_one",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/stories?library=family-a&page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "asset_id": "101",
+          "library_id": "family-a",
+          "page": 1,
+          "can_create": false,
+          "has_more": true,
+          "items": [
+            {
+              "id": "00000000-0000-0000-0000-000000000065",
+              "title": "Memory 1",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000066",
+              "title": "Memory 2",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000067",
+              "title": "Memory 3",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000068",
+              "title": "Memory 4",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000069",
+              "title": "Memory 5",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "story_list_page_two",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/stories?library=family-a&page=2",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "asset_id": "101",
+          "library_id": "family-a",
+          "page": 2,
+          "can_create": false,
+          "has_more": false,
+          "items": [
+            {
+              "id": "00000000-0000-0000-0000-00000000006a",
+              "title": "Memory 6",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "author_id": "00000000-0000-0000-0000-000000000001",
+              "revision": 1,
+              "created_at": 2000000000,
+              "updated_at": 2000000000,
+              "asset_id": "101",
+              "deleted": false,
+              "can_edit": false,
+              "can_view_history": false,
+              "source": "family"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "viewer_cannot_create_story",
+      "request": {
+        "method": "POST",
+        "path": "/assets/101/stories?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "title": "Memory 1",
+          "text": "A family story. 奶奶的花园。",
+          "byline": "Synthetic author",
+          "language": "mixed",
+          "mutation_id": "00000000-0000-0000-0000-0000000000c9"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "viewer_cannot_read_history",
+      "request": {
+        "method": "GET",
+        "path": "/stories/00000000-0000-0000-0000-000000000065/history?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "story_update",
+      "request": {
+        "method": "PUT",
+        "path": "/stories/00000000-0000-0000-0000-000000000065?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "byline": "Synthetic author",
+          "language": "mixed",
+          "mutation_id": "00000000-0000-0000-0000-00000000012d",
+          "revision": "1"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "language": "mixed",
+          "byline": "Synthetic author",
+          "author_id": "00000000-0000-0000-0000-000000000001",
+          "revision": 2,
+          "created_at": 2000000000,
+          "updated_at": 2000000000,
+          "asset_id": "101",
+          "deleted": false,
+          "can_edit": true,
+          "can_view_history": true,
+          "source": "family"
+        }
+      }
+    },
+    {
+      "id": "story_stale_update",
+      "request": {
+        "method": "PUT",
+        "path": "/stories/00000000-0000-0000-0000-000000000065?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "byline": "Synthetic author",
+          "language": "mixed",
+          "mutation_id": "00000000-0000-0000-0000-00000000012e",
+          "revision": "1"
+        }
+      },
+      "response": {
+        "status": 409,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "This story changed; keep your draft and reload before saving"
+        }
+      }
+    },
+    {
+      "id": "story_exact_old_retry",
+      "request": {
+        "method": "POST",
+        "path": "/assets/101/stories?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "title": "Memory 1",
+          "text": "A family story. 奶奶的花园。",
+          "byline": "Synthetic author",
+          "language": "mixed",
+          "mutation_id": "00000000-0000-0000-0000-0000000000c9"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "language": "mixed",
+          "byline": "Synthetic author",
+          "author_id": "00000000-0000-0000-0000-000000000001",
+          "revision": 2,
+          "created_at": 2000000000,
+          "updated_at": 2000000000,
+          "asset_id": "101",
+          "deleted": false,
+          "can_edit": true,
+          "can_view_history": true,
+          "source": "family"
+        }
+      }
+    },
+    {
+      "id": "story_history",
+      "request": {
+        "method": "GET",
+        "path": "/stories/00000000-0000-0000-0000-000000000065/history?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "story": {
+            "id": "00000000-0000-0000-0000-000000000065",
+            "title": "Memory 1",
+            "text": "The current story. 奶奶的新故事。",
+            "language": "mixed",
+            "byline": "Synthetic author",
+            "author_id": "00000000-0000-0000-0000-000000000001",
+            "revision": 2,
+            "created_at": 2000000000,
+            "updated_at": 2000000000,
+            "asset_id": "101",
+            "deleted": false,
+            "can_edit": true,
+            "can_view_history": true,
+            "source": "family"
+          },
+          "page": 1,
+          "has_more": false,
+          "items": [
+            {
+              "revision": 2,
+              "title": "Memory 1",
+              "text": "The current story. 奶奶的新故事。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "editor_id": "00000000-0000-0000-0000-000000000001",
+              "occurred_at": 2000000000,
+              "deleted": 0
+            },
+            {
+              "revision": 1,
+              "title": "Memory 1",
+              "text": "A family story. 奶奶的花园。",
+              "language": "mixed",
+              "byline": "Synthetic author",
+              "editor_id": "00000000-0000-0000-0000-000000000001",
+              "occurred_at": 2000000000,
+              "deleted": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "story_search",
+      "request": {
+        "method": "POST",
+        "path": "/library/search?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "text": "新故事",
+          "source": "family",
+          "media": "all",
+          "page": "1"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 24,
+          "total": 1,
+          "items": [
+            {
+              "id": "101",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-01",
+              "thumbnail_url": "/assets/101/thumbnail?library=family-a",
+              "match": {
+                "source": "family",
+                "id": "00000000-0000-0000-0000-000000000065",
+                "excerpt": "Memory 1\nThe current story. 奶奶的新故事。"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "story_delete",
+      "request": {
+        "method": "DELETE",
+        "path": "/stories/00000000-0000-0000-0000-000000000065?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "revision": "2",
+          "mutation_id": "00000000-0000-0000-0000-000000000191"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "language": "mixed",
+          "byline": "Synthetic author",
+          "author_id": "00000000-0000-0000-0000-000000000001",
+          "revision": 3,
+          "created_at": 2000000000,
+          "updated_at": 2000000000,
+          "asset_id": "101",
+          "deleted": true,
+          "can_edit": true,
+          "can_view_history": true,
+          "source": "family"
+        }
+      }
+    },
+    {
+      "id": "story_delete_retry",
+      "request": {
+        "method": "DELETE",
+        "path": "/stories/00000000-0000-0000-0000-000000000065?library=family-a",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {},
+        "json": {
+          "revision": "2",
+          "mutation_id": "00000000-0000-0000-0000-000000000191"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000065",
+          "title": "Memory 1",
+          "text": "The current story. 奶奶的新故事。",
+          "language": "mixed",
+          "byline": "Synthetic author",
+          "author_id": "00000000-0000-0000-0000-000000000001",
+          "revision": 3,
+          "created_at": 2000000000,
+          "updated_at": 2000000000,
+          "asset_id": "101",
+          "deleted": true,
+          "can_edit": true,
+          "can_view_history": true,
+          "source": "family"
+        }
+      }
+    },
+    {
+      "id": "story_deleted_search",
+      "request": {
+        "method": "POST",
+        "path": "/library/search?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "text": "新故事",
+          "source": "family",
+          "media": "all",
+          "page": "1"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 24,
+          "total": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "id": "closed_upload",
+      "request": {
+        "method": "POST",
+        "path": "/upload",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "closed_voice_transcribe",
+      "request": {
+        "method": "POST",
+        "path": "/voice/transcribe",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "closed_auth_refresh",
+      "request": {
+        "method": "POST",
+        "path": "/auth/refresh",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "revoked_session_still_authenticated",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "account_id": "00000000-0000-0000-0000-000000000004",
+          "phone_login": "+12025550105",
+          "memberships": [
+            {
+              "library_id": "family-a",
+              "status": "revoked",
+              "role": "viewer",
+              "revision": 2,
+              "expires_at": null,
+              "originals": 1,
+              "available": false
+            },
+            {
+              "library_id": "family-b",
+              "status": "revoked",
+              "role": "viewer",
+              "revision": 2,
+              "expires_at": null,
+              "originals": 1,
+              "available": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "revoked_story_list",
+      "request": {
+        "method": "GET",
+        "path": "/assets/101/stories?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "native_logout",
+      "request": {
+        "method": "POST",
+        "path": "/auth/logout",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "id": "native_logout_retry",
+      "request": {
+        "method": "POST",
+        "path": "/auth/logout",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "ok": true
+        }
+      }
+    },
+    {
+      "id": "logged_out_session",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "wrong_password",
+      "request": {
+        "method": "POST",
+        "path": "/auth/login",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "incorrect",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "login_rate_limited",
+      "request": {
+        "method": "POST",
+        "path": "/auth/login",
+        "credential": "none",
+        "headers": {},
+        "json": {
+          "phone": "+12025550105",
+          "password": "Test1234",
+          "transport": "native"
+        }
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+          "retry-after": "600"
+        },
+        "body": {
+          "detail": "Try again later"
+        }
+      }
+    },
+    {
+      "id": "expired_session",
+      "request": {
+        "method": "GET",
+        "path": "/auth/session",
+        "credential": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    }
+  ]
+}
