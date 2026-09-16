@@ -1,5 +1,107 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.5 — reissue after the member tag-catalog source slice
+
+Source baseline: `2ced43e3063773d4344c04ba8f5de1d415fd4bf7`.
+Branch: `master`, local and unpushed.
+
+This reissue moves the pinned source closure and the pack version. Opening the read-only
+tag catalog to ordinary library members adds two member-scoped read routes, `GET /tags`
+and `GET /tags/{tag_id}/assets`, and — unlike candidates.3 and .4 — it adds a module:
+`backend/app/access/tags.py`. The closure therefore moves **99 → 100 files**: one added,
+two changed (`backend/app/access/boundary.py` for the two allowlist entries and
+`backend/app/main.py` for the router registration), none removed. A coordinator
+comparing file lists will see a new name, not only new digests.
+
+Like candidates.3 and .4, this slice adds routes, and both are again **outside the wire
+surface this pack documents**. The 60 captured ASGI exchanges cover 28 paths — accounts,
+gallery, asset detail, captions, stories, search, members, invitations, upload and
+voice — and none of them is `/tags`.
+
+**Wire neutrality was measured, not assumed.** `cases.json` was regenerated from a live
+capture against the new source and differs from the candidate.4 file by exactly one
+line — the version string. Every one of the 60 exchanges, including status codes,
+selected headers and normalized bodies, is identical. A client already tested against
+candidate.4 needs no rework.
+
+The two routes are narrower than the retired legacy tag surface they partially answer,
+which matters because "read-only" alone would not say so. Both are gated on
+`library.read`, so every approved role may read them. The catalog returns only tags
+linked to an asset that is active (or status-less) **and** mapped into the selected
+library, and each count counts that library's own visible assets — so another library's
+tag is neither listed nor countable and no global total is revealed. Neither a tag's
+`type` nor a link's `source` (`cap` / `img` / `cap+img` / `manual` / `rule`) is
+returned; legacy `/tags` returned both. A tag with no visible asset in the library is
+refused as access denied rather than answered empty, so tag existence is never
+confirmed to a non-member. The photo list reuses the gallery's library-scoped predicate
+and its asset row, so it adds no second asset or media surface. The module contains no
+POST, PUT or DELETE at all. Both narrowings are asserted, and both assertions were
+mutation-tested (see below).
+
+```sh
+PYTHONPATH=tests/security:backend python -m unittest \
+  test_protected_native_contract test_access_foundation test_access_transport \
+  test_library_reads test_family_stories.FamilyStoryTests \
+  test_protected_photo_delivery test_closed_application
+```
+
+**134 tests passed in 18.035 seconds**, no skips — the same runner count as candidate.4,
+including seven contract tests and the complete replay comparison of 60 captured ASGI
+exchanges. Synthetic and in-process; no network listener.
+
+`python3 scripts/verify_protected_native_contract.py`:
+`PASS 2.0.0-candidate.5: 60 cases; 100 source hashes; 7 payload hashes; profile
+defaults off`.
+
+All 100 source hashes were independently compared with `git show 2ced43e:<path>` while
+building the manifest — 0 worktree mismatches and 0 git-blob mismatches. The database
+migration head remains `d8e5b2f7a904` and `backend/app/access/library.py` remains
+byte-identical to the frozen v1 backend, SHA-256
+`5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe`.
+
+The whole `tests/security` tree was run on both sides with the same runner
+(`python -m unittest discover -s tests/security -t tests/security -p 'test_*.py'`) to
+attribute the failure set rather than count it: **794 passed / 3 failed / 7 skipped**
+(804 collected) on this source versus **788 passed / 3 failed / 7 skipped** (798
+collected) at `d477d71` in a clean control worktree. The three failing node ids are
+identical on both sides — `test_home_library` native-memory observation (`/bin/ps`
+process inspection is unavailable in this sandbox), `test_home_media_profiles`
+large-baseline-JPEG subsampling (host resource observation), and one pre-existing
+full-suite order dependence in `test_suppressed_ownership_repair` — and the 6 extra
+collected tests, all passing, are exactly this slice's six new tag-catalog tests. The
+pack reissue itself adds no test outcome. Elapsed times are not compared: this host
+carried unrelated load (load average 9–21) throughout both runs.
+
+The protected-WebUI browser suite is **48 checkpoints, exit 0** (was 47), one of them
+new: a plain member — not the owner — opens the tag panel, sees exactly the two tags
+that carry visible assets in this library while a foreign-library-only tag and a
+deleted-asset-only tag stay absent, opens one tag and sees its two photos, finds one
+input and one form and no tag *control* in the panel, and sees every owner panel still
+hidden. Counting the visible tags is the leak detector: an over-broad catalog renders
+more than two.
+
+**Both narrowings were mutation-tested, so the tests are known to be able to fail.**
+Removing the active-asset predicate from the catalog's visible-asset CTE let a
+foreign-library tag and a deleted-asset-only tag surface and failed three tests.
+Removing the access-denied precondition on `/tags/{tag_id}/assets` let a non-member
+probe a tag by id and failed
+`test_no_foreign_deleted_or_linkless_tag_is_listed_or_probeable_by_id` with
+`200 != 401`.
+
+Deploy gap — **this slice exposes a gap in the payload allowlist itself.** Against the
+deployed `4022a57`, the allowlisted changed set moves 11 → **12 files (10 M, 2 A)**,
+because `backend/app/main.py` now carries the router registration. Separately,
+`backend/app/access/tags.py` was **not** in the allowlist: the bundle built at this
+source held 87 files including `main.py` (which imports `app.access.tags`) and
+`boundary.py` (which imports `.tags`) but **not** `tags.py` itself — measured, not
+inferred. That payload would have failed at import on the Windows host. The allowlist is
+an explicit closed list in `scripts/build_staging_package.py`, so this is not
+self-healing; it was repaired here by adding the module (bundle now 88 files), and the
+relative-import closure inside `backend/app/**` was re-checked at 0 unresolved imports.
+The correct staging set is therefore **13 files (10 M, 3 A)**, and the host staging
+script's changed-file assertion must list all 13. The pack itself is not in the payload
+allowlist, so this reissue never moves the gap.
+
 ## 2.0.0-candidate.4 — reissue after the member people-directory source slice
 
 Source baseline: `99078f1d127d5577b2548cc202dc75593ce77ab3`.

@@ -1,12 +1,47 @@
-# Protected native profile 2.0.0-candidate.4
+# Protected native profile 2.0.0-candidate.5
 
-Backend source: `99078f1d127d5577b2548cc202dc75593ce77ab3`.
+Backend source: `2ced43e3063773d4344c04ba8f5de1d415fd4bf7`.
 Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.5
+
+`2.0.0-candidate.4` pinned source `99078f1`. Opening the read-only tag catalog to
+ordinary library members adds two member-scoped read routes, `GET /tags` and
+`GET /tags/{tag_id}/assets`. That slice is the first since candidate.1 to change the
+**closure itself**: it adds a new application module, `backend/app/access/tags.py`, so
+the pinned `backend/app/**` closure count moves **99 → 100 files**. Two existing
+source hashes moved (`backend/app/access/boundary.py` for the two allowlist entries,
+`backend/app/main.py` for the router registration) and one was added. This is a
+closure change, not merely a hash change — a coordinator comparing file lists will
+see a new name, not only different digests.
+
+Like candidates.3 and .4, and unlike candidate.2, this slice adds routes, and they are
+again **outside the wire surface this pack documents**. The 60 captured ASGI exchanges
+cover 28 paths — accounts, gallery, asset detail, captions, stories, search, members,
+invitations, upload and voice — and none of them is `/tags`. Re-capturing all 60
+exchanges against the new source reproduced `cases.json` byte for byte except for the
+version string. A client already tested against candidate.4 needs no rework.
+
+The two routes are narrower than the retired legacy tag surface they partially
+answer, which is worth stating because "read-only" alone would not say so. Both are
+gated on `library.read`, so every approved role may read them. The catalog returns
+only tags linked to an asset that is active (or status-less) **and** mapped into the
+selected library, and each count counts that library's own visible assets — so
+another library's tag is neither listed nor countable, and no global total is
+revealed. Neither a tag's `type` nor a link's `source` (`cap` / `img` / `cap+img` /
+`manual` / `rule`) is returned; legacy `/tags` returned both. A tag with no visible
+asset in the library is refused as access denied rather than answered empty, so tag
+existence is never confirmed to a non-member. The photo list reuses the gallery's
+library-scoped predicate and its asset row, so it introduces no second asset or media
+surface. Nothing in either route is writable, and the module contains no POST, PUT or
+DELETE at all. The pack's `client_profile_defaults` remain off. Candidate.4 was never
+adopted; this reissue supersedes it as the reviewed candidate and still requires
+explicit coordinator adoption.
 
 ## Reissue — 2.0.0-candidate.4
 
