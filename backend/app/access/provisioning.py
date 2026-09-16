@@ -49,6 +49,9 @@ class _PlanState:
         if operation == 'import_management_ownership':
             from .management_import import management_state
             return management_state(self, target)
+        if operation == 'repair_suppressed_person_ownership':
+            from .ownership_repair import repair_state
+            return repair_state(self, target)
         if operation == 'bootstrap_owner':
             if set(target) != {'phone_login','library_id'}:
                 raise PlanRejected('Invalid plan')
@@ -139,6 +142,18 @@ class _PlanState:
             'operator_account_id':operator_account_id,'person_ids':[str(i) for i in sorted(person_ids)],
             'album_ids':[str(i) for i in sorted(album_ids)],'include_orphan_people':include_orphan_people,
             'include_empty_albums':include_empty_albums,'quiescence_reference':quiescence_reference})
+
+    def repair_person(self, *, library_id, operator_account_id, person_id, asset_ids,
+                      quiescence_reference, provenance_reference):
+        from .ownership_repair import MAX_ASSETS, OPERATION
+        if (type(person_id) is not int or not isinstance(asset_ids, list)
+                or not 1 <= len(asset_ids) <= MAX_ASSETS or any(type(value) is not int for value in asset_ids)
+                or len(set(asset_ids)) != len(asset_ids)):
+            raise PlanRejected('Explicit person and unique asset IDs required')
+        return self._plan(OPERATION, {'library_id': _library(library_id),
+            'operator_account_id': operator_account_id, 'person_id': str(person_id),
+            'asset_ids': [str(value) for value in sorted(asset_ids)],
+            'quiescence_reference': quiescence_reference, 'provenance_reference': provenance_reference})
 
     def _validate_in_transaction(self, envelope):
         """Caller owns the snapshot or write reservation for all checks and effects."""

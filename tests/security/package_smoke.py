@@ -117,6 +117,37 @@ with ExitStack() as guards:
         operator('apply',*management_args,'--review-digest',reviewed['review_digest'],'--all-writers-stopped')
         assert operator('receipt','--database',recovered,'--plan-id',planned['plan_id'],
             '--reviewed-plan-digest',planned['plan_digest'])['receipt_found']
+        from app.access import ownership_repair
+        assert Path(ownership_repair.__file__).resolve().is_relative_to(root)
+        with ExistingDatabase(recovered)() as connection:
+            connection.execute("INSERT INTO persons(id,display_name,face_count) VALUES (92,'Synthetic target',2)")
+            connection.executemany("INSERT INTO assets(id,path,hash_sha256,status) VALUES (?,?,?,?)",[
+                (93,'synthetic/visible.jpg','synthetic-hash-93','active'),
+                (94,'synthetic/suppressed.jpg','synthetic-hash-94','suppressed')])
+            connection.execute("INSERT INTO access_asset_libraries VALUES (93,'synthetic-family')")
+            connection.executemany("INSERT INTO face_detections(id,asset_id,bbox_x,bbox_y,bbox_w,bbox_h,person_id)"
+                " VALUES (?,?,0,0,1,1,92)",[(931,93),(941,94)])
+            connection.commit()
+        with redirect_stdout(io.StringIO()):
+            assert prepare_access_database.main(['backup','--database',str(recovered),
+                '--out',str(data/'repair-backup.sqlite')])==0
+        request=data/'repair-request.json';plan=data/'repair-plan.json'
+        request.write_text(json.dumps({'library_id':'synthetic-family',
+            'operator_account_id':applied['actor_account_id'],'person_id':92,'asset_ids':[94],
+            'quiescence_reference':'synthetic-stopped-workers',
+            'provenance_reference':'synthetic-ownership-review'}))
+        planned=operator('plan-person-repair','--database',recovered,'--request',request,'--out',plan)
+        operator('validate','--database',recovered,'--plan',plan)
+        repair_args=['--database',recovered,'--plan',plan,'--backup',data/'repair-backup.sqlite',
+            '--reviewed-plan-digest',planned['plan_digest'],'--authority-reference','synthetic-authority',
+            '--restore-reference','synthetic-restore']
+        reviewed=operator('review',*repair_args)
+        operator('apply',*repair_args,'--review-digest',reviewed['review_digest'],'--all-writers-stopped')
+        assert operator('receipt','--database',recovered,'--plan-id',planned['plan_id'],
+            '--reviewed-plan-digest',planned['plan_digest'])['receipt_found']
+        with ExistingDatabase(recovered,read_only=True)() as connection:
+            assert connection.execute("SELECT library_id FROM access_person_libraries WHERE person_id=92").fetchall()==[('synthetic-family',)]
+            assert connection.execute("SELECT status FROM assets WHERE id=94").fetchall()==[('suppressed',)]
 print(json.dumps({'package_smoke':'pass','synthetic_migration_revision':REQUIRED_REVISION,
-    'asgi_checks':7,'operator_commands':14,'database_preparation_commands':9,
+    'asgi_checks':7,'operator_commands':19,'database_preparation_commands':9,
     'listeners_opened':False,'live_data_accessed':False}))

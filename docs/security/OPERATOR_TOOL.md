@@ -46,6 +46,13 @@ the same validate/review/apply/receipt commands, with an additional independent
 all-writer shutdown confirmation for application. It does not migrate a database,
 create accounts or rewrite legacy records.
 
+The separate [suppressed-ownership repair workflow](OWNERSHIP_REPAIR.md) adds
+`plan-person-repair` for one explicitly selected person whose remaining face
+references sit on still-suppressed, unmapped assets. It uses the same
+validate/review/apply/receipt commands and the same independent all-writer
+shutdown confirmation. It does not change asset status, face labels, people
+metadata, media, memberships or queues.
+
 This is a tool for an independently authorized local database administrator.
 Plan seals, digests, CLI flags and audit references are not authentication or
 approval. The operator must first confirm the exact host, existing database,
@@ -63,6 +70,13 @@ local-only task authorization.
   current readers, including already approved original readers, gain visibility
   under their existing permissions when the mapping is applied. No new original
   permission or audience membership is created.
+- `plan-person-repair` reads exactly `library_id`, `operator_account_id`,
+  `person_id`, integer `asset_ids`, `quiescence_reference` and
+  `provenance_reference`. The selected assets must be exactly the still-suppressed,
+  still-unmapped assets that hold the target's remaining references, and the target
+  must already be visible through mapped active faces. Existing ownership, foreign
+  references, missing rows and any selection that would make another person
+  exclusive are refused. See [suppressed-ownership repair](OWNERSHIP_REPAIR.md).
 - `validate` checks a saved plan read-only. `review` checks a separate matching
   backup, rehearses SQLite restoration in memory and returns `applied=false`.
 - `apply` is a separate command. It reconstructs a fresh in-process review and

@@ -141,14 +141,14 @@ def _review_backup(*, database, backup, envelope, reviewed_plan_digest,
     if target_id == backup_id:
         raise PlanRejected('A separate backup is required')
     with ExistingDatabase(database, read_only=True)() as db:
-        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment'):
+        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment', 'repair_suppressed_person_ownership'):
             _offline_restore_source(database, db)
         state = state_type(db, clock=clock)
         with state.access._transaction():
             state._validate_in_transaction(envelope)
             snapshot = _snapshot(db)
     with ExistingDatabase(backup, read_only=True)() as source:
-        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment'):
+        if restore_out is not None or envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment', 'repair_suppressed_person_ownership'):
             _offline_restore_source(backup, source)
         source.execute('BEGIN')
         with _restore_target(restore_out, source) as restored:
@@ -186,7 +186,8 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
     envelope = json.loads(_json(envelope))
     management = envelope['plan']['operation']=='import_management_ownership'
     face_job = envelope['plan']['operation']=='enqueue_face_assignment'
-    offline = management or face_job
+    repair = envelope['plan']['operation']=='repair_suppressed_person_ownership'
+    offline = management or face_job or repair
     if offline and all_writers_stopped is not True:
         raise PlanRejected('Independent all-writer shutdown confirmation required')
     if plan_digest(envelope) != review.plan_digest:
@@ -235,6 +236,9 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                 state._validate_in_transaction(envelope)
                 target = plan['target']
                 library = target['library_id']
+                if repair:
+                    from .ownership_repair import restrict_writes
+                    db.set_authorizer(restrict_writes)
                 if encoded is not None:
                     actor = str(uuid.uuid4())
                     db.execute('INSERT INTO access_accounts(id,phone_login,password_hash) VALUES (?,?,?)',
@@ -253,6 +257,10 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                     elif management:
                         from .management_import import apply_management
                         apply_management(state,target)
+                    elif repair:
+                        from .ownership_repair import apply_repair
+                        apply_repair(state, target)
+                        asset_ids = target['asset_ids']
                     else:
                         db.executemany('INSERT INTO access_asset_libraries(asset_id,library_id) VALUES (?,?)',
                                        ((int(item), library) for item in asset_ids))
@@ -267,6 +275,10 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                 if management:
                     receipt.update(person_ids=target['person_ids'],album_ids=target['album_ids'],
                                    quiescence_reference=target['quiescence_reference'])
+                if repair:
+                    receipt.update(person_ids=[target['person_id']],
+                        quiescence_reference=target['quiescence_reference'],
+                        provenance_reference=target['provenance_reference'], suppression_preserved=True)
                 if face_job:
                     from .face_jobs import seal_receipt
                     seal_receipt(state, receipt, envelope, task_id)
@@ -278,6 +290,12 @@ def apply_reviewed(envelope, *, review, clock=time.time, all_writers_stopped=Fal
                     from .management_import import management_state
                     if management_state(state,target,imported=True)!=plan['expected']:
                         raise PlanRejected('Imported ownership or reviewed state changed')
+                if repair:
+                    from .ownership_repair import repair_state
+                    if repair_state(state, target, repaired=True) != plan['expected']:
+                        raise PlanRejected('Repaired ownership or reviewed state changed')
+                    if db.execute('PRAGMA foreign_key_check').fetchone():
+                        raise PlanRejected('Repair foreign key validation failed')
                 if face_job:
                     from .face_jobs import verify_queued
                     verify_queued(state, plan_id=plan['plan_id'], digest=review.plan_digest,

@@ -99,7 +99,7 @@ def write_new_plan(path, envelope):
 def parser():
     result = Parser(description=__doc__)
     commands = result.add_subparsers(dest='command', required=True)
-    for name in ('plan-owner', 'plan-assets', 'plan-management', 'plan-face-job', 'validate', 'review', 'apply', 'receipt',
+    for name in ('plan-owner', 'plan-assets', 'plan-management', 'plan-face-job', 'plan-person-repair', 'validate', 'review', 'apply', 'receipt',
                  'plan-recovery', 'validate-recovery', 'review-recovery', 'apply-recovery'):
         command = commands.add_parser(name)
         command.add_argument('--database', required=True, type=Path)
@@ -150,6 +150,9 @@ def execute(args, *, clock=time.time):
                         'include_orphan_people','include_empty_albums','quiescence_reference'}
         if args.command == 'plan-face-job':
             expected = {'kind', 'payload', 'quiescence_reference'}
+        if args.command == 'plan-person-repair':
+            expected = {'library_id', 'operator_account_id', 'person_id', 'asset_ids',
+                        'quiescence_reference', 'provenance_reference'}
         if set(request) != expected:
             raise OperatorError('Unexpected request fields')
         with ExistingDatabase(database, read_only=True)() as connection:
@@ -162,6 +165,8 @@ def execute(args, *, clock=time.time):
                 envelope = planner.management(**request)
             elif args.command == 'plan-face-job':
                 envelope = planner.face_job(**request)
+            elif args.command == 'plan-person-repair':
+                envelope = planner.repair_person(**request)
             else:
                 envelope = planner.assets(**request)
         write_new_plan(args.out, envelope)
@@ -201,7 +206,7 @@ def execute(args, *, clock=time.time):
     if (not re.fullmatch('[0-9a-f]{64}', args.review_digest)
             or not hmac.compare_digest(args.review_digest, review_digest(review))):
         raise OperatorError('Review changed; repeat explicit review')
-    options = {'all_writers_stopped':getattr(args,'all_writers_stopped',False)} if envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment') else {}
+    options = {'all_writers_stopped':getattr(args,'all_writers_stopped',False)} if envelope['plan']['operation'] in ('import_management_ownership', 'enqueue_face_assignment', 'repair_suppressed_person_ownership') else {}
     return receipt_summary(application(envelope, review=review, clock=clock, **options))
 
 
