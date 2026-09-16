@@ -30,6 +30,23 @@ the user just left. A failed step stops the slideshow, does not advance past the
 requested item, does not retry, and stays recoverable with Previous. This is the
 covered behaviour — it is a deliberate choice, not an accident of ordering.
 
+The viewer also carries a filmstrip over the same loaded order. It renders a window
+of at most 11 thumbnails centred on the current item, marks that item with
+`aria-current`, scrolls it into view, and jumps when clicked. Unlike the legacy strip,
+`start` is clamped so the window keeps its width on the last item instead of shrinking
+to 6. Each thumbnail reuses the exact `/assets/{id}/thumbnail?library=…` URL the
+gallery grid already requested (`size` defaults to 256), so the strip escalates to no
+larger prepared variant and adds no new authorization surface; it is hidden entirely
+when the sequence has fewer than two items.
+
+## Gallery page jump
+
+`#page-input` with `#page-jump` navigates directly to a gallery page. Two independent
+refusals protect it: the input's own `min`/`max` stops an out-of-range page before the
+form submits at all, and the submit handler independently refuses any value that is
+not a page number. Neither may move the gallery, and out-of-range input is reported
+through the existing status line.
+
 ## Saved people that cannot be assigned
 
 Story editing is not proof of face-management permission. Face management is

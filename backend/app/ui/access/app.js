@@ -32,6 +32,8 @@
   Object.assign(words.zh,{assignFaces:'查看人脸归属 · 主人',assignHelp:'为一张人脸选择已保存的人物。不会自动传播标签或创建新人物。',unassigned:'未分配',choosePerson:'选择人物',confirmAssignment:'确认归属',assignmentReview:'将这张人脸分配给',assignmentSaved:'已保存归属，其他人脸未更改。',assignmentConflict:'人脸或人物已更改，或人脸处理正在进行。请刷新并重新确认。',assignmentFailed:'尚未确认保存成功，请刷新并核对此人脸后再试。',assignmentUnavailable:'此归属需要另行确认权限。',noFaces:'此照片暂无已检测的人脸。',selectPerson:'选择此人'});
   Object.assign(words.en,{managePeople:'Manage people · Owner',peopleHelp:'Review saved names and faces in this library. Renaming does not merge people or change face assignments.',findPerson:'Find a saved name',peopleEmpty:'No matching saved names. Unassigned faces and names not linked to this library are not included yet.',personName:'Display name',unnamedPerson:'Unnamed person',reviewFaces:'Review faces',saveName:'Save name',nameSaved:'Name saved.',nameConflict:'This person changed. Review the refreshed record before editing again.',nameUnavailable:'Name editing needs a separate ownership review for this record.',facesCount:'faces in this library',moreFaces:'More faces',nameShortened:'Long existing name: preview shortened.',nameSaveFailed:'Save not confirmed. Refresh the record before trying again.'});
   Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
+  Object.assign(words.en,{viewFilmstrip:'Photos in this view',viewFilmstripItem:'Photo',goToPage:'Go to page',go:'Go',pageRange:'Enter a page number between 1 and the last page.'});
+  Object.assign(words.zh,{viewFilmstrip:'当前视图中的照片',viewFilmstripItem:'照片',goToPage:'跳转到页码',go:'前往',pageRange:'请输入有效范围内的页码。'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
   function resetStoryEditor(){
@@ -191,6 +193,26 @@
     image.addEventListener('error',()=>{if(photoState.image!==image)return;stopSlideshow();$('view-quality').textContent=t('previewMissing');});
     image.src=url;surface.append(image);$('viewer-media').append(surface);
   }
+  function updateFilmstrip(s){
+    const strip=$('viewer-filmstrip');strip.setAttribute('aria-label',t('viewFilmstrip'));
+    if(s.items.length<2){strip.replaceChildren();return;}
+    // Same bounded window as the legacy strip (at most 11 thumbnails, so a long
+    // page never fetches every preview). start is clamped so the window keeps its
+    // width at the tail of the list instead of shrinking to as few as 6.
+    const start=Math.max(0,Math.min(s.index-5,s.items.length-11));
+    const end=Math.min(s.items.length,start+11);
+    strip.replaceChildren(...s.items.slice(start,end).map((item,offset)=>{
+      const index=start+offset,button=document.createElement('button');
+      button.type='button';button.className='quiet';button.dataset.viewerIndex=String(index);button.disabled=s.busy;
+      button.setAttribute('aria-label',`${t('viewFilmstripItem')} ${index+1} / ${s.items.length}`);
+      button.setAttribute('aria-current',String(index===s.index));
+      const image=document.createElement('img');image.alt='';image.loading='lazy';
+      // Same URL the gallery grid already requested, so the HTTP cache serves it.
+      image.src=safeMediaURL(item.id,'thumbnail');
+      button.append(image);return button;
+    }));
+    if(!s.busy)strip.querySelector('[aria-current="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
+  }
   function updateSequence(){
     const s=sequenceState;
     $('viewer-sequence').hidden=s.items.length<2;
@@ -199,6 +221,7 @@
     $('view-play').disabled=s.busy||!photoState.image?.naturalWidth||s.items.length<2||(!s.playing&&s.index>=s.items.length-1);
     $('view-play').textContent=t(s.playing?'viewPause':'viewPlay');$('view-play').setAttribute('aria-pressed',String(s.playing));
     $('viewer-sequence').title=t('viewSequenceHelp');
+    updateFilmstrip(s);
   }
   function stopSlideshow(){clearTimeout(sequenceState.timer);sequenceState.timer=null;sequenceState.playing=false;updateSequence();}
   function scheduleSlideshow(){
@@ -369,6 +392,7 @@
       $('empty').hidden=result.items.length>0;$('empty').textContent=t(storyState.search?'noMatches':'noPhotos');
       const pages=Math.max(1,Math.ceil(result.total/24));
       $('pagination').hidden=result.total===0;$('previous').disabled=state.page===1;$('next').disabled=state.page>=pages;
+      $('page-input').max=String(pages);$('page-input').value=String(state.page);
       $('page-label').textContent=`${t('page')} ${state.page} ${t('of')} ${pages} · ${result.total} ${t('photos')}`;
       status('');
       if(!$('members-panel').hidden&&$('members-panel').open)void loadMembers();
@@ -743,6 +767,14 @@
   $('library-select').addEventListener('change',()=>{if(state.locked||!abandonStory()){$('library-select').value=state.library||'';return;}storyState.search=null;storyState.suspended=null;$('search-text').value='';peopleState.page=1;peopleState.query='';$('people-query').value='';state.library=$('library-select').value;state.page=1;state.memberPage=1;void restore();});
   $('previous').addEventListener('click',()=>{if(state.page>1){state.page--;void loadGallery();}});
   $('next').addEventListener('click',()=>{if(state.page*24<state.total){state.page++;void loadGallery();}});
+  $('page-jump').addEventListener('submit',event=>{
+    event.preventDefault();
+    if(state.locked||!abandonStory())return;
+    const pages=Math.max(1,Math.ceil(state.total/24)),value=Number($('page-input').value);
+    if(!Number.isInteger(value)||value<1||value>pages){status('pageRange');return;}
+    if(value===state.page){status('');return;}
+    state.page=value;void loadGallery();
+  });
   $('members-panel').addEventListener('toggle',()=>{if($('members-panel').open)void loadMembers();});
   $('member-previous').addEventListener('click',()=>{if(state.memberPage>1){state.memberPage--;void loadMembers();}});
   $('member-next').addEventListener('click',()=>{if(state.memberPage*25<state.memberTotal){state.memberPage++;void loadMembers();}});
@@ -750,6 +782,17 @@
   $('view-previous').addEventListener('click',()=>void movePhoto(-1));$('view-next').addEventListener('click',()=>void movePhoto(1));
   $('view-play').addEventListener('click',()=>{if(sequenceState.playing){stopSlideshow();return;}if(state.busy||storyState.busy||storyState.dirty||!$('story-form').hidden||$('face-panel').open){$('view-quality').textContent=t('viewQuality')+' '+t('viewEditing');return;}sequenceState.playing=true;updateSequence();scheduleSlideshow();});
   $('view-interval').addEventListener('change',scheduleSlideshow);
+  $('viewer-filmstrip').addEventListener('click',event=>{
+    const button=event.target.closest('[data-viewer-index]');
+    if(!button||state.locked||sequenceState.busy)return;
+    const index=Number(button.dataset.viewerIndex);
+    if(!Number.isInteger(index)||index===sequenceState.index)return;
+    if(!abandonStory())return;
+    stopSlideshow();
+    const {items,origin}=sequenceState;
+    if(index<0||index>=items.length)return;
+    void openAsset(items[index],{sequence:items,origin,advance:true});
+  });
   for(const mode of ['fit','width','height','actual'])$('view-'+mode).addEventListener('click',()=>fitPhoto(mode));
   $('view-in').addEventListener('click',()=>zoomPhoto(1.25));$('view-out').addEventListener('click',()=>zoomPhoto(0.8));
   $('view-fullscreen').addEventListener('click',()=>void fullscreenPhoto());

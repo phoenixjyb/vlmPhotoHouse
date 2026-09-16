@@ -1,95 +1,173 @@
-# Protected WebUI parity inventory
+# Protected WebUI parity ledger
 
-## Scope and evidence
+## Scope and method
 
 This is a source-level comparison of the legacy page (`backend/app/ui/index.html`,
-`backend/app/ui/app.js`) with the protected page
-(`backend/app/ui/access/index.html`, `backend/app/ui/access/app.js`) and its
-library/access routes under `backend/app/access/`. A control in the legacy page
-is evidence that the old UI attempted to offer a feature, not proof that the
-feature was operational, authorized, or ready for family use. Likewise, this
-inventory does not claim deployment, Windows/runtime readiness, or device
+`backend/app/ui/app.js`, the unscoped routes in `backend/app/legacy_main.py` and
+friends) against the protected page (`backend/app/ui/access/*`) and its routes in
+`backend/app/access/`.
+
+It is a **decided ledger**, not a to-do list. Every legacy capability that is not
+present in the protected UI carries an explicit disposition and the dependency that
+blocks it, so "parity" means a recorded decision rather than a pending question.
+
+Measured counts on this source (`f697fa8` + the viewer/gallery slice):
+
+| Measure | Value | How it was derived |
+| --- | --- | --- |
+| Legacy-surface routes | 114 | Decorators under `backend/app/**` excluding `access/` |
+| Protected routes | 34 | Decorators under `backend/app/access/` |
+| Protected routes reachable from the protected UI | 32 | Route static segments matched against `access/app.js` |
+| Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
+| Protected control ids | 111 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 44 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Python security suite | 789 tests, 0 failures, 3 errors | `unittest discover -s tests/security`; the 3 errors are pre-existing and unrelated (see "Known-red tests") |
+
+**Limits of this measure.** Reachability is a source-level property. It does not
+prove that a route authorizes correctly, that a control is operational at runtime,
+or anything about deployment. A control in the legacy page is evidence that the old
+UI *attempted* a feature, not proof it worked. Neither column is device or TV
 acceptance.
 
-The current branch already has local protected-viewer control work. The full
-browser suite now runs to completion on this source: **42 checkpoints pass, three
-consecutive runs, exit 0** (`node tests/security/test_web_browser.cjs` against the
-real ASGI application with synthetic SQLite/media over a pipe). The earlier "35
-browser passes" was never a run of the current file — the viewer/sequence
-checkpoints did not exist in it — and is superseded by that result. Family Stories
-and people/albums protected flows already exist in source. The owner slice's
-previous/next and slideshow over the loaded gallery-page/album order is implemented
-and covered, and so is the privacy cleanup: a delayed, failed or closed step cannot
-repopulate a closed or changed viewer.
+The two routes that are *not* reachable from the protected UI are
+`GET /libraries/{id}/discovery/v1/facets` and `POST /libraries/{id}/discovery/v1/search`.
+Both are composed only by `app/phone_discovery_candidate.create_candidate()`, which
+requires an explicit `DiscoveryRuntime` built from operator-supplied, in-memory
+`ReviewedIndex` records (`backend/app/access/discovery_provider.py`). They are not
+wired into the production protected app, so this is **not** a case of a finished
+capability hiding behind a missing button.
 
-## Feature inventory
+## Dispositions
 
-### Family browsing and finding memories
+- **PARITY** — the capability is present in the protected UI.
+- **AHEAD** — the protected implementation exceeds the legacy one.
+- **GAP·CONTRACT** — wanted, but needs a new library-scoped protected contract or an
+  explicit authorization/privacy decision before any UI exists.
+- **EXCLUDED** — deliberately not offered to library members; reason recorded.
+- **SUPERSEDED** — the legacy mechanism was replaced by a different, better one.
 
-| Legacy capability | Protected current status | Contract/dependency and parity slice |
-| --- | --- | --- |
-| Home dashboard: featured/recent items, people, story highlights, quick search and “view all” navigation | Missing. The protected page opens directly to the selected library gallery. | Build only on protected library-scoped reads; do not copy dashboard calls to unscoped legacy endpoints. |
-| Gallery browsing and pagination | Present: `GET /assets?library=…&page=…&page_size=…`, detail and captions routes; thumbnails/media are protected. | `library.read`; verify page boundaries and stale-library/session handling. |
-| Search by path, caption, smart query, person name, media filter, tags | Partial: protected `/library/search` searches family stories and AI/legacy descriptions; no protected path/smart/person/tag search in the UI. | `library.read`; define a protected search contract/index before exposing additional modes. Existing discovery routes (`/libraries/{id}/discovery/v1/*`) are separate and not a drop-in replacement. |
-| Tags catalog and tag-to-assets browsing | Missing. Legacy UI called `/tags…` and asset tag mutation routes; no corresponding protected routes/UI. | Requires an explicit library-scoped read/write policy, not reuse of global tag endpoints. |
-| Map/geolocation browsing | Missing. Legacy UI used `/assets/geo`; protected page has no map. | Requires a privacy-reviewed coarse-location contract and `library.read`; do not expose raw location by copying legacy behavior. |
-| Similarity reduction and hidden/restore groups | Missing. Legacy UI offered preview/apply/restore and `/duplicates/reduction/*`. | Requires a library-scoped, revision/idempotency-aware mutation contract; global duplicate suppression cannot be assumed safe. |
-| Asset viewer: preview, captions, fullscreen, fit/width/height/actual, zoom and pan | Present in protected source for authorized photo/media and captions, with original download shown only when allowed. Previous/next and slideshow are implemented and covered by the browser suite. | Thumbnail/display use `library.read`; original uses `media.original.read` (`member.originals`). Keep viewer navigation bounded to the loaded gallery page/album order until cross-page ordering is specified. |
+### Browsing and finding
 
-### Family contributions
+| Capability | Legacy evidence | Protected status | Disposition |
+| --- | --- | --- | --- |
+| Gallery browse and pagination | `/assets`, `library-grid` | `/assets`, grid, previous/next | **PARITY** |
+| Jump to a specific page | `library-page-input` (wired at `app.js:940,2263,3946`) | `#page-input` + `#page-jump` | **PARITY** (closed in this slice) |
+| Viewer: preview, captions, fit/width/height/actual, zoom, pan, fullscreen | `/assets/{id}/thumbnail|media`, `preview-*` | `#photo-viewer`, `view-*` | **PARITY** |
+| Viewer: previous/next and slideshow | `btn-preview-prev|next|play` | `#view-previous|next|play` | **PARITY** |
+| Viewer: filmstrip over the loaded view | `preview-filmstrip`, windowed at `app.js:2931-2937`, click at `3833` | `#viewer-filmstrip` | **PARITY** (closed in this slice) |
+| Search: family stories and AI/earlier captions | `/search/captions` | `POST /library/search` | **PARITY** |
+| Search: local path / filename | `search-mode`, `library-result-meta` | none | **GAP·CONTRACT** |
+| Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
+| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | owner-only `/admin/people?q=` | **GAP·CONTRACT** (member-visible person search needs a privacy decision) |
+| Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | none | **GAP·CONTRACT** |
+| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** |
+| Map / geolocation browsing | `/assets/geo`, `geo-map` | none | **GAP·CONTRACT** (needs a coarse-location privacy contract; raw location must not be copied) |
+| Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
+| Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | none | **GAP·CONTRACT** |
+| Suppressed / restore groups | `/assets/suppressed` | none | **GAP·CONTRACT** |
+| Video browsing and segments | `/videos/{id}`, `/videos/{id}/segments` | thumbnail/display only | **GAP·CONTRACT** |
 
-| Legacy capability | Protected current status | Contract/dependency and parity slice |
-| --- | --- | --- |
-| Upload/multipart upload and ingest scan | Missing. Legacy UI exposed upload/`/ingest/scan`; protected UI has no intake control or protected intake route. | Requires an explicit contribution/upload contract, storage/quota policy, provenance, malware/content handling, and role permission. Do not wire the legacy write routes into the protected page. |
-| Family Stories attached to an asset | Present and materially richer in protected source: list/create/edit/delete, conflict-safe revisions/history, search, and draft handling. | Read requires `library.read`; create/edit requires `story.write` (owner/contributor, with non-owner edits limited to the author); preserve revision and mutation handling. “Shared with this library” is not automatic TV publication. |
-| AI descriptions / earlier caption edits | Present as a bounded read-only caption section (first 20, explicit truncation state). | `GET /assets/{id}/captions` with `library.read`; no protected caption regeneration. |
+### Contributions
+
+| Capability | Legacy evidence | Protected status | Disposition |
+| --- | --- | --- | --- |
+| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** (needs provenance, quota, storage, content-handling and role policy) |
+| Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
+| Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
+| Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | none | **GAP·CONTRACT** |
 
 ### People and albums
 
-| Legacy capability | Protected current status | Contract/dependency and parity slice |
-| --- | --- | --- |
-| People list, named/unnamed filters, person assets and face crops | Partial: owner-only people review, search, pagination, person face review, asset face review and crops exist. | `library.people.manage`; all reads are library-scoped and active-asset filtered. Viewer/contributor visibility is intentionally not equivalent to legacy global `/persons`. |
-| Create person, rename and face assignment/unassignment | Partial: protected owner-only rename and explicit face assignment/new-person/unassign with revision checks exist. | `library.people.manage`; exclusivity and face/person revisions must be honored. No automatic propagation is promised. |
-| Merge/delete people, delete faces, recluster | Missing. Legacy UI exposed these/global recluster controls; protected routes do not. | Requires a separately designed library-scoped mutation and review policy; do not expose global `/persons/merge`, `/persons/{id}/delete`, or recluster. |
-| Story albums / album drafts / composer | Partial-to-present: protected library albums list, owner create/edit composer, bounded asset selection and ordering, cover and bilingual title/description. | Reads require `library.read`; create/edit is owner-only (`library.albums.manage`). No protected album delete, publish-to-TV, or legacy draft endpoint is present. |
-| Album ordering and viewer navigation | Partial: album asset strips open authorized assets; current previous/next/slideshow slice is scoped to the loaded album order. | Keep album membership/order revision-bound and avoid leaking assets across libraries. Acceptance must include empty/small/large albums and session/library changes. |
+| Capability | Legacy evidence | Protected status | Disposition |
+| --- | --- | --- | --- |
+| People list, rename, search, pagination | `/persons`, `/persons/{id}/name`, `/search/person/*` | `/admin/people`, `PUT /admin/people/{id}` | **PARITY** (owner-only, library-scoped) |
+| Person asset and face crops | `/search/person/{id}`, `/faces/{id}/crop` | `/admin/people/{id}/faces`, `/faces/{id}/crop` | **PARITY** |
+| Attach or detach a face to a person | `/faces/{id}/assign`, `/faces/{id}/assign-stranger` | `/admin/faces/{id}/assignment`, `new-person`, `unassign` | **PARITY** |
+| Filter named vs unnamed people | `people-show-unnamed` | none — `/admin/people` accepts only `library, page, q` | **GAP·CONTRACT** |
+| Review unassigned faces as a worklist | `unassigned-faces`, `btn-unassigned-*` | none (per-asset face review only) | **GAP·CONTRACT** |
+| Merge people, delete people, delete faces, recluster | `/persons/merge`, `/persons/{id}/delete`, `DELETE /faces/{id}`, `/persons/recluster` | none | **EXCLUDED** (irreversible clustering mutations; need a separate reviewed design) |
+| Albums: list, compose, order, cover, bilingual title | `/albums/drafts*`, `album-*` | `/library-albums`, `/admin/albums` | **AHEAD** (library-owned, revision-bound) |
+| Album drafts as a separate object | `/albums/drafts`, `/albums/drafts/{id}` | — | **SUPERSEDED** by library-owned albums |
+| Album delete / archive | none in legacy UI | none | **GAP·CONTRACT** |
+| Publish an album to the TV surface | `home/v2|catalog` | none | **GAP·CONTRACT** (keep separate from authenticated albums) |
 
-### Owner and operational controls
+### Owner, session and operations
 
-| Legacy capability | Protected current status | Contract/dependency and parity slice |
-| --- | --- | --- |
-| Voice command/chat/transcription/TTS and voice history | Missing from protected UI and access routes. | If later required, design a protected, local-runtime-only contract with typed actions and authorization; do not reuse legacy voice routes by button parity. |
-| Health, metrics, system usage, task queue, vector rebuild, ingest and recluster actions | Missing. These remain legacy/admin operational controls. | Keep operational/admin surfaces separate from family library access; require explicit operator authorization and runtime evidence. |
-| Asset delete, photo delete, caption regenerate, tag writes | Missing from protected UI/routes. | Requires separately approved destructive, library-scoped contracts with confirmation, audit, revision/idempotency and recovery semantics. |
-| Invitations, switching libraries, member list and revoke | Present: protected auth/session/logout, invitation accept/create/cancel, library selector, owner member review and revision-bound revoke. | Membership/session policy is enforced by `AccessService`; owner-only management. Revocation stops future requests but cannot recall already downloaded files. |
+| Capability | Legacy evidence | Protected status | Disposition |
+| --- | --- | --- | --- |
+| Sign in, session, sign out | `auth` | `/auth/login`, `/auth/session`, `/auth/logout` | **PARITY** |
+| Invitations: create, accept, cancel | none in legacy UI | `/libraries/{id}/invitations`, `/invitations/accept`, `/invitations/cancel` | **AHEAD** |
+| Member list and revoke | none in legacy UI | `/libraries/{id}/members`, `/members/{id}/revoke` | **AHEAD** |
+| Delete an asset or photo | `/assets/{id}/delete`, `btn-delete-asset`, `btn-delete-photo` | none | **EXCLUDED** (destructive; needs confirmation, audit and recovery semantics) |
+| Tag writes | `POST|DELETE /assets/{id}/tags`, `btn-add-tags` | none | **EXCLUDED** |
+| Voice: chat, command, transcribe, TTS, photo description | `/voice/*` (14 routes), `btn-voice-*` | none | **EXCLUDED** (separate local-runtime surface) |
+| Health, metrics, system usage, task queue, index rebuilds, recluster triggers | `/health*`, `/metrics*`, `/system/usage`, `/tasks*`, `/vector-index/rebuild`, `/video-index/rebuild` | none | **EXCLUDED** (operator surface, not family access) |
 
-## Prioritized implementation slices
+## Deliberate deviations from legacy
 
-1. Finish and locally verify the current viewer navigation slice: previous/next
-   and slideshow over the loaded gallery page and album order, with no
-   cross-library or stale-viewer leakage; complete privacy cleanup before
-   expanding the order scope.
-2. Add protected discovery parity: decide which legacy search, people, tags,
-   date/place and media filters are family-safe, then add typed library-scoped
-   API contracts and UI states. Treat the existing protected story/description
-   search as a distinct capability.
-3. Complete album lifecycle parity only after defining delete/archive,
-   membership visibility, ordering revisions, and whether/when an album can be
-   published to the anonymous TV surface. Keep TV publication separate from
-   authenticated library albums.
-4. Define contributions/intake separately (upload, provenance, quota,
-   processing status and review) before adding any upload or ingest control.
-5. Consider owner/admin mutations (tags, asset deletion, caption regeneration,
-   similarity, people merge/delete/recluster) one contract at a time with
-   explicit permission, audit, conflict and recovery behavior. Voice and
-   operational controls should remain separate until their protected/local
-   runtime boundary is specified.
+These are intentional and should not be "fixed" toward the legacy behaviour:
+
+1. **A failed viewer step commits to the requested item.** The viewer drops the
+   previous photo when a step starts (`closeViewer` clears the media on every open),
+   so a step that fails reports that item's error rather than appearing to roll back.
+   The suite asserts the requested item is not skipped past, not retried, and stays
+   recoverable via Previous. See `PROTECTED_WEBUI_VIEWER.md`.
+2. **The filmstrip window keeps its width at the end of a list.** Legacy computed
+   `start = max(0, index-5)` then `end = min(len, start+11)`, which shrank the strip to
+   as few as 6 buttons on the last item; the protected strip clamps `start` so the
+   window stays 11 wide. The cost bound (at most 11 thumbnails) is identical.
+3. **The page jump has two independent refusals.** The input carries `min`/`max`, so
+   the browser blocks an out-of-range page before the form submits at all; the submit
+   handler independently refuses a value that is not a page number. Legacy had only
+   the handler.
+4. **The protected UI is a single page, not nine tabs.** Legacy's `Home`, `Library`,
+   `Map`, `People`, `Tags`, `Stories`, `Similarity`, `Tasks` and `Admin` tabs
+   (`tab-*`, wired by `.tab`/`data-tab` at `app.js:1818,3891`) are not a layout to
+   reproduce; the protected page is gallery-first with progressive `details` panels.
+
+## Closed in the viewer/gallery parity slice
+
+- `#viewer-filmstrip`: a bounded, windowed strip over the loaded gallery-page or album
+  order, marking the current item and jumping on click. Thumbnails reuse the exact
+  `/assets/{id}/thumbnail?library=…` URL the grid already requested (`size` defaults
+  to 256), so navigation adds no new media variant and no new authorization surface.
+- `#page-input` / `#page-jump`: jump to a gallery page, with the two refusals above.
+- Browser checkpoints: *"Viewer filmstrip mirrors the loaded order, marks the current
+  item, and jumps to it"* and *"Gallery page jump accepts an in-range page and refuses
+  an out-of-range one"*. The page-jump checkpoint runs last because it grows the
+  fixture library past one page, which would change what every earlier checkpoint sees.
+
+## Known-red tests
+
+The Python suite reports 3 errors against this source. All three reproduce at `f697fa8`
+in a clean control worktree with no changes applied, and none touch the WebUI:
+
+- `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
+  process inspection is unavailable.
+- `test_home_media_profiles…test_large_baseline_jpeg_is_subsampled…` — environment
+  dependent.
+- `test_suppressed_ownership_repair…test_stale_audience_backup_expiry_and_schema_are_refused`
+  — passes in isolation and errors only in full-suite order; a pre-existing order
+  dependence, not a regression.
+
+## Recommended sequence
+
+1. **Date/media filtering** — the narrowest genuinely useful family gap, and the only
+   one whose contract is already designed (`discovery` facets `date`, `media`). Blocked
+   on deciding who supplies `ReviewedIndex` in production.
+2. **Member-visible person browsing** — needs a privacy decision: today person data is
+   owner-only and library-scoped on purpose.
+3. **Tags catalog** — read-only tag browsing is the cheap half; tag writes stay excluded.
+4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
+   provenance, quota, content handling and the contributor role.
+5. **Album delete/archive**, then **TV publication** as a separate surface.
+6. Discovery-driven browsing in the protected UI, once the provider question above is
+   answered; it must not be presented as a drop-in for legacy `/search`.
 
 ## Acceptance gates
 
-For each slice, require source tests plus protected route authorization and
-negative tests for wrong library, viewer/contributor/owner role, revoked
-membership, stale revision, and missing original permission as applicable.
-Then separately re-run browser checks, deploy/runtime checks, and real family
-device/TV acceptance. A green local browser run, HTTP 200, or visible button is
-not evidence of those later gates.
+For each slice, require source tests plus protected route authorization and negative
+tests for wrong library, viewer/contributor/owner role, revoked membership, stale
+revision, and missing original permission as applicable. Then separately re-run browser
+checks, deploy/runtime checks, and real family device/TV acceptance. A green local
+browser run, HTTP 200, or a visible button is not evidence of those later gates.

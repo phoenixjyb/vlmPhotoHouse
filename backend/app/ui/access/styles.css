@@ -31,3 +31,12 @@
 .assignment-review:not(:empty){border-top:1px solid #cfc2b4;padding:1rem 0}.face-confirm{display:flex;gap:.75rem;flex-wrap:wrap}
 .album-card{padding:1rem 0;border-top:1px solid var(--line);overflow-wrap:anywhere}.album-strip{display:flex;gap:.75rem;flex-wrap:wrap;margin:1rem 0}.album-strip button{padding:.25rem}.album-strip img,.album-selection img{width:5rem;height:5rem;object-fit:cover;border-radius:.5rem}.album-selection{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 0;border-bottom:1px solid var(--line)}#album-editor{overflow-wrap:anywhere}#album-editor textarea{width:100%;min-height:6rem;font:inherit;padding:.7rem}#album-editor form>button{margin:.5rem .5rem .5rem 0}.new-person-form{padding:1rem;background:#efe3d6;border-radius:.75rem;margin-top:1rem}
 @media(max-width:540px){.person-name-form label,.people-search label{flex-basis:100%}.person-name-form input,.people-search input{min-width:0;width:100%}}
+
+/* Viewer filmstrip: the same bounded window as the legacy strip. Each thumbnail reuses
+   the 256px variant the gallery grid already requested, so it costs no new media fetch. */
+#viewer-filmstrip{display:flex;flex:0 0 100%;gap:6px;overflow-x:auto;padding:6px 0}
+#viewer-filmstrip button{padding:2px;border:2px solid transparent;border-radius:8px;background:none;line-height:0}
+#viewer-filmstrip button[aria-current=true]{border-color:var(--accent)}
+#viewer-filmstrip img{display:block;width:3.5rem;height:3.5rem;object-fit:cover;border-radius:6px}
+.page-jump{display:flex;align-items:center;gap:6px}
+.page-jump input{width:5.5rem;min-width:0;flex:0 0 auto;padding:6px}

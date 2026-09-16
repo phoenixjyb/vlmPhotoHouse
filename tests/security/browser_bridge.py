@@ -84,6 +84,21 @@ try:
                 (derived/'thumbnails/1024').mkdir(parents=True,exist_ok=True)
                 image=Image.open(derived/'thumbnails/256/101.jpg')
                 image.resize((1024,768)).save(derived/'thumbnails/1024/101.jpg')
+            elif scenario=='many-assets':
+                # Grows family-a past one gallery page at page_size 24. taken_at keeps
+                # 102/101 ahead of the new rows, so page 1 order is unchanged.
+                (derived/'thumbnails/256').mkdir(parents=True,exist_ok=True)
+                with fixture.connection() as db:
+                    for asset_id in range(1101,1130):
+                        db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,
+                            taken_at,gps_lat,gps_lon,caption_error_last) VALUES (?,?,?,?,?,640,480,?,1,2,?)''',
+                            (asset_id,f'private-synthetic/{asset_id}.jpg',f'private-hash-{asset_id}',
+                             'active','image/jpeg','2025-06-01','private-provider-error'))
+                        db.execute('INSERT INTO access_asset_libraries VALUES (?,?)',(asset_id,'family-a'))
+                    db.commit()
+                source=derived/'thumbnails/256/101.jpg'
+                for asset_id in range(1101,1130):
+                    Image.open(source).save(derived/f'thumbnails/256/{asset_id}.jpg')
             elif scenario=='thumbnail-head-503':
                 head_503=True
             else:

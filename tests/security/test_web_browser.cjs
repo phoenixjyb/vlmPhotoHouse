@@ -598,7 +598,25 @@ let browser;
   assert.equal(await page.locator('#view-fit').getAttribute('aria-pressed'),'true');
   await page.locator('#view-fullscreen').click();await page.waitForFunction(()=>!document.fullscreenElement);
   checkpoint('Manual navigation resets fit mode and retains fullscreen across a step');
+  // The filmstrip mirrors the legacy strip over the same loaded order, and reuses the
+  // gallery grid's already-authorized 256 URL rather than escalating to a larger variant.
+  const filmstrip=page.locator('#viewer-filmstrip');
+  assert.equal(await filmstrip.getAttribute('aria-label'),'Photos in this view');
+  assert.equal(await filmstrip.locator('button').count(),2);
+  assert.equal(await filmstrip.locator('button').first().locator('img').getAttribute('src'),'/assets/102/thumbnail?library=family-a');
+  assert.equal(await filmstrip.locator('button[aria-current="true"]').getAttribute('data-viewer-index'),'1');
+  assert.equal(await filmstrip.locator('button').first().getAttribute('aria-label'),'Photo 1 / 2');
+  await filmstrip.locator('img').first().evaluate(img=>img.decode());
+  assert((await filmstrip.locator('img').first().evaluate(img=>img.naturalWidth))>0);
+  await filmstrip.locator('button').first().click();
+  await page.locator('.viewer-surface img').evaluate(img=>img.decode());
+  assert.match(await page.locator('#viewer-title').textContent(),/102/);
+  assert.equal(await page.locator('#view-position').textContent(),'This page · 1 / 2');
+  assert.equal(await filmstrip.locator('button[aria-current="true"]').getAttribute('data-viewer-index'),'0');
+  assert.equal(await page.locator('#view-play').getAttribute('aria-pressed'),'false');
+  checkpoint('Viewer filmstrip mirrors the loaded order, marks the current item, and jumps to it');
   await page.locator('#close-viewer').click();
+  assert.equal(await filmstrip.locator('button').count(),0);
   await page.locator('.asset').filter({hasText:'102'}).click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   if(page.clock&&typeof page.clock.install==='function')await page.clock.install();
   await page.locator('#view-interval').selectOption('5000');await page.locator('#view-play').click();
@@ -672,6 +690,32 @@ let browser;
   assert.equal((await memberContext.cookies()).length,0);
   await auth(page);
   checkpoint('Expired session cookie clears and returning login succeeds');
+  // Run last: this grows family-a past one gallery page, which changes how many cards
+  // and which page boundaries every earlier checkpoint sees.
+  await mutate('many-assets');await page.locator('#refresh').click();
+  await page.locator('.asset').first().waitFor();
+  assert.equal(await page.locator('.asset').count(),24);
+  assert.equal(await page.locator('#page-input').inputValue(),'1');
+  assert.equal(await page.locator('#page-input').getAttribute('max'),'2');
+  // Two independent refusals, neither of which may move the gallery: the input's own
+  // min/max stops an out-of-range page before the form submits at all, and the submit
+  // handler refuses a value that is not a page number if it is reached.
+  await page.locator('#page-input').fill('9');
+  await page.locator('#page-jump button[type="submit"]').click();
+  assert.equal(await page.locator('#page-input').evaluate(input=>input.validity.rangeOverflow),true);
+  assert.equal(await page.locator('.asset').count(),24);
+  await page.locator('#page-input').fill('');
+  await page.locator('#page-jump button[type="submit"]').click();
+  assert.match(await page.locator('#status').textContent(),/between 1 and the last page/);
+  assert.equal(await page.locator('.asset').count(),24);
+  await page.locator('#page-input').fill('2');
+  await page.locator('#page-jump button[type="submit"]').click();
+  await page.waitForFunction(()=>document.querySelectorAll('.asset').length===7);
+  assert.equal(await page.locator('#page-input').inputValue(),'2');
+  assert.equal(await page.locator('#previous').isDisabled(),false);
+  assert.equal(await page.locator('#next').isDisabled(),true);
+  await page.screenshot({path:path.join(artifacts,'gallery-page-jump.png')});
+  checkpoint('Gallery page jump accepts an in-range page and refuses an out-of-range one');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);
