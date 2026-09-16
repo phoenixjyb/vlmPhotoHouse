@@ -11,18 +11,19 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`372db83`, the tip the member people-directory slice and
-its contract reissue produced; the ledger commit `2dde6ef` adds only this file):
+Measured counts on this source (`492b7e4`, the tip the member tag-catalog slice, its
+contract reissue and the payload-allowlist repair produced; the ledger commit adds only
+this file):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
-| Legacy-surface routes | 114 | Decorators under `backend/app/**` excluding `access/` |
-| Protected routes | 36 | Decorators under `backend/app/access/` |
-| Protected routes reachable from the protected UI | 34 | Route static segments matched against `access/app.js` |
+| Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
+| Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
+| Protected routes reachable from the protected UI | 36 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 128 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 47 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
-| Python security suite | 788 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
+| Protected control ids | 138 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 48 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Python security suite | 794 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -60,7 +61,7 @@ capability hiding behind a missing button.
 | Search: local path / filename | `search-mode`, `library-result-meta` | none | **GAP·CONTRACT** |
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
 | Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails); photos-of-a-person and vector search absent | **GAP·CONTRACT** — the name+thumbnail half is now implemented; "all photos of this person" (`/search/person/{id}`) and face **vector** search are still not offered, deliberately |
-| Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | none | **GAP·CONTRACT** — decision taken 2026-09-16: read-only catalog open to members; tag writes stay excluded; not yet implemented |
+| Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | member-visible `GET /tags` and `GET /tags/{tag_id}/assets` (25/page, library-scoped) | **GAP·CONTRACT** — the catalog and tag-to-asset halves are now implemented (see "Closed in the member tag-catalog slice"); `/search/tags` autocomplete is still absent and tag **writes** stay EXCLUDED |
 | Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** — decision taken 2026-09-16: open date/media filtering to members; not yet implemented |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | none | **GAP·CONTRACT** (needs a coarse-location privacy contract; raw location must not be copied) |
 | Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
@@ -140,10 +141,10 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports **3 failures** against this source (`788 passed, 3 failed,
-7 skipped` under `pytest tests/security`). All three reproduce at `f61028e` in a clean
-control worktree (`779 passed, 3 failed, 7 skipped`), with the *same three node ids*,
-and none touch the WebUI:
+The Python suite reports **3 failures** against this source (`794 passed, 3 failed,
+7 skipped` under `pytest tests/security`; 804 collected). All three reproduce at
+`d477d71` in a clean control worktree (`788 passed, 3 failed, 7 skipped`; 798
+collected), with the *same three node ids*, and none touch the WebUI:
 
 - `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
   process inspection is unavailable (`/bin/ps` is blocked).
@@ -153,11 +154,10 @@ and none touch the WebUI:
   — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
 
-The extra passes on this source come from the two slices landed since the control: the
-owner-tools slice's new people-management tests (4) and the member people-directory
-slice's directory tests (5). Because the *failure set* is identical on both sides, both
-slices and their contract reissues are behaviour-neutral with respect to everything else
-in the tree.
+The 6 extra passes on this source are exactly this slice's six new tag-catalog tests.
+Because the *failure set* is identical on both sides, the slice, its contract reissue and
+the payload-allowlist repair are behaviour-neutral with respect to everything else in the
+tree.
 
 ## Closed in the owner-tools slice
 
@@ -202,12 +202,42 @@ new privacy decision, which is why they could be closed first.
 - Still not offered, deliberately: "all photos of this person" (`/search/person/{id}`) and
   face **vector** search.
 
+## Closed in the member tag-catalog slice
+
+- `GET /tags` — the tag catalog of the selected library: 25 rows per page, ordered by
+  visible asset count, with an optional literal name search. Gated on `library.read`,
+  which every approved role holds, so a viewer, contributor or member may use it.
+- `GET /tags/{tag_id}/assets` — the photos carrying one tag, in the same row shape the
+  gallery already renders.
+- It is deliberately narrower than the legacy tag surface it partially answers, and each
+  narrowing is a test rather than a comment:
+  - **library-scoped counts** — the visible-asset CTE joins `access_asset_libraries` and
+    skips non-active assets, so a tag used only by another library, or only by a deleted
+    asset, is neither listed nor countable. No cross-library or global total exists.
+  - **no `type`, no link `source`** — legacy `/tags` returned both; a member sees exactly
+    `{id, name, name_truncated, asset_count}`.
+  - **existence is not confirmable** — a tag with no visible asset in the library is
+    refused as access denied rather than answered empty, so the route cannot be used to
+    probe whether a name exists elsewhere.
+  - **no second media surface** — the photo list reuses the gallery's library-scoped
+    predicate and its asset row, and the page renders a thumbnail only when the URL
+    starts with `/assets/`.
+- The panel is a sibling `details`, not a nested one: `#tags-panel` sits beside
+  `#people-panel` rather than inside it, so the member panel cannot inherit an owner
+  panel's visibility or id.
+- Still not offered, deliberately: `/search/tags` (tag autocomplete) and tag **writes**
+  (`POST|DELETE /assets/{id}/tags`), which were already EXCLUDED.
+- Browser checkpoint: *"Member browses the read-only tag catalog and its photos without
+  tag controls"* — a plain member sees exactly the two tags that carry visible assets,
+  not the foreign-only or deleted-only ones, and the panel exposes one input and one
+  form and no control that could write.
+
 ## Owner decisions on member-facing gaps (2026-09-16)
 
 The owner reviewed which currently owner-only capabilities may be opened to ordinary
 library members. Three were approved in principle, each still needing its own scoped
-slice, route and negative authorization tests before any UI is exposed. One is now
-implemented; two are not:
+slice, route and negative authorization tests before any UI is exposed. Two are now
+implemented; one is not:
 
 1. **Person names + thumbnails** — **implemented** as `GET /people` (see "Closed in the
    member people-directory slice"). Members may browse people by name and see face
@@ -218,8 +248,9 @@ implemented; two are not:
 2. **Date / media filtering** — members may narrow a library by date and media kind.
    This is the facet model already designed in the discovery provider, which is still
    the open dependency (who supplies `ReviewedIndex` in production).
-3. **Tags read-only catalog** — members may browse the tag catalog and tag-to-asset
-   results. Tag *writes* remain EXCLUDED.
+3. **Tags read-only catalog** — **implemented** as `GET /tags` and
+   `GET /tags/{tag_id}/assets` (see "Closed in the member tag-catalog slice"). Members
+   may browse the catalog and open a tag's photos. Tag *writes* remain EXCLUDED.
 
 Everything else on the GAP·CONTRACT list either stays owner-only or stays excluded;
 no other row changed disposition as a result of this review.
@@ -235,11 +266,12 @@ no other row changed disposition as a result of this review.
 2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
    member people-directory slice; see "Closed in the member people-directory slice").
    Person *editing* stays owner-only.
-3. **Tags catalog** — read-only tag browsing is the cheap half; tag writes stay excluded.
-   Unlike item 1 this needs no provider: `tags` and `asset_tags` are already in the
-   protected read schema (`migrations/versions/a5d2e8f4b610_legacy_read_schema.py`) and
-   `access/discovery.py` already reads both scoped to a library, so a member-facing
-   catalog is a scoped read rather than a new contract.
+3. **Tags catalog** — **done** (`2ced43e`, the member tag-catalog slice; see "Closed in
+   the member tag-catalog slice"). Tag writes stay excluded. Unlike item 1 this needed no
+   provider: `tags` and `asset_tags` are already in the protected read schema
+   (`migrations/versions/a5d2e8f4b610_legacy_read_schema.py`) and `access/discovery.py`
+   already reads both scoped to a library, so a member-facing catalog was a scoped read
+   rather than a new contract.
 4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
    provenance, quota, content handling and the contributor role.
 5. **Album delete/archive**, then **TV publication** as a separate surface.
