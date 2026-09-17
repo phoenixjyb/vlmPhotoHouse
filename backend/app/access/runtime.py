@@ -91,6 +91,7 @@ class RuntimeConfiguration:
     original_roots: tuple[Path, ...]
     derived_root: Path
     photo_cache: object = None
+    discovery_indexes: tuple[Path, ...] = ()
 
     def build_app(self, *, clock=time.time):
         """Build only; storage is opened lazily in the request's worker thread.
@@ -98,9 +99,19 @@ class RuntimeConfiguration:
         No environment variables, .env, existing model settings, implicit roots,
         proxy trust or production credentials are consulted. Missing/wrong storage
         returns generic 503 from protected routes. The public code shell remains.
+
+        `discovery_indexes` is empty by default, so discovery stays unmounted from
+        every existing deployment's behaviour: with no paths the routes answer 503.
+        Supplying paths is an explicit operator opt-in and the artifacts are loaded
+        and validated here, so a missing or stale artifact refuses at startup rather
+        than silently degrading to 503 and looking unconfigured.
         """
         database = ExistingDatabase(self.database)
         access = AccessRuntime(database, self.web_origin, clock=clock)
         media = MediaRuntime(self.original_roots, self.derived_root, self.photo_cache)
+        discovery = None
+        if self.discovery_indexes:
+            from .discovery_index import runtime as discovery_runtime
+            discovery = discovery_runtime(access, self.discovery_indexes)
         from ..main import create_app
-        return create_app(access_runtime=access, media_runtime=media)
+        return create_app(access_runtime=access, media_runtime=media, discovery_runtime=discovery)

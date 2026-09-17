@@ -145,7 +145,13 @@ class PhoneDiscoveryHttpTests(unittest.TestCase):
         for method,path in [('HEAD','facets'),('POST','facets'),('GET','search'),('OPTIONS','search')]:
             r=self.client.request(method,BASE+'/'+path,headers=self.auth);self.assertEqual(r.status_code,403)
         default=TestClient(create_app(access_runtime=self.fixture.access),base_url=ORIGIN)
-        self.addCleanup(default.close);self.assertEqual(default.get(BASE+'/facets',headers=self.auth).status_code,403)
+        self.addCleanup(default.close)
+        # The default app mounts the reviewed routes but holds no reviewed index
+        # runtime, so it refuses instead of serving candidate data.
+        denied=default.get(BASE+'/facets',headers=self.auth)
+        self.assertEqual(denied.status_code,503)
+        self.assertEqual(set(denied.json()),{'error','detail'})
+        self.assertEqual(denied.json()['error'],'discovery_unavailable')
         route=next(r for r in self.fixture.app.routes if r.path==BASE.replace('family-a','{library_id}')+'/facets')
         old=route.endpoint;route.endpoint=lambda:None
         try:self.assertEqual(self.get().status_code,403)

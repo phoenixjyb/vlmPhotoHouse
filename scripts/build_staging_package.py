@@ -22,7 +22,8 @@ FILES = tuple(sorted([
         '__init__','schema','provisioning','admission','runtime','provisioning_apply',
         'transport','credentials','members','recovery','owner_recovery','library','metadata','media',
         'boundary','service','bootstrap','stories','story_schema','people','management_schema','albums','management_import','face_jobs',
-        'ownership_repair','tags')),
+        'ownership_repair','tags',
+        'discovery','discovery_provider','discovery_transport','discovery_index')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -34,6 +35,7 @@ FILES = tuple(sorted([
         'd8e5b2f7a904_library_management',
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
+    'scripts/prepare_access_discovery_index.py',
     'scripts/check_access_environment.py', 'scripts/rehearse_fullsize_database.py',
     'scripts/apply_access_schema.py', 'docs/security/SCHEMA_APPLICATION.md',
     'backend/app/photo_delivery.py', 'backend/app/home_feed.py',

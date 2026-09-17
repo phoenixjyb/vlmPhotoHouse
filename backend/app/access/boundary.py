@@ -12,6 +12,7 @@ from .stories import router as story_router
 from .people import router as people_router
 from .tags import router as tag_router
 from .albums import router as album_router
+from .discovery_transport import router as discovery_router
 from ..routers.ui import router as ui_router
 
 
@@ -26,7 +27,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router)
+                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -79,6 +80,10 @@ class ClosedBoundary:
         if method == 'POST' and re.fullmatch(r'/libraries/[^/]+/members/[^/]+/revoke', path):
             return True
         if method == 'GET' and (path == '/assets' or re.fullmatch(r'/assets/(?:detail/[0-9]+|[0-9]+/captions)', path)):
+            return True
+        if method == 'GET' and re.fullmatch(r'/libraries/[^/]+/discovery/v1/facets', path):
+            return True
+        if method == 'POST' and re.fullmatch(r'/libraries/[^/]+/discovery/v1/search', path):
             return True
         return method in {'GET', 'HEAD'} and bool(re.fullmatch(
             r'/(?:assets/[0-9]+/(?:media|thumbnail|display)|faces/[0-9]+/crop)', path))
