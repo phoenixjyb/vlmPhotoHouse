@@ -90,7 +90,16 @@ Three stages:
 unassigned upload unservable **by construction**, rather than by an authorization check that
 could later be misconfigured. The media route resolves an original from `row['path']` and
 requires it to sit under a configured root, so bytes in `INCOMING` are unreachable even if an
-authorization decision were wrong.
+authorization decision were wrong. `UploadRuntime` refuses an incoming root that overlaps any
+original root, so the property cannot be lost by a later configuration change.
+
+**Naming caution for whoever configures this.** On the deployed host the configured originals
+root is *itself* named for incoming material — it is the live media root holding the family's
+originals, not a staging area — and the volume around it is a numbered content pipeline. So an
+incoming area must be a **new sibling**, never a subfolder of the originals root, and the name
+must not reuse the word already taken by that root. The deployment entry point's accepted
+configuration fields do not yet include an incoming root, so that entry point needs a change
+before any of this can be switched on.
 
 ### Review, and why there is no UI for it
 
