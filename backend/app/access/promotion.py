@@ -30,6 +30,7 @@ from .runtime import ExistingDatabase
 
 PROMOTE_OPERATION = 'promote_and_assign_uploads'
 REASSIGN_OPERATION = 'reassign_library_assets'
+UNASSIGN_OPERATION = 'unassign_library_assets'
 MAX_ASSETS = 10000
 # Promoted member photos are grouped so they stay traceable inside the originals root rather
 # than scattered flat among the family's own folders.
@@ -109,6 +110,8 @@ class _PromotionState(_PlanState):
             return self._promote_state(target)
         if operation == REASSIGN_OPERATION:
             return self._reassign_state(target)
+        if operation == UNASSIGN_OPERATION:
+            return self._unassign_state(target)
         raise PlanRejected('Invalid plan')
 
     def _promote_state(self, target):
@@ -180,6 +183,44 @@ class _PromotionState(_PlanState):
                 'originals_granted': False, 'media_writes': False, 'moves_between_libraries': True}
 
 
+    def _unassign_state(self, target):
+        if set(target) != {'library_id', 'operator_account_id', 'asset_ids'}:
+            raise PlanRejected('Invalid plan')
+        db = self.access.db
+        now = self.access._now()
+        library = _library(target['library_id'])
+        actor = target['operator_account_id']
+        revision = _operator(db, actor, library, now)
+        values = _ids(target)
+        fingerprints = []
+        total = 0
+        for start in range(0, len(values), 500):
+            chunk = values[start:start + 500]
+            rows = db.execute('''SELECT a.id,a.path,a.hash_sha256,a.status,a.file_size,
+                    u.incoming_label,u.batch,u.state,m.library_id
+                FROM assets a JOIN access_uploads u ON u.asset_id=a.id
+                JOIN access_asset_libraries m ON m.asset_id=a.id
+                WHERE a.id IN (''' + ','.join('?' for _ in chunk) + ') ORDER BY a.id', chunk).fetchall()
+            if len(rows) != len(chunk):
+                raise PlanRejected('Every selected asset must be a promoted upload')
+            for row in rows:
+                # Restricted to promoted uploads on purpose. An asset with no provenance row
+                # could never be promoted again, because promotion requires that row, so
+                # un-assigning one would be a one-way door out of every library.
+                if (row[3] not in (None, 'active') or row[7] != 'assigned'
+                        or row[8] != library):
+                    raise PlanRejected('Only promoted uploads in this library can be un-assigned')
+                fingerprints.append(list(row))
+                total += row[4]
+        audience, current = _audience(db, library, now)
+        return {'operator_revision': str(revision),
+                'asset_state': self._mac('upload-unassignment', fingerprints),
+                'count': len(values), 'bytes_to_return': total,
+                'audience_state': self._mac('library-audience', audience), 'current_readers': len(current),
+                'current_original_readers': sum(bool(member[5]) for member in current),
+                'originals_granted': False, 'media_writes': True, 'moves_between_libraries': False}
+
+
 class PromotionPlanner(_PromotionState):
     def __init__(self, connection, *, clock=time.time):
         super().__init__(connection, clock=clock)
@@ -201,6 +242,15 @@ class PromotionPlanner(_PromotionState):
                 or len(set(asset_ids)) != len(asset_ids)):
             raise PlanRejected('Explicit unique integer asset IDs required')
         return self._plan(REASSIGN_OPERATION, {'library_id': _library(library_id),
+            'operator_account_id': operator_account_id,
+            'asset_ids': [str(item) for item in sorted(asset_ids)]})
+
+    def unassign(self, *, library_id, operator_account_id, asset_ids):
+        if (not isinstance(asset_ids, list) or not 1 <= len(asset_ids) <= MAX_ASSETS
+                or any(type(item) is not int for item in asset_ids)
+                or len(set(asset_ids)) != len(asset_ids)):
+            raise PlanRejected('Explicit unique integer asset IDs required')
+        return self._plan(UNASSIGN_OPERATION, {'library_id': _library(library_id),
             'operator_account_id': operator_account_id,
             'asset_ids': [str(item) for item in sorted(asset_ids)]})
 
@@ -334,6 +384,73 @@ def promote_and_assign(envelope, *, review, clock=time.time):
             except OSError:
                 pass
         raise PlanRejected('Promotion failed; no partial operation committed') from None
+
+
+def unassign_assets(envelope, *, review, clock=time.time):
+    """Return promoted uploads to the incoming area and unmap them.
+
+    The exact inverse of promotion, **including the file move**. Leaving the bytes in the
+    originals root would make the photo un-promotable again, because promotion requires the
+    recorded path to sit inside the incoming root — so an un-assign that skipped the move would
+    be a one-way door dressed up as an undo.
+
+    Restricted to assets that carry upload provenance and are currently assigned, so a photo that
+    never came through upload cannot be made unrecoverable this way.
+    """
+    envelope = _checked_envelope(envelope, review, UNASSIGN_OPERATION)
+    incoming = _directory(review.incoming_root, 'Explicit incoming root required')
+    originals = _directory(review.originals_root, 'Explicit originals root required')
+    if incoming.resolve().is_relative_to(originals.resolve()) or originals.resolve().is_relative_to(incoming.resolve()):
+        raise PlanRejected('The incoming root must sit outside every original root')
+    returned = []
+    try:
+        with ExistingDatabase(review.database)() as db:
+            state = _PromotionState(db, clock=clock)
+            with state.access._transaction(write=True):
+                if _identity(review.database) != review.database_identity:
+                    raise PlanRejected('Unassignment target changed')
+                plan = envelope['plan']
+                if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
+                              (plan['plan_id'], review.plan_digest)).fetchone():
+                    raise PlanRejected('Plan already applied')
+                state._validate_in_transaction(envelope)
+                target = plan['target']
+                library = target['library_id']
+                rows = db.execute('''SELECT a.id,a.path,u.incoming_label,u.batch,u.bytes
+                    FROM assets a JOIN access_uploads u ON u.asset_id=a.id
+                    WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
+                    ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
+                for asset_id, path, label, batch, size in rows:
+                    source = Path(path)
+                    # The recorded path must be inside the originals root, or the operator is
+                    # applying against the wrong roots and nothing should move.
+                    if not source.is_absolute() or not source.resolve().is_relative_to(originals.resolve()):
+                        raise PlanRejected('Recorded path is outside the originals root')
+                    info = source.lstat()
+                    if not stat.S_ISREG(info.st_mode) or info.st_size != size:
+                        raise PlanRejected('Promoted file changed since planning')
+                    destination = incoming / label / batch / source.name
+                    _place(source, destination)
+                    returned.append((source, destination))
+                    db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
+                    db.execute("UPDATE access_uploads SET state='incoming' WHERE asset_id=?", (asset_id,))
+                    db.execute('DELETE FROM access_asset_libraries WHERE asset_id=?', (asset_id,))
+                receipt = _receipt(state, plan, review, {
+                    'library_id': library, 'asset_count': len(rows),
+                    'bytes_returned': sum(row[4] for row in rows), 'media_writes': True})
+                _record(state, plan, receipt)
+                _assert_unexpired(state, plan)
+                if db.execute('PRAGMA foreign_key_check').fetchone():
+                    raise PlanRejected('Unassignment barrier failed')
+            return receipt
+    except sqlite3.Error:
+        for source, destination in reversed(returned):
+            try:
+                if destination.exists() and not source.exists():
+                    _place(destination, source)
+            except OSError:
+                pass
+        raise PlanRejected('Unassignment failed; no partial operation committed') from None
 
 
 def reassign_assets(envelope, *, review, clock=time.time):

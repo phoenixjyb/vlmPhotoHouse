@@ -100,7 +100,7 @@ def parser():
     result = Parser(description=__doc__)
     commands = result.add_subparsers(dest='command', required=True)
     for name in ('plan-owner', 'plan-assets', 'plan-management', 'plan-face-job', 'plan-person-repair', 'validate', 'review', 'apply', 'receipt',
-                 'plan-promote', 'plan-reassign', 'validate-promotion', 'apply-promotion',
+                 'plan-promote', 'plan-reassign', 'plan-unassign', 'validate-promotion', 'apply-promotion',
                  'plan-recovery', 'validate-recovery', 'review-recovery', 'apply-recovery'):
         command = commands.add_parser(name)
         command.add_argument('--database', required=True, type=Path)
@@ -143,11 +143,11 @@ def execute(args, *, clock=time.time):
     from app.access.owner_recovery import (OwnerRecoveryPlanner, review_owner_recovery_backup,
                                            recover_owner_library)
     from app.access.promotion import (PROMOTE_OPERATION, PromotionPlanner, PromotionReview,
-                                      promote_and_assign, reassign_assets)
+                                      promote_and_assign, reassign_assets, unassign_assets)
     from app.access.provisioning_apply import _identity
     recovery = args.command.endswith('-recovery')
-    promotion = args.command in ('plan-promote', 'plan-reassign', 'validate-promotion',
-                                 'apply-promotion')
+    promotion = args.command in ('plan-promote', 'plan-reassign', 'plan-unassign',
+                                 'validate-promotion', 'apply-promotion')
     planner_type = (OwnerRecoveryPlanner if recovery
                     else PromotionPlanner if promotion else ProvisioningPlanner)
     reviewer = review_owner_recovery_backup if recovery else review_backup
@@ -179,6 +179,8 @@ def execute(args, *, clock=time.time):
                 envelope = planner.promote(**request)
             elif args.command == 'plan-reassign':
                 envelope = planner.reassign(**request)
+            elif args.command == 'plan-unassign':
+                envelope = planner.unassign(**request)
             elif args.command == 'plan-owner':
                 envelope = planner.owner(phone=request['phone_login'], library_id=request['library_id'])
             elif args.command == 'plan-management':
@@ -221,8 +223,9 @@ def execute(args, *, clock=time.time):
             plan_digest=digest, authority_reference=args.authority_reference,
             incoming_root=selected_path(args.incoming_root),
             originals_root=selected_path(args.originals_root))
-        apply = (promote_and_assign if envelope['plan']['operation'] == PROMOTE_OPERATION
-                 else reassign_assets)
+        apply = {PROMOTE_OPERATION: promote_and_assign,
+                 'unassign_library_assets': unassign_assets,
+                 'reassign_library_assets': reassign_assets}[envelope['plan']['operation']]
         receipt = apply(envelope, review=review, clock=clock)
         return receipt_summary(receipt) | {'applied': True}
     # A saved review is never deserialized. Both commands construct a fresh local

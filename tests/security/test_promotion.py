@@ -22,8 +22,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 from app.access.bootstrap import bootstrap_owner
 from app.access.library import LibraryReads
-from app.access.promotion import (PROMOTE_OPERATION, REASSIGN_OPERATION, PromotionPlanner,
-                                  PromotionReview, promote_and_assign, reassign_assets)
+from app.access.promotion import (PROMOTE_OPERATION, REASSIGN_OPERATION, UNASSIGN_OPERATION,
+                                  PromotionPlanner, PromotionReview, promote_and_assign,
+                                  reassign_assets, unassign_assets)
 from app.access.provisioning import PlanRejected
 from app.access.runtime import ExistingDatabase
 from app.access.service import AccessService
@@ -252,6 +253,64 @@ class PromotionTests(unittest.TestCase):
         self.planned('reassign', library_id='family-b',
                      operator_account_id=self.owner_id, asset_ids=[900])
 
+    def promote(self, asset_id, library='family-a'):
+        envelope = self.planned('promote', library_id=library,
+                                operator_account_id=self.owner_id, asset_ids=[asset_id])
+        return promote_and_assign(envelope, review=self.review(envelope), clock=lambda: NOW)
+
+    def test_unassign_returns_the_photo_to_pending_and_it_can_be_promoted_again(self):
+        """The round trip is the point: an undo that cannot be redone is not an undo."""
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        self.promote(asset_id)
+        self.assertIn(str(asset_id), self.gallery(self.owner_token))
+
+        envelope = self.planned('unassign', library_id='family-a',
+                                operator_account_id=self.owner_id, asset_ids=[asset_id])
+        self.assertEqual(envelope['plan']['operation'], UNASSIGN_OPERATION)
+        receipt = unassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW)
+        self.assertEqual(receipt['asset_count'], 1)
+        # Invisible again, unmapped, and back in the incoming area with a matching row.
+        self.assertNotIn(str(asset_id), self.gallery(self.owner_token))
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,)), [])
+        self.assertEqual(self.rows('SELECT state FROM access_uploads WHERE asset_id=?', (asset_id,))[0][0],
+                         'incoming')
+        stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (asset_id,))[0][0])
+        self.assertTrue(stored.is_relative_to(self.incoming.resolve()), stored)
+        self.assertTrue(stored.exists())
+        # And the same plan can be made and applied again, which is what makes this an undo.
+        self.promote(asset_id)
+        self.assertIn(str(asset_id), self.gallery(self.owner_token))
+        # Three receipts: the first promotion, the un-assignment, and the second promotion.
+        self.assertEqual(len(self.rows('SELECT 1 FROM access_provisioning_receipts')), 3)
+
+    def test_unassign_refuses_an_asset_that_never_came_through_upload(self):
+        """An asset with no provenance row could never be promoted again, so this is a one-way door."""
+        with self.assertRaises(PlanRejected):
+            self.planned('unassign', library_id='family-a',
+                         operator_account_id=self.owner_id, asset_ids=[900])
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=900')[0][0],
+                         'family-a', 'the mapping must be untouched')
+
+    def test_unassign_requires_an_owner_of_that_library(self):
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        self.promote(asset_id)
+        for actor in (self.member_id, self.other_id):
+            with self.subTest(actor=actor):
+                with self.assertRaises(PlanRejected):
+                    self.planned('unassign', library_id='family-a',
+                                 operator_account_id=actor, asset_ids=[asset_id])
+
+    def test_unassign_refuses_an_asset_in_another_library(self):
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        self.promote(asset_id)
+        with self.assertRaises(PlanRejected):
+            self.planned('unassign', library_id='family-b',
+                         operator_account_id=self.other_id, asset_ids=[asset_id])
+
     def test_a_plan_is_bound_to_its_database_and_review(self):
         uploaded = self.upload()
         envelope = self.planned('promote', library_id='family-a',
@@ -281,6 +340,9 @@ class PromotionCliTests(PromotionTests):
         self.cli = cli
         self.request = self.root / 'request.json'
         self.plan = self.root / 'plan.json'
+        # write_new_plan never overwrites, so every sealed plan needs a fresh file.
+        self.plan2 = self.root / 'plan2.json'
+        self.plan3 = self.root / 'plan3.json'
 
     def call(self, command, *args):
         output, error = self.io.StringIO(), self.io.StringIO()
@@ -289,10 +351,11 @@ class PromotionCliTests(PromotionTests):
                                  clock=lambda: NOW)
         return code, (json.loads(output.getvalue()) if output.getvalue() else None), error.getvalue()
 
-    def plan_promotion(self, asset_ids):
+    def plan_promotion(self, asset_ids, out=None):
         self.request.write_text(json.dumps({'library_id': 'family-a',
             'operator_account_id': self.owner_id, 'asset_ids': asset_ids}))
-        code, result, error = self.call('plan-promote', '--request', self.request, '--out', self.plan)
+        code, result, error = self.call('plan-promote', '--request', self.request,
+                                        '--out', out or self.plan)
         self.assertEqual((code, error), (0, ''))
         self.assertEqual(result['operation'], PROMOTE_OPERATION)
         return result
@@ -327,6 +390,41 @@ class PromotionCliTests(PromotionTests):
         self.assertEqual(code, 2)
         self.assertTrue(error.startswith('Operator command refused'), error)
         self.assertEqual(self.rows('SELECT 1 FROM access_provisioning_receipts'), [])
+
+    def test_plan_unassign_round_trips_through_the_operator_tool(self):
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        planned = self.plan_promotion([asset_id])
+        code, applied, error = self.call('apply-promotion', '--plan', self.plan,
+            '--reviewed-plan-digest', planned['plan_digest'],
+            '--authority-reference', 'synthetic-authority',
+            '--incoming-root', self.incoming, '--originals-root', self.originals)
+        self.assertEqual((code, error), (0, ''))
+        self.assertTrue(applied['applied'])
+
+        self.request.write_text(json.dumps({'library_id': 'family-a',
+            'operator_account_id': self.owner_id, 'asset_ids': [asset_id]}))
+        code, planned_unassign, error = self.call('plan-unassign', '--request', self.request,
+                                                  '--out', self.plan2)
+        self.assertEqual((code, error), (0, ''))
+        self.assertEqual(planned_unassign['operation'], UNASSIGN_OPERATION)
+        code, undone, error = self.call('apply-promotion', '--plan', self.plan2,
+            '--reviewed-plan-digest', planned_unassign['plan_digest'],
+            '--authority-reference', 'synthetic-authority',
+            '--incoming-root', self.incoming, '--originals-root', self.originals)
+        self.assertEqual((code, error), (0, ''))
+        self.assertTrue(undone['applied'])
+        self.assertEqual(undone['asset_count'], 1)
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,)), [])
+        # And the same command promotes it again, so the tool offers a real undo.
+        planned_again = self.plan_promotion([asset_id], out=self.plan3)
+        code, reapplied, error = self.call('apply-promotion', '--plan', self.plan3,
+            '--reviewed-plan-digest', planned_again['plan_digest'],
+            '--authority-reference', 'synthetic-authority',
+            '--incoming-root', self.incoming, '--originals-root', self.originals)
+        self.assertEqual((code, error), (0, ''))
+        self.assertTrue(reapplied['applied'])
 
     def test_plan_reassign_is_available_and_validates(self):
         self.make_owner_of_both()
