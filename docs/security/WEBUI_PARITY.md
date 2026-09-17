@@ -11,9 +11,8 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`492b7e4`, the tip the member tag-catalog slice, its
-contract reissue and the payload-allowlist repair produced; the ledger commit adds only
-this file):
+Measured counts on this source (`0ea0075`, the tip the protected discovery wiring slice
+produced; the ledger commit adds only this file):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
@@ -33,11 +32,18 @@ acceptance.
 
 The two routes that are *not* reachable from the protected UI are
 `GET /libraries/{id}/discovery/v1/facets` and `POST /libraries/{id}/discovery/v1/search`.
-Both are composed only by `app/phone_discovery_candidate.create_candidate()`, which
-requires an explicit `DiscoveryRuntime` built from operator-supplied, in-memory
-`ReviewedIndex` records (`backend/app/access/discovery_provider.py`). They are not
-wired into the production protected app, so this is **not** a case of a finished
-capability hiding behind a missing button.
+As of the 2026-09-17 wiring slice they **are** mounted in the default protected app and
+served through the closed boundary, so they are no longer confined to the standalone
+`app/phone_discovery_candidate.create_candidate()` factory. What is still absent is any
+control in the protected UI that calls them — this remains a source-level reachability
+statement, not a claim that the capability is unusable or that a member can filter.
+
+Enabling them is an explicit operator act: `RuntimeConfiguration.discovery_indexes`
+defaults to empty, and an artifact must be produced offline and loaded by
+`backend/app/access/discovery_index.py`, which re-validates it through the service's own
+`validate` and index budget before a runtime exists. With no opt-in the routes refuse
+`503 discovery_unavailable` after the usual authorization-first check, so a member
+cannot filter until the UI gap is closed deliberately.
 
 ## Dispositions
 
