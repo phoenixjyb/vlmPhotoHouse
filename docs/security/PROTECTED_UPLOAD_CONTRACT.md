@@ -38,6 +38,19 @@ contract depends on: **an asset with no row in that table is invisible to every 
 
 That is exactly the state an incoming upload should be in.
 
+**A photo cannot be in two libraries, and no indirect path reaches across.** Because
+`asset_id` is the primary key, the classification is exclusive; and the other two
+library-scoped entities cannot be used to route around it:
+
+- **Albums** — `albums.py` filters an album's assets by joining `access_asset_libraries` on
+  the *reading* library, and refuses to save an album whose assets are not all mapped to it.
+  A foreign reference is not rendered: the row is excluded and `needs_review` flips true.
+- **People** — a person is owned by one library (`access_person_libraries`), and `_person()`
+  **denies** access when the owner is a different library even if faces exist locally; a
+  person with no face in this library is not listed at all.
+- **Discovery** — the index is derived per library from `scoped_source`, which joins the same
+  table, so a photo is in at most one library's index by construction.
+
 ## Decisions taken by the owner (2026-09-17)
 
 | question | decision |
@@ -129,6 +142,10 @@ of `access_asset_libraries`, a photo cannot be in two libraries. So if the famil
 photo to the wrong library, **there is currently no reviewed way to move it** — only a new
 reviewed operation would provide one. Either accept that, or add a bounded "reassign" plan
 before opening upload to members.
+
+The codebase already expects moves to be possible even though nothing provides one: the album
+read carries the comment *"A moved/deleted asset is excluded, including its ID and cover
+reference."* So the defensive handling exists; only the reviewed operation does not.
 
 ## Required schema change
 
