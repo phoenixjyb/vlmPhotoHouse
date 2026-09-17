@@ -100,6 +100,7 @@ def parser():
     result = Parser(description=__doc__)
     commands = result.add_subparsers(dest='command', required=True)
     for name in ('plan-owner', 'plan-assets', 'plan-management', 'plan-face-job', 'plan-person-repair', 'validate', 'review', 'apply', 'receipt',
+                 'plan-promote', 'plan-reassign', 'validate-promotion', 'apply-promotion',
                  'plan-recovery', 'validate-recovery', 'review-recovery', 'apply-recovery'):
         command = commands.add_parser(name)
         command.add_argument('--database', required=True, type=Path)
@@ -123,6 +124,13 @@ def parser():
                     command.add_argument('--review-digest', required=True)
                 if name == 'apply':
                     command.add_argument('--all-writers-stopped', action='store_true')
+            if name == 'apply-promotion':
+                # No backup and no restore reference: promotion and reassignment restore
+                # nothing, so the review carries the roots and the operator's own ticket.
+                command.add_argument('--reviewed-plan-digest', required=True)
+                command.add_argument('--authority-reference', required=True)
+                command.add_argument('--incoming-root', required=True, type=Path)
+                command.add_argument('--originals-root', required=True, type=Path)
     return result
 
 
@@ -134,8 +142,14 @@ def execute(args, *, clock=time.time):
     from app.access.provisioning_apply import plan_digest, review_backup, apply_reviewed
     from app.access.owner_recovery import (OwnerRecoveryPlanner, review_owner_recovery_backup,
                                            recover_owner_library)
+    from app.access.promotion import (PROMOTE_OPERATION, PromotionPlanner, PromotionReview,
+                                      promote_and_assign, reassign_assets)
+    from app.access.provisioning_apply import _identity
     recovery = args.command.endswith('-recovery')
-    planner_type = OwnerRecoveryPlanner if recovery else ProvisioningPlanner
+    promotion = args.command in ('plan-promote', 'plan-reassign', 'validate-promotion',
+                                 'apply-promotion')
+    planner_type = (OwnerRecoveryPlanner if recovery
+                    else PromotionPlanner if promotion else ProvisioningPlanner)
     reviewer = review_owner_recovery_backup if recovery else review_backup
     application = recover_owner_library if recovery else apply_reviewed
     database = selected_path(args.database)
@@ -153,12 +167,18 @@ def execute(args, *, clock=time.time):
         if args.command == 'plan-person-repair':
             expected = {'library_id', 'operator_account_id', 'person_id', 'asset_ids',
                         'quiescence_reference', 'provenance_reference'}
+        if promotion:
+            expected = {'library_id', 'operator_account_id', 'asset_ids'}
         if set(request) != expected:
             raise OperatorError('Unexpected request fields')
         with ExistingDatabase(database, read_only=True)() as connection:
             planner = planner_type(connection, clock=clock)
             if recovery:
                 envelope = planner.recover(**request)
+            elif args.command == 'plan-promote':
+                envelope = planner.promote(**request)
+            elif args.command == 'plan-reassign':
+                envelope = planner.reassign(**request)
             elif args.command == 'plan-owner':
                 envelope = planner.owner(phone=request['phone_login'], library_id=request['library_id'])
             elif args.command == 'plan-management':
@@ -184,10 +204,27 @@ def execute(args, *, clock=time.time):
         receipt = json.loads(row[0])
         return receipt_summary(receipt) | {'receipt_found': True}
     envelope = read_json(args.plan)
-    if args.command in ('validate', 'validate-recovery'):
+    if args.command in ('validate', 'validate-recovery', 'validate-promotion'):
         with ExistingDatabase(database, read_only=True)() as connection:
             result = planner_type(connection, clock=clock).validate(envelope)
         return result | {'plan_digest': plan_digest(envelope)}
+    if promotion:
+        # Promotion restores no backup, so the review is built from the roots and the operator's
+        # own ticket rather than from a restore point. A saved review is still never
+        # deserialized: this constructs a fresh one, and only this command may write.
+        if args.command != 'apply-promotion':
+            raise OperatorError('Invalid operator command')
+        digest = plan_digest(envelope)
+        if not hmac.compare_digest(digest, args.reviewed_plan_digest):
+            raise OperatorError('Exact reviewed plan digest required')
+        review = PromotionReview(database=database, database_identity=_identity(database),
+            plan_digest=digest, authority_reference=args.authority_reference,
+            incoming_root=selected_path(args.incoming_root),
+            originals_root=selected_path(args.originals_root))
+        apply = (promote_and_assign if envelope['plan']['operation'] == PROMOTE_OPERATION
+                 else reassign_assets)
+        receipt = apply(envelope, review=review, clock=clock)
+        return receipt_summary(receipt) | {'applied': True}
     # A saved review is never deserialized. Both commands construct a fresh local
     # review; only the distinct apply command can call the write service.
     restore_options = {}
@@ -222,8 +259,11 @@ def review_digest(review):
 
 
 def receipt_summary(receipt):
-    # No phone, password, invitation, token, media path, raw key or SQL dump.
-    return {key: receipt[key] for key in ('plan_id', 'plan_digest', 'operation', 'actor_account_id', 'task_id') if key in receipt} | {'applied': True}
+    # No phone, password, invitation, token, media path, raw key or SQL dump. Library IDs and
+    # counts are already visible to an operator through the reviewed plan.
+    keys = ('plan_id', 'plan_digest', 'operation', 'actor_account_id', 'task_id', 'library_id',
+            'asset_count', 'bytes_promoted', 'source_libraries')
+    return {key: receipt[key] for key in keys if key in receipt} | {'applied': True}
 
 
 def main(argv=None, *, clock=time.time):

@@ -6,6 +6,7 @@ promotion would leave `assets.path` outside the originals root, so the photo wou
 library and still unviewable.
 """
 from contextlib import closing
+import json
 from pathlib import Path
 import sqlite3
 import struct
@@ -85,7 +86,10 @@ class PromotionTests(unittest.TestCase):
         self.incoming = self.root / '00_MEMBER_UPLOADS'
         self.originals = self.root / '01_INCOMING'
         self.originals.mkdir()
-        self.access = AccessRuntime(self.connection, 'https://photohouse.test', clock=lambda: NOW)
+        # ExistingDatabase is the closing context manager AccessRuntime expects; a raw
+        # sqlite3.connect here would leak a connection on every call.
+        self.access = AccessRuntime(ExistingDatabase(self.path.resolve()),
+                                    'https://photohouse.test', clock=lambda: NOW)
         self.uploads = UploadRuntime(self.access, self.incoming, (self.originals,))
 
     def connection(self):
@@ -97,6 +101,12 @@ class PromotionTests(unittest.TestCase):
     def rows(self, sql, args=()):
         with closing(self.connection()) as db:
             return db.execute(sql, args).fetchall()
+
+    def gallery(self, token):
+        """Read the gallery and close the connection; a leak shows up as a ResourceWarning."""
+        with closing(self.connection()) as db:
+            reads = LibraryReads(AccessService(db, clock=lambda: NOW))
+            return [str(item['id']) for item in reads.gallery(token, 'family-a')['items']]
 
     def upload(self, data=None, filename='photo.png'):
         return self.uploads.store(self.member_token, data or png(640, 480), filename, BATCH)
@@ -120,9 +130,7 @@ class PromotionTests(unittest.TestCase):
         uploaded = self.upload()
         asset_id = int(uploaded['asset_id'])
         # Invisible before: it is in no library.
-        reads = LibraryReads(AccessService(self.connection(), clock=lambda: NOW))
-        self.assertNotIn(str(asset_id),
-                         [str(item['id']) for item in reads.gallery(self.owner_token, 'family-a')['items']])
+        self.assertNotIn(str(asset_id), self.gallery(self.owner_token))
         envelope = self.planned('promote', library_id='family-a',
                                 operator_account_id=self.owner_id, asset_ids=[asset_id])
         self.assertEqual(envelope['plan']['operation'], PROMOTE_OPERATION)
@@ -141,9 +149,7 @@ class PromotionTests(unittest.TestCase):
                                    (asset_id,))[0][0], 'family-a')
         self.assertEqual(len(self.rows('SELECT 1 FROM access_provisioning_receipts')), 1)
         # And it is now visible, which is the point of the operation.
-        reads = LibraryReads(AccessService(self.connection(), clock=lambda: NOW))
-        self.assertIn(str(asset_id),
-                      [str(item['id']) for item in reads.gallery(self.owner_token, 'family-a')['items']])
+        self.assertIn(str(asset_id), self.gallery(self.owner_token))
         # The incoming copy is gone, so nothing is left behind to be reviewed twice.
         self.assertEqual(list(self.incoming.rglob('*.png')), [])
 
@@ -206,7 +212,7 @@ class PromotionTests(unittest.TestCase):
 
     def make_owner_of_both(self):
         """A reassignment takes a photo away from one audience, so one person must own both."""
-        with self.connection() as db:
+        with closing(self.connection()) as db:
             db.execute('''INSERT INTO access_memberships
                 (account_id,library_id,status,role,revision,approved_by)
                 VALUES (?,?,'approved','owner',1,?)''', (self.owner_id, 'family-b', self.other_id))
@@ -260,3 +266,94 @@ class PromotionTests(unittest.TestCase):
         tampered['plan']['target'] = dict(tampered['plan']['target'], library_id='family-b')
         with self.assertRaises(PlanRejected):
             promote_and_assign(tampered, review=self.review(envelope), clock=lambda: NOW)
+
+
+class PromotionCliTests(PromotionTests):
+    """The same operations, driven through the operator tool an operator would actually use."""
+
+    def setUp(self):
+        super().setUp()
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        self.io, self.redirect = io, (redirect_stdout, redirect_stderr)
+        sys.path.insert(0, str(ROOT / 'scripts'))
+        import provision_access as cli
+        self.cli = cli
+        self.request = self.root / 'request.json'
+        self.plan = self.root / 'plan.json'
+
+    def call(self, command, *args):
+        output, error = self.io.StringIO(), self.io.StringIO()
+        with self.redirect[0](output), self.redirect[1](error):
+            code = self.cli.main([command, '--database', str(self.path), *map(str, args)],
+                                 clock=lambda: NOW)
+        return code, (json.loads(output.getvalue()) if output.getvalue() else None), error.getvalue()
+
+    def plan_promotion(self, asset_ids):
+        self.request.write_text(json.dumps({'library_id': 'family-a',
+            'operator_account_id': self.owner_id, 'asset_ids': asset_ids}))
+        code, result, error = self.call('plan-promote', '--request', self.request, '--out', self.plan)
+        self.assertEqual((code, error), (0, ''))
+        self.assertEqual(result['operation'], PROMOTE_OPERATION)
+        return result
+
+    def test_plan_promote_then_apply_promotion(self):
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        planned = self.plan_promotion([asset_id])
+        # A read-only validation must succeed and grant nothing.
+        code, validated, error = self.call('validate-promotion', '--plan', self.plan)
+        self.assertEqual((code, error), (0, ''))
+        self.assertTrue(validated['valid'])
+        self.assertFalse(validated['applied'])
+        code, applied, error = self.call('apply-promotion', '--plan', self.plan,
+            '--reviewed-plan-digest', planned['plan_digest'],
+            '--authority-reference', 'synthetic-authority',
+            '--incoming-root', self.incoming, '--originals-root', self.originals)
+        self.assertEqual((code, error), (0, ''))
+        self.assertTrue(applied['applied'])
+        self.assertEqual(applied['library_id'], 'family-a')
+        self.assertEqual(applied['asset_count'], 1)
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,))[0][0], 'family-a')
+
+    def test_apply_promotion_requires_the_exact_reviewed_digest(self):
+        uploaded = self.upload()
+        self.plan_promotion([int(uploaded['asset_id'])])
+        code, _result, error = self.call('apply-promotion', '--plan', self.plan,
+            '--reviewed-plan-digest', '0' * 64,
+            '--authority-reference', 'synthetic-authority',
+            '--incoming-root', self.incoming, '--originals-root', self.originals)
+        self.assertEqual(code, 2)
+        self.assertTrue(error.startswith('Operator command refused'), error)
+        self.assertEqual(self.rows('SELECT 1 FROM access_provisioning_receipts'), [])
+
+    def test_plan_reassign_is_available_and_validates(self):
+        self.make_owner_of_both()
+        self.request.write_text(json.dumps({'library_id': 'family-b',
+            'operator_account_id': self.owner_id, 'asset_ids': [900]}))
+        code, result, error = self.call('plan-reassign', '--request', self.request, '--out', self.plan)
+        self.assertEqual((code, error), (0, ''))
+        self.assertEqual(result['operation'], REASSIGN_OPERATION)
+        code, validated, error = self.call('validate-promotion', '--plan', self.plan)
+        self.assertEqual((code, error), (0, ''))
+        self.assertEqual(validated['operation'], REASSIGN_OPERATION)
+        # validate reports identity only; the reviewed state lives in the sealed plan itself.
+        expected = json.loads(self.plan.read_text())['plan']['expected']
+        self.assertEqual(expected['source_libraries'], ['family-a'])
+        self.assertTrue(expected['moves_between_libraries'])
+        self.assertFalse(expected['media_writes'])
+
+    def test_the_promotion_commands_do_not_appear_for_the_backup_review_flow(self):
+        """Promotion restores no backup, so it must not silently accept --backup or --restore-reference."""
+        for flag in ('--backup', '--restore-reference'):
+            with self.subTest(flag=flag):
+                output, error = self.io.StringIO(), self.io.StringIO()
+                with self.redirect[0](output), self.redirect[1](error):
+                    code = self.cli.main(['apply-promotion', '--database', str(self.path),
+                        '--plan', str(self.plan), '--reviewed-plan-digest', '0' * 64,
+                        '--authority-reference', 'synthetic-authority',
+                        '--incoming-root', str(self.incoming), '--originals-root', str(self.originals),
+                        flag, str(self.root / 'x')], clock=lambda: NOW)
+                self.assertEqual(code, 2)
+                self.assertNotIn('x', output.getvalue())

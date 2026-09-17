@@ -250,6 +250,7 @@ def _receipt(state, plan, review, extra):
     return {'version': 1, 'operation': plan['operation'], 'plan_id': plan['plan_id'],
             'plan_digest': review.plan_digest, 'applied_at': state.access._now(),
             'authority_reference': review.authority_reference,
+            'actor_account_id': plan['target']['operator_account_id'],
             'database_identity': list(review.database_identity),
             'reviewed_state': plan['expected'], 'originals_granted': False, **extra}
 

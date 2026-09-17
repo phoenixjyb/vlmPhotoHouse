@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 from app.access.bootstrap import bootstrap_owner
 from app.access.library import LibraryReads
+from app.access.runtime import ExistingDatabase
 from app.access.service import AccessDenied, AccessService
 from app.access.transport import AccessRuntime
 from app.access.upload import MAX_UPLOAD_BYTES, UploadRuntime, dimensions, sniff
@@ -84,7 +85,10 @@ class UploadTests(unittest.TestCase):
             self.template.backup(db)
         self.incoming = self.root / 'INCOMING'
         self.originals = self.root / 'originals'
-        self.access = AccessRuntime(self.connection, 'https://photohouse.test', clock=lambda: NOW)
+        # ExistingDatabase is the closing context manager AccessRuntime expects; a raw
+        # sqlite3.connect here would leak a connection on every call.
+        self.access = AccessRuntime(ExistingDatabase(self.path.resolve()),
+                                    'https://photohouse.test', clock=lambda: NOW)
         self.runtime = UploadRuntime(self.access, self.incoming, (self.originals,))
         for target in ('socket.socket.bind', 'socket.socket.connect', 'subprocess.Popen', 'os.system'):
             guard = patch(target, side_effect=AssertionError('External I/O forbidden'))
@@ -159,7 +163,7 @@ class UploadTests(unittest.TestCase):
         with closing(self.connection()) as db:
             existing = db.execute('SELECT hash_sha256 FROM assets WHERE id=900').fetchone()[0]
         # Upload the same content the mapped asset claims; the mapping must not be reused.
-        with self.connection() as db:
+        with closing(self.connection()) as db:
             db.execute('UPDATE assets SET hash_sha256=? WHERE id=900', (hashlib.sha256(png(32, 32)).hexdigest(),))
             db.commit()
         result = self.upload(png(32, 32))
@@ -168,7 +172,7 @@ class UploadTests(unittest.TestCase):
                                    (int(result['asset_id']),)), [])
 
     def test_a_revoked_member_cannot_upload(self):
-        with self.connection() as db:
+        with closing(self.connection()) as db:
             db.execute("UPDATE access_memberships SET status='revoked' WHERE account_id=?",
                        (self.member_id,))
             db.commit()
