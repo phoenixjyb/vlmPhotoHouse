@@ -18,11 +18,18 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 36 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 38 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 138 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 48 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Protected control ids | 150 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 49 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
+
+**The contract pin is Python-only.** The pinned closure is `backend/app/**/*.py` plus
+`backend/migrations/**/*.py`, `backend/alembic.ini`, the two requirements locks and one test
+JPEG — 97 Python files and no UI asset. `app.js`, `index.html` and `styles.css` are **not**
+pinned, so a slice that changes only the protected UI needs **no reissue**; the date/media
+filter slice below was pin-neutral for exactly that reason. A slice that adds or changes a
+*route* does drift the pin, because routes live in Python.
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -30,20 +37,18 @@ or anything about deployment. A control in the legacy page is evidence that the 
 UI *attempted* a feature, not proof it worked. Neither column is device or TV
 acceptance.
 
-The two routes that are *not* reachable from the protected UI are
-`GET /libraries/{id}/discovery/v1/facets` and `POST /libraries/{id}/discovery/v1/search`.
-As of the 2026-09-17 wiring slice they **are** mounted in the default protected app and
-served through the closed boundary, so they are no longer confined to the standalone
-`app/phone_discovery_candidate.create_candidate()` factory. What is still absent is any
-control in the protected UI that calls them — this remains a source-level reachability
-statement, not a claim that the capability is unusable or that a member can filter.
+**Every protected route is now reachable from the protected UI.** The last two that were
+not — `GET /libraries/{id}/discovery/v1/facets` and `POST /libraries/{id}/discovery/v1/search`
+— gained a control in the 2026-09-17 date/media filter slice (see below). Being reachable is
+a source-level property only: it does not mean the capability is switched on in any given
+deployment.
 
-Enabling them is an explicit operator act: `RuntimeConfiguration.discovery_indexes`
-defaults to empty, and an artifact must be produced offline and loaded by
+The filter is offered **only where the deployment has opted in**. `RuntimeConfiguration.
+discovery_indexes` defaults to empty, and an artifact must be produced offline and loaded by
 `backend/app/access/discovery_index.py`, which re-validates it through the service's own
-`validate` and index budget before a runtime exists. With no opt-in the routes refuse
-`503 discovery_unavailable` after the usual authorization-first check, so a member
-cannot filter until the UI gap is closed deliberately.
+`validate` and index budget. With no opt-in the routes refuse `503 discovery_unavailable`
+and the UI hides the panel entirely rather than showing a control that cannot work — absence
+of the filter is a deployment state, not an error a member can act on.
 
 ## Dispositions
 
@@ -68,7 +73,7 @@ cannot filter until the UI gap is closed deliberately.
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
 | Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails); photos-of-a-person and vector search absent | **GAP·CONTRACT** — the name+thumbnail half is now implemented; "all photos of this person" (`/search/person/{id}`) and face **vector** search are still not offered, deliberately |
 | Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | member-visible `GET /tags` and `GET /tags/{tag_id}/assets` (25/page, library-scoped) | **GAP·CONTRACT** — the catalog and tag-to-asset halves are now implemented (see "Closed in the member tag-catalog slice"); `/search/tags` autocomplete is still absent and tag **writes** stay EXCLUDED |
-| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | member-scoped `GET /libraries/{id}/discovery/v1/facets` and `POST …/discovery/v1/search` — **mounted in the default app, no UI control** | **GAP·CONTRACT** — the 2026-09-16 decision to open date/media filtering to members is approved and its transport is now mounted and boundary-admitted, but there is **no control in the protected UI** and the routes refuse `503 discovery_unavailable` until an operator opts in with an offline index artifact. Members still cannot filter. |
+| Date / media filtering | `/albums/time` | member-visible `#discovery-panel` → `GET /libraries/{id}/discovery/v1/facets` + `POST …/search` | **CLOSED 2026-09-17** for capture date and media kind (see "Closed in the member date/media filter slice"). It requires an operator index opt-in; without one the panel is hidden. A calendar or month view is still absent, so the *browsing* half of `/albums/time` is not reproduced. |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | **none — and no data path**: the protected asset projection is `a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at`, so no coordinate is ever selected | **GAP·CONTRACT** — needs a coarse-location privacy contract. The legacy endpoint returned raw `gps_lat`/`gps_lon` floats **and the asset's filesystem `path`**, up to 20,000 points per call; porting it as-is would leak precise location and server paths, and neither is replicated. `gps_lat`/`gps_lon` exist only in the original `0001_initial` schema; no protected code reads them. |
 | Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
 | Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | none | **GAP·CONTRACT** |
@@ -281,6 +286,46 @@ so nothing member-visible changed; members still cannot filter.
   the default app now imports `discovery_transport` and the bundle would otherwise fail at
   import. See `PROTECTED_PAYLOAD_UPGRADE_E718B84_RETURN.md`.
 
+## Closed in the member date/media filter slice
+
+- `#discovery-panel` — a sibling `details`, member-visible, and **hidden unless the
+  deployment has an index**. It is the control that finally reaches the two discovery routes
+  the wiring slice mounted.
+- Controls: a media-kind select (photos and videos / photos only / videos only), a date
+  `from` and `to` bounded by the range the facets route reports, Apply, and Clear. Nothing is
+  listed until a filter is chosen — the panel narrows, it does not duplicate the gallery
+  beneath it.
+- **Two independent refusals on the date range**, matching the page-jump precedent: the
+  inputs carry the captured range as native `min`/`max`, and the service independently
+  refuses an inverted or malformed range.
+- It is deliberately narrower than the legacy `/albums/time` surface it partially answers.
+  It offers **capture date and media kind only**: no path or filename search, no vector,
+  video-segment or person search, and no calendar or month view. `/albums/time` as a
+  *browsing* mode is not reproduced.
+- **Read-only by construction**: one form, one select, no file input, and no control that
+  could write. Results reuse the gallery's asset row and its `/assets/{id}/thumbnail` URL, so
+  the panel adds no new media surface and no new authorization surface.
+- **Two failure modes are explicit rather than silent.** With no index the routes answer
+  `503`, and the panel hides — a deployment state, not an error the member can act on. When
+  the snapshot goes stale the service answers `409`, and the panel clears its results and says
+  the library changed rather than showing a list the service no longer stands behind.
+- Browser checkpoint: *"Member narrows the library by date and media without any write
+  control"*. The load-bearing assertion is the **video** case: every fixture photo is an
+  image, so a video filter can only return zero if the filter reached the server rather than
+  the client rendering an unfiltered list.
+- **The checkpoint was mutation-tested, and the first version failed it.** The original video
+  assertion waited on an empty result list, which is *also* true while the request is in
+  flight — a hardcoded media kind survived it. It now waits on the response itself, and both
+  a hardcoded media kind (`24 !== 0`) and a dropped date filter (timeout) are caught. The
+  slice also fixed a real bug the checkpoint found: both date inputs were being given the
+  same bound as `min` *and* `max`, so the native validator silently blocked every request.
+- **The browser harness now exercises the whole chain.** It derives the artifact with the
+  real producer's own functions — in-process, because the harness forbids subprocess and
+  network I/O — and passes it through `RuntimeConfiguration.discovery_indexes`, so the
+  checkpoint covers producer → artifact → loader → runtime rather than a hand-written index.
+  Because the artifact is a whole-library snapshot and earlier scenarios change captions and
+  faces, the checkpoint refreshes it first through a new `refresh-discovery-index` scenario.
+
 ## Owner decisions on member-facing gaps (2026-09-16)
 
 The owner reviewed which currently owner-only capabilities may be opened to ordinary
@@ -309,15 +354,12 @@ no other row changed disposition as a result of this review.
 
 ## Recommended sequence
 
-1. **Date/media filtering** — still the narrowest genuinely useful family gap, and now the
-   *only* thing standing between members and it is UI plus an operator opt-in. The two
-   historical blockers are both settled: an operator-run offline producer supplies
-   `ReviewedIndex` (`scripts/prepare_access_discovery_index.py`), and the reviewed transport
-   is **mounted in the default app** as of `0ea0075` with its contract reissued as
-   `2.0.0-candidate.6` and deployed to the Windows host at `e718b84`. What remains is (a) a
-   control in the protected UI that calls those two routes, and (b) an operator who opts in
-   with `RuntimeConfiguration.discovery_indexes`. Until both, the routes answer `503
-   discovery_unavailable` and members cannot filter.
+1. **Date/media filtering** — **done as source** (`0ea0075` wiring, `e718b84` payload, plus the
+   2026-09-17 filter slice; see "Closed in the member date/media filter slice"). The two
+   historical blockers are settled and the UI control now exists. The only thing left is
+   **deployment**: an operator produces an artifact with `scripts/prepare_access_discovery_index.py`
+   and sets `RuntimeConfiguration.discovery_indexes`. Until then the routes answer `503` and
+   the panel stays hidden, which is the intended state rather than a defect.
 2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
    member people-directory slice; see "Closed in the member people-directory slice").
    Person *editing* stays owner-only.

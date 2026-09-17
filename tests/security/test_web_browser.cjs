@@ -783,6 +783,68 @@ let browser;
   await page.screenshot({path:path.join(artifacts,'member-tag-catalog.png'),fullPage:true});
   await page.locator('#tags-panel > summary').click();
   checkpoint('Member browses the read-only tag catalog and its photos without tag controls');
+  // Date/media narrowing over the reviewed discovery index. The transport is mounted in
+  // the default app but the index is an operator opt-in, so the panel is offered only
+  // where one exists. This harness supplies one via the real producer. The artifact is a
+  // whole-library snapshot, so refresh it first: earlier scenarios changed captions and
+  // faces, which the snapshot covers, and a stale one is refused rather than answered.
+  await mutate('refresh-discovery-index');
+  // Reload rather than re-authenticate: the member's session survives, and the reload is
+  // what makes the page re-probe availability against the rebuilt app.
+  await page.goto('https://photohouse.test/ui');
+  await page.locator('#library').waitFor({state:'visible'});
+  await page.locator('#discovery-panel').waitFor({state:'visible'});
+  assert.equal(await page.locator('#discovery-panel').isVisible(),true);
+  await page.locator('#discovery-panel > summary').click();
+  // Nothing is listed until a filter is chosen: the panel narrows, it does not duplicate
+  // the gallery below it.
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);
+  assert((await page.locator('#discovery-status').textContent()).length>0);
+  // Media narrowing. Every visible family-a photo is an image, so photos match and
+  // videos do not; the video case is the load-bearing one, because it can only return
+  // zero if the filter actually reached the server rather than the client showing
+  // everything. The library is already past one page here, because the page-jump
+  // checkpoint grew it, so the photo case also exercises bounded pagination.
+  await page.locator('#discovery-media').selectOption('image');
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),24);
+  assert.equal(await page.locator('#discovery-pages').isVisible(),true);
+  await page.locator('#discovery-list .tag-asset-card img').first().evaluate(img=>img.decode());
+  await page.locator('#discovery-media').selectOption('video');
+  // Wait on the response itself, not on a DOM state: the list is cleared and the status
+  // set to the loading text before the request goes out, so an empty list or a non-empty
+  // status are both also true mid-flight and would pass even if the filter were ignored.
+  const videoSearch=page.waitForResponse(response=>response.url().includes('/discovery/v1/search'));
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await videoSearch;
+  await pause(120);
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);
+  assert.equal(await page.locator('#discovery-pages').isVisible(),false);
+  // Date narrowing, bounded by what the facets route reported as the captured range. Only
+  // asset 102 was captured on or after this date, so this is a single-row answer.
+  await page.locator('#discovery-media').selectOption('all');
+  await page.locator('#discovery-from').fill('2026-01-02');
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').getAttribute('data-asset-id'),'102');
+  // A date outside the reported captured range is refused before any request: the native
+  // bounds carry the first refusal, and the previous result set is left untouched rather
+  // than replaced by an empty or unfiltered one.
+  await page.locator('#discovery-from').fill('2026-01-03');
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await pause(150);
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').getAttribute('data-asset-id'),'102');
+  // Read-only by construction: one form, one select, and nothing that could write.
+  assert.equal(await page.locator('#discovery-panel form').count(),1);
+  assert.equal(await page.locator('#discovery-panel select').count(),1);
+  assert.equal(await page.locator('#discovery-panel input[type="file"]').count(),0);
+  assert.equal(await page.locator('#people-panel').isVisible(),false);
+  await page.screenshot({path:path.join(artifacts,'member-discovery-filter.png'),fullPage:true});
+  await page.locator('#discovery-panel > summary').click();
+  checkpoint('Member narrows the library by date and media without any write control');
   await auth(owner,'+12025550100');
   await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();

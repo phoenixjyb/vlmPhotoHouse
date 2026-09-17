@@ -11,9 +11,42 @@ from test_library_reads import LibraryReadTests
 from app.access.runtime import RuntimeConfiguration
 from fastapi.testclient import TestClient
 
+ROOT = Path(__file__).resolve().parents[2]
+
 fixture = LibraryReadTests()
 LibraryReadTests.setUpClass()
 head_503 = False
+index_serial = 0
+
+
+def build_client():
+    """Build the protected app with an index produced by the real offline tool.
+
+    The artifact is derived from the *current* fixture database by the producer's own
+    functions, called in-process because this harness forbids subprocess and network I/O.
+    That keeps the browser checkpoint on the producer -> artifact -> loader -> runtime
+    chain instead of a hand-written index. A fresh file is written each call because the
+    producer refuses to overwrite, and the artifact is a whole-library snapshot: any later
+    mutation makes it stale, so a checkpoint running after one must refresh first.
+    """
+    global index_serial
+    from contextlib import closing
+    from dataclasses import asdict
+    import time
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import prepare_access_discovery_index as producer
+    index_serial += 1
+    out = root.resolve() / f'discovery-index-{index_serial}.json'
+    start = time.monotonic()
+    with closing(producer.open_read_only(fixture.path.resolve(), start)) as db:
+        index, _catalog = producer.derive(db, producer.library('family-a'), producer.revision('1'))
+    producer.write_new(out, json.dumps(asdict(index), sort_keys=True, ensure_ascii=True,
+                                       separators=(',', ':'), allow_nan=False).encode())
+    return TestClient(RuntimeConfiguration(fixture.path.resolve(), 'https://photohouse.test',
+        (originals,), derived, discovery_indexes=(out,)).build_app(clock=lambda:fixture.now),
+        base_url='https://photohouse.test', client=('192.0.2.20',23456))
+
+
 try:
     fixture.setUp()
     # Tiny generated JPEG fixtures, never real family media. Pillow is a test-only
@@ -29,10 +62,6 @@ try:
         image.save(derived / f'thumbnails/256/{asset_id}.jpg')
         image.save(originals / f'{asset_id}.jpg')
         fixture.mutate('UPDATE assets SET path=? WHERE id=?',(str(originals / f'{asset_id}.jpg'),asset_id))
-    fixture.client=TestClient(RuntimeConfiguration(fixture.path.resolve(), 'https://photohouse.test',
-        (originals,), derived).build_app(clock=lambda:fixture.now),
-        base_url='https://photohouse.test',client=('192.0.2.20',23456))
-    fixture.addCleanup(fixture.client.close)
     (derived/'faces/256').mkdir(parents=True)
     with fixture.connection() as db:
         for person,name in [(1,'Alice'),(2,'Shared person'),*[(i,f'Person {i:02}') for i in range(10,37)]]:
@@ -50,6 +79,8 @@ try:
         for tag_id,asset in ((1,101),(1,102),(2,101),(3,201),(4,103)):
             db.execute('INSERT INTO asset_tags(asset_id,tag_id,source) VALUES(?,?,?)',(asset,tag_id,'cap'))
         db.commit()
+    fixture.client = build_client()
+    fixture.addCleanup(fixture.client.close)
     print(json.dumps({'ready':True}),flush=True)
     for line in sys.stdin:
         message=json.loads(line)
@@ -122,6 +153,14 @@ try:
                     db.commit()
                 Image.new('RGB',(100,100),'#c9b8a8').save(derived/'faces/256/50.jpg')
                 Image.new('RGB',(100,100),'#a8b8c9').save(derived/'faces/256/301.jpg')
+            elif scenario=='refresh-discovery-index':
+                # Re-derive the reviewed index from the mutated database and rebuild the
+                # app. The artifact is a whole-library snapshot loaded once at startup, so
+                # any mutation makes it stale and the service answers 409 until it is
+                # re-derived and reloaded. This keeps the discovery checkpoint independent
+                # of whatever earlier scenarios changed.
+                fixture.client.close()
+                fixture.client = build_client()
             else:
                 raise ValueError('Unknown synthetic scenario')
             print(json.dumps({'id':message['id'],'ok':True}),flush=True);continue
