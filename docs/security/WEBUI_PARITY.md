@@ -11,8 +11,8 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`0ea0075`, the tip the protected discovery wiring slice
-produced; the ledger commit adds only this file):
+Measured counts on this source (`cf5e23b`, refreshed after the discovery wiring slice, its
+contract reissue, the Windows payload upgrade and the caption-worker resume):
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ produced; the ledger commit adds only this file):
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 138 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 48 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
-| Python security suite | 805 passed, 3 errors, 7 skipped | `pytest tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
+| Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -68,7 +68,7 @@ cannot filter until the UI gap is closed deliberately.
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
 | Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails); photos-of-a-person and vector search absent | **GAP·CONTRACT** — the name+thumbnail half is now implemented; "all photos of this person" (`/search/person/{id}`) and face **vector** search are still not offered, deliberately |
 | Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | member-visible `GET /tags` and `GET /tags/{tag_id}/assets` (25/page, library-scoped) | **GAP·CONTRACT** — the catalog and tag-to-asset halves are now implemented (see "Closed in the member tag-catalog slice"); `/search/tags` autocomplete is still absent and tag **writes** stay EXCLUDED |
-| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | none | **GAP·CONTRACT** — decision taken 2026-09-16: open date/media filtering to members; not yet implemented |
+| Date / calendar browsing | `/albums/time`, `/home/discovery/v3/calendar` | member-scoped `GET /libraries/{id}/discovery/v1/facets` and `POST …/discovery/v1/search` — **mounted in the default app, no UI control** | **GAP·CONTRACT** — the 2026-09-16 decision to open date/media filtering to members is approved and its transport is now mounted and boundary-admitted, but there is **no control in the protected UI** and the routes refuse `503 discovery_unavailable` until an operator opts in with an offline index artifact. Members still cannot filter. |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | none | **GAP·CONTRACT** (needs a coarse-location privacy contract; raw location must not be copied) |
 | Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
 | Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | none | **GAP·CONTRACT** |
@@ -147,11 +147,11 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports **3 errors** against this source (`805 passed, 3 errors,
-7 skipped`; 815 collected). They are errors rather than failures because each raises in
-fixture setup, not in an assertion. All three reproduce at the previous tip in a clean
-control worktree (`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same three
-node ids*, and none touch the WebUI:
+The Python suite reports **3 errors** against this source (`836 collected, 3 errors,
+7 skipped`). They are errors rather than failures because each raises in fixture setup, not
+in an assertion. All three reproduce at the pre-slice tip in a clean control worktree
+(`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same three node ids*, and none
+touch the WebUI:
 
 - `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
   process inspection is unavailable (`/bin/ps` is blocked).
@@ -161,10 +161,11 @@ node ids*, and none touch the WebUI:
   — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
 
-The 11 extra passes on this source are exactly the discovery-index producer slice's
-eleven new tests (the six tag-catalog tests were already counted in the 794). Because the
-*non-passing set* is identical on both sides, the earlier slices and this one are
-behaviour-neutral with respect to everything else in the tree.
+The 21 extra collected tests on this source are the discovery wiring slice's new loader and
+wiring tests; the 11 before them were the discovery-index producer slice's, and the six
+tag-catalog tests were already counted in the 794. Because the *non-passing set* is
+identical on both sides, every slice since is behaviour-neutral with respect to everything
+else in the tree.
 
 ## Closed in the owner-tools slice
 
@@ -275,8 +276,10 @@ so nothing member-visible changed; members still cannot filter.
   and one shared `ReadBudget`, which `MemoryIndexProvider` already satisfies, so the
   artifact loads straight into the reviewed HTTP candidate
   (`GET .../discovery/v1/facets`, `POST .../discovery/v1/search`) without new transport
-  design. The producer is deliberately not added to the Windows staging allowlist yet:
-  it has no consumer on the box until that candidate is mounted.
+  design. **Superseded 2026-09-17:** the producer and the four discovery modules are now in
+  the Windows staging allowlist and were deployed with the `e718b84` payload upgrade, because
+  the default app now imports `discovery_transport` and the bundle would otherwise fail at
+  import. See `PROTECTED_PAYLOAD_UPGRADE_E718B84_RETURN.md`.
 
 ## Owner decisions on member-facing gaps (2026-09-16)
 
@@ -306,17 +309,15 @@ no other row changed disposition as a result of this review.
 
 ## Recommended sequence
 
-1. **Date/media filtering** — still the narrowest genuinely useful family gap. Until now
-   it carried one dependency, and that is settled: an operator-run offline producer
-   supplies `ReviewedIndex` (see "Closed in the discovery-index producer slice"). The
-   transport is *also* already designed and reviewed rather than open:
-   `GET /libraries/{id}/discovery/v1/facets` and
-   `POST /libraries/{id}/discovery/v1/search`, composed only by
-   `app.phone_discovery_candidate.create_candidate()` and documented in
-   `PHONE_DISCOVERY_HTTP_CANDIDATE.md`. What remains is therefore wiring, not design —
-   building a `DiscoveryRuntime` from a provider loaded from the producer's artifact and
-   exposing those two routes in the default app. That adds routes, so it drifts the
-   pinned closure and is a coordinator call rather than an ordinary slice.
+1. **Date/media filtering** — still the narrowest genuinely useful family gap, and now the
+   *only* thing standing between members and it is UI plus an operator opt-in. The two
+   historical blockers are both settled: an operator-run offline producer supplies
+   `ReviewedIndex` (`scripts/prepare_access_discovery_index.py`), and the reviewed transport
+   is **mounted in the default app** as of `0ea0075` with its contract reissued as
+   `2.0.0-candidate.6` and deployed to the Windows host at `e718b84`. What remains is (a) a
+   control in the protected UI that calls those two routes, and (b) an operator who opts in
+   with `RuntimeConfiguration.discovery_indexes`. Until both, the routes answer `503
+   discovery_unavailable` and members cannot filter.
 2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
    member people-directory slice; see "Closed in the member people-directory slice").
    Person *editing* stays owner-only.
@@ -329,8 +330,10 @@ no other row changed disposition as a result of this review.
 4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
    provenance, quota, content handling and the contributor role.
 5. **Album delete/archive**, then **TV publication** as a separate surface.
-6. Discovery-driven browsing in the protected UI, once the provider question above is
-   answered; it must not be presented as a drop-in for legacy `/search`.
+6. **Discovery-driven browsing in the protected UI** — the provider question is answered and
+   the transport is mounted, so this is now purely the UI control from item 1. It must not
+   be presented as a drop-in for legacy `/search`: it offers date and media-kind narrowing
+   over a reviewed snapshot, not path/filename, vector, video-segment or person search.
 
 ## Acceptance gates
 
