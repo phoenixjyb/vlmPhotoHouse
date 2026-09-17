@@ -95,12 +95,38 @@ successive samples, five tasks finished within ten minutes, and the pending coun
 run). At the observed cadence the remaining queue is a multi-day drain, which is its normal
 mode.
 
+## Authenticated browser acceptance — DONE 2026-09-17 13:55 CST
+
+The plan's step 6 asks for a deliberate authenticated read as the only proof the new UI
+serves. The owner performed one against the configured public origin: logged in, opened the
+tags panel and the people directory, and reported both behaving normally.
+
+**Confirmed host-side, not taken on report.** The protected server has no request log, so
+the durable rows are the evidence:
+
+- `access_audit` gained a `login` row at **13:55:52 CST** (the previous login was the
+  day before at 15:57), and `access_sessions` gained the matching session, unrevoked, with
+  its normal 24-hour expiry.
+- No further audit rows were written, which is what read-only browsing should look like —
+  the tags and people reads are not mutations.
+- The API task is still Running on the **same process** as at 12:25, so the session was
+  served by the upgraded payload with no restart or crash in between; both
+  `production-server.{stdout,stderr}` are still 0 bytes, so nothing was logged as an
+  unhandled failure.
+- The live manifest still declares `e718b84`.
+
+**Access note for the next operator.** The service requires the request `Host` to equal the
+configured origin exactly (`backend/app/access/transport.py`), and the browser must be at
+that origin for its `Origin` and CSRF headers to match. A loopback port-forward — which
+exists on this setup and serves the UI shell happily — therefore **cannot** be used for the
+browser journey: the shell loads and every API call answers `400`. Use the configured public
+origin. A tunnel is still useful for host-side probing if the `Host` header is set
+explicitly.
+
 ## Not done
 
-- **No authenticated browser acceptance.** The plan's step 6 calls for one owner request
-  against the new viewer control as the only proof the new UI serves. That needs owner
-  credentials and the private relay, and is deliberately left to the owner. The evidence
-  above proves the service is up, composed and answering; it does not prove a member
-  journey.
+- **No member-role journey.** Only one account and one approved owner exist, so the
+  member-versus-owner distinction (owner panels staying hidden from a plain member) was not
+  exercised. That needs a viewer account and is a separate decision.
 - **No database change, no worker change, no other task touched.** The two
   `PhotoHouse-Home*` and legacy tasks were left alone.
