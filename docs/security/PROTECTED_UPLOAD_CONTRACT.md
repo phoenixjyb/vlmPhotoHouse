@@ -240,11 +240,12 @@ date/media filter slice, **this slice does drift the pin and needs a reissue**.
 - **One incoming folder or one per library** — settled by construction: the upload route carries
   no library, so there is exactly one incoming folder per account. A per-library folder would
   require choosing a library *at upload*, which is the thing this contract exists to avoid.
+- **Batch granularity** — **one folder per upload session**. The session is the review unit, the
+  provenance receipt and the "this whole batch → library X" action, so all three line up on the
+  same boundary.
+- **Who sets a display name** — **both**: the member supplies it at registration, and an
+  operator may set or change it. Registration is the ordinary path; the operator override
+  matters when a name is wrong or duplicated. It is the same field either way, so the folder
+  label rule above applies unchanged — a change never recomputes a stored label.
 
-## Still open
-
-- **Batch granularity** — proposed: one folder per upload session, so that the review unit, the
-  provenance receipt and a "this whole batch → library X" action all line up. Not yet confirmed.
-- **Who may set or change a display name** — the member at registration, an operator, or both.
-  Registration is the natural place; an operator override matters when a name is wrong or
-  duplicated.
+**No open items.** The contract is decided; implementation follows.
