@@ -79,15 +79,32 @@ def dimensions(data: bytes, mime: str):
 
 @dataclass(frozen=True)
 class UploadRuntime:
-    """Explicit incoming root only; construction must not stat anything or read settings."""
+    """Explicit roots only; construction must not stat anything or read settings.
 
+    The incoming root is required to sit **outside** every original root, and that is checked
+    here rather than trusted to the caller. It is what makes an unassigned upload unservable by
+    construction: the media route resolves an original from the stored path and requires it to
+    sit under a configured original root, so bytes here are unreachable even if a policy check
+    were later wrong.
+    """
+
+    access: object
     incoming_root: Path
+    original_roots: tuple[Path, ...]
 
     def __post_init__(self):
         if not isinstance(self.incoming_root, Path) or not self.incoming_root.is_absolute():
             raise ValueError('Explicit absolute incoming root required')
+        if not self.original_roots or any(not isinstance(p, Path) or not p.is_absolute()
+                                          for p in self.original_roots):
+            raise ValueError('Explicit absolute original roots required')
+        incoming = self.incoming_root.resolve()
+        for root in self.original_roots:
+            resolved = root.resolve()
+            if incoming.is_relative_to(resolved) or resolved.is_relative_to(incoming):
+                raise ValueError('The incoming root must sit outside every original root')
 
-    def store(self, access, token, data, filename, batch):
+    def store(self, token, data, filename, batch):
         """Accept one upload and return its public result.
 
         The file is written **outside** the write transaction, so a 25 MiB write never holds
@@ -98,6 +115,7 @@ class UploadRuntime:
         """
         from .service import AccessService
 
+        access = self.access
         if not isinstance(data, bytes) or not data or len(data) > MAX_UPLOAD_BYTES:
             raise AccessDenied('Access denied')
         if not isinstance(filename, str) or not filename or len(filename) > MAX_ORIGINAL_NAME:
@@ -112,7 +130,7 @@ class UploadRuntime:
 
         with access.connection_factory() as connection:
             service = AccessService(connection, clock=access.clock)
-            account_id, label = service.uploader(token)
+            _account_id, label = service.uploader(token)
 
         directory = self.incoming_root / label / batch
         directory.mkdir(parents=True, exist_ok=True)

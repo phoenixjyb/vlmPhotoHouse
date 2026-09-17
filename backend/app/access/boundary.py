@@ -13,6 +13,7 @@ from .people import router as people_router
 from .tags import router as tag_router
 from .albums import router as album_router
 from .discovery_transport import router as discovery_router
+from .upload_transport import router as upload_router
 from ..routers.ui import router as ui_router
 
 
@@ -27,7 +28,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router)
+                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router, upload_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -46,6 +47,10 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method == 'POST' and path == '/uploads':
+            # No library in the path: the upload is a pre-library action, so there is nothing
+            # library-scoped for this pattern to bind. The capability is checked in the service.
+            return True
         if method == 'GET' and path == '/library-albums': return True
         if method == 'POST' and path == '/admin/albums': return True
         if method == 'PUT' and re.fullmatch(r'/admin/albums/[0-9]+',path): return True

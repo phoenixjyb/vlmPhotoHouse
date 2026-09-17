@@ -92,6 +92,7 @@ class RuntimeConfiguration:
     derived_root: Path
     photo_cache: object = None
     discovery_indexes: tuple[Path, ...] = ()
+    incoming_root: Path | None = None
 
     def build_app(self, *, clock=time.time):
         """Build only; storage is opened lazily in the request's worker thread.
@@ -105,6 +106,11 @@ class RuntimeConfiguration:
         Supplying paths is an explicit operator opt-in and the artifacts are loaded
         and validated here, so a missing or stale artifact refuses at startup rather
         than silently degrading to 503 and looking unconfigured.
+
+        `incoming_root` is likewise unset by default, so upload answers 503 and no
+        deployment gains a write surface by accident. Supplying it constructs the runtime
+        here, which refuses an incoming root that overlaps an original root — the invariant
+        that keeps an unassigned upload unservable.
         """
         database = ExistingDatabase(self.database)
         access = AccessRuntime(database, self.web_origin, clock=clock)
@@ -113,5 +119,10 @@ class RuntimeConfiguration:
         if self.discovery_indexes:
             from .discovery_index import runtime as discovery_runtime
             discovery = discovery_runtime(access, self.discovery_indexes)
+        upload = None
+        if self.incoming_root is not None:
+            from .upload import UploadRuntime
+            upload = UploadRuntime(access, self.incoming_root, self.original_roots)
         from ..main import create_app
-        return create_app(access_runtime=access, media_runtime=media, discovery_runtime=discovery)
+        return create_app(access_runtime=access, media_runtime=media, discovery_runtime=discovery,
+                          upload_runtime=upload)

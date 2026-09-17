@@ -15,6 +15,7 @@ import unittest
 from unittest.mock import patch
 
 from alembic import command
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,8 +83,9 @@ class UploadTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             self.template.backup(db)
         self.incoming = self.root / 'INCOMING'
-        self.runtime = UploadRuntime(self.incoming)
+        self.originals = self.root / 'originals'
         self.access = AccessRuntime(self.connection, 'https://photohouse.test', clock=lambda: NOW)
+        self.runtime = UploadRuntime(self.access, self.incoming, (self.originals,))
         for target in ('socket.socket.bind', 'socket.socket.connect', 'subprocess.Popen', 'os.system'):
             guard = patch(target, side_effect=AssertionError('External I/O forbidden'))
             guard.start()
@@ -96,7 +98,7 @@ class UploadTests(unittest.TestCase):
         return db
 
     def upload(self, data, filename='photo.png', token=None, batch=BATCH):
-        return self.runtime.store(self.access, token or self.member_token, data, filename, batch)
+        return self.runtime.store(token or self.member_token, data, filename, batch)
 
     def rows(self, sql, args=()):
         with closing(self.connection()) as db:
@@ -185,6 +187,18 @@ class UploadTests(unittest.TestCase):
                 with self.assertRaises(AccessDenied):
                     self.upload(png(64, 64), batch=bad)
 
+    def test_the_incoming_root_must_not_overlap_an_original_root(self):
+        """This is the invariant that makes an unassigned upload unservable."""
+        for bad in (self.originals / 'INCOMING', self.root, self.originals):
+            with self.subTest(incoming=str(bad)):
+                with self.assertRaises(ValueError):
+                    UploadRuntime(self.access, bad, (self.originals,))
+        # The reverse nesting is refused too, not just the one direction.
+        with self.assertRaises(ValueError):
+            UploadRuntime(self.access, self.root / 'outer', (self.root / 'outer' / 'originals',))
+        # And the sibling layout this project actually uses is accepted.
+        self.assertIsInstance(self.runtime, UploadRuntime)
+
     def test_the_file_lands_under_the_members_own_label_and_batch(self):
         result = self.upload(png(640, 480))
         stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (int(result['asset_id']),))[0][0])
@@ -192,3 +206,82 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(stored.parent.name, BATCH)
         self.assertEqual(stored.parent.parent.name, result['incoming'])
         self.assertIn('-', result['incoming'])
+
+    def client(self, upload_runtime='configured'):
+        from app.main import create_app
+        return TestClient(
+            create_app(access_runtime=self.access,
+                       upload_runtime=self.runtime if upload_runtime == 'configured' else upload_runtime),
+            base_url='https://photohouse.test', client=('192.0.2.20', 23456))
+
+    def headers(self, **overrides):
+        base = {'Authorization': 'Bearer ' + self.member_token,
+                'Content-Type': 'application/octet-stream',
+                'X-Upload-Filename': 'photo.png', 'X-Upload-Batch': BATCH}
+        base.update(overrides)
+        return base
+
+    def test_route_answers_503_when_no_upload_runtime_is_configured(self):
+        """The default app mounts the route but grants nothing until an operator opts in."""
+        response = self.client(upload_runtime=None).post('/uploads', headers=self.headers(),
+                                                         content=png(64, 64))
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.rows('SELECT 1 FROM access_uploads'), [])
+
+    def test_route_requires_credentials(self):
+        anonymous = self.headers()
+        anonymous.pop('Authorization')
+        self.assertEqual(self.client().post('/uploads', headers=anonymous,
+                                            content=png(64, 64)).status_code, 401)
+
+    def test_route_requires_the_filename_and_batch_headers(self):
+        for missing in ('X-Upload-Filename', 'X-Upload-Batch'):
+            with self.subTest(missing=missing):
+                headers = self.headers()
+                headers.pop(missing)
+                self.assertEqual(self.client().post('/uploads', headers=headers,
+                                                    content=png(64, 64)).status_code, 400)
+
+    def test_route_refuses_a_wrong_content_type(self):
+        self.assertEqual(self.client().post('/uploads', headers=self.headers(**{'Content-Type': 'application/json'}),
+                                            content=png(64, 64)).status_code, 400)
+        self.assertEqual(self.client().post('/uploads', headers=self.headers(**{'Content-Encoding': 'gzip'}),
+                                            content=png(64, 64)).status_code, 400)
+
+    def test_route_refuses_an_oversize_declared_length_before_reading_the_body(self):
+        headers = self.headers(**{'Content-Length': str(MAX_UPLOAD_BYTES + 1)})
+        response = self.client().post('/uploads', headers=headers, content=b'')
+        self.assertEqual(response.status_code, 413)
+
+    def test_route_accepts_an_upload_that_stays_out_of_every_library(self):
+        response = self.client().post('/uploads', headers=self.headers(), content=png(640, 480))
+        self.assertEqual(response.status_code, 201)
+        body = response.json()
+        self.assertIsNone(body['library_id'])
+        self.assertEqual(body['tasks_enqueued'], 5)
+        asset_id = int(body['asset_id'])
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,)), [])
+        # And the library read still does not offer it.
+        reads = LibraryReads(AccessService(self.connection(), clock=lambda: NOW))
+        self.assertNotIn(str(asset_id),
+                         [str(item['id']) for item in reads.gallery(self.member_token, 'family-a')['items']])
+
+    def test_runtime_configuration_refuses_an_incoming_root_inside_an_original_root(self):
+        from app.access.runtime import RuntimeConfiguration
+        configuration = RuntimeConfiguration(self.path.resolve(), 'https://photohouse.test',
+                                              (self.originals,), self.root / 'derived',
+                                              incoming_root=self.originals / 'INCOMING')
+        with self.assertRaises(ValueError):
+            configuration.build_app()
+
+    def test_runtime_configuration_wires_the_upload_runtime_when_configured(self):
+        from app.access.runtime import RuntimeConfiguration
+        configuration = RuntimeConfiguration(self.path.resolve(), 'https://photohouse.test',
+                                              (self.originals,), self.root / 'derived',
+                                              incoming_root=self.incoming)
+        app = configuration.build_app(clock=lambda: NOW)
+        self.assertIsInstance(app.state.upload_runtime, UploadRuntime)
+        self.assertIsNone(RuntimeConfiguration(self.path.resolve(), 'https://photohouse.test',
+                                               (self.originals,), self.root / 'derived').build_app(
+            clock=lambda: NOW).state.upload_runtime)

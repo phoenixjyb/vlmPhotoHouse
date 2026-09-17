@@ -55,7 +55,8 @@ class ImportIsolationTests(unittest.TestCase):
                 self.assertIsNone(main.app.state.access_runtime)
                 self.assertIsNone(main.app.state.media_runtime)
                 self.assertIsNone(main.app.state.discovery_runtime)
-                self.assertEqual(len(main.app.routes), 48)
+                self.assertIsNone(main.app.state.upload_runtime)
+                self.assertEqual(len(main.app.routes), 49)
                 self.assertEqual(main.app.router.on_startup, [])
                 self.assertEqual(main.app.router.on_shutdown, [])
                 self.assertEqual(logging.getLogger().handlers, handlers)
@@ -166,7 +167,7 @@ class ClosedApplicationTests(unittest.TestCase):
         actual = [(method, route.path) for route in self.app.routes for method in route.methods]
         self.assertEqual(len(actual), len(set(actual)))
         self.assertEqual(set(actual), expected)
-        self.assertEqual(len(actual), 48)
+        self.assertEqual(len(actual), 49)
         for method, path in actual:
             sample = path.replace('{story_id}', '11111111-1111-4111-8111-111111111111')
             sample = re.sub(r'\{[^}]+\}', '1', sample)
