@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.5'
+VERSION = '2.0.0-candidate.6'
 
 
 def capture():

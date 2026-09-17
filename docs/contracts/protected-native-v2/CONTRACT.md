@@ -1,12 +1,59 @@
-# Protected native profile 2.0.0-candidate.5
+# Protected native profile 2.0.0-candidate.6
 
-Backend source: `2ced43e3063773d4344c04ba8f5de1d415fd4bf7`.
+Backend source: `0ea007535545003b0c7fc2bae5efad6b75132278`.
 Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.6
+
+`2.0.0-candidate.5` pinned source `2ced43e`. Mounting the already-reviewed protected
+discovery transport in the **default** application adds the offline artifact loader,
+`backend/app/access/discovery_index.py`, so the pinned `backend/app/**` closure count
+moves **100 → 101 files**. Three existing source hashes moved —
+`backend/app/access/boundary.py` for the two allowlist entries, `backend/app/main.py`
+for the router registration, and `backend/app/access/runtime.py` for the explicit
+opt-in — and one was added. This is a closure change, not merely a hash change.
+
+Like candidates.3–.5 and unlike candidate.2, this slice adds routes, and they are
+again **outside the wire surface this pack documents**. The 60 captured ASGI
+exchanges cover 28 paths and none of them is under `/libraries/*/discovery/`.
+Re-capturing all 60 exchanges against the new source reproduced `cases.json` byte for
+byte except for the version string, which is the measurement, not an assumption. A
+client already tested against candidate.5 needs no rework.
+
+What changed is the default application's **composition**, not its authorization. The
+two routes were already reviewed as a candidate capsule and were reachable only
+through the standalone `create_candidate()` factory; the default app now registers the
+same `discovery_transport` router, and the closed boundary admits exactly those two
+method/path pairs bound to endpoint identity as every other entry is. This is the one
+deliberate departure from the capsule's original statement that `create_app()` and its
+boundary "remain byte-identical" — that sentence is superseded here, and the default
+app's live route count moves **46 → 48**.
+
+Mounting a route is not enabling it. `DiscoveryRuntime` is supplied only through an
+explicit opt-in: `RuntimeConfiguration.discovery_indexes` defaults to empty, so every
+existing deployment keeps its current behaviour, and with no runtime the routes refuse
+`503 discovery_unavailable` after the same authorization-first check every other
+protected route performs — an unauthenticated caller is refused `401` before the
+runtime is even consulted. No index is derived, globbed or inferred from configuration:
+the operator-produced artifact is the only source, it is read read-only, and it is
+re-validated against the service's own `validate` and index budget before a runtime
+exists. Supplying paths is a deliberate operator act, and a missing or malformed
+artifact refuses at startup rather than silently degrading to 503, so a
+misconfiguration cannot masquerade as "not configured".
+
+The capability is unchanged: both routes are gated on `library.read`, so every
+approved role may read them and no new grant is introduced. Responses remain bounded
+and no-store, and neither route exposes a face crop, caption, coordinate, path or
+anonymous home URL. The pack's `client_profile_defaults` remain off. This reissue does
+**not** adopt anything for Android: the two routes are for a later reviewed client
+slice, and a native client must not treat them as part of this profile. Candidate.5
+was never adopted; this reissue supersedes it as the reviewed candidate and still
+requires explicit coordinator adoption.
 
 ## Reissue — 2.0.0-candidate.5
 

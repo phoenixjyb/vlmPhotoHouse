@@ -1,5 +1,97 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.6 — reissue after the protected discovery wiring slice (2026-09-17)
+
+Source baseline: `0ea007535545003b0c7fc2bae5efad6b75132278`.
+Branch: `master`. The two earlier commits of this session were pushed; the slice and this
+reissue are local.
+
+This reissue moves the pinned source closure and the pack version. Mounting the
+already-reviewed protected discovery transport in the **default** application adds the
+offline artifact loader `backend/app/access/discovery_index.py`, so the closure moves
+**100 → 101 files**: one added, three changed (`backend/app/access/boundary.py` for the
+two allowlist entries, `backend/app/main.py` for the router registration, and
+`backend/app/access/runtime.py` for the explicit opt-in), none removed.
+
+Like candidates.3–.5, this slice adds routes, and both are again **outside the wire
+surface this pack documents**. The 60 captured ASGI exchanges cover 28 paths and none of
+them is under `/libraries/*/discovery/`.
+
+**Wire neutrality was measured, not assumed.** `cases.json` was regenerated from a live
+capture against the new source and compared with the candidate.5 file: identical, 0 diff
+lines. After bumping the probe `VERSION`, re-capturing reproduced the committed file
+exactly — `capture() == cases.json` evaluated `True` at candidate.6. A client already
+tested against candidate.5 needs no rework.
+
+What changed is the default application's **composition**, not its authorization. The
+default app now registers the same `discovery_transport` router, and the closed boundary
+admits exactly those two method/path pairs bound to endpoint identity as every other
+entry is; the live route count moves **46 → 48**. This is the deliberate departure from
+the capsule's original statement that `create_app()` and its boundary remain
+byte-identical — that sentence is superseded by this reissue, and the route inventory
+gained the matching `app.include_router(discovery_router)` topology entry (199 discovered
+method/path entries, no UNINVENTORIED, STALE or TOPOLOGY CHANGED).
+
+Mounting is not enabling. `RuntimeConfiguration.discovery_indexes` defaults to empty, so
+every existing deployment keeps its current behaviour, and with no runtime the routes
+refuse `503 discovery_unavailable` after the same authorization-first check every other
+protected route performs — an unauthenticated caller is refused `401` before the runtime
+is consulted. No index is derived, globbed or inferred from configuration: the
+operator-produced artifact is the only source, it is read read-only, and it is
+re-validated through the service's own `validate` and index budget before a runtime
+exists.
+
+**The slice was mutation-tested, so the new tests are known to be able to fail.** Removing
+the two `allowed()` patterns from the closed boundary failed the admission test with
+`403 == 403`; removing `app.include_router(discovery_router)` failed the mounting test;
+relaxing the loader's exact key-set check failed the unexpected-key test; and disabling
+the loader's `OSError` guard failed the missing-artifact test with a raw
+`FileNotFoundError`. All four mutations were reverted byte-identically (SHA-256 compared
+against pre-mutation copies).
+
+```sh
+PYTHONPATH=tests/security:backend python -m unittest \
+  test_protected_native_contract test_access_foundation test_access_transport \
+  test_library_reads test_family_stories.FamilyStoryTests \
+  test_protected_photo_delivery test_closed_application test_phone_discovery \
+  test_discovery_index_producer test_discovery_wiring test_inventory
+```
+
+**211 tests passed in 18.5 seconds**, no skips — the candidate.5 receipt battery (170
+tests) plus this slice's 21 new wiring and loader tests plus `test_inventory` (20).
+
+`python3 scripts/verify_protected_native_contract.py`:
+`PASS 2.0.0-candidate.6: 60 cases; 101 source hashes; 7 payload hashes; profile defaults
+off`.
+
+All 101 source hashes were recomputed from the worktree while building the manifest, and
+the closure was re-derived independently (added 1, changed 3, removed 0) rather than
+carried forward. The database migration head remains `d8e5b2f7a904`.
+
+The whole `tests/security` tree was run with the same runner
+(`python -m unittest discover -s tests/security -t tests/security -p 'test_*.py'`):
+**836 collected / 3 errors / 7 skipped**. The collection count moves 815 → 836, which is
+exactly this slice's 21 new tests. Before this manifest was regenerated the run showed a
+fourth error — `test_manifest_pins_source_and_complete_payload`, failing with
+`Unexpected backend source pin` — which is the pin assertion this reissue satisfies, not a
+regression; the three remaining errors are the same pre-existing fixture-setup
+observations as candidate.5 (`/bin/ps` process inspection unavailable, the host-resource
+observation, and the `test_suppressed_ownership_repair` full-suite order dependence).
+
+Deploy gap — **this slice necessarily widens the payload allowlist.** The default app now
+imports `app.access.discovery_transport`, so the bundle would fail at import on the host
+unless the discovery modules ship. `scripts/build_staging_package.py` therefore gains four
+modules (`discovery`, `discovery_provider`, `discovery_transport`, `discovery_index`) and
+the producer script `scripts/prepare_access_discovery_index.py`, taking the allowlist
+**88 → 93 entries** and the relative-import closure inside `backend/app/**` to **0
+unresolved imports** (re-checked, not assumed). Against the deployed `4022a57` the
+allowlisted changed set moves **13 → 16 files (11 M, 5 A)**; `runtime.py` enters as a
+changed file and `discovery_index.py` plus the producer enter as additions. The host
+staging script's changed-file assertion must list all 16, and the three pins (bundle SHA,
+`runtime-pins.json:protected_manifest`, the commit asserted in `server_entry.py`) move
+with them. The pack itself is still not in the payload allowlist, so this reissue never
+moves the gap. Nothing was staged or deployed to the host.
+
 ## 2.0.0-candidate.5 — reissue after the member tag-catalog source slice
 
 Source baseline: `2ced43e3063773d4344c04ba8f5de1d415fd4bf7`.
