@@ -6,6 +6,7 @@ The connection must be to the existing PhotoHouse SQLite database. HTTP admissio
 TLS, cookies/CSRF and password recovery are separate, mandatory delivery gates.
 """
 from contextlib import contextmanager
+import json
 import math
 import secrets
 import sqlite3
@@ -13,8 +14,8 @@ import time
 import uuid
 
 from .credentials import (DUMMY_HASH, display_name as canonical_display_name, hash_password,
-                          invitation_code, invitation_digest, phone_login, session_digest,
-                          verify_password)
+                          incoming_label, invitation_code, invitation_digest, phone_login,
+                          session_digest, verify_password)
 
 
 class AccessDenied(Exception):
@@ -238,6 +239,81 @@ class AccessService:
                 member['available'] = bool(member['available'])
             return {'account_id': session['account_id'], 'phone_login': session['phone_login'],
                     'display_name': session['display_name'], 'memberships': memberships}
+
+    def uploader(self, token):
+        """The account and incoming label for an uploader, or a denial.
+
+        Gated on holding at least one approved, unexpired membership in an active library —
+        the `upload.submit` capability. No library is chosen here: upload is a pre-library
+        action, and which library a photo joins is an operator decision made later.
+        """
+        with self._transaction():
+            session = self._session(token)
+            if not self._may_submit(session['account_id']):
+                raise AccessDenied('Access denied')
+            return session['account_id'], incoming_label(session['display_name'],
+                                                         session['account_id'])
+
+    def _may_submit(self, account_id):
+        return self._one('''SELECT 1 FROM access_memberships m
+            JOIN access_libraries l ON l.id=m.library_id
+            WHERE m.account_id=? AND m.status='approved' AND l.state='active'
+            AND (m.expires_at IS NULL OR m.expires_at>?) LIMIT 1''',
+            (account_id, self._now())) is not None
+
+    def record_upload(self, token, label, batch, path, original_name, digest, size_bytes,
+                      mime, size):
+        """Write the asset, its provenance and its audit row, then enqueue the derived work.
+
+        Deliberately writes **no** `access_asset_libraries` row. An incoming photo is in no
+        library, so it is invisible to every member until an operator assigns it — that is what
+        makes accepting uploads from any approved member safe.
+
+        Dedup is scoped to this account's own incoming uploads. A hash matching an asset that
+        is already in a library must not return that asset's id, because doing so would confirm
+        the file exists elsewhere in the system.
+        """
+        with self._transaction(write=True):
+            session = self._session(token)
+            account_id = session['account_id']
+            # Re-checked inside the write transaction: a revocation between the file write and
+            # this row must still be honoured.
+            if not self._may_submit(account_id):
+                raise AccessDenied('Access denied')
+            existing = self._one("""SELECT asset_id FROM access_uploads
+                WHERE account_id=? AND sha256=? AND state='incoming'""", (account_id, digest))
+            if existing:
+                return self._upload_result(existing['asset_id'], label, batch, digest,
+                                           size_bytes, mime, size, 0)
+            self.db.execute('''INSERT INTO assets(path,hash_sha256,status,mime,width,height,file_size)
+                VALUES (?,?,'active',?,?,?,?)''',
+                (str(path), digest, mime, size[0], size[1], size_bytes))
+            asset_id = self.db.execute('SELECT last_insert_rowid()').fetchone()[0]
+            self.db.execute('''INSERT INTO access_uploads(asset_id,account_id,incoming_label,batch,
+                original_name,sha256,bytes,state,created_at) VALUES (?,?,?,?,?,?,?,'incoming',?)''',
+                (asset_id, account_id, label, batch, original_name, digest, size_bytes, self._now()))
+            self.db.execute('''INSERT INTO access_audit(actor_account,action,library_id,
+                target_account,occurred_at) VALUES (?,'upload.create',NULL,NULL,?)''',
+                (account_id, self._now()))
+            enqueued = 0
+            for kind, priority, extra in (('embed', 50, {'modality': 'image'}), ('phash', 60, None),
+                                          ('thumb', 80, None), ('caption', 110, None),
+                                          ('face', 120, None)):
+                payload = {'asset_id': asset_id}
+                if extra:
+                    payload.update(extra)
+                self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,
+                    scheduled_at,created_at) VALUES (?,?,'pending',?,datetime('now'),datetime('now'))''',
+                    (kind, json.dumps(payload, sort_keys=True), priority))
+                enqueued += 1
+            return self._upload_result(asset_id, label, batch, digest, size_bytes, mime, size,
+                                       enqueued)
+
+    @staticmethod
+    def _upload_result(asset_id, label, batch, digest, size_bytes, mime, size, enqueued):
+        return {'asset_id': str(asset_id), 'library_id': None, 'incoming': label, 'batch': batch,
+                'kind': 'image', 'width': size[0], 'height': size[1], 'sha256': digest,
+                'bytes': size_bytes, 'tasks_enqueued': enqueued}
 
     def set_display_name(self, operator_account_id: str, target_account_id: str, name: str):
         """An operator corrects or sets a member's name.
