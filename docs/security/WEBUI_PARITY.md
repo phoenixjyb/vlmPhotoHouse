@@ -23,7 +23,7 @@ this file):
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 138 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 48 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
-| Python security suite | 794 passed, 3 failed, 7 skipped | `pytest tests/security`; the 3 failures are pre-existing and unrelated (see "Known-red tests") |
+| Python security suite | 805 passed, 3 errors, 7 skipped | `pytest tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
 **Limits of this measure.** Reachability is a source-level property. It does not
 prove that a route authorizes correctly, that a control is operational at runtime,
@@ -141,10 +141,11 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports **3 failures** against this source (`794 passed, 3 failed,
-7 skipped` under `pytest tests/security`; 804 collected). All three reproduce at
-`d477d71` in a clean control worktree (`788 passed, 3 failed, 7 skipped`; 798
-collected), with the *same three node ids*, and none touch the WebUI:
+The Python suite reports **3 errors** against this source (`805 passed, 3 errors,
+7 skipped`; 815 collected). They are errors rather than failures because each raises in
+fixture setup, not in an assertion. All three reproduce at the previous tip in a clean
+control worktree (`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same three
+node ids*, and none touch the WebUI:
 
 - `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
   process inspection is unavailable (`/bin/ps` is blocked).
@@ -154,10 +155,10 @@ collected), with the *same three node ids*, and none touch the WebUI:
   — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
 
-The 6 extra passes on this source are exactly this slice's six new tag-catalog tests.
-Because the *failure set* is identical on both sides, the slice, its contract reissue and
-the payload-allowlist repair are behaviour-neutral with respect to everything else in the
-tree.
+The 11 extra passes on this source are exactly the discovery-index producer slice's
+eleven new tests (the six tag-catalog tests were already counted in the 794). Because the
+*non-passing set* is identical on both sides, the earlier slices and this one are
+behaviour-neutral with respect to everything else in the tree.
 
 ## Closed in the owner-tools slice
 
@@ -232,6 +233,45 @@ new privacy decision, which is why they could be closed first.
   not the foreign-only or deleted-only ones, and the panel exposes one input and one
   form and no control that could write.
 
+## Closed in the discovery-index producer slice
+
+This slice answers the dependency that blocked date/media filtering since it was
+approved: **who supplies `ReviewedIndex` in production**. It adds no route and no UI,
+so nothing member-visible changed; members still cannot filter.
+
+- `scripts/prepare_access_discovery_index.py` — an operator-run offline tool. It opens an
+  existing database read-only (`mode=ro`, `query_only=ON`, and an authorizer that permits
+  only `SELECT`/`READ`/`TRANSACTION` plus the single `length()` the projection uses), then
+  derives one `ReviewedIndex` for one library and writes it once with `O_EXCL`.
+- **It reads through the service's own code, not a copy of it**: `scoped_source`, `digest`
+  and the service's default `ReadBudget`, so the artifact is by construction one the
+  service can consume. A test asserts the produced `source_digest` and `scope_ids` equal
+  what the service computes for itself; a mutant that digests a narrower projection fails
+  five tests.
+- **It approves nothing.** `enabled` is exactly `('date','media')` and people, places,
+  assignments and regions are empty, because those two filters read native library fields
+  (`taken_at`, media kind) rather than operator assertions. Only a future
+  people/locations phase needs reviewed evidence, and it is not this tool's job to invent
+  it. A mutant that also enables `people` fails two tests.
+- **Freshness is whole-library, not incremental.** `scope_ids` is the full ordered visible
+  asset set and the digest covers the whole library projection, so one new photo — or a
+  finished caption batch, a new tag, a face assignment — invalidates the artifact. The
+  service answers `409 discovery_changed` rather than serving older results, and the
+  invalidation is confined to that library. Re-deriving re-emits the artifact; it does not
+  re-review anything.
+- Refusals, each with a test: implicit or indirect paths, an existing output file, a
+  revision that is not a canonical positive decimal, a library with no visible assets, and
+  a database missing any projected table. The database is verified unchanged after a run.
+- **No contract drift**: a new file under `scripts/` and a new test file are both outside
+  the pinned closure (only `scripts/home_media_worker.py` and three named test files are
+  in it), so the pack stayed at **100 source hashes** and this slice needed no reissue.
+- Where it feeds in: `DiscoveryRuntime` needs an object with a `get(library_id)` method
+  and one shared `ReadBudget`, which `MemoryIndexProvider` already satisfies, so the
+  artifact loads straight into the reviewed HTTP candidate
+  (`GET .../discovery/v1/facets`, `POST .../discovery/v1/search`) without new transport
+  design. The producer is deliberately not added to the Windows staging allowlist yet:
+  it has no consumer on the box until that candidate is mounted.
+
 ## Owner decisions on member-facing gaps (2026-09-16)
 
 The owner reviewed which currently owner-only capabilities may be opened to ordinary
@@ -246,8 +286,11 @@ implemented; one is not:
    artifact is exposed to a member. The person directory itself stays owner-only for
    edits.
 2. **Date / media filtering** — members may narrow a library by date and media kind.
-   This is the facet model already designed in the discovery provider, which is still
-   the open dependency (who supplies `ReviewedIndex` in production).
+   The dependency this used to carry (who supplies `ReviewedIndex`) is **answered**:
+   an operator-run offline producer derives it (`scripts/prepare_access_discovery_index.py`,
+   see "Closed in the discovery-index producer slice"). What remains is not a dependency
+   but work: nothing mounts the provider or exposes the filter yet, so members still
+   cannot use it.
 3. **Tags read-only catalog** — **implemented** as `GET /tags` and
    `GET /tags/{tag_id}/assets` (see "Closed in the member tag-catalog slice"). Members
    may browse the catalog and open a tag's photos. Tag *writes* remain EXCLUDED.
@@ -257,12 +300,17 @@ no other row changed disposition as a result of this review.
 
 ## Recommended sequence
 
-1. **Date/media filtering** — still the narrowest genuinely useful family gap, and still
-   carrying the one dependency it always had: the facet contract is designed
-   (`discovery` facets `date`, `media`), but production needs an answer for who supplies
-   `ReviewedIndex`. Until that is answered the only options are to pre-empt that contract
-   with a second, non-discovery filter surface, or to wait — which is a coordinator call,
-   not a slice.
+1. **Date/media filtering** — still the narrowest genuinely useful family gap. Until now
+   it carried one dependency, and that is settled: an operator-run offline producer
+   supplies `ReviewedIndex` (see "Closed in the discovery-index producer slice"). The
+   transport is *also* already designed and reviewed rather than open:
+   `GET /libraries/{id}/discovery/v1/facets` and
+   `POST /libraries/{id}/discovery/v1/search`, composed only by
+   `app.phone_discovery_candidate.create_candidate()` and documented in
+   `PHONE_DISCOVERY_HTTP_CANDIDATE.md`. What remains is therefore wiring, not design —
+   building a `DiscoveryRuntime` from a provider loaded from the producer's artifact and
+   exposing those two routes in the default app. That adds routes, so it drifts the
+   pinned closure and is a coordinator call rather than an ordinary slice.
 2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
    member people-directory slice; see "Closed in the member people-directory slice").
    Person *editing* stays owner-only.
