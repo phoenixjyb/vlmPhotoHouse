@@ -199,6 +199,25 @@ reviewed operation does not.
 **Out of scope:** un-accepting a photo, i.e. sending an assigned asset back to `INCOMING`.
 Reassign covers the mistake the family will actually make, which is the wrong library.
 
+## Deployment ordering
+
+This slice moves the required migration revision, and the worker gates move with it —
+`scoped_face_worker` (exact equality), `run_face_worker.REVISION`,
+`run_caption_worker.REVISIONS` and `apply_access_schema.TO_REVISION`. A payload carrying the
+new head therefore **refuses to run against an un-migrated database**: the caption worker stops
+rather than operating on a schema the code no longer matches.
+
+The owner's decision (2026-09-17) is **migrate first, then deploy**, so the gates stay exact and
+are deliberately *not* widened to accept two revisions. The sequence is:
+
+1. apply the migration to the host database, under the existing backup and rollback discipline;
+2. confirm the revision moved and that `access_uploads` exists;
+3. only then stage and start a payload carrying the new head.
+
+A migrated database on its own does **not** let members upload: `upload.submit` stays off in the
+deployed profile until the promotion path exists, so bytes would otherwise accumulate with no
+reviewed way into a library.
+
 ## Required schema changes
 
 Two, in one migration.
