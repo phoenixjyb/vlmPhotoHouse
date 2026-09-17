@@ -51,7 +51,7 @@ class AccessFoundationTests(unittest.TestCase):
         cls.owner_token = service.login(OWNER, PASSWORD)
         cls.other_token = service.login(OTHER_OWNER, PASSWORD)
         cls.member_code = service.invite(cls.owner_token, 'family-a', MEMBER)
-        cls.member_token = service.register(MEMBER, PASSWORD, cls.member_code)
+        cls.member_token = service.register(MEMBER, PASSWORD, cls.member_code, 'Synthetic Member')
         cls.member_id = service.profile(cls.member_token)['account_id']
         cls.template.executemany('INSERT INTO access_asset_libraries VALUES (?,?)',
                                 [(101, 'family-a'), (102, 'family-a'), (201, 'family-b')])
@@ -88,24 +88,24 @@ class AccessFoundationTests(unittest.TestCase):
 
     def test_registration_requires_correct_phone_and_owner_code(self):
         count = self.db.execute('SELECT COUNT(*) FROM access_accounts').fetchone()[0]
-        self.deny(lambda: self.service.register(NEW, PASSWORD, 'not-a-code'))
-        self.deny(lambda: self.service.register(NEW, PASSWORD, 'a' * 32))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, 'not-a-code', 'Synthetic Member'))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, 'a' * 32, 'Synthetic Member'))
         code = self.service.invite(self.owner_token, 'family-a', NEW)
-        self.deny(lambda: self.service.register('+12025550109', PASSWORD, code))
+        self.deny(lambda: self.service.register('+12025550109', PASSWORD, code, 'Synthetic Member'))
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM access_accounts').fetchone()[0], count)
-        token = self.service.register('+1 (202) 555-0103', PASSWORD, code.upper())
+        token = self.service.register('+1 (202) 555-0103', PASSWORD, code.upper(), 'Synthetic Member')
         self.assertEqual(self.service.profile(token)['phone_login'], NEW)
         self.assertEqual(self.service.require(token, 'family-a', 'library.read'), 1)
         self.deny(lambda: self.service.require(token, 'family-b', 'library.read'))
         self.deny(lambda: self.service.require(token, 'family-a', 'media.original.read'))
         self.deny(lambda: self.service.require_operator(token))
-        self.deny(lambda: self.service.register(NEW, PASSWORD, code))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, code, 'Synthetic Member'))
 
     def test_no_account_or_owner_created_without_invite_even_when_empty(self):
         empty = database()
         self.addCleanup(empty.close)
         service = AccessService(empty, clock=lambda: NOW)
-        self.deny(lambda: service.register(NEW, PASSWORD, 'a' * 32))
+        self.deny(lambda: service.register(NEW, PASSWORD, 'a' * 32, 'Synthetic Member'))
         self.assertEqual(empty.execute('SELECT COUNT(*) FROM access_accounts').fetchone()[0], 0)
         self.assertEqual(empty.execute('SELECT COUNT(*) FROM access_libraries').fetchone()[0], 0)
 
@@ -121,13 +121,13 @@ class AccessFoundationTests(unittest.TestCase):
     def test_expired_cancelled_and_replaced_codes_fail(self):
         expired = self.service.invite(self.owner_token, 'family-a', NEW, lifetime=1)
         self.now += 1
-        self.deny(lambda: self.service.register(NEW, PASSWORD, expired))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, expired, 'Synthetic Member'))
         cancelled = self.service.invite(self.owner_token, 'family-a', NEW)
         self.service.cancel_invitation(self.owner_token, 'family-a', cancelled)
-        self.deny(lambda: self.service.register(NEW, PASSWORD, cancelled))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, cancelled, 'Synthetic Member'))
         old = self.service.invite(self.owner_token, 'family-a', NEW)
         replacement = self.service.invite(self.owner_token, 'family-a', NEW)
-        self.deny(lambda: self.service.register(NEW, PASSWORD, old))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, old, 'Synthetic Member'))
         self.assertNotEqual(invitation_digest(old), invitation_digest(replacement))
 
     def test_inviter_revocation_expiry_or_library_closure_invalidates_code(self):
@@ -138,14 +138,14 @@ class AccessFoundationTests(unittest.TestCase):
             (f"UPDATE access_memberships SET expires_at={NOW} WHERE account_id=?", "UPDATE access_memberships SET expires_at=NULL WHERE account_id=?"),
         ]:
             self.update(sql, (self.owner_id,))
-            self.deny(lambda: self.service.register(NEW, PASSWORD, code))
+            self.deny(lambda: self.service.register(NEW, PASSWORD, code, 'Synthetic Member'))
             self.update(undo, (self.owner_id,))
         self.update("UPDATE access_libraries SET state='closed' WHERE id='family-a'")
-        self.deny(lambda: self.service.register(NEW, PASSWORD, code))
+        self.deny(lambda: self.service.register(NEW, PASSWORD, code, 'Synthetic Member'))
 
     def test_existing_account_accepts_invite_without_password_reset(self):
         code = self.service.invite(self.other_token, 'family-b', MEMBER)
-        self.deny(lambda: self.service.register(MEMBER, 'Attacker chosen passphrase!', code))
+        self.deny(lambda: self.service.register(MEMBER, 'Attacker chosen passphrase!', code, 'Synthetic Member'))
         self.deny(lambda: self.service.accept_invitation(self.owner_token, code))
         self.service.accept_invitation(self.member_token, code)
         self.assertEqual(self.service.list_asset_ids(self.member_token, 'family-b')['asset_ids'], [201])
@@ -236,7 +236,7 @@ class AccessFoundationTests(unittest.TestCase):
         code = self.service.invite(self.owner_token, 'family-a', NEW)
         with patch.object(self.service, '_audit', side_effect=RuntimeError('synthetic failure')):
             with self.assertRaises(RuntimeError):
-                self.service.register(NEW, PASSWORD, code)
+                self.service.register(NEW, PASSWORD, code, 'Synthetic Member')
         self.assertIsNone(self.db.execute('SELECT id FROM access_accounts WHERE phone_login=?', (NEW,)).fetchone())
         self.assertEqual(self.db.execute('SELECT consumed FROM access_invitations WHERE digest=?',
                                         (invitation_digest(code),)).fetchone()[0], 0)
@@ -255,7 +255,7 @@ class AccessFoundationTests(unittest.TestCase):
                 service = AccessService(conn, clock=lambda: NOW)
                 barrier.wait()
                 try:
-                    service.register(NEW, PASSWORD, code)
+                    service.register(NEW, PASSWORD, code, 'Synthetic Member')
                     return 'accepted'
                 except AccessDenied:
                     return 'denied'
@@ -275,7 +275,7 @@ class AccessFoundationTests(unittest.TestCase):
     def test_weak_password_does_not_consume_invitation(self):
         code = self.service.invite(self.owner_token, 'family-a', NEW)
         with self.assertRaises(ValueError):
-            self.service.register(NEW, 'short', code)
+            self.service.register(NEW, 'short', code, 'Synthetic Member')
         self.assertEqual(self.db.execute('SELECT consumed FROM access_invitations WHERE digest=?',
                                         (invitation_digest(code),)).fetchone()[0], 0)
 

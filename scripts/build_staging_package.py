@@ -32,7 +32,7 @@ FILES = tuple(sorted([
         '8a2f1c3d4b5e_captions_multi_variants','9b1e7d2a5c6f_caption_status_and_variant_meta',
         'a1c9d4e5f8b2_face_assignment_events','a5d2e8f4b610_legacy_read_schema',
         'b6e3f9a5c721_offline_receipts','c7f4a9e2b610_family_stories','c4e7a2d9f1b3_versioned_face_embeddings',
-        'd8e5b2f7a904_library_management',
+        'd8e5b2f7a904_library_management','f2a6d8b4c915_protected_upload',
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/prepare_access_discovery_index.py',
@@ -84,7 +84,7 @@ def package_bytes(commit, files):
     if set(files) != set(FILES):
         raise ValueError('Exact source allowlist required')
     manifest = {'format_version':1,'source_commit':commit,'artifact_kind':'source_only_not_deployed',
-        'migration_revision':'d8e5b2f7a904','dependencies_included':False,'private_configuration_included':False,
+        'migration_revision':'f2a6d8b4c915','dependencies_included':False,'private_configuration_included':False,
         'files':{name:hashlib.sha256(files[name]).hexdigest() for name in FILES}}
     output=io.BytesIO()
     with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_STORED) as archive:

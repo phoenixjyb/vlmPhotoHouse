@@ -9,7 +9,8 @@ STATEMENTS = (
         id TEXT PRIMARY KEY NOT NULL,
         phone_login TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
-        state TEXT NOT NULL DEFAULT 'active' CHECK(state IN ('active','disabled'))
+        state TEXT NOT NULL DEFAULT 'active' CHECK(state IN ('active','disabled')),
+        display_name TEXT
     )""",
     """CREATE TABLE access_sessions (
         digest TEXT PRIMARY KEY NOT NULL,

@@ -119,7 +119,7 @@ class OfflineRecoveryTests(unittest.TestCase):
             with self.assertRaises(AccessDenied): service.login(OWNER, PASSWORD)
             with self.assertRaises(AccessDenied): service.profile(fixtures.LibraryReadTests.owner_token)
             with self.assertRaises(AccessDenied): service.list_asset_ids(fixtures.LibraryReadTests.member_token, 'family-a')
-            with self.assertRaises(AccessDenied): service.register(NEW, PASSWORD, self.code)
+            with self.assertRaises(AccessDenied): service.register(NEW, PASSWORD, self.code, 'Synthetic Member')
 
     def test_real_asgi_rejects_restored_cookie_bearer_and_range_without_opening_media(self):
         plan = self.plan(); self.apply(plan, self.review(plan))

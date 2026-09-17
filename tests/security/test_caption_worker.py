@@ -60,7 +60,7 @@ class CaptionWorkerTests(unittest.TestCase):
             worker.preflight(self.db, 'd2b7e4f6a901')
 
     def test_each_supported_revision_requires_exact_read_only_selection(self):
-        revisions = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904')
+        revisions = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904', 'f2a6d8b4c915')
         self.assertEqual(worker.REVISIONS, revisions)
         for actual in revisions:
             with closing(sqlite3.connect(self.db)) as db:
@@ -80,12 +80,12 @@ class CaptionWorkerTests(unittest.TestCase):
 
     def test_migrated_schema_does_not_bypass_running_caption_gate(self):
         with closing(sqlite3.connect(self.db)) as db:
-            db.execute("UPDATE alembic_version SET version_num='d8e5b2f7a904'")
+            db.execute("UPDATE alembic_version SET version_num='f2a6d8b4c915'")
             db.execute("INSERT INTO tasks VALUES ('caption','running')")
             db.commit()
         before = self.db.read_bytes()
         with self.assertRaises(worker.Refused):
-            worker.preflight(self.db, 'd8e5b2f7a904')
+            worker.preflight(self.db, 'f2a6d8b4c915')
         self.assertEqual(before, self.db.read_bytes())
 
     def test_unknown_revision_refuses(self):

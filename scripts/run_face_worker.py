@@ -18,7 +18,7 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-REVISION = 'd8e5b2f7a904'
+REVISION = 'f2a6d8b4c915'
 KINDS = ('person_cluster', 'person_recluster', 'person_label_propagate')
 
 

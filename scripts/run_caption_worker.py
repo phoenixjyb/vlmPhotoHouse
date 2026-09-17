@@ -17,7 +17,7 @@ import threading
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-REVISIONS = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904')
+REVISIONS = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904', 'f2a6d8b4c915')
 NUMBERS = {
     'CAPTION_WORD_LIMIT': (0, 10000, int), 'CAPTION_MAX_VARIANTS': (1, 100, int),
     'CAPTION_POLICY_MAX_RETRIES': (0, 10, int), 'CAPTION_HTTP_RETRIES': (1, 10, int),

@@ -101,7 +101,7 @@ class FullsizeTests(unittest.TestCase):
             result = full.snapshot(old, self.backup, self.budget())
             proof = full.rehearse(self.backup, self.candidate, self.restored, result['snapshot_digest'], self.budget())
             self.assertEqual(proof['source_revision'], 'd2b7e4f6a901')
-            self.assertEqual(proof['revision'], 'd8e5b2f7a904')
+            self.assertEqual(proof['revision'], 'f2a6d8b4c915')
         finally: engine.dispose()
 
     def test_existing_owner_and_library_are_closed_without_changing_original(self):

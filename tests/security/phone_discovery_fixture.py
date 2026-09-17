@@ -32,7 +32,7 @@ CREATE TABLE asset_tag_blocks(id INTEGER PRIMARY KEY,asset_id INTEGER,tag_id INT
 ''')
     apply_schema(db.execute)
     for account,phone in [('one','+12025550101'),('two','+12025550102'),('foreign','+12025550103')]:
-        db.execute('INSERT INTO access_accounts VALUES(?,?,?,?)',(account,phone,'unused-synthetic-hash','active'))
+        db.execute('INSERT INTO access_accounts(id,phone_login,password_hash,state) VALUES(?,?,?,?)',(account,phone,'unused-synthetic-hash','active'))
     db.execute("INSERT INTO access_libraries VALUES('family-a','active','one')")
     db.execute("INSERT INTO access_libraries VALUES('family-b','active','foreign')")
     for account,library,role in [('one','family-a','viewer'),('two','family-a','owner'),('foreign','family-b','owner')]:

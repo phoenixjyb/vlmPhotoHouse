@@ -12,8 +12,9 @@ import sqlite3
 import time
 import uuid
 
-from .credentials import (DUMMY_HASH, hash_password, invitation_code, invitation_digest,
-                          phone_login, session_digest, verify_password)
+from .credentials import (DUMMY_HASH, display_name as canonical_display_name, hash_password,
+                          invitation_code, invitation_digest, phone_login, session_digest,
+                          verify_password)
 
 
 class AccessDenied(Exception):
@@ -63,7 +64,7 @@ class AccessService:
             digest = session_digest(token)
         except ValueError:
             raise AccessDenied('Access denied') from None
-        row = self._one('''SELECT s.*, a.state, a.phone_login FROM access_sessions s
+        row = self._one('''SELECT s.*, a.state, a.phone_login, a.display_name FROM access_sessions s
             JOIN access_accounts a ON a.id=s.account_id WHERE s.digest=?''', (digest,))
         if not row or row['revoked'] or row['state'] != 'active' or row['expires_at'] <= self._now():
             raise AccessDenied('Access denied')
@@ -183,14 +184,20 @@ class AccessService:
         self.db.execute('UPDATE access_invitations SET consumed=1 WHERE digest=?', (invite['digest'],))
         self._audit(account_id, 'accept_invitation', invite['library_id'], account_id)
 
-    def register(self, phone: str, password: str, code: str):
+    def register(self, phone: str, password: str, code: str, name: str):
         """Atomically create account + approved viewer membership + consume code.
+
+        A display name is required: the family has to recognise a member by something other
+        than a phone number, and the name is the source of that member's incoming folder
+        label. An invalid name is refused the same non-enumerating way as a bad phone or a
+        bad code, so registration reveals nothing about which invitations exist.
 
         No account is created without a valid owner invitation. Existing-account
         invitations require login and accept_invitation; never reset a password.
         """
         try:
             canonical, digest = phone_login(phone), invitation_digest(code)
+            chosen = canonical_display_name(name)
         except ValueError:
             raise AccessDenied('Access denied') from None
         with self._transaction():
@@ -203,8 +210,8 @@ class AccessService:
             if self._one('SELECT id FROM access_accounts WHERE phone_login=?', (canonical,)):
                 raise AccessDenied('Access denied')
             account_id = str(uuid.uuid4())
-            self.db.execute('INSERT INTO access_accounts(id,phone_login,password_hash) VALUES (?,?,?)',
-                            (account_id, canonical, encoded))
+            self.db.execute('''INSERT INTO access_accounts(id,phone_login,password_hash,display_name)
+                VALUES (?,?,?,?)''', (account_id, canonical, encoded, chosen))
             self._activate(account_id, invite)
             return self._new_session(account_id)
 
@@ -230,7 +237,32 @@ class AccessService:
             for member in memberships:
                 member['available'] = bool(member['available'])
             return {'account_id': session['account_id'], 'phone_login': session['phone_login'],
-                    'memberships': memberships}
+                    'display_name': session['display_name'], 'memberships': memberships}
+
+    def set_display_name(self, operator_account_id: str, target_account_id: str, name: str):
+        """An operator corrects or sets a member's name.
+
+        Gated on the caller being a registered operator, not on a library role: a name is an
+        account property, so it is not something a library owner should be able to reach.
+        Changing a name does **not** touch the incoming folder label, which is stored once —
+        a rename must not silently move a folder or invalidate a stored path.
+        """
+        try:
+            chosen = canonical_display_name(name)
+        except ValueError:
+            raise ValueError('Provide a display name') from None
+        with self._transaction(write=True):
+            if not self._one('SELECT 1 FROM access_operators WHERE account_id=?', (operator_account_id,)):
+                raise AccessDenied('Access denied')
+            if not self._one("SELECT 1 FROM access_accounts WHERE id=? AND state='active'",
+                             (target_account_id,)):
+                raise AccessDenied('Access denied')
+            self.db.execute('UPDATE access_accounts SET display_name=? WHERE id=?',
+                            (chosen, target_account_id))
+            self.db.execute('''INSERT INTO access_audit(actor_account,action,library_id,target_account,occurred_at)
+                VALUES (?,'account.set_display_name',NULL,?,?)''',
+                            (operator_account_id, target_account_id, self._now()))
+            return {'account_id': target_account_id, 'display_name': chosen}
 
     def decide_membership(self, owner_token: str, library_id: str, target_account: str, *,
                           expected_revision: int, status: str, originals=False, expires_at=None):

@@ -30,7 +30,7 @@ class CaptionSupervisorTests(unittest.TestCase):
             archive.extractall(self.source)
         self.db = self.root/'catalog.sqlite'
         with closing(sqlite3.connect(self.db)) as db:
-            db.executescript("CREATE TABLE alembic_version(version_num TEXT); INSERT INTO alembic_version VALUES ('d8e5b2f7a904'); CREATE TABLE tasks(type TEXT,state TEXT);")
+            db.executescript("CREATE TABLE alembic_version(version_num TEXT); INSERT INTO alembic_version VALUES ('f2a6d8b4c915'); CREATE TABLE tasks(type TEXT,state TEXT);")
         for name in ('derived', 'temporary', 'receipts'):
             (self.root/name).mkdir()
         self.environment = self.root/'environment.json'
@@ -38,7 +38,7 @@ class CaptionSupervisorTests(unittest.TestCase):
         self.path = self.root/'supervisor.json'
         self.config = dict(format_version=1, worker_root=str(self.source), worker_commit='a'*40,
             manifest_sha256=hashlib.sha256((self.source/'manifest.json').read_bytes()).hexdigest(),
-            database=str(self.db), expected_revision='d8e5b2f7a904', derived=str(self.root/'derived'),
+            database=str(self.db), expected_revision='f2a6d8b4c915', derived=str(self.root/'derived'),
             temporary=str(self.root/'temporary'), stop_file=str(self.root/'stop'),
             caption_url='http://127.0.0.1:1', environment_json=str(self.environment),
             environment_sha256=hashlib.sha256(self.environment.read_bytes()).hexdigest(),
@@ -65,7 +65,7 @@ class CaptionSupervisorTests(unittest.TestCase):
              patch('subprocess.Popen', side_effect=AssertionError('No process')), \
              patch.object(supervisor, 'receipt', side_effect=AssertionError('No receipts')):
             result = supervisor.supervise(self.args())
-        self.assertEqual(result, {'supervisor': 'preflight-pass', 'activated': False, 'revision': 'd8e5b2f7a904'})
+        self.assertEqual(result, {'supervisor': 'preflight-pass', 'activated': False, 'revision': 'f2a6d8b4c915'})
         after = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         self.assertEqual(before, after)
         self.assertFalse(any(n == 'app' or n.startswith('app.') for n in sys.modules))

@@ -67,6 +67,24 @@ class UploadMigrationTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertIsNone(rows[0][1], 'an existing account must not be given a name it did not choose')
 
+    def test_database_that_predates_the_revision_gains_the_column(self):
+        """The deployed database predates this revision, so it needs the real ADD COLUMN.
+
+        A database built from migrations already carries the column, because the foundation
+        migration composes `access/schema.py`. Dropping it here reproduces the older shape and
+        proves the conditional branch does the work rather than being dead code.
+        """
+        self.upgrade(PRE_UPLOAD)
+        with self.engine.begin() as connection:
+            present = {row[1] for row in connection.exec_driver_sql('PRAGMA table_info(access_accounts)')}
+            if 'display_name' in present:
+                connection.exec_driver_sql('ALTER TABLE access_accounts DROP COLUMN display_name')
+            connection.exec_driver_sql(
+                "INSERT INTO access_accounts(id,phone_login,password_hash,state) "
+                "VALUES('00000000-0000-4000-8000-000000000001','+12025550199','synthetic','active')")
+        self.upgrade()
+        self.assertEqual(self.rows('SELECT display_name FROM access_accounts'), [(None,)])
+
     def test_provenance_table_shape(self):
         self.upgrade()
         columns = {row[1] for row in self.rows('PRAGMA table_info(access_uploads)')}

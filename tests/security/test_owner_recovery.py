@@ -126,13 +126,13 @@ class OwnerRecoveryTests(unittest.TestCase):
             for phone,password in ((OWNER,PASSWORD),(MEMBER,PASSWORD),(OTHER_OWNER,PASSWORD)):
                 with self.assertRaises(AccessDenied): service.login(phone,password)
             with self.assertRaises(AccessDenied): service.profile(fixtures.LibraryReadTests.owner_token)
-            with self.assertRaises(AccessDenied): service.register(NEW,PASSWORD,self.invitation)
+            with self.assertRaises(AccessDenied): service.register(NEW,PASSWORD,self.invitation, 'Synthetic Member')
             owner=service.login(OWNER,NEW_PASSWORD)
             code=service.invite(owner,'family-a',NEW)
-            viewer=service.register(NEW,PASSWORD,code)
+            viewer=service.register(NEW,PASSWORD,code, 'Synthetic Member')
             self.assertEqual(service.list_asset_ids(viewer,'family-a'), {'total':2,'asset_ids':[101,102]})
             with self.assertRaises(AccessDenied): service.list_asset_ids(owner,'family-b')
-            with self.assertRaises(AccessDenied): service.register(NEW,PASSWORD,code)
+            with self.assertRaises(AccessDenied): service.register(NEW,PASSWORD,code, 'Synthetic Member')
 
     def test_real_app_new_owner_reads_but_old_tokens_originals_and_other_library_deny(self):
         from fastapi.testclient import TestClient

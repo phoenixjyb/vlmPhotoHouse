@@ -39,7 +39,7 @@ class LibraryReadTests(unittest.TestCase):
         service = AccessService(cls.template, clock=lambda: NOW)
         cls.owner_token = service.login(OWNER, PASSWORD)
         cls.other_token = service.login(OTHER_OWNER, PASSWORD)
-        cls.member_token = service.register(MEMBER, PASSWORD, service.invite(cls.owner_token, 'family-a', MEMBER))
+        cls.member_token = service.register(MEMBER, PASSWORD, service.invite(cls.owner_token, 'family-a', MEMBER), 'Synthetic Member')
         cls.member_id = service.profile(cls.member_token)['account_id']
         for asset_id, library, status, date in [(101,'family-a','active','2026-01-01'),
                 (102,'family-a',None,'2026-01-02'), (103,'family-a','deleted','2026-01-03'),

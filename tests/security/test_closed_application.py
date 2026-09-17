@@ -86,7 +86,7 @@ class ClosedApplicationTests(unittest.TestCase):
         cls.owner_token = service.login(OWNER, PASSWORD)
         cls.other_token = service.login(OTHER_OWNER, PASSWORD)
         code = service.invite(cls.owner_token, 'family-a', MEMBER)
-        cls.member_token = service.register(MEMBER, PASSWORD, code)
+        cls.member_token = service.register(MEMBER, PASSWORD, code, 'Synthetic Member')
         cls.member_id = service.profile(cls.member_token)['account_id']
         cls.template.executemany('INSERT INTO access_asset_libraries VALUES (?,?)', [(101, 'family-a'), (102, 'family-a'), (201, 'family-b')])
         cls.template.execute('UPDATE access_memberships SET originals=1 WHERE account_id=?', (cls.member_id,))

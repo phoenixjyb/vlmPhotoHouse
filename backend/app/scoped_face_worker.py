@@ -184,7 +184,7 @@ def _run(session, task, p, root, clock, deadline):
         return session.execute(text(sql), params)
 
     tables = set(execute("SELECT name FROM sqlite_master WHERE type='table'").scalars())
-    if not TABLES <= tables or execute('SELECT version_num FROM alembic_version').all() != [('d8e5b2f7a904',)]:
+    if not TABLES <= tables or execute('SELECT version_num FROM alembic_version').all() != [('f2a6d8b4c915',)]:
         raise AssignmentRefused('Migrated assignment schema required')
     if execute('PRAGMA foreign_keys').scalar() != 1:
         raise AssignmentRefused('Foreign keys must be enabled')

@@ -24,7 +24,7 @@ class StagingPackageTests(unittest.TestCase):
             for name in package.FILES:
                 self.assertEqual(hashlib.sha256(archive.read(name)).hexdigest(),manifest['files'][name])
             self.assertIn('backend/app/ui/photohouse-icon.png',archive.namelist())
-            self.assertEqual(manifest['migration_revision'], 'd8e5b2f7a904')
+            self.assertEqual(manifest['migration_revision'], 'f2a6d8b4c915')
             for name in ('backend/app/access/stories.py', 'backend/app/access/story_schema.py',
                          'backend/migrations/versions/c7f4a9e2b610_family_stories.py'):
                 self.assertIn(name, archive.namelist())

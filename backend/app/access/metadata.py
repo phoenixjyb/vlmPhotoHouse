@@ -17,6 +17,9 @@ def migration_metadata(legacy_metadata):
         Column('phone_login', Text, nullable=False, unique=True),
         Column('password_hash', Text, nullable=False),
         Column('state', Text, nullable=False, server_default=text("'active'")),
+        # Appended, not inserted: the deployed database gains this column by ADD COLUMN, and
+        # positional readers of this table must keep seeing the same order.
+        Column('display_name', Text),
         CheckConstraint("state IN ('active','disabled')"))
     Table('access_sessions', metadata,
         Column('digest', Text, primary_key=True, nullable=False),
@@ -85,4 +88,6 @@ def migration_metadata(legacy_metadata):
     add_story_tables(metadata)
     from .management_schema import add_management_tables
     add_management_tables(metadata)
+    from .upload_schema import add_upload_tables
+    add_upload_tables(metadata)
     return metadata

@@ -25,6 +25,44 @@ def phone_login(value: str) -> str:
     return normalized
 
 
+MAX_DISPLAY_NAME = 64
+
+
+def display_name(value: str) -> str:
+    """A person's name, for display and as the source of their incoming folder label.
+
+    Whitespace is collapsed, so a name cannot carry a newline or a run of spaces into a
+    stored value. Control characters are refused. Path separators are *not* refused here:
+    this function validates a name, and `incoming_label` is what guarantees path safety, so
+    the two concerns stay separate and neither depends on the other being right.
+    """
+    if not isinstance(value, str):
+        raise ValueError('Provide a display name')
+    collapsed = ' '.join(value.split())
+    if not collapsed or len(collapsed) > MAX_DISPLAY_NAME:
+        raise ValueError('Provide a display name')
+    if any(character < ' ' or character == '\x7f' for character in collapsed):
+        raise ValueError('Provide a display name')
+    return collapsed
+
+
+def incoming_label(name, account_id: str) -> str:
+    """A path-safe, stable folder label for one account's incoming uploads.
+
+    Derived from the name and then **stored**, never recomputed: the label is a path
+    component, so recomputing it after a rename would either move a folder or leave a stored
+    path pointing at a name that no longer matches.
+
+    `\\w` is Unicode-aware, so a non-ASCII family name survives; everything that is not a
+    word character — including `/`, `\\`, `:`, `.` and control characters — collapses to a
+    dash, so the result cannot escape its parent directory. The account-id suffix keeps two
+    members who pick the same name apart without needing a collision table, and it also
+    means the label can never collide with a reserved device name.
+    """
+    slug = re.sub(r'[^\w]+', '-', name or '', flags=re.UNICODE).strip('-')
+    return (slug[:32] or 'member') + '-' + account_id[:8]
+
+
 def hash_password(password: str) -> str:
     if not isinstance(password, str) or not 8 <= len(password) <= 128:
         raise ValueError('Use a password or passphrase of 8 to 128 characters')

@@ -19,11 +19,12 @@ from app.db import Base
 from app.access.metadata import migration_metadata
 
 PRE_ACCESS = 'd2b7e4f6a901'
-ACCESS_HEAD = 'd8e5b2f7a904'
+ACCESS_HEAD = 'f2a6d8b4c915'
 ACCESS_TABLES = {'access_accounts', 'access_sessions', 'access_operators', 'access_libraries',
     'access_memberships', 'access_invitations', 'access_asset_libraries', 'access_audit',
     'access_admission_key', 'access_attempts', 'access_kdf_slot', 'access_provisioning_receipts',
-    'access_stories', 'access_story_revisions', 'access_person_libraries', 'access_album_libraries'}
+    'access_stories', 'access_story_revisions', 'access_person_libraries', 'access_album_libraries',
+    'access_uploads'}
 
 
 def config():
@@ -176,7 +177,8 @@ class OrmMigrationTests(unittest.TestCase):
         with self.engine.connect() as connection:
             self.assertEqual(connection.exec_driver_sql('PRAGMA foreign_keys').scalar_one(), 1)
             for sql in ("INSERT INTO access_asset_libraries VALUES (101,'unassigned')",
-                        "INSERT INTO access_accounts VALUES ('synthetic','+12025550199','synthetic','unknown')",
+                        "INSERT INTO access_accounts(id,phone_login,password_hash,state) "
+                        "VALUES ('synthetic','+12025550199','synthetic','unknown')",
                         'INSERT INTO access_kdf_slot VALUES (2,\'synthetic\')'):
                 with self.assertRaises(IntegrityError):
                     connection.exec_driver_sql(sql)

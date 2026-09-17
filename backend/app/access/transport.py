@@ -216,7 +216,7 @@ async def _sign_in(request, registration=False):
     runtime = _runtime(request)
     if _single(request, 'authorization') is not None or _cookie(request) is not None:
         raise TransportError(401, 'Access denied')
-    fields = {'phone', 'password', 'transport'} | ({'code'} if registration else set())
+    fields = {'phone', 'password', 'transport'} | ({'code', 'name'} if registration else set())
     body = await _body(request, fields)
     mode = body['transport']
     origin = _single(request, 'origin')
@@ -224,7 +224,7 @@ async def _sign_in(request, registration=False):
         raise TransportError(403, 'Access denied')
     if request.client is None:
         raise TransportError(503, 'Access unavailable')
-    args = [body['phone'], body['password']] + ([body['code']] if registration else [])
+    args = [body['phone'], body['password']] + ([body['code'], body['name']] if registration else [])
     token = await run_in_threadpool(runtime.call, 'register' if registration else 'login',
                                    *args, source=request.client.host)
     result = {'expires_in': AccessService.SESSION_SECONDS}

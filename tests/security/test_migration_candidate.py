@@ -93,7 +93,7 @@ class MigrationCandidateTests(unittest.TestCase):
             service = AccessService(db, clock=lambda: NOW)
             with self.assertRaises(AccessDenied): service.login(OWNER, PASSWORD)
             with self.assertRaises(AccessDenied): service.profile(fixtures.LibraryReadTests.owner_token)
-            with self.assertRaises(AccessDenied): service.register(NEW, PASSWORD, self.invitation)
+            with self.assertRaises(AccessDenied): service.register(NEW, PASSWORD, self.invitation, 'Synthetic Member')
             self.assertEqual(db.execute("SELECT count(*) FROM access_libraries WHERE state!='closed'").fetchone()[0], 0)
             self.assertEqual(db.execute('SELECT count(*) FROM access_attempts').fetchone()[0], 0)
             self.assertEqual(db.execute('SELECT count(*) FROM access_kdf_slot').fetchone()[0], 0)

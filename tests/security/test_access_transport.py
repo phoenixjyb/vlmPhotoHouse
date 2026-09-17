@@ -185,7 +185,7 @@ class TransportTests(unittest.TestCase):
         service = AccessService(cls.template, clock=lambda: NOW)
         cls.owner_token = service.login(OWNER, PASSWORD)
         cls.code = service.invite(cls.owner_token, 'family-a', MEMBER)
-        cls.member_token = service.register(MEMBER, PASSWORD, cls.code)
+        cls.member_token = service.register(MEMBER, PASSWORD, cls.code, 'Synthetic Member')
         cls.member_id = service.profile(cls.member_token)['account_id']
 
     @classmethod
@@ -321,7 +321,8 @@ class TransportTests(unittest.TestCase):
         invite = self.client.post('/libraries/family-a/invitations', headers=self.bearer(self.owner_token), json={'phone': NEW})
         self.assertEqual(invite.status_code, 201)
         code = invite.json()['code']
-        body = {'phone': NEW, 'password': PASSWORD, 'code': code, 'transport': 'native'}
+        body = {'phone': NEW, 'password': PASSWORD, 'code': code, 'transport': 'native',
+                'name': 'Synthetic Member'}
         response = self.client.post('/auth/register', json=body)
         self.assertEqual(response.status_code, 201)
         token = response.json()['access_token']
@@ -337,7 +338,8 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(signed_in.status_code, 200)
 
     def test_no_invitation_no_signup_and_weak_password_does_not_consume(self):
-        body = {'phone': NEW, 'password': PASSWORD, 'code': 'a' * 32, 'transport': 'native'}
+        body = {'phone': NEW, 'password': PASSWORD, 'code': 'a' * 32, 'transport': 'native',
+                'name': 'Synthetic Member'}
         self.assertEqual(self.client.post('/auth/register', json=body).status_code, 401)
         code = self.client.post('/libraries/family-a/invitations', headers=self.bearer(self.owner_token), json={'phone': NEW}).json()['code']
         body.update(code=code, password='short')
@@ -353,7 +355,8 @@ class TransportTests(unittest.TestCase):
         code = response.json()['code']
         self.assertEqual(self.client.post('/libraries/family-a/invitations/cancel', headers=self.bearer(), json={'code': code}).status_code, 401)
         self.assertEqual(self.client.post('/libraries/family-a/invitations/cancel', headers=self.bearer(self.owner_token), json={'code': code}).status_code, 200)
-        self.assertEqual(self.client.post('/auth/register', json={'phone': NEW, 'password': PASSWORD, 'code': code, 'transport': 'native'}).status_code, 401)
+        self.assertEqual(self.client.post('/auth/register', json={'phone': NEW, 'password': PASSWORD, 'code': code, 'transport': 'native',
+            'name': 'Synthetic Member'}).status_code, 401)
 
     def test_existing_member_accepts_fresh_invitation_only_after_login(self):
         self.mutate("UPDATE access_memberships SET status='revoked',revision=revision+1 WHERE account_id=?", (self.member_id,))
@@ -394,7 +397,8 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(self.login().status_code, 429)
             # Registration shares the same account budget and must not reach hash.
             with patch('access.service.hash_password', side_effect=AssertionError('KDF bypass')):
-                response = self.client.post('/auth/register', json={'phone': MEMBER, 'password': PASSWORD, 'code': 'a' * 32, 'transport': 'native'})
+                response = self.client.post('/auth/register', json={'phone': MEMBER, 'password': PASSWORD, 'code': 'a' * 32, 'transport': 'native',
+                    'name': 'Synthetic Member'})
                 self.assertEqual(response.status_code, 429)
 
     def test_busy_slot_denies_before_password_work_and_does_not_steal_claim(self):

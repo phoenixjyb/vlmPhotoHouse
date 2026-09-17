@@ -40,8 +40,8 @@
   Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
   Object.assign(words.en,{viewFilmstrip:'Photos in this view',viewFilmstripItem:'Photo',goToPage:'Go to page',go:'Go',pageRange:'Enter a page number between 1 and the last page.'});
   Object.assign(words.zh,{viewFilmstrip:'当前视图中的照片',viewFilmstripItem:'照片',goToPage:'跳转到页码',go:'前往',pageRange:'请输入有效范围内的页码。'});
-  Object.assign(words.en,{filterByDate:'Filter by date and media',discoveryHelp:'Narrow this library by when a photo was taken and whether it is a photo or a video. Read-only: nothing here changes or hides a photo.',mediaKind:'Media',mediaAll:'Photos and videos',mediaImage:'Photos only',mediaVideo:'Videos only',dateFrom:'From',dateTo:'To',applyFilter:'Apply',clearFilter:'Clear',discoveryHint:'Choose a date range or a media kind, then apply.',discoveryRange:'Enter a range whose first date is not after the second.',discoveryNone:'No photo in this library matches that filter.',discoveryChanged:'This library changed since the filter was prepared. Reopen the panel and apply again.',discoveryResult:'Filtered photo'});
-  Object.assign(words.zh,{filterByDate:'按日期和媒体筛选',discoveryHelp:'按拍摄时间和媒体类型缩小本资料库范围。此处为只读：不会更改或隐藏任何照片。',mediaKind:'媒体',mediaAll:'照片和视频',mediaImage:'仅照片',mediaVideo:'仅视频',dateFrom:'从',dateTo:'到',applyFilter:'应用',clearFilter:'清除',discoveryHint:'请选择日期范围或媒体类型，然后应用。',discoveryRange:'请输入起始日期不晚于结束日期的范围。',discoveryNone:'本资料库中没有符合该筛选的照片。',discoveryChanged:'准备筛选后本资料库已发生变化。请重新打开面板后再应用。',discoveryResult:'筛选出的照片'});
+  Object.assign(words.en,{displayName:'Your name',displayNameHelp:'How your family will see you, up to 64 characters.',invalidName:'Enter your name to join.',filterByDate:'Filter by date and media',discoveryHelp:'Narrow this library by when a photo was taken and whether it is a photo or a video. Read-only: nothing here changes or hides a photo.',mediaKind:'Media',mediaAll:'Photos and videos',mediaImage:'Photos only',mediaVideo:'Videos only',dateFrom:'From',dateTo:'To',applyFilter:'Apply',clearFilter:'Clear',discoveryHint:'Choose a date range or a media kind, then apply.',discoveryRange:'Enter a range whose first date is not after the second.',discoveryNone:'No photo in this library matches that filter.',discoveryChanged:'This library changed since the filter was prepared. Reopen the panel and apply again.',discoveryResult:'Filtered photo'});
+  Object.assign(words.zh,{displayName:'您的名字',displayNameHelp:'家人将以此称呼您，最多 64 个字符。',invalidName:'请输入您的名字后再加入。',filterByDate:'按日期和媒体筛选',discoveryHelp:'按拍摄时间和媒体类型缩小本资料库范围。此处为只读：不会更改或隐藏任何照片。',mediaKind:'媒体',mediaAll:'照片和视频',mediaImage:'仅照片',mediaVideo:'仅视频',dateFrom:'从',dateTo:'到',applyFilter:'应用',clearFilter:'清除',discoveryHint:'请选择日期范围或媒体类型，然后应用。',discoveryRange:'请输入起始日期不晚于结束日期的范围。',discoveryNone:'本资料库中没有符合该筛选的照片。',discoveryChanged:'准备筛选后本资料库已发生变化。请重新打开面板后再应用。',discoveryResult:'筛选出的照片'});
   Object.assign(words.en,{peopleFilter:'Show',peopleAll:'Named and unnamed',peopleNamed:'Named only',peopleUnnamed:'Unnamed only',unassignedFaces:'Unassigned faces · Owner worklist',unassignedHelp:'Faces that no saved person claims yet, across this library. Assigning one keeps the rest of the list.',noUnassignedFaces:'No unassigned faces in this library.',sourcePhoto:'Photo',openPhoto:'Open this photo'});
   Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
@@ -135,7 +135,7 @@
     $('tag-query').value='';$('tag-list').replaceChildren();$('tag-status').textContent='';$('tag-pages').hidden=true;$('tag-assets').replaceChildren();
     discoveryState.binding=null;discoveryState.page=1;discoveryState.total=0;discoveryState.fingerprint=null;discoveryState.applied=false;
     $('discovery-panel').hidden=true;$('discovery-panel').open=false;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';$('discovery-list').replaceChildren();$('discovery-status').textContent='';$('discovery-pages').hidden=true;
-    $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';
+    $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';$('name').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
   async function failure(error,epoch) {
@@ -458,7 +458,7 @@
     if(state.busy)return;state.mode=mode;
     $('login-tab').setAttribute('aria-pressed',String(mode==='login'));
     $('register-tab').setAttribute('aria-pressed',String(mode==='register'));
-    $('registration-fields').hidden=mode!=='register';$('code').required=mode==='register';
+    $('registration-fields').hidden=mode!=='register';$('code').required=mode==='register';$('name').required=mode==='register';
     $('password').autocomplete=mode==='register'?'new-password':'current-password';
     $('password').minLength=mode==='register'?8:1;$('password').value='';$('code').value='';translate();
   }
@@ -476,11 +476,15 @@
     const phone=phoneForRequest($('phone').value),password=$('password').value;
     if(!phone) {status('invalidPhone');return;}
     if(state.mode==='register'&&(Array.from(password).length<8||Array.from(password).length>128)){status('invalidPassword');return;}
+    // The name is required at registration: it is how the family recognises a member, and it
+    // is the source of that member's incoming upload folder label.
+    if(state.mode==='register'&&!$('name').value.trim()){status('invalidName');return;}
     state.busy=true;$('auth-submit').disabled=true;translate();const epoch=invalidate();
-    const body={phone,password,transport:'web'};if(state.mode==='register')body.code=$('code').value;
+    const body={phone,password,transport:'web'};
+    if(state.mode==='register'){body.code=$('code').value;body.name=$('name').value.trim();}
     try {
       await request('/auth/'+state.mode,{method:'POST',body,epoch});
-      if(!stale(epoch)) {$('password').value='';$('code').value='';await restore();}
+      if(!stale(epoch)) {$('password').value='';$('code').value='';$('name').value='';await restore();}
     } catch(error) {if(error.name!=='AbortError'&&!stale(epoch))status(errorStatus(error));}
     finally {state.busy=false;$('auth-submit').disabled=false;translate();}
   }
