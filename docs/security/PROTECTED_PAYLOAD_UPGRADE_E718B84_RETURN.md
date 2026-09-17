@@ -78,8 +78,22 @@ result is `0`.
 
 The upgrade did not stop it: the worker runs as a separate scheduled task, its entry
 script asserts only its own three pins (not the protected manifest), and it had already
-started its final claimed task before the API was stopped. Whether to start another drain
-is a separate decision — the queue is still deep, and the worker has no restart loop.
+started its final claimed task before the API was stopped.
+
+**Resumed 2026-09-17 ~13:42 CST on owner instruction.** Preconditions were checked
+read-only before starting: the three pins the worker entry asserts
+(`runtime-environment.json`, `worker-config.json`, `supervisor`) all still verify, the
+worker tree is present, and the configured `stop_file` is absent. Note that the worker's
+`stop_file` is the **same path** as the staging `stop-request` token — so removing that
+token after the upgrade was not merely tidiness; had it been left behind, the worker would
+have refused to run.
+
+Started via the worker's scheduled task. It is confirmed **consuming the queue**, not
+merely "started": a new `started` receipt was written, caption task ids advanced across
+successive samples, five tasks finished within ten minutes, and the pending count fell
+4451 → 4445. Both scheduled tasks are now Running (API on its new process, worker on a new
+run). At the observed cadence the remaining queue is a multi-day drain, which is its normal
+mode.
 
 ## Not done
 
