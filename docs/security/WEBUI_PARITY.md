@@ -84,7 +84,7 @@ of the filter is a deployment state, not an error a member can act on.
 
 | Capability | Legacy evidence | Protected status | Disposition |
 | --- | --- | --- | --- |
-| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** (needs provenance, quota, storage, content-handling and role policy) |
+| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** — contract now **proposed** in `PROTECTED_UPLOAD_CONTRACT.md` (2026-09-17), with the owner's decisions recorded: any approved member may upload, bytes land in a separate quarantine root, and all five derived tasks are enqueued. Not implemented; needs a migration, so this slice does drift the pin. Multipart and `/ingest/scan` stay out of scope. |
 | Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
 | Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
 | Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | none | **GAP·CONTRACT** |
