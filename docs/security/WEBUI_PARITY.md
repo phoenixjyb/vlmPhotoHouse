@@ -84,7 +84,7 @@ of the filter is a deployment state, not an error a member can act on.
 
 | Capability | Legacy evidence | Protected status | Disposition |
 | --- | --- | --- | --- |
-| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** — contract now **proposed** in `PROTECTED_UPLOAD_CONTRACT.md` (2026-09-17), with the owner's decisions recorded: any approved member may upload, bytes land in a separate quarantine root, and all five derived tasks are enqueued. Not implemented; needs a migration, so this slice does drift the pin. Multipart and `/ingest/scan` stay out of scope. |
+| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** — contract **proposed** in `PROTECTED_UPLOAD_CONTRACT.md` (2026-09-17). Owner decisions: any approved member may submit, no cap or quota, face detection allowed, and bytes land in a **per-member folder under `INCOMING`** with **no library** — an operator decides the library afterwards using the existing `assign_unmapped_assets` operation. Not implemented; needs a migration, so this slice does drift the pin. Multipart and `/ingest/scan` stay out of scope. |
 | Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
 | Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
 | Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | none | **GAP·CONTRACT** |
