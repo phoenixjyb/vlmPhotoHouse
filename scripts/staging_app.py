@@ -18,6 +18,10 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = {'format_version', 'database', 'web_origin', 'original_roots', 'derived_root',
           'bind_host', 'port', 'tls_certificate', 'tls_private_key'}
+# Optional on purpose. A configuration written before member upload existed must keep loading,
+# and an operator who has not created an incoming area must not be forced to invent one: absent
+# means the upload route answers 503 and no deployment gains a write surface by accident.
+OPTIONAL_FIELDS = {'incoming_root'}
 PRIVATE_NETWORKS = tuple(map(ipaddress.ip_network,
     ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10',
      '127.0.0.0/8', 'fc00::/7', '::1/128')))
@@ -49,6 +53,7 @@ class StagingConfiguration:
     port: int
     tls_certificate: Path
     tls_private_key: Path
+    incoming_root: Path | None = None
 
     def __post_init__(self):
         try:
@@ -86,6 +91,16 @@ class StagingConfiguration:
             if any(file.is_relative_to(root) or root.is_relative_to(file)
                    for file in files for root in media):
                 raise InvalidConfiguration()
+            if self.incoming_root is not None:
+                if (not isinstance(self.incoming_root, Path)
+                        or _path(str(self.incoming_root)) != self.incoming_root):
+                    raise InvalidConfiguration()
+                # The incoming area must not overlap anything else the service already owns.
+                # Overlapping a media root would put unaccepted bytes inside the tree the media
+                # routes serve from; overlapping a file would nest the database inside it.
+                if any(self.incoming_root.is_relative_to(other) or other.is_relative_to(self.incoming_root)
+                       for other in (*media, *files)):
+                    raise InvalidConfiguration()
         except (TypeError, ValueError):
             raise InvalidConfiguration() from None
 
@@ -94,7 +109,8 @@ class StagingConfiguration:
         sys.path.insert(0, str(ROOT/'backend'))
         from app.access.runtime import RuntimeConfiguration
         return RuntimeConfiguration(database=self.database, web_origin=self.web_origin,
-            original_roots=self.original_roots, derived_root=self.derived_root).build_app()
+            original_roots=self.original_roots, derived_root=self.derived_root,
+            incoming_root=self.incoming_root).build_app()
 
     def server_options(self):
         return dict(host=self.bind_host, port=self.port, ssl_certfile=str(self.tls_certificate),
@@ -107,14 +123,17 @@ class StagingConfiguration:
 
 def parse_configuration(value):
     try:
-        if (type(value) is not dict or set(value) != FIELDS
+        if (type(value) is not dict or not FIELDS <= set(value)
+                or set(value) - FIELDS - OPTIONAL_FIELDS
                 or type(value['format_version']) is not int or value['format_version'] != 1
                 or type(value['original_roots']) is not list):
             raise InvalidConfiguration()
+        incoming = value.get('incoming_root')
         return StagingConfiguration(database=_path(value['database']), web_origin=value['web_origin'],
             original_roots=tuple(_path(p) for p in value['original_roots']),
             derived_root=_path(value['derived_root']), bind_host=value['bind_host'], port=value['port'],
-            tls_certificate=_path(value['tls_certificate']), tls_private_key=_path(value['tls_private_key']))
+            tls_certificate=_path(value['tls_certificate']), tls_private_key=_path(value['tls_private_key']),
+            incoming_root=None if incoming is None else _path(incoming))
     except (TypeError, ValueError, KeyError):
         raise InvalidConfiguration() from None
 
