@@ -192,21 +192,32 @@ Two new operations are needed, both in the same offline sealed-plan family:
    `original_roots` — so the media route would refuse it: the photo would be *in* a library but
    unviewable. Promotion and assignment must therefore happen in one operation; one operation
    is safer than an ordering rule that a later caller can get wrong.
-2. **Reassign, bounded.** Because `asset_id` is the primary key of `access_asset_libraries`, a
-   photo is in exactly one library, so correcting a mistake means **updating** that mapping
-   rather than adding a second. The owner has decided the decision must be reversible, so a
-   bounded reassign plan is required before upload opens to members.
+2. **Un-assign, bounded — the operation that actually provides reversibility.** The owner has
+   decided the decision must be reversible. With a single library the mistake the family will
+   actually make is *not* "wrong library" — there is nowhere else to put it — but **"I promoted
+   the wrong photo"**, or "promoted it too early". So the required operation returns a promoted
+   upload to the incoming area: the file moves back, `assets.path` is updated, the provenance row
+   returns to `incoming`, and the library mapping is removed.
 
-Reassign is a database-only change — after promotion the bytes are already in the originals
-root — but it has consequences the codebase already anticipates: the asset leaves one library's
-reads and joins another's; a person whose faces were exclusive to the old library stops being
-renameable; a containing album reports `needs_review`; and both libraries' discovery indexes go
-stale until re-derived. The album read already carries the comment *"A moved/deleted asset is
-excluded, including its ID and cover reference"*, so the defensive handling exists — only the
-reviewed operation does not.
+   It must move the bytes. Leaving them in the originals root would make the photo
+   **un-promotable again**, because promotion requires the recorded path to sit inside the
+   incoming root — an undo that cannot be redone is not an undo. It is also restricted to assets
+   that carry upload provenance, because an asset with no provenance row could never be promoted
+   again, so un-assigning one would be a one-way door out of every library.
 
-**Out of scope:** un-accepting a photo, i.e. sending an assigned asset back to `INCOMING`.
-Reassign covers the mistake the family will actually make, which is the wrong library.
+   Consequences the codebase already anticipates: the asset leaves the library's reads, a person
+   whose faces were exclusive to it stops being renameable, a containing album reports
+   `needs_review`, and that library's discovery index goes stale until re-derived.
+
+3. **Reassign, bounded — kept, but currently unusable in this deployment.** Because `asset_id` is
+   the primary key of `access_asset_libraries`, a photo is in exactly one library, so moving one
+   means **updating** that mapping rather than adding a second. It requires ownership of *both*
+   libraries, since a reassignment removes the photo from the source audience. The deployment has
+   exactly one library and the owner does not foresee adding another, so this operation has no
+   target today; it exists, tested and gated, for the point at which a second library appears.
+
+Reassign is database-only — after promotion the bytes are already in the originals root — while
+un-assign moves bytes, because it returns them to a different root.
 
 ## Deployment ordering
 
