@@ -60,10 +60,54 @@ library-scoped entities cannot be used to route around it:
 | face detection on upload | **allowed**, on the same reasoning |
 | where bytes land | **a per-member folder under `INCOMING`** |
 | which library they join | **not decided at upload** — the family decides later |
+| member identity | **a display name is required**, not just a phone number |
+| how the family reviews | **filesystem browsing plus an operator listing** — no UI review surface |
+| is the decision reversible | **yes** — a wrong assignment must be correctable |
 
 The last two are the significant ones: upload is a **pre-library** action. A member submits
 bytes to their own incoming area, and an operator later decides which library each photo
 belongs to. So this is not a library-scoped write at all.
+
+## The organizing structure
+
+**The folder is a human interface; the database stays authoritative.** This is forced by the
+existing model, not chosen: `assets.path` is a database column constrained to configured
+roots, and derived files are addressed flat by asset id, so the on-disk layout of originals is
+whatever the database says and "which library" is never a filesystem concept. Putting libraries
+in the folder tree would create a second source of truth that can drift silently.
+
+Three stages:
+
+1. **Upload** — bytes are written to `INCOMING/<member-label>/<batch>/`; an `assets` row is
+   written with `path` pointing into `INCOMING`, plus the provenance row; **no**
+   `access_asset_libraries` row exists, so the photo is visible to nobody.
+2. **The family decides** — one reviewed operation **promotes and assigns together**: the file
+   moves into the originals root, `path` is updated, and the library mapping is written.
+3. **In the library** — the photo is an ordinary asset and every existing route treats it as
+   one.
+
+**`INCOMING` sits outside `original_roots`.** This is the invariant worth the most: it makes an
+unassigned upload unservable **by construction**, rather than by an authorization check that
+could later be misconfigured. The media route resolves an original from `row['path']` and
+requires it to sit under a configured root, so bytes in `INCOMING` are unreachable even if an
+authorization decision were wrong.
+
+### Review, and why there is no UI for it
+
+An unmapped asset is **unreachable through every media route** — every lookup happens after
+current parent authorization, and the parent is library-scoped. So a pending upload cannot be
+rendered in the protected UI at all.
+
+Given that, the family reviews two ways, both of which need no new authorization surface:
+
+- **by opening the incoming folder** — the folder is the interface, which is why the label must
+  be human-readable;
+- **by an operator listing** that reports, per pending upload, the uploader, batch, original
+  filename, byte size and time. No thumbnails: deciding from names and dates is the point.
+
+A UI review surface is deliberately **not** built. It would require the first route that serves
+an asset with **no library**, which is a new authorization surface and belongs in its own
+reviewed slice, not smuggled in behind upload.
 
 ## Contract
 
@@ -124,36 +168,59 @@ area. Nothing about it grants read access to anything.
 8. **Idempotence under retry.** The same bytes from the same account must not produce two
    assets; a retry after a lost response returns the first result.
 
-## The decision step already exists — with one gap
+## The operator operations this needs
 
-"Let us decide which library these photos go into" is `assign_unmapped_assets`
-(`backend/app/access/provisioning.py`), an existing **offline, sealed-plan** operator
-operation:
+The decision step partly exists: `assign_unmapped_assets` (`backend/app/access/provisioning.py`)
+is an offline, **sealed-plan** operation that requires an approved **owner** of the target
+library *and* a registered operator with an active account, is bounded, validates every asset
+id, and accepts **only currently unmapped assets**.
 
-- target is `{library_id, operator_account_id, asset_ids}`;
-- it requires the operator to be an approved **owner** of that library *and* a registered
-  operator, with an active account and library;
-- it is bounded and validates every asset id;
-- and it accepts **only currently unmapped assets**.
+Two new operations are needed, both in the same offline sealed-plan family:
 
-**The gap worth knowing: assignment is one-shot.** The operation rejects already-mapped
-assets and reports `moves_or_media_writes: False`, and because `asset_id` is the primary key
-of `access_asset_libraries`, a photo cannot be in two libraries. So if the family assigns a
-photo to the wrong library, **there is currently no reviewed way to move it** — only a new
-reviewed operation would provide one. Either accept that, or add a bounded "reassign" plan
-before opening upload to members.
+1. **Promote and assign, together.** `assign_unmapped_assets` reports
+   `moves_or_media_writes: False`, and it must stay that way for existing callers. If a photo
+   were assigned without being promoted, `path` would still point into `INCOMING` — outside
+   `original_roots` — so the media route would refuse it: the photo would be *in* a library but
+   unviewable. Promotion and assignment must therefore happen in one operation; one operation
+   is safer than an ordering rule that a later caller can get wrong.
+2. **Reassign, bounded.** Because `asset_id` is the primary key of `access_asset_libraries`, a
+   photo is in exactly one library, so correcting a mistake means **updating** that mapping
+   rather than adding a second. The owner has decided the decision must be reversible, so a
+   bounded reassign plan is required before upload opens to members.
 
-The codebase already expects moves to be possible even though nothing provides one: the album
-read carries the comment *"A moved/deleted asset is excluded, including its ID and cover
-reference."* So the defensive handling exists; only the reviewed operation does not.
+Reassign is a database-only change — after promotion the bytes are already in the originals
+root — but it has consequences the codebase already anticipates: the asset leaves one library's
+reads and joins another's; a person whose faces were exclusive to the old library stops being
+renameable; a containing album reports `needs_review`; and both libraries' discovery indexes go
+stale until re-derived. The album read already carries the comment *"A moved/deleted asset is
+excluded, including its ID and cover reference"*, so the defensive handling exists — only the
+reviewed operation does not.
 
-## Required schema change
+**Out of scope:** un-accepting a photo, i.e. sending an assigned asset back to `INCOMING`.
+Reassign covers the mistake the family will actually make, which is the wrong library.
 
-Provenance needs somewhere to live. `access_audit` records an action and an actor but has no
-payload column, so a new table is required (`access_uploads`: asset id, account, original
-filename, sha256, bytes, state, created_at). That is a **migration**, and migrations are inside
-the pinned contract closure — so unlike the date/media filter slice, **this slice does drift
-the pin and needs a reissue**.
+## Required schema changes
+
+Two, in one migration.
+
+**1. A display name on accounts.** `access_accounts` holds only `id`, `phone_login`,
+`password_hash` and `state`, so a member currently has no name to show — or to name a folder
+with. A `display_name` column is required, and because it becomes a **path component** it needs
+more than a length bound:
+
+- it is bounded, and non-empty for an approved member;
+- the folder label is a **path-safe slug derived from it**, made unique at first upload with a
+  numeric suffix if two members collide, and **recorded in the database** so it is never
+  recomputed. A rename therefore does not silently move a folder, and a later name change
+  cannot break a stored path;
+- the raw name is display-only and is never used to build a path directly.
+
+**2. Provenance.** `access_audit` records an action and an actor but has no payload column, so a
+new table is required (`access_uploads`: asset id, account, incoming label, batch, original
+filename, sha256, bytes, state, created_at).
+
+Both are **migrations**, and migrations are inside the pinned contract closure — so unlike the
+date/media filter slice, **this slice does drift the pin and needs a reissue**.
 
 ## Explicitly out of scope
 
@@ -164,10 +231,20 @@ the pin and needs a reissue**.
 - Publication to the TV surface.
 - Any client adoption. This is a source contract.
 
-## Open items for the owner
+## Decisions closed
 
-1. **The one-shot assignment gap above** — accept it, or require a reassign operation first.
-2. **Whether the incoming area is per-account or per-account-per-library.** "Their own
-   designated folders" is decided; what is not is whether a member who belongs to two
-   libraries gets one incoming folder or one per library. One folder is simpler and keeps
-   upload library-agnostic, which matches the rest of this contract.
+- **Reversibility** — a bounded reassign plan is required before upload opens to members.
+- **Review surface** — filesystem browsing plus an operator listing; deliberately no route that
+  serves an unmapped asset.
+- **Member identity** — a display name is required, and it drives the incoming folder label.
+- **One incoming folder or one per library** — settled by construction: the upload route carries
+  no library, so there is exactly one incoming folder per account. A per-library folder would
+  require choosing a library *at upload*, which is the thing this contract exists to avoid.
+
+## Still open
+
+- **Batch granularity** — proposed: one folder per upload session, so that the review unit, the
+  provenance receipt and a "this whole batch → library X" action all line up. Not yet confirmed.
+- **Who may set or change a display name** — the member at registration, an operator, or both.
+  Registration is the natural place; an operator override matters when a name is wrong or
+  duplicated.
