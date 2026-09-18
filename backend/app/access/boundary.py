@@ -56,6 +56,7 @@ class ClosedBoundary:
         if method == 'GET' and path == '/library-albums': return True
         if method == 'POST' and path == '/admin/albums': return True
         if method == 'PUT' and re.fullmatch(r'/admin/albums/[0-9]+',path): return True
+        if method == 'POST' and re.fullmatch(r'/admin/albums/[0-9]+/(archive|restore)',path): return True
         if method == 'POST' and re.fullmatch(r'/admin/faces/[0-9]+/(new-person|unassign)',path): return True
         if method == 'GET' and re.fullmatch(r'/admin/assets/[0-9]+/faces', path):
             return True
@@ -71,6 +72,7 @@ class ClosedBoundary:
             return True
         if method == 'POST' and re.fullmatch(r'/assets/[0-9]+/captions', path):
             return True
+        if method == 'GET' and path == '/admin/albums/archived': return True
         if method == 'GET' and path == '/duplicates':
             return True
         if method == 'GET' and (path == '/tags' or re.fullmatch(r'/tags/[0-9]+/assets', path)):

@@ -18,9 +18,9 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 41 of 42 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 44 of 45 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 163 | `id="…"` in `backend/app/ui/access/index.html` |
+| Protected control ids | 166 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 49 checkpoints, exit 0 — **plus 2 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person and duplicate-group checkpoints were written 2026-09-18 but could not be run (no Playwright in that environment), so neither is counted until it passes |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
@@ -107,7 +107,7 @@ of the filter is a deployment state, not an error a member can act on.
 | Merge people, delete people, delete faces, recluster | `/persons/merge`, `/persons/{id}/delete`, `DELETE /faces/{id}`, `/persons/recluster` | none | **EXCLUDED** (irreversible clustering mutations; need a separate reviewed design) |
 | Albums: list, compose, order, cover, bilingual title | `/albums/drafts*`, `album-*` | `/library-albums`, `/admin/albums` | **AHEAD** (library-owned, revision-bound) |
 | Album drafts as a separate object | `/albums/drafts`, `/albums/drafts/{id}` | — | **SUPERSEDED** by library-owned albums |
-| Album delete / archive | none in legacy UI | none | **GAP·CONTRACT** |
+| Album delete / archive | none in legacy UI | owner `POST /admin/albums/{id}/archive`, `POST …/restore`, `GET /admin/albums/archived` | **CLOSED 2026-09-18 as archive, not delete.** Archiving writes `albums.status='archived'`, which every read already excludes, so **no migration** was needed and **nothing is deleted** — the album, its selected assets and its cover all survive. That is the reversibility the owner asked for: a mistake is put away and can be brought back, and deletion is not offered at all. Restoring takes **no revision**, because an archived album cannot be edited, so there is no lost update to guard against — and a revision could not be obtained anyway, since archiving removes the album from the list. A separate owner-only read lists what has been put away, without which archiving would hide an album with no way back. **Note:** the deployed library has **no albums at all** (0 rows), so this capability has no observed use yet. |
 | Publish an album to the TV surface | `home/v2|catalog` | none | **GAP·CONTRACT** (keep separate from authenticated albums) |
 
 ### Owner, session and operations

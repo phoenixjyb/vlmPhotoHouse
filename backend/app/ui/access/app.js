@@ -22,7 +22,7 @@
   const discoveryState={binding:null,page:1,total:0,load:0,fingerprint:null,applied:false};
   const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
-  const albumState={page:1,total:0,load:0,draft:null};
+  const albumState={page:1,total:0,load:0,draft:null,archivedLoad:0};
   const photoState={image:null,surface:null,mode:'fit',scale:1,drag:null};
   const sequenceState={items:[],index:0,origin:'single',playing:false,timer:null,busy:false};
   Object.assign(words.en,{viewPrevious:'Previous photo',viewNext:'Next photo',viewPlay:'Play slideshow',viewPause:'Pause slideshow',viewInterval:'Each preview',viewPage:'This page',viewAlbum:'This album',viewSequenceHelp:'Slideshow uses these previews only; videos are shown as still previews.'});
@@ -49,9 +49,11 @@
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
   Object.assign(words.zh,{personPhotos:'此人的照片',noPersonPhotos:'本家庭库中还没有标记为此人的照片。',clearPerson:'关闭',personPhotosHelp:'只读。人脸标记是系统自动判断的结果，可能不准确。'});
   Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
+  Object.assign(words.en,{archivedAlbums:'Albums put away',archivedHelp:'Albums this library has put away. Nothing was deleted, so any of them can be brought back.',noArchivedAlbums:'No album has been put away.',archiveAlbum:'Put away',restoreAlbum:'Bring back',confirmArchive:'Put this album away? Nothing is deleted and you can bring it back.'});
   Object.assign(words.en,{describePhoto:'Describe this photo',saveCaption:'Save description',captionSaved:'Saved. Thank you.',captionConflict:'This photo already has a description.'});
   Object.assign(words.en,{duplicatesInLibrary:'Photos saved twice',duplicatesHelp:'Photos this library holds more than once, because the same picture was imported twice. Read-only: nothing here deletes, hides or merges a copy.',savedTimes:'Saved',noDuplicatesInLibrary:'No photo in this library is saved twice.'});
   Object.assign(words.en,{tagsInLibrary:'Tags in this library',tagsHelp:'Tags already attached to photos in this library. Read-only: no tag can be added or removed here.',findTag:'Find a tag',noTagsInLibrary:'No tags in this library yet.',assetsCount:'photos',tagAssets:'Photos with this tag',noTaggedAssets:'No photo in this library carries this tag.',clearTag:'Close'});
+  Object.assign(words.zh,{archivedAlbums:'已收起的相册',archivedHelp:'本家庭库收起的相册。照片和相册都没有删除，随时可以恢复。',noArchivedAlbums:'还没有收起任何相册。',archiveAlbum:'收起',restoreAlbum:'恢复',confirmArchive:'确定收起这个相册吗？不会删除任何内容，之后可以恢复。'});
   Object.assign(words.zh,{describePhoto:'为这张照片写一句描述',saveCaption:'保存描述',captionSaved:'已保存，谢谢。',captionConflict:'这张照片已经有描述了。'});
   Object.assign(words.zh,{duplicatesInLibrary:'保存了两次的照片',duplicatesHelp:'本家庭库中保存了不止一次的相同照片，通常是因为同一批照片被导入过两次。只读：这里不会删除、隐藏或合并任何一份。',savedTimes:'保存份数',noDuplicatesInLibrary:'本家庭库中没有重复保存的照片。'});
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
@@ -130,7 +132,7 @@
     } finally {state.controllers.delete(controller);}
   }
   function showAuth() {
-    albumState.draft=null;albumState.page=1;
+    albumState.draft=null;albumState.page=1;$('album-archived-panel').hidden=true;$('album-archived-panel').open=false;$('album-archived-list').replaceChildren();
     storyState.search=null;storyState.suspended=null;$('search-text').value='';$('search-source').value='all';
     state.profile=null;state.csrf=null;state.library=null;state.locked=false;
     $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
@@ -601,6 +603,34 @@
       $('member-page-label').textContent=`${t('page')} ${state.memberPage} ${t('of')} ${pages}`;
     } catch(error) {await failure(error,epoch);}
   }
+  // Albums this library has put away. Owner-only, and the only surface that shows them: an
+  // archived album is excluded from every member-facing read, which is the point of archiving.
+  // Restoring takes no revision, so there is nothing here to read back first.
+  async function loadArchivedAlbums(){
+    if(state.locked||$('album-archived-panel').hidden||!$('album-archived-panel').open)return;
+    const epoch=state.generation,library=state.library,load=++albumState.archivedLoad;
+    $('album-archived-list').replaceChildren();$('album-archived-status').textContent=t('loading');
+    const current=()=>!stale(epoch)&&load===albumState.archivedLoad&&library===state.library;
+    try{
+      const result=await request(libraryPath('/admin/albums/archived',{page:'1'}),{epoch});
+      if(!current())return;
+      $('album-archived-status').textContent=result.total?'':t('noArchivedAlbums');
+      for(const album of result.items){
+        const row=document.createElement('article');row.className='album-archived-card';row.dataset.albumId=album.id;
+        const title=document.createElement('h3');title.textContent=album.title;
+        row.append(title);
+        row.append(storyButton('restoreAlbum',async()=>{
+          if(state.busy||state.locked)return;
+          try{
+            await request(libraryPath(`/admin/albums/${album.id}/restore`),{method:'POST',epoch,body:{}});
+            if(!current())return;
+            await loadArchivedAlbums();await loadAlbums();
+          }catch(error){if(current())await failure(error,epoch);}
+        }));
+        $('album-archived-list').append(row);
+      }
+    }catch(error){if(current()){$('album-archived-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
   async function loadAlbums(){
     if(state.locked||!state.library)return;
     const epoch=state.generation,load=++albumState.load;
@@ -609,6 +639,7 @@
       const result=await request(libraryPath('/library-albums',{page:String(albumState.page)}),{epoch});
       if(stale(epoch)||load!==albumState.load)return;albumState.total=result.total;
       $('album-status').textContent=result.total?'':t('noAlbums');$('album-create').hidden=!result.can_manage;
+      $('album-archived-panel').hidden=!result.can_manage;
       for(const album of result.items){
         const card=document.createElement('article');card.className='album-card';card.dataset.albumId=album.id;
         const title=document.createElement('h3');title.textContent=state.language==='zh'&&album.title_zh?album.title_zh:album.title;
@@ -616,7 +647,19 @@
         if(album.needs_review){const note=document.createElement('p');note.textContent=t('albumNeedsReview');card.append(note);}
         const photos=document.createElement('div');photos.className='album-strip';
         for(const id of album.asset_ids){const button=document.createElement('button');button.type='button';button.className='quiet';const img=document.createElement('img');img.src=safeMediaURL(id,'thumbnail');img.alt=`${t('photo')} ${id}`;img.loading='lazy';button.append(img);button.addEventListener('click',async()=>{try{const detail=await request(libraryPath(`/assets/detail/${id}`),{epoch});if(!stale(epoch)&&card.isConnected)await openAsset(detail.asset,{sequence:album.asset_ids.map(id=>({id})),origin:'album'});}catch(error){await failure(error,epoch);}});photos.append(button);}
-        card.append(photos);if(result.can_manage)card.append(storyButton('editAlbum',()=>editAlbum(album)));$('album-list').append(card);
+        card.append(photos);
+        if(result.can_manage){
+          card.append(storyButton('editAlbum',()=>editAlbum(album)));
+          // Archive puts the album away without deleting anything, so a mistake is recoverable.
+          card.append(storyButton('archiveAlbum',async()=>{
+            if(state.busy||state.locked||!window.confirm(t('confirmArchive')))return;
+            try{
+              await request(libraryPath(`/admin/albums/${album.id}/archive`),{method:'POST',epoch,body:{revision:album.revision}});
+              await loadAlbums();await loadArchivedAlbums();
+            }catch(error){await failure(error,epoch);}
+          }));
+        }
+        $('album-list').append(card);
       }
       $('album-pages').hidden=!result.total;$('album-previous').disabled=albumState.page===1;$('album-next').disabled=albumState.page*10>=result.total;
       $('album-page-label').textContent=`${t('page')} ${albumState.page} ${t('of')} ${Math.max(1,Math.ceil(result.total/10))}`;

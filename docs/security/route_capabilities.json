@@ -3205,6 +3205,48 @@
    "scope": "One caption for one active asset this library maps, and only while that asset has no current caption. Writes one row marked user_edited.",
    "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other member writes; caption.write for any approved membership, with the asset resolved through the same access_asset_libraries predicate the gallery uses, so a deleted, foreign or unmapped asset is refused; 409 rather than an overwrite when a current caption already exists, so this cannot take a description away; text bounded at 1024 characters with control characters refused; the row is written user_edited=1, which both the generation path and the refresh path already honour rather than overwriting; the actor is recorded in access_audit; one transaction with a 3-second deadline.",
    "gap": "Source/synthetic evidence only; no member UI control yet. Fill-the-gap only: replacing or removing an existing caption is a separate decision and stays unbuilt, so a wrong AI description cannot be corrected yet. No moderation, no rate limit and no per-member cap, so the audit row is the only record of who wrote what. Caption quality is unverified: nothing checks the text against the policy that rejected the model output. No physical acceptance."
+  },
+  {
+   "source": "backend/app/access/albums.py",
+   "owner": "router",
+   "method": "POST",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.albums.manage"
+   ],
+   "path": "/admin/albums/{album_id}/archive",
+   "handler": "archive_album",
+   "scope": "One album owned by the selected library, moved out of the library list.",
+   "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other album writes; library.albums.manage, so owner only; the album is resolved through the same library-owned join the edit path uses, so a foreign or missing album is refused; the revision is checked exactly as an edit checks it, so an archive cannot race an edit and silently lose it; a no-op is refused with 409 rather than reported as success; the actor is recorded in access_audit. Nothing is deleted: only albums.status changes.",
+   "gap": "Source/synthetic evidence only; no UI control yet, and **no album exists on the deployed library**, so this capability has no observed use yet. Archiving is reversible by design and deletion is not offered at all, so a mistake can be put away but never destroyed. An archived album has no member-visible surface: nothing lists archived albums, so only an owner who knows the id can restore one. No physical acceptance."
+  },
+  {
+   "source": "backend/app/access/albums.py",
+   "owner": "router",
+   "method": "POST",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.albums.manage"
+   ],
+   "path": "/admin/albums/{album_id}/restore",
+   "handler": "restore_album",
+   "scope": "One archived album owned by the selected library, returned to the library list.",
+   "current_control": "Same boundary, capability, library-owned resolution and audit as the archive route; refuses a no-op with 409. Deliberately **not** revision-bound: the revision exists to stop two writers losing each other's edit, and an archived album cannot be edited at all, so there is no concurrent edit to lose. Requiring one would make restore impossible, because a client can only read a revision from the list and archiving removes the album from it.",
+   "gap": "Source/synthetic evidence only; no UI control yet. Restoring needs the album id, and no read lists archived albums, so recovery depends on the owner having recorded it. A listing of archived albums is the obvious next piece. No physical acceptance."
+  },
+  {
+   "source": "backend/app/access/albums.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/admin/albums/archived",
+   "handler": "archived_albums",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.albums.manage"
+   ],
+   "scope": "Albums the selected library has archived, so an archive can be undone.",
+   "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other album routes; library.albums.manage, so owner only, and a separate route rather than a flag on the member list so an archived album stays invisible to members without a conditional capability; scoped by the same library-owned join the edit path uses; 10 per page, bounded page number, 3-second deadline. Returns no revision, because restoring does not take one.",
+   "gap": "Source/synthetic evidence only; no UI control yet, and no album exists on the deployed library. Archived albums are excluded from every member-facing read by design, so this is the only surface that shows them and it is owner-only. No physical acceptance."
   }
  ]
 }

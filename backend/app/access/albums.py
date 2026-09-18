@@ -38,15 +38,27 @@ class Albums:
     def __init__(self, access):
         self.access,self.db = access,access.db
 
-    def _row(self, album, library):
+    def _row_any(self, album, library):
+        """The album row regardless of status, validated, for the archive/restore pair.
+
+        `_row` refuses anything that is not `draft`, and that refusal is what hides an archived
+        album from every read — so restoring one cannot go through `_row`. Both paths share this
+        fetch so they cannot drift apart.
+        """
         row = self.db.execute('''SELECT a.id,substr(a.title,1,160),substr(a.title_zh,1,160),substr(a.description,1,1000),
             substr(a.theme,1,32),a.cover_asset_id,owned.revision,a.status,
             length(a.title),length(a.title_zh),length(a.description) FROM albums a JOIN access_album_libraries owned ON owned.album_id=a.id
             WHERE a.id=? AND owned.library_id=?''',(album,library)).fetchone()
-        if row is None or row[7]!='draft':
-            raise AccessDenied('Access denied')
+        if row is None:
+            return None
         if any((length or 0)>limit for length,limit in zip(row[8:],(160,160,1000))) or row[4] not in THEMES:
             raise TransportError(503,'Album unavailable')
+        return row
+
+    def _row(self, album, library):
+        row = self._row_any(album, library)
+        if row is None or row[7]!='draft':
+            raise AccessDenied('Access denied')
         return row[:8]
 
     def _revision(self, row, library):
@@ -118,6 +130,72 @@ class Albums:
             return self._present(self._row(album,library),library)
 
 
+    def archived(self,token,library,page):
+        """The albums this library has put away, so an archive can actually be undone.
+
+        Owner-only, and deliberately a separate read rather than a flag on the member list: an
+        archived album is meant to be invisible to members, and a conditional capability on one
+        route is easier to get wrong than a route that simply requires the owner.
+
+        No revision is returned, because restoring does not take one — an archived album cannot be
+        edited, so there is no concurrent change for a revision to protect against.
+        """
+        with self.access._transaction():
+            self.access._require(token,library,'library.albums.manage')
+            total=self.db.execute('''SELECT count(*) FROM albums a
+                JOIN access_album_libraries owned ON owned.album_id=a.id
+                WHERE owned.library_id=? AND a.status='archived' ''',(library,)).fetchone()[0]
+            rows=self.db.execute('''SELECT a.id,substr(a.title,1,160),substr(a.title_zh,1,160),
+                substr(a.theme,1,32),a.cover_asset_id FROM albums a
+                JOIN access_album_libraries owned ON owned.album_id=a.id
+                WHERE owned.library_id=? AND a.status='archived'
+                ORDER BY a.id DESC LIMIT 10 OFFSET ?''',(library,(page-1)*10)).fetchall()
+            return {'library_id':library,'page':page,'page_size':10,'total':total,
+                    'items':[{'id':str(r[0]),'title':r[1],'title_zh':r[2] or '','theme':r[3],
+                              'cover_asset_id':str(r[4]) if r[4] is not None else ''} for r in rows]}
+
+    def archive(self,token,library,album,body,archived):
+        """Hide an album from the library, or bring it back.
+
+        Archiving writes `albums.status='archived'`, which every read already excludes: the list
+        selects `status='draft'` and `_row` refuses anything else. So no migration is needed and
+        **nothing is deleted** — the album, its selected assets and its cover all survive, which
+        makes this reversible by design. That is the property the owner asked for: an album
+        created by mistake can be put away and brought back, and deletion is not offered at all.
+
+        The revision is checked exactly as `save` checks it, so two owners cannot archive and
+        edit the same album concurrently and silently lose one of the changes.
+        """
+        # Only archiving is revision-bound. Restoring deliberately is not: the revision exists
+        # to stop two writers losing each other's edit, and an archived album cannot be edited
+        # at all — every read refuses it — so there is no concurrent edit to lose. Requiring one
+        # would in fact make restore impossible, because the client can only read a revision from
+        # the list, and archiving removes the album from it.
+        if archived and not re.fullmatch('[0-9a-f]{64}',body.get('revision','')):
+            raise TransportError(400,'Invalid revision')
+        with self.access._transaction(write=True):
+            member=self.access._require(token,library,'library.albums.manage')
+            row=self._row_any(album,library)
+            if row is None:
+                raise AccessDenied('Access denied')
+            # Refuse a no-op rather than silently reporting success, so the caller learns the
+            # album was already in the state they asked for.
+            if archived and row[7]!='draft':
+                raise TransportError(409,'Album is not in this library')
+            if not archived and row[7]!='archived':
+                raise TransportError(409,'Album is not archived')
+            if archived and not hmac.compare_digest(body['revision'],self._revision(row[:8],library)):
+                raise TransportError(409,'Album changed; review again')
+            self.db.execute('UPDATE albums SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?',
+                            ('archived' if archived else 'draft',album))
+            self.db.execute('UPDATE access_album_libraries SET revision=revision+1 WHERE album_id=?',(album,))
+            self.access._audit(member['account_id'],
+                               'album.'+('archive' if archived else 'restore')+'.'+str(album),library)
+            # Not `_present`: an archived album is refused by `_row`, which is the point.
+            return {'id':str(album),'library_id':library,
+                    'status':'archived' if archived else 'draft','archived':bool(archived)}
+
+
 def _call(runtime,action,*args):
     with runtime.connection_factory() as db:
         deadline=time.monotonic()+3
@@ -148,3 +226,33 @@ async def update_album(album_id: str,request: Request):
     query=_query(request,{'library'})
     body=await _body(request,FIELDS|{'revision'})
     return JSONResponse(await run_in_threadpool(_call,_runtime(request,allow_query=True),'save',token,query['library'],_integer(album_id,2**63-1),body))
+
+
+@router.get('/admin/albums/archived')
+async def archived_albums(request: Request):
+    # The recovery surface: without it, archiving would hide an album with no way back.
+    token,_=credentials_from_request(request,allow_query=True)
+    query=_query(request,{'library','page'})
+    return JSONResponse(await run_in_threadpool(_call,_runtime(request,allow_query=True),'archived',
+        token,query['library'],_integer(query.get('page','1'),100000)))
+
+
+@router.post('/admin/albums/{album_id}/archive')
+async def archive_album(album_id: str,request: Request):
+    # Put an album away without deleting anything, so a mistake is recoverable.
+    token,_=credentials_from_request(request,allow_query=True)
+    query=_query(request,{'library'})
+    body=await _body(request,{'revision'})
+    return JSONResponse(await run_in_threadpool(_call,_runtime(request,allow_query=True),'archive',
+        token,query['library'],_integer(album_id,2**63-1),body,True))
+
+
+@router.post('/admin/albums/{album_id}/restore')
+async def restore_album(album_id: str,request: Request):
+    # The other half of archive: without it, archiving would be a one-way door. No revision is
+    # required, because an archived album cannot be edited and so cannot be concurrently changed.
+    token,_=credentials_from_request(request,allow_query=True)
+    query=_query(request,{'library'})
+    body=await _body(request,set())
+    return JSONResponse(await run_in_threadpool(_call,_runtime(request,allow_query=True),'archive',
+        token,query['library'],_integer(album_id,2**63-1),body,False))
