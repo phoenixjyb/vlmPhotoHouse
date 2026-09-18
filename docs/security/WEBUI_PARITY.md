@@ -17,7 +17,7 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | Measure | Value | How it was derived |
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
-| Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
+| Protected routes | 45 | Route decorators under `backend/app/access/`, excluding `@*.head` |
 | Protected routes reachable from the protected UI | 44 of 45 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 166 | `id="…"` in `backend/app/ui/access/index.html` |
@@ -158,11 +158,12 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
 
 ## Known-red tests
 
-The Python suite reports **3 errors** against this source (`836 collected, 3 errors,
-7 skipped`). They are errors rather than failures because each raises in fixture setup, not
-in an assertion. All three reproduce at the pre-slice tip in a clean control worktree
-(`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same three node ids*, and none
-touch the WebUI:
+The Python suite reports **3 errors** against this source (`962 collected, 3 errors,
+7 skipped` as of the 2026-09-18 slices; it was `836 collected` when this section was written,
+and the *non-passing set* has not changed since). They are errors rather than failures because
+each raises in fixture setup, not in an assertion. All three reproduce at the pre-slice tip in
+a clean control worktree (`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same
+three node ids*, and none touch the WebUI:
 
 - `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
   process inspection is unavailable (`/bin/ps` is blocked).
@@ -172,9 +173,11 @@ touch the WebUI:
   — passes in isolation and fails only in full-suite order; a pre-existing order
   dependence, not a regression.
 
-The 21 extra collected tests on this source are the discovery wiring slice's new loader and
-wiring tests; the 11 before them were the discovery-index producer slice's, and the six
-tag-catalog tests were already counted in the 794. Because the *non-passing set* is
+The growth from 804 to 962 collected tests is the discovery wiring slice's loader and wiring
+tests, the discovery-index producer slice's, and then the 2026-09-18 slices — upload, photos of a
+person, duplicate review, caption write and album archive — which added **126** tests between them
+and no new failure. Only `test_suppressed_ownership_repair` passes in isolation and fails in
+full-suite order; the other two fail either way. Because the *non-passing set* is
 identical on both sides, every slice since is behaviour-neutral with respect to everything
 else in the tree.
 
