@@ -78,6 +78,10 @@ try:
             db.execute('INSERT INTO tags(id,name,type) VALUES(?,?,?)',(tag_id,name,'caption-auto'))
         for tag_id,asset in ((1,101),(1,102),(2,101),(3,201),(4,103)):
             db.execute('INSERT INTO asset_tags(asset_id,tag_id,source) VALUES(?,?,?)',(asset,tag_id,'cap'))
+        # Exact-duplicate fixture. 101 and 102 are visible in family-a and active; 103 is
+        # deleted and 201 belongs to family-b, so those two are the negative controls the
+        # duplicate checkpoint asserts never appear.
+        db.execute("UPDATE assets SET hash_sha256='dup-shared' WHERE id IN (101,102,103,201)")
         db.commit()
     fixture.client = build_client()
     fixture.addCleanup(fixture.client.close)

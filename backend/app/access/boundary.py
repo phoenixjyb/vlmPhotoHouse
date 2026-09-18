@@ -14,6 +14,7 @@ from .tags import router as tag_router
 from .albums import router as album_router
 from .discovery_transport import router as discovery_router
 from .upload_transport import router as upload_router
+from .duplicates import router as duplicate_router
 from ..routers.ui import router as ui_router
 
 
@@ -28,7 +29,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router, upload_router)
+                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router, upload_router, duplicate_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -66,6 +67,8 @@ class ClosedBoundary:
                                 or re.fullmatch(r'/admin/people/[0-9]+/faces', path)):
             return True
         if method == 'PUT' and re.fullmatch(r'/admin/people/[0-9]+', path):
+            return True
+        if method == 'GET' and path == '/duplicates':
             return True
         if method == 'GET' and (path == '/tags' or re.fullmatch(r'/tags/[0-9]+/assets', path)):
             return True

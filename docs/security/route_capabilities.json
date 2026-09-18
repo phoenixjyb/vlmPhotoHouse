@@ -42,6 +42,10 @@
    "expression": "router = APIRouter(route_class=DiscoveryRoute)"
   },
   {
+   "source": "backend/app/access/duplicates.py",
+   "expression": "router = APIRouter(route_class=LibraryRoute)"
+  },
+  {
    "source": "backend/app/access/library.py",
    "expression": "router = APIRouter(route_class=LibraryRoute)"
   },
@@ -200,6 +204,10 @@
   {
    "source": "backend/app/main.py",
    "expression": "app.include_router(discovery_router)"
+  },
+  {
+   "source": "backend/app/main.py",
+   "expression": "app.include_router(duplicate_router)"
   },
   {
    "source": "backend/app/main.py",
@@ -3160,6 +3168,20 @@
    "scope": "Photos in the selected library that contain a face of one person, one row per photo. The person must already be visible to this library, so the read opens no audience the people directory would not already list.",
    "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the people directory; library.read rather than an owner capability, matching the directory it completes; the person is resolved through the same library-scoped visibility check the directory uses, so a person owned by another library is refused identically; active assets only, through the same access_asset_libraries predicate the gallery uses; 25 per page, bounded page number, 3-second query deadline. The response carries no face id, bounding box, confidence or vector, and counts distinct photos rather than faces. The route also refuses a person with no display name, which is the same rule the directory applies, so a member cannot enumerate sequential person ids to reach an unnamed cluster the directory never offered.",
    "gap": "Source/synthetic evidence only; the member control now exists in the protected page, so this is reachable, but no physical acceptance. Face assignment quality is unqualified: a mislabelled face makes this read return the wrong photos, and nothing here verifies the clustering that produced the mapping. A person with no name is refused, matching the directory, so an unnamed cluster cannot be reached by guessing a sequential id. No cross-library person identity by design."
+  },
+  {
+   "source": "backend/app/access/duplicates.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/duplicates",
+   "handler": "duplicates",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.read"
+   ],
+   "scope": "Exact duplicate groups within one library: active assets this library maps that share a hash_sha256 with at least one other active asset in the same library.",
+   "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other member reads; library.read rather than an owner capability, matching the tag catalog and the people directory; the repeat predicate is scoped to the library, so a copy that is deleted, in another library or unmapped never counts and never appears; 25 groups per page, 25 copies per group, bounded page number, 3-second query deadline. The response carries no filesystem path, no filename and no content hash: a group is identified by its lowest asset id, which is stable for paging without letting a caller test whether a known image is in the library.",
+   "gap": "Source/synthetic evidence only; no member UI control yet. Exact duplicates only — perceptual near-duplicates (legacy /duplicates/reduction/*) need the phash task output and an explicit threshold decision, and are a separate contract. Nothing here deletes, suppresses or merges a copy, and deletion stays EXCLUDED, so the view explains the duplication rather than resolving it. On the deployed library that is 3,081 groups covering 6,189 of 27,842 active assets, caused by the same material being imported twice under two naming schemes. No physical acceptance."
   }
  ]
 }

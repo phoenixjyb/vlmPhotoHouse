@@ -18,10 +18,10 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 39 of 40 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 40 of 41 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 156 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 49 checkpoints, exit 0 — **plus 1 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person checkpoint was written 2026-09-18 but could not be run (no Playwright in that environment), so it is not counted until it passes |
+| Protected control ids | 163 | `id="…"` in `backend/app/ui/access/index.html` |
+| Browser suite | 49 checkpoints, exit 0 — **plus 2 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person and duplicate-group checkpoints were written 2026-09-18 but could not be run (no Playwright in that environment), so neither is counted until it passes |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
 **The contract pin is Python-only.** The pinned closure is `backend/app/**/*.py` plus
@@ -82,7 +82,7 @@ of the filter is a deployment state, not an error a member can act on.
 | Date / media filtering | `/albums/time` | member-visible `#discovery-panel` → `GET /libraries/{id}/discovery/v1/facets` + `POST …/search` | **CLOSED 2026-09-17** for capture date and media kind (see "Closed in the member date/media filter slice"). It requires an operator index opt-in; without one the panel is hidden. A calendar or month view is still absent, so the *browsing* half of `/albums/time` is not reproduced. |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | **none — and no data path**: the protected asset projection is `a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at`, so no coordinate is ever selected | **GAP·CONTRACT** — needs a coarse-location privacy contract. The legacy endpoint returned raw `gps_lat`/`gps_lon` floats **and the asset's filesystem `path`**, up to 20,000 points per call; porting it as-is would leak precise location and server paths, and neither is replicated. `gps_lat`/`gps_lon` exist only in the original `0001_initial` schema; no protected code reads them. |
 | Home dashboard: featured, recent, people, story highlights, quick search | `tab-home`, `home-*` | none | **GAP·CONTRACT** (separate surface; see also `app/home_*.py`) |
-| Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | none | **GAP·CONTRACT** |
+| Duplicate detection and similarity reduction | `/duplicates*`, `/duplicates/reduction/*`, `sim-*` | member-visible `GET /duplicates` (exact duplicate groups) | **CLOSED 2026-09-18 for exact duplicates.** Groups of active assets the library maps that share a `hash_sha256`; 25 groups per page. Read-only — nothing deletes, hides or merges a copy, and **deletion stays EXCLUDED**. The response carries **no path, no filename and no content hash**: a group is identified by its lowest asset id, so a caller cannot test whether a known image is in the library. Measured on the deployed library: **3,081 groups covering 6,189 of 27,842 active assets**, caused by the same material imported twice under two naming schemes. **Similarity reduction (`/duplicates/reduction/*`) is still GAP·CONTRACT** — near-duplicates need the `phash` task output and an explicit threshold decision, a separate contract. |
 | Suppressed / restore groups | `/assets/suppressed` | none | **GAP·CONTRACT** |
 | Video browsing and segments | `/videos/{id}`, `/videos/{id}/segments` | thumbnail/display only | **GAP·CONTRACT** |
 
@@ -378,7 +378,9 @@ no other row changed disposition as a result of this review.
    rather than a new contract.
 4. **Contributions (upload)** — the largest family-visible gap, and the largest contract:
    provenance, quota, content handling and the contributor role.
-5. **Album delete/archive**, then **TV publication** as a separate surface.
+5. **Duplicate review** — **done** (2026-09-18, exact duplicates; see the duplicates row).
+   Similarity reduction stays a separate contract.
+6. **Album delete/archive**, then **TV publication** as a separate surface.
 6. **Discovery-driven browsing in the protected UI** — the provider question is answered and
    the transport is mounted, so this is now purely the UI control from item 1. It must not
    be presented as a drop-in for legacy `/search`: it offers date and media-kind narrowing

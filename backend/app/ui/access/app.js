@@ -16,6 +16,7 @@
   const peopleState={page:1,total:0,load:0,query:'',named:'all'};
   const directoryState={page:1,total:0,load:0,query:'',person:null,assetLoad:0,assetPage:1,assetTotal:0};
   const tagState={page:1,total:0,load:0,query:'',tag:null,tagLoad:0,tagPage:1,tagTotal:0,open:null};
+  const duplicateState={page:1,total:0,load:0};
   // Date/media narrowing. `binding` is issued by the facets route and must be echoed to
   // the search route; `fingerprint` chains a later page to the exact filter it paginates.
   const discoveryState={binding:null,page:1,total:0,load:0,fingerprint:null,applied:false};
@@ -48,7 +49,9 @@
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
   Object.assign(words.zh,{personPhotos:'此人的照片',noPersonPhotos:'本家庭库中还没有标记为此人的照片。',clearPerson:'关闭',personPhotosHelp:'只读。人脸标记是系统自动判断的结果，可能不准确。'});
   Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
+  Object.assign(words.en,{duplicatesInLibrary:'Photos saved twice',duplicatesHelp:'Photos this library holds more than once, because the same picture was imported twice. Read-only: nothing here deletes, hides or merges a copy.',savedTimes:'Saved',noDuplicatesInLibrary:'No photo in this library is saved twice.'});
   Object.assign(words.en,{tagsInLibrary:'Tags in this library',tagsHelp:'Tags already attached to photos in this library. Read-only: no tag can be added or removed here.',findTag:'Find a tag',noTagsInLibrary:'No tags in this library yet.',assetsCount:'photos',tagAssets:'Photos with this tag',noTaggedAssets:'No photo in this library carries this tag.',clearTag:'Close'});
+  Object.assign(words.zh,{duplicatesInLibrary:'保存了两次的照片',duplicatesHelp:'本家庭库中保存了不止一次的相同照片，通常是因为同一批照片被导入过两次。只读：这里不会删除、隐藏或合并任何一份。',savedTimes:'保存份数',noDuplicatesInLibrary:'本家庭库中没有重复保存的照片。'});
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
@@ -420,7 +423,7 @@
       status('');
       if(!$('members-panel').hidden&&$('members-panel').open)void loadMembers();
       if($('directory-panel').open)void loadDirectory();
-      if($('tags-panel').open)void loadTags();
+      if($('tags-panel').open)void loadTags();if($('duplicates-panel').open)void loadDuplicates();
       // Probe once per library (the reset clears the binding): the filter appears only
       // where the deployment has opted in, and reappears on a later load if it does.
       if(!discoveryState.binding)void openDiscovery();
@@ -876,6 +879,46 @@
       $('person-page-label').textContent=`${t('page')} ${directoryState.assetPage} ${t('of')} ${pages}`;
     }catch(error){if(current())await failure(error,epoch);}
   }
+  // Exact duplicate groups in this library. Read-only by construction: the route is GET-only
+  // and returns no path, filename or content hash, so there is nothing here to submit and
+  // nothing to act on. It explains a duplication the member can already see in the gallery.
+  async function loadDuplicates(){
+    if(state.locked||!$('duplicates-panel').open)return;
+    const epoch=state.generation,library=state.library,load=++duplicateState.load;
+    $('duplicate-list').replaceChildren();$('duplicate-pages').hidden=true;$('duplicate-status').textContent=t('loading');
+    const current=()=>!stale(epoch)&&load===duplicateState.load&&library===state.library&&$('duplicates-panel').open;
+    try{
+      const result=await request(libraryPath('/duplicates',{page:String(duplicateState.page)}),{epoch});
+      if(!current())return;
+      duplicateState.total=result.total;
+      $('duplicate-status').textContent=result.total?'':t('noDuplicatesInLibrary');
+      for(const group of result.items){
+        const row=document.createElement('article');row.className='duplicate-group';row.dataset.groupId=group.group_id;
+        const title=document.createElement('h4');title.textContent=`${t('savedTimes')} ${group.copy_count}`;
+        const copies=document.createElement('div');copies.className='duplicate-copies';
+        for(const copy of group.copies){
+          const card=document.createElement('article');card.className='duplicate-copy';card.dataset.assetId=copy.id;
+          // Only a same-origin thumbnail path is accepted, so no unexpected origin is loaded.
+          if(typeof copy.thumbnail_url==='string'&&copy.thumbnail_url.startsWith('/assets/')){
+            const image=document.createElement('img');image.className='duplicate-crop';image.loading='lazy';
+            image.alt=`${t('duplicatesInLibrary')} · ${copy.id}`;
+            image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+            image.src=copy.thumbnail_url;card.append(image);
+          }
+          card.append(storyButton('openPhoto',async()=>{
+            if(!current()||state.locked||state.busy||!abandonStory())return;
+            try{const detail=await request(libraryPath(`/assets/detail/${copy.id}`),{epoch});if(current())await openAsset(detail.asset);}
+            catch(error){await failure(error,epoch);}
+          }));
+          copies.append(card);
+        }
+        row.append(title,copies);$('duplicate-list').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('duplicate-pages').hidden=result.total===0;
+      $('duplicate-previous').disabled=duplicateState.page===1;$('duplicate-next').disabled=duplicateState.page>=pages;
+      $('duplicate-page-label').textContent=`${t('page')} ${duplicateState.page} ${t('of')} ${pages}`;
+    }catch(error){if(current()){$('duplicate-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
   // Member-facing tag catalog. Read-only by construction: both routes are GET-only and
   // the server returns a name plus a count of this library's own photos, so there is no
   // add, rename or remove control here and nothing to submit.
@@ -1058,6 +1101,9 @@
   $('person-previous').addEventListener('click',()=>{if(!state.busy&&directoryState.assetPage>1){directoryState.assetPage--;void loadPersonAssets();}});
   $('person-next').addEventListener('click',()=>{if(!state.busy&&directoryState.assetPage*25<directoryState.assetTotal){directoryState.assetPage++;void loadPersonAssets();}});
   $('tags-panel').addEventListener('toggle',()=>{if($('tags-panel').open)void loadTags();});
+  $('duplicates-panel').addEventListener('toggle',()=>{if($('duplicates-panel').open)void loadDuplicates();});
+  $('duplicate-previous').addEventListener('click',()=>{if(!state.busy&&duplicateState.page>1){duplicateState.page--;void loadDuplicates();}});
+  $('duplicate-next').addEventListener('click',()=>{if(!state.busy&&duplicateState.page*25<duplicateState.total){duplicateState.page++;void loadDuplicates();}});
   $('tag-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;tagState.query=$('tag-query').value.trim();tagState.page=1;void loadTags();});
   $('tag-previous').addEventListener('click',()=>{if(!state.busy&&tagState.page>1){tagState.page--;void loadTags();}});
   $('tag-next').addEventListener('click',()=>{if(!state.busy&&tagState.page*25<tagState.total){tagState.page++;void loadTags();}});

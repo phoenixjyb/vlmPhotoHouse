@@ -796,6 +796,24 @@ let browser;
   await page.screenshot({path:path.join(artifacts,'member-tag-catalog.png'),fullPage:true});
   await page.locator('#tags-panel > summary').click();
   checkpoint('Member browses the read-only tag catalog and its photos without tag controls');
+  // Exact duplicate groups. Read-only: the panel has no form and no control that could
+  // delete, hide or merge a copy. The fixture gives 101 and 102 the same hash; 103 is
+  // deleted and 201 belongs to family-b, so the group must contain exactly the two visible
+  // family-a copies and the panel must not name a path, a filename or a hash.
+  await page.locator('#duplicates-panel > summary').click();
+  await page.locator('#duplicate-list .duplicate-group').first().waitFor();
+  assert.equal(await page.locator('#duplicate-list .duplicate-group').count(),1);
+  assert.equal(await page.locator('#duplicate-list .duplicate-copy').count(),2);
+  const copyIds=await page.locator('#duplicate-list .duplicate-copy').evaluateAll(nodes=>nodes.map(n=>n.dataset.assetId));
+  assert.deepEqual(copyIds.slice().sort(),['101','102']);
+  await page.locator('#duplicate-list .duplicate-crop').first().evaluate(img=>img.decode());
+  assert.equal(await page.locator('#duplicates-panel input').count(),0);
+  assert.equal(await page.locator('#duplicates-panel form').count(),0);
+  const duplicateText=await page.locator('#duplicates-panel').textContent();
+  for(const leaked of ['private-synthetic','private-hash','dup-shared','.jpg'])assert.equal(duplicateText.includes(leaked),false);
+  await page.screenshot({path:path.join(artifacts,'member-duplicates.png'),fullPage:true});
+  await page.locator('#duplicates-panel > summary').click();
+  checkpoint('Member sees photos saved twice, with no way to delete or merge a copy');
   // Date/media narrowing over the reviewed discovery index. The transport is mounted in
   // the default app but the index is an operator opt-in, so the panel is offered only
   // where one exists. This harness supplies one via the real producer. The artifact is a
