@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from .library import LibraryRoute, _integer, _query
+from .library import FIELDS, LibraryRoute, _asset, _integer, _query
 from .service import AccessDenied, AccessService
 from .transport import TransportError, _body, _runtime, credentials_from_request
 
@@ -148,6 +148,39 @@ class People:
                                    (library, library, pattern, (page-1)*25)).fetchall()
             return {'library_id': library, 'page': page, 'page_size': 25, 'total': total,
                     'items': [self._present(row[:4], library, row[4]) for row in rows]}
+
+    def person_assets(self, token, library, person, page):
+        """Photos of one person, scoped to this library and bounded per page.
+
+        Completes the member directory: `browse` lists a person, and this opens their
+        photos. Gated on `library.read` for the same reason the directory is, and `_person`
+        runs first, so this adds no way to reach a person the directory would not already
+        list — a person owned by another library stays unreachable here too.
+
+        One row per **photo**, not per face, and the response carries no face id, bounding
+        box, confidence or vector. A member browses photographs, which is what the
+        directory promises; they cannot learn where in a photo a face is, how many faces
+        matched, or enumerate faces at all. The owner view already exposes those, and this
+        deliberately does not.
+        """
+        with self.access._transaction():
+            self.access._require(token, library, 'library.read')
+            row = self._person(person, library)
+            # The directory lists a person only when they have a name, because an unnamed
+            # cluster has no name to browse by. This read must apply the same rule: person IDs
+            # are sequential, so without it a member could enumerate ids and reach the photos
+            # of a cluster the directory deliberately never offered them.
+            if not row[1]:
+                raise AccessDenied('Access denied')
+            # count(DISTINCT asset_id) because a photo can hold two faces of one person;
+            # counting faces would overstate what the member is about to page through.
+            total = self.db.execute('SELECT count(DISTINCT f.asset_id)' + SCOPED +
+                ' AND f.person_id=?', (library, person)).fetchone()[0]
+            rows = self.db.execute('SELECT ' + FIELDS + SCOPED + ' AND f.person_id=?' +
+                ' GROUP BY a.id ORDER BY a.taken_at DESC,a.id DESC LIMIT 25 OFFSET ?',
+                (library, person, (page - 1) * 25)).fetchall()
+            return {'library_id': library, 'person_id': str(person), 'page': page, 'page_size': 25,
+                    'total': total, 'items': [_asset(row, library) for row in rows]}
 
     def faces(self, token, library, person, page):
         with self.access._transaction():
@@ -332,6 +365,16 @@ async def people(request: Request):
     return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'list', token,
         query['library'], _integer(query.get('page', '1'), 100000), query.get('q', ''),
         query.get('named', 'all')))
+
+
+@router.get('/people/{person_id}/assets')
+async def person_assets(person_id: str, request: Request):
+    # Completes the member directory: a listed person's photos. Same capability and the
+    # same scoping as the directory itself, so it opens no new audience and no new bytes.
+    token, _ = credentials_from_request(request, allow_query=True)
+    query = _query(request, {'library', 'page'})
+    return JSONResponse(await run_in_threadpool(_call, _runtime(request, allow_query=True), 'person_assets', token,
+        query['library'], _integer(person_id, 2**63-1), _integer(query.get('page', '1'), 100000)))
 
 
 @router.get('/admin/people/{person_id}/faces')

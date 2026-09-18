@@ -3146,6 +3146,20 @@
    "scope": "One account writing into its own incoming folder only. No library is selected, so the accepted asset is written in no library and is invisible to every member.",
    "current_control": "Exact handler registration in the default app plus the reviewed closed boundary bound to method, route template and endpoint identity; shared bearer/cookie/CSRF policy; declared content type required and a streaming byte cap refused before the body is buffered; type decided by leading bytes rather than the declared filename; decoded-pixel cap enforced before any write, from a bounded header parse with no decoder; bytes written only under a configured incoming root that is required to sit outside every original root, so an unassigned upload is unservable by construction; provenance and audit rows written; the capability re-checked inside the write transaction; deliberately no library mapping.",
    "gap": "Source/synthetic evidence only. No deployment configures an incoming root, so the route answers 503, and upload.submit is enabled in no profile. The promotion-and-assign and reassign operations do not exist yet, so an accepted photo has no reviewed path into a library. No quota or per-member cap by owner decision, so a per-file byte cap and the audit row are the only controls. No physical acceptance."
+  },
+  {
+   "source": "backend/app/access/people.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/people/{person_id}/assets",
+   "handler": "person_assets",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.read"
+   ],
+   "scope": "Photos in the selected library that contain a face of one person, one row per photo. The person must already be visible to this library, so the read opens no audience the people directory would not already list.",
+   "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the people directory; library.read rather than an owner capability, matching the directory it completes; the person is resolved through the same library-scoped visibility check the directory uses, so a person owned by another library is refused identically; active assets only, through the same access_asset_libraries predicate the gallery uses; 25 per page, bounded page number, 3-second query deadline. The response carries no face id, bounding box, confidence or vector, and counts distinct photos rather than faces.",
+   "gap": "Source/synthetic evidence only; no member UI control yet, so a member still cannot reach it. Face assignment quality is unqualified: a mislabelled face makes this read return the wrong photos, and nothing here verifies the clustering that produced the mapping. No cross-library person identity by design. No physical acceptance."
   }
  ]
 }
