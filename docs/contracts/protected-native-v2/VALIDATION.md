@@ -1,5 +1,40 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.8 — reissue after the member photos-of-a-person slice (2026-09-18)
+
+Source baseline: `45adbc410e3a38ccf91526b586f4dba1e37d2c36`.
+Branch: `master`.
+
+**Wire-neutral.** Unlike candidate.7, no captured exchange moves: `cases.json` regenerated
+against the new source is byte-identical, still **61 cases**, 0 changed, 0 added, 0 removed. The
+pinned closure stays **107 files**; two files changed content
+(`backend/app/access/people.py`, `backend/app/access/boundary.py`) and none was added or removed.
+The live route count moves **49 → 50**. The migration head is unchanged at `f2a6d8b4c915`, so
+this reissue requires **no** database migration — unlike candidate.7.
+
+The slice closes a dead end: `GET /people` let a member see 49 names with thumbnails and open
+none of them, while **13,246 of 27,842** active assets carry a face. `GET /people/{person_id}/assets`
+returns that person's photos, one row per photo, 25 per page.
+
+Four properties were enforced rather than assumed, each pinned by a test:
+
+- **`library.read`, not an owner capability**, matching the directory it completes.
+- **The person is resolved through the same library-scoped visibility check**, so a person owned
+  by another library is refused exactly as the directory refuses to list them.
+- **A person with no display name is refused.** This is the rule the directory applies, and
+  person IDs are sequential, so without it a member could enumerate ids to reach an unnamed
+  cluster the directory deliberately never offered. This was found while writing the test, not
+  anticipated in the design.
+- **One row per photo, and nothing about faces.** A photo holding two faces of one person
+  appears once, and the body carries no face id, bounding box, confidence or vector, so it
+  cannot be used to learn where a face is or to enumerate faces.
+
+Not verified here: the browser suite could not be run in this environment (no Playwright), so
+the new member control is covered by source tests, a static check that every referenced element
+id exists, and a `node --check` syntax pass. The browser checkpoint was written but is
+**unexecuted**, and the ledger's browser-suite count is therefore not restated for this slice.
+
+
 ## 2.0.0-candidate.7 — reissue after the member-upload slice (2026-09-18)
 
 Source baseline: `a8b1d74a6e953f9567beee4f237a8985e0c4412e`.

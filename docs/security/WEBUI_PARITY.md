@@ -21,7 +21,7 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | Protected routes reachable from the protected UI | 39 of 40 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 156 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 49 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
+| Browser suite | 49 checkpoints, exit 0 — **plus 1 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person checkpoint was written 2026-09-18 but could not be run (no Playwright in that environment), so it is not counted until it passes |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
 **The contract pin is Python-only.** The pinned closure is `backend/app/**/*.py` plus

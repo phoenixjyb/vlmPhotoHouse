@@ -1,12 +1,37 @@
-# Protected native profile 2.0.0-candidate.7
+# Protected native profile 2.0.0-candidate.8
 
-Backend source: `a8b1d74a6e953f9567beee4f237a8985e0c4412e`.
+Backend source: `45adbc410e3a38ccf91526b586f4dba1e37d2c36`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.8
+
+`2.0.0-candidate.7` pinned source `a8b1d74`. **This reissue is wire-neutral.** The member people
+directory could list a person but not open them, so a member saw names and thumbnails and could
+go no further. This slice adds `GET /people/{person_id}/assets`, which returns the photos of one
+person, scoped to the library and to people the directory already lists.
+
+`cases.json` was regenerated from a live capture against the new source and compared with
+candidate.7: **identical, 0 changed, 0 added, 0 removed**, still 61 cases. The 61 captured ASGI
+exchanges cover 28 paths and none is `/people`; the pack has never covered the member people
+surface, and this slice does not change that.
+
+What moved is the source closure's **content**, not its set: `backend/app/access/people.py` for
+the read and `backend/app/access/boundary.py` for its allowlist entry. The closure stays at
+**107 files**. The live route count moves **49 → 50**, and the migration head is unchanged at
+`f2a6d8b4c915`, so this reissue needs no database migration.
+
+The read is deliberately narrow. It requires `library.read` rather than an owner capability,
+matching the directory it completes; it resolves the person through the same library-scoped
+visibility check, so a person owned by another library is refused identically; it **refuses a
+person with no display name**, which is the rule the directory already applies, so a member
+cannot enumerate sequential person ids to reach an unnamed cluster the directory never offered;
+and it returns one row per **photo** with no face id, bounding box, confidence or vector, so it
+cannot be used to learn where a face is or to enumerate faces.
 
 ## Reissue — 2.0.0-candidate.7
 

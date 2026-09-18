@@ -1,21 +1,21 @@
 {
-  "backend_source_commit": "a8b1d74a6e953f9567beee4f237a8985e0c4412e",
+  "backend_source_commit": "45adbc410e3a38ccf91526b586f4dba1e37d2c36",
   "case_count": 61,
   "client_profile_defaults": {
     "protected_native_v2": false,
     "protected_photo_display": false,
     "protected_story_read": false
   },
-  "contract_version": "2.0.0-candidate.7",
+  "contract_version": "2.0.0-candidate.8",
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "186818175ec6a373545bc2533ecf4b8ee44f1a8a92171bc6c85cf9c6499efd3a",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "f2fd62c1de7a7a951f313060506b4b303cd3803b6e5cbffa2d05dffdc5d7f983",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "2c57749fb18ccf1170bdec0d9cb4be7113dc1cca45a2475dffd32b2bd671c374",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "0be691b9e4062d5b04e247d9282bf92f627314ab3be164dfff3d9771703c675e",
-    "docs/contracts/protected-native-v2/cases.json": "59a7a58a22a6d3ab9efc5b39755ce29842fe1c7ba815641f9cd72624dc3f9445",
-    "scripts/verify_protected_native_contract.py": "f6047b49f4479ee79df5c48f0c9a55f29093509b7d8c3c2cef180b34596bd2d3",
-    "tests/security/native_contract_v2_probe.py": "01520833be72e85b311d947ed4bd565cb73b308d01a6226092d131aa29deb7d8",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "b1d368fa029746fb4c4972b7b2e70a16c27e3f8047729ac4a15e5fb04df97c33",
+    "docs/contracts/protected-native-v2/cases.json": "8d0654408d5aeb6ebef1af96496a18a524862686e55898ca3bbcfdbeef5c3b93",
+    "scripts/verify_protected_native_contract.py": "14818bd1848e60944bc24c78d3486998fda14c06d31d9dd62b399e8c24e4cf32",
+    "tests/security/native_contract_v2_probe.py": "bef5468237d4ca7c4a56570d638a2aace406aeaafa9a6ea77b9a177f8cd77794",
     "tests/security/test_protected_native_contract.py": "151ded7458d534dc7bc8315abadc6f51096600fd353958b533e491b62fef6968"
   },
   "source_sha256": {
@@ -25,7 +25,7 @@
     "backend/app/access/admission.py": "12d77f6193298bafd67cc888412638d85a495028c5c809e17afdb611709f448c",
     "backend/app/access/albums.py": "6eb424a3fa61c6f799093739fa07c96003a0daae87765f8847d2b66c60d88df7",
     "backend/app/access/bootstrap.py": "d047446ae23196f8f24ea8c1b93c78b88ea77b1ece1594313595a79a8bba77f0",
-    "backend/app/access/boundary.py": "5e56d1bac1f4900c5149f21d4a00cdbff39516a2421880bca9fa1f389286af83",
+    "backend/app/access/boundary.py": "3344e6e26a5c4ac46fb9f60eafc1ae8c7a860bed269dc31abd35b80367c93665",
     "backend/app/access/credentials.py": "daee4f9549bc258b1b98319da2b411210f288a1896b61833ad867ad544933a50",
     "backend/app/access/discovery.py": "1f7e2d329dfa4b29212819a9532ffbfc9387b4e58275d3d3411728adaae35f82",
     "backend/app/access/discovery_index.py": "62d7ede1703222a48e702f8f6846abcad59a0910e2abd7ad962c0f09b62eeec9",
@@ -40,7 +40,7 @@
     "backend/app/access/metadata.py": "c83303b02fea179f647043b0689eba46aebdc7d09578d04374c20e01207250d8",
     "backend/app/access/owner_recovery.py": "a978677755d4c16f536000db575b4ea0221266ac00d77b899c69dd20699a1f07",
     "backend/app/access/ownership_repair.py": "7ac69e511bfb8f39bfcf7124ca6edb1256817e6759618973f4bf3fc4e8324a1e",
-    "backend/app/access/people.py": "f4036fc0badc62ef5f15b3bc90732a53649b465b006bea08db15aa2fa12354f7",
+    "backend/app/access/people.py": "031f18845f626093080440c4679d6ebe10a7230e335c57713f9f1e9237807947",
     "backend/app/access/promotion.py": "d0c5b4e42b9977a72e48ae0284a19a66e0676269957e53868cc610e734a2691e",
     "backend/app/access/provisioning.py": "9c7528f3f38f93801de5d4d1c87a87fc8cf70dfb8caa521dff5028f1709c5415",
     "backend/app/access/provisioning_apply.py": "9f082a6b5ef26244fbb15f9de6699a261e60e02b61a56daa6223ec6842775a84",
