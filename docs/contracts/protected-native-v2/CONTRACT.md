@@ -1,12 +1,45 @@
-# Protected native profile 2.0.0-candidate.8
+# Protected native profile 2.0.0-candidate.9
 
-Backend source: `45adbc410e3a38ccf91526b586f4dba1e37d2c36`.
+Backend source: `a4c54030c6f5593e46f6a1335f00843e6af65432`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.9
+
+`2.0.0-candidate.8` pinned source `45adbc4`. **This reissue is wire-neutral.** It adds
+`GET /duplicates`, which lists the exact duplicate groups of one library: active assets that
+library maps which share a `hash_sha256` with at least one other active asset **in the same
+library**.
+
+The reason the view exists is measured, not assumed. On the deployed family library that is
+**3,081 groups covering 6,189 of 27,842 active assets**, and the cause is ordinary: the same
+material was imported twice under two naming schemes, so one copy carries the camera's own
+filename and the other a phone export's date-stamped name. Both are real files in real folders,
+and neither is a defect. A family browsing 27,842 photos sees the same picture twice about a
+fifth of the time, and this explains why.
+
+`cases.json` was regenerated from a live capture against the new source and compared with
+candidate.8: **identical, 0 changed, 0 added, 0 removed**, still 61 cases. The closure moves
+**107 → 108 files** with `backend/app/access/duplicates.py`, and `backend/app/main.py` and
+`backend/app/access/boundary.py` changed content for the registration and the allowlist entry.
+The live route count moves **50 → 51**. The migration head is unchanged at `f2a6d8b4c915`, so
+this reissue needs **no** database migration.
+
+Two deliberate omissions, both narrower than the legacy surface:
+
+- **No path and no filename.** The legacy `/duplicates` route returned full filesystem paths. The
+  folder names would explain *why* a pair exists, but nothing here acts on that, so the leak is
+  not worth the explanation.
+- **No content hash.** A group is identified by its **lowest asset id**, which is stable across
+  pages without letting a caller test whether a known image is in the library.
+
+Nothing here deletes, hides or merges a copy, and deletion stays excluded. Perceptual
+near-duplicates (legacy `/duplicates/reduction/*`) remain a separate and unbuilt contract: they
+need the `phash` task's output and an explicit threshold decision.
 
 ## Reissue — 2.0.0-candidate.8
 

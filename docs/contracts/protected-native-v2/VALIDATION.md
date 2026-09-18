@@ -1,5 +1,45 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.9 — reissue after the duplicate-review slice (2026-09-18)
+
+Source baseline: `a4c54030c6f5593e46f6a1335f00843e6af65432`.
+Branch: `master`.
+
+**Wire-neutral.** `cases.json` regenerated against the new source is byte-identical, still
+**61 cases**, 0 changed, 0 added, 0 removed. The closure moves **107 → 108 files**
+(`backend/app/access/duplicates.py` added; `backend/app/main.py` and
+`backend/app/access/boundary.py` changed content). The live route count moves **50 → 51**. The
+migration head is unchanged at `f2a6d8b4c915`, so this reissue requires **no** database
+migration.
+
+**The scope was measured before it was built.** The deployed library holds **3,081 duplicate
+groups covering 6,189 of 27,842 active assets** — 22%. Sizes are 3,056 pairs, 24 triples and one
+group of five, and **every group sits inside a single library**. Inspecting the paths showed the
+cause: the same material imported twice under two naming schemes, so one copy carries the
+camera's own filename and the other a phone export's date-stamped name, with identical byte
+sizes. That is the family's history rather than a defect, which is why the slice is a read-only
+explanation and not a cleanup tool.
+
+Four properties were enforced rather than assumed, each pinned by a test:
+
+- **The repeat predicate is scoped to the library.** A copy that is deleted, in another library
+  or unmapped never counts and never appears, so a photo this library holds once is not reported
+  as a duplicate merely because another library also has it.
+- **No path, no filename, no content hash.** The legacy route returned full filesystem paths; the
+  group is identified by its lowest asset id instead, which is stable for paging without letting
+  a caller test whether a known image is in the library.
+- **Nothing writes.** The route is GET-only and the boundary admits exactly that method and path;
+  no role can delete, hide or merge a copy, and deletion stays excluded.
+- **Copies are bounded.** 25 groups per page and 25 copies per group, with the true count still
+  reported and a `copies_truncated` flag, so a pathological import cannot turn one page into an
+  unbounded response.
+
+Not verified here: the browser checkpoint is written but **unexecuted** (no Playwright in this
+environment), so the ledger records it as uncounted rather than passing. Covered instead by 9
+source tests, a static check that every referenced element id exists, and a `node --check` syntax
+pass on both JS files.
+
+
 ## 2.0.0-candidate.8 — reissue after the member photos-of-a-person slice (2026-09-18)
 
 Source baseline: `45adbc410e3a38ccf91526b586f4dba1e37d2c36`.
