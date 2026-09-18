@@ -1,5 +1,50 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.10 — reissue after the describe-a-photo slice (2026-09-18)
+
+Source baseline: `b1bda66793f2729b8c802dac67d7a425d8259a8b`.
+Branch: `master`.
+
+**Wire-neutral.** `cases.json` regenerated against the new source is byte-identical, still **61
+cases**, 0 changed, 0 added, 0 removed. The closure moves **108 → 109 files**
+(`backend/app/access/captions.py` added; `main.py`, `boundary.py` and `service.py` changed
+content). The live route count moves **51 → 52**. The migration head is unchanged at
+`f2a6d8b4c915`, so this reissue requires **no** database migration.
+
+**The need was measured first.** Of 27,842 active assets, **3,203 carry no caption**, and of the
+caption failures **556 are permanent** — 283 rejected by the English-word policy, 201 by the
+Chinese policy, 41 by a format rule, 24 by word-count. A retry produces the same rejected text, so
+those photos would stay undescribed forever. The slice exists for exactly that set: a member can
+describe a photo that has none.
+
+Four properties were enforced rather than assumed, each pinned by a test:
+
+- **Fill a gap, never replace.** An asset that already has a current caption is answered `409`, so
+  this cannot take a description away. The check runs inside the write transaction, so two members
+  racing cannot both succeed.
+- **`user_edited=1`.** This is the mechanism the pipeline already honours: the generation path
+  returns an existing user edit rather than replacing it, and the refresh script treats all
+  historical user edits as protected. Without the flag a later worker run could silently discard
+  what a member wrote, which would make the feature worse than useless.
+- **Any approved member.** Deliberately not contributor-or-owner, which is what `story.write`
+  requires: an invitation creates a viewer, and **no route changes a role**, so a
+  contributor-gated write could never be reached at all. This matches the owner's upload decision.
+- **Attributed through `access_audit`.** `captions` has no author column, and the audit already
+  records the actor, so attribution costs no migration.
+
+The asset is resolved through the same `access_asset_libraries` predicate the gallery uses, so a
+deleted, foreign or unmapped asset is refused. Text is bounded at 1024 characters with control
+characters refused, because a caption is one short human sentence and a newline would corrupt the
+stored row and any later export.
+
+Not verified here: the browser checkpoint is written but **unexecuted** (no Playwright in this
+environment), so the ledger counts neither it nor the two from the earlier slices. The browser
+fixture was deliberately **not** changed — adding an asset would shift the discovery index counts
+that existing checkpoints assert — so the browser suite pins only that the describe control is
+*absent* where a photo already has a caption. The write path itself is covered by 9 source tests,
+the element-id static check, and `node --check`.
+
+
 ## 2.0.0-candidate.9 — reissue after the duplicate-review slice (2026-09-18)
 
 Source baseline: `a4c54030c6f5593e46f6a1335f00843e6af65432`.

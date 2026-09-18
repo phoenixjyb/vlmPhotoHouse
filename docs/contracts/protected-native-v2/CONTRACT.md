@@ -1,12 +1,49 @@
-# Protected native profile 2.0.0-candidate.9
+# Protected native profile 2.0.0-candidate.10
 
-Backend source: `a4c54030c6f5593e46f6a1335f00843e6af65432`.
+Backend source: `b1bda66793f2729b8c802dac67d7a425d8259a8b`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.10
+
+`2.0.0-candidate.9` pinned source `a4c5403`. **This reissue is wire-neutral.** It adds
+`POST /assets/{asset_id}/captions`, which lets a member describe a photo that has none.
+
+The need is measured. **3,203 of 27,842** active assets carry no caption, and of the failures
+**556 are permanent**: 283 were rejected by the English-word policy, 201 by the Chinese policy, 41
+by a format rule and 24 by word-count. The model produces text the policy refuses, so a retry
+yields the same result and those photos stay undescribed forever. Nothing else in the protected
+surface lets the family describe them, and no client-side change can fix a server-side refusal.
+
+Four properties, each pinned by a test:
+
+- **Only where the asset has no current caption.** A photo that already has one is answered `409`
+  rather than overwritten, so this cannot take a description away. Replacing or removing an
+  existing caption is a separate decision and stays unbuilt.
+- **Written as `user_edited=1`**, which is the mechanism the pipeline already respects: both the
+  generation path (`backend/app/tasks.py`) and the refresh path (`scripts/refresh_captions.py`)
+  return an existing user edit rather than replacing it. Without that flag a later worker run
+  could silently discard what a member wrote.
+- **Any approved member**, matching the owner's upload decision. The alternative — contributor or
+  owner, which is what `story.write` requires — is currently **unreachable**: an invitation
+  creates a viewer and no route changes a role, so a contributor-gated write could never be used.
+- **Attributed through `access_audit`**, not a new column. `captions` has no author field, and the
+  audit already records the actor, so this costs no migration.
+
+`cases.json` was regenerated against the new source and compared with candidate.9: **identical, 0
+changed, 0 added, 0 removed**, still 61 cases. The closure moves **108 → 109 files** with
+`backend/app/access/captions.py`, and `backend/app/main.py`, `backend/app/access/boundary.py` and
+`backend/app/access/service.py` changed content for the registration, the allowlist entry and the
+new `caption.write` capability. The live route count moves **51 → 52**. The migration head is
+unchanged at `f2a6d8b4c915`, so this reissue needs **no** database migration.
+
+Not built: caption deletion, `/regenerate`, variant selection, moderation, and any rate limit or
+per-member cap. Nothing checks the written text against the policy that rejected the model's
+output, so caption quality remains unverified.
 
 ## Reissue — 2.0.0-candidate.9
 
