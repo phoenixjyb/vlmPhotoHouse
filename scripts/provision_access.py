@@ -101,6 +101,7 @@ def parser():
     commands = result.add_subparsers(dest='command', required=True)
     for name in ('plan-owner', 'plan-assets', 'plan-management', 'plan-face-job', 'plan-person-repair', 'validate', 'review', 'apply', 'receipt',
                  'plan-promote', 'plan-reassign', 'plan-unassign', 'validate-promotion', 'apply-promotion',
+                 'plan-clear-claim', 'validate-claim-recovery', 'apply-claim-recovery',
                  'plan-recovery', 'validate-recovery', 'review-recovery', 'apply-recovery'):
         command = commands.add_parser(name)
         command.add_argument('--database', required=True, type=Path)
@@ -131,6 +132,13 @@ def parser():
                 command.add_argument('--authority-reference', required=True)
                 command.add_argument('--incoming-root', required=True, type=Path)
                 command.add_argument('--originals-root', required=True, type=Path)
+            if name == 'apply-claim-recovery':
+                # Also restores nothing. The operator restates the quiescence claim the plan
+                # was built on, so a plan reviewed under one assumption cannot be applied
+                # under another.
+                command.add_argument('--reviewed-plan-digest', required=True)
+                command.add_argument('--authority-reference', required=True)
+                command.add_argument('--quiescence-reference', required=True)
     return result
 
 
@@ -145,11 +153,19 @@ def execute(args, *, clock=time.time):
     from app.access.promotion import (PROMOTE_OPERATION, PromotionPlanner, PromotionReview,
                                       promote_and_assign, reassign_assets, unassign_assets)
     from app.access.provisioning_apply import _identity
-    recovery = args.command.endswith('-recovery')
+    from app.access.task_recovery import (ClaimRecoveryPlanner, ClaimRecoveryReview,
+                                          clear_abandoned_claim)
+    # Explicit, not derived from a name suffix: `validate-claim-recovery` also ends in
+    # "-recovery", so an endswith() test silently routed it into the owner-recovery family.
+    recovery = args.command in ('plan-recovery', 'validate-recovery', 'review-recovery',
+                                'apply-recovery')
     promotion = args.command in ('plan-promote', 'plan-reassign', 'plan-unassign',
                                  'validate-promotion', 'apply-promotion')
+    claim_recovery = args.command in ('plan-clear-claim', 'validate-claim-recovery',
+                                      'apply-claim-recovery')
     planner_type = (OwnerRecoveryPlanner if recovery
-                    else PromotionPlanner if promotion else ProvisioningPlanner)
+                    else PromotionPlanner if promotion
+                    else ClaimRecoveryPlanner if claim_recovery else ProvisioningPlanner)
     reviewer = review_owner_recovery_backup if recovery else review_backup
     application = recover_owner_library if recovery else apply_reviewed
     database = selected_path(args.database)
@@ -169,6 +185,8 @@ def execute(args, *, clock=time.time):
                         'quiescence_reference', 'provenance_reference'}
         if promotion:
             expected = {'library_id', 'operator_account_id', 'asset_ids'}
+        if claim_recovery:
+            expected = {'operator_account_id', 'task_ids', 'quiescence_reference'}
         if set(request) != expected:
             raise OperatorError('Unexpected request fields')
         with ExistingDatabase(database, read_only=True)() as connection:
@@ -181,6 +199,8 @@ def execute(args, *, clock=time.time):
                 envelope = planner.reassign(**request)
             elif args.command == 'plan-unassign':
                 envelope = planner.unassign(**request)
+            elif args.command == 'plan-clear-claim':
+                envelope = planner.clear(**request)
             elif args.command == 'plan-owner':
                 envelope = planner.owner(phone=request['phone_login'], library_id=request['library_id'])
             elif args.command == 'plan-management':
@@ -206,10 +226,20 @@ def execute(args, *, clock=time.time):
         receipt = json.loads(row[0])
         return receipt_summary(receipt) | {'receipt_found': True}
     envelope = read_json(args.plan)
-    if args.command in ('validate', 'validate-recovery', 'validate-promotion'):
+    if args.command in ('validate', 'validate-recovery', 'validate-promotion', 'validate-claim-recovery'):
         with ExistingDatabase(database, read_only=True)() as connection:
             result = planner_type(connection, clock=clock).validate(envelope)
         return result | {'plan_digest': plan_digest(envelope)}
+    if claim_recovery:
+        if args.command != 'apply-claim-recovery':
+            raise OperatorError('Invalid operator command')
+        digest = plan_digest(envelope)
+        if not hmac.compare_digest(digest, args.reviewed_plan_digest):
+            raise OperatorError('Exact reviewed plan digest required')
+        review = ClaimRecoveryReview(database=database, database_identity=_identity(database),
+            plan_digest=digest, authority_reference=args.authority_reference,
+            quiescence_reference=args.quiescence_reference)
+        return receipt_summary(clear_abandoned_claim(envelope, review=review, clock=clock)) | {'applied': True}
     if promotion:
         # Promotion restores no backup, so the review is built from the roots and the operator's
         # own ticket rather than from a restore point. A saved review is still never
@@ -265,7 +295,7 @@ def receipt_summary(receipt):
     # No phone, password, invitation, token, media path, raw key or SQL dump. Library IDs and
     # counts are already visible to an operator through the reviewed plan.
     keys = ('plan_id', 'plan_digest', 'operation', 'actor_account_id', 'task_id', 'library_id',
-            'asset_count', 'bytes_promoted', 'source_libraries')
+            'asset_count', 'bytes_promoted', 'source_libraries', 'requeued')
     return {key: receipt[key] for key in keys if key in receipt} | {'applied': True}
 
 
