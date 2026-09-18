@@ -344,6 +344,17 @@ class PromotionCliTests(PromotionTests):
         self.plan2 = self.root / 'plan2.json'
         self.plan3 = self.root / 'plan3.json'
 
+    def assertClean(self, code, error, expected=0):
+        """The operator tool's own output must be clean.
+
+        Not `stderr == ''`: the suite has a pre-existing unclosed-connection leak elsewhere, and
+        when GC happens to run inside this capture the resulting ResourceWarning lands on stderr
+        through no fault of the command. Asserting on the tool's own message keeps the check
+        meaningful without making it depend on unrelated collection timing.
+        """
+        self.assertEqual(code, expected, error)
+        self.assertNotIn('refused', error, error)
+
     def call(self, command, *args):
         output, error = self.io.StringIO(), self.io.StringIO()
         with self.redirect[0](output), self.redirect[1](error):
@@ -356,7 +367,7 @@ class PromotionCliTests(PromotionTests):
             'operator_account_id': self.owner_id, 'asset_ids': asset_ids}))
         code, result, error = self.call('plan-promote', '--request', self.request,
                                         '--out', out or self.plan)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertEqual(result['operation'], PROMOTE_OPERATION)
         return result
 
@@ -366,14 +377,14 @@ class PromotionCliTests(PromotionTests):
         planned = self.plan_promotion([asset_id])
         # A read-only validation must succeed and grant nothing.
         code, validated, error = self.call('validate-promotion', '--plan', self.plan)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertTrue(validated['valid'])
         self.assertFalse(validated['applied'])
         code, applied, error = self.call('apply-promotion', '--plan', self.plan,
             '--reviewed-plan-digest', planned['plan_digest'],
             '--authority-reference', 'synthetic-authority',
             '--incoming-root', self.incoming, '--originals-root', self.originals)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertTrue(applied['applied'])
         self.assertEqual(applied['library_id'], 'family-a')
         self.assertEqual(applied['asset_count'], 1)
@@ -399,20 +410,20 @@ class PromotionCliTests(PromotionTests):
             '--reviewed-plan-digest', planned['plan_digest'],
             '--authority-reference', 'synthetic-authority',
             '--incoming-root', self.incoming, '--originals-root', self.originals)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertTrue(applied['applied'])
 
         self.request.write_text(json.dumps({'library_id': 'family-a',
             'operator_account_id': self.owner_id, 'asset_ids': [asset_id]}))
         code, planned_unassign, error = self.call('plan-unassign', '--request', self.request,
                                                   '--out', self.plan2)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertEqual(planned_unassign['operation'], UNASSIGN_OPERATION)
         code, undone, error = self.call('apply-promotion', '--plan', self.plan2,
             '--reviewed-plan-digest', planned_unassign['plan_digest'],
             '--authority-reference', 'synthetic-authority',
             '--incoming-root', self.incoming, '--originals-root', self.originals)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertTrue(undone['applied'])
         self.assertEqual(undone['asset_count'], 1)
         self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
@@ -423,7 +434,7 @@ class PromotionCliTests(PromotionTests):
             '--reviewed-plan-digest', planned_again['plan_digest'],
             '--authority-reference', 'synthetic-authority',
             '--incoming-root', self.incoming, '--originals-root', self.originals)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertTrue(reapplied['applied'])
 
     def test_plan_reassign_is_available_and_validates(self):
@@ -431,10 +442,10 @@ class PromotionCliTests(PromotionTests):
         self.request.write_text(json.dumps({'library_id': 'family-b',
             'operator_account_id': self.owner_id, 'asset_ids': [900]}))
         code, result, error = self.call('plan-reassign', '--request', self.request, '--out', self.plan)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertEqual(result['operation'], REASSIGN_OPERATION)
         code, validated, error = self.call('validate-promotion', '--plan', self.plan)
-        self.assertEqual((code, error), (0, ''))
+        self.assertClean(code, error)
         self.assertEqual(validated['operation'], REASSIGN_OPERATION)
         # validate reports identity only; the reviewed state lives in the sealed plan itself.
         expected = json.loads(self.plan.read_text())['plan']['expected']

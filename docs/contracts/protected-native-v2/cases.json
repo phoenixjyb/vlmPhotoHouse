@@ -1,5 +1,5 @@
 {
-  "contract_version": "2.0.0-candidate.10",
+  "contract_version": "2.0.0-candidate.11",
   "synthetic_only": true,
   "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
   "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim",

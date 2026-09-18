@@ -1,12 +1,47 @@
-# Protected native profile 2.0.0-candidate.10
+# Protected native profile 2.0.0-candidate.11
 
-Backend source: `b1bda66793f2729b8c802dac67d7a425d8259a8b`.
+Backend source: `4674685cae782827cec6604ade1811e8e7ce23eb`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.11
+
+`2.0.0-candidate.10` pinned source `b1bda66`. **This reissue is wire-neutral.** It adds the
+album archive/restore pair and the owner-only read that makes them usable.
+
+The gap was that an album could be created and edited but never removed, so a mistake was
+permanent. The slice closes it as **archive, not delete**:
+
+- **Archiving writes `albums.status='archived'`**, which every read already excludes — the list
+  selects `status='draft'` and the row fetch refuses anything else. So **no migration** was
+  needed, and **nothing is deleted**: the album, its selected assets and its cover all survive.
+  Deletion is not offered at all, so a mistake can be put away and can never be destroyed.
+- **Restoring takes no revision.** That looks like a loosening, and it is deliberate: a revision
+  exists to stop two writers losing each other's edit, and an archived album **cannot be edited at
+  all**, so there is no concurrent edit to lose. Requiring one would in fact make restore
+  impossible — the client can only read a revision from the list, and archiving removes the album
+  from it. This was found by testing the round trip, not by inspection: the first version required
+  a revision and could never have been used.
+- **Archiving is revision-bound**, exactly as an edit is, so an archive cannot race an edit and
+  silently lose it. A no-op in either direction is refused with `409` rather than reported as
+  success.
+- **`GET /admin/albums/archived` is owner-only and is the recovery surface.** Without it,
+  archiving would hide an album with no way back. It is a separate route rather than a flag on the
+  member list, so an archived album stays invisible to members without a conditional capability.
+
+`cases.json` was regenerated against the new source and compared with candidate.10: **identical,
+0 changed, 0 added, 0 removed**, still 61 cases. The closure stays at **109 files**;
+`backend/app/access/albums.py` and `backend/app/access/boundary.py` changed content and none was
+added or removed. The live route count moves **52 → 55**. The migration head is unchanged at
+`f2a6d8b4c915`, so this reissue needs **no** database migration.
+
+**Note for whoever adopts this:** the deployed library currently holds **no albums at all**, so
+none of this has an observed use yet. It exists because creating without removing is an asymmetry
+the owner asked to close, and because the cost was three routes and no migration.
 
 ## Reissue — 2.0.0-candidate.10
 

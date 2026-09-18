@@ -1,5 +1,49 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.11 — reissue after the album archive slice (2026-09-18)
+
+Source baseline: `4674685cae782827cec6604ade1811e8e7ce23eb`.
+Branch: `master`.
+
+**Wire-neutral.** `cases.json` regenerated against the new source is byte-identical, still **61
+cases**, 0 changed, 0 added, 0 removed. The closure stays at **109 files**
+(`backend/app/access/albums.py` and `boundary.py` changed content; none added or removed). The
+live route count moves **52 → 55**. The migration head is unchanged at `f2a6d8b4c915`, so this
+reissue requires **no** database migration.
+
+**Archive, not delete.** An album could be created and edited but never removed, so a mistake was
+permanent. Archiving writes `albums.status='archived'`, a value every read already excludes, so no
+migration was needed and **nothing is deleted** — the album, its selected assets and its cover all
+survive. Deletion is not offered at all.
+
+**The round trip found a design flaw that inspection had missed.** The first version required a
+revision to restore. But the revision is an HMAC the client can only read from the album list, and
+archiving removes the album from that list — so restore could never have been used. The asymmetry
+is now deliberate and documented: **archiving is revision-bound** (it competes with edits, and
+must not silently lose one), **restoring is not** (an archived album cannot be edited, so there is
+no concurrent change for a revision to protect against). A no-op in either direction is refused
+with `409` rather than reported as success.
+
+**`GET /admin/albums/archived` is the recovery surface and is owner-only.** Without it, archiving
+would hide an album with no way back. It is a separate route rather than a flag on the member list,
+so an archived album stays invisible to members without a conditional capability on one route.
+
+Properties enforced and tested: the pair hides and restores the album and leaves the list and the
+recovery list consistent; archiving deletes no row in `albums`, `album_assets` or
+`access_album_libraries`; an archived album is refused by the edit path, not merely hidden from the
+list; a stale revision is refused; a no-op in either direction is refused; the whole pair is owner
+only, with a viewer, another library's owner and no credential all refused; a missing or foreign
+album is refused; and the change is audited as `album.archive.<id>`.
+
+**Note for whoever adopts this:** the deployed library holds **no albums at all**, so none of this
+has an observed use yet. It exists because creating without removing is an asymmetry the owner
+asked to close, and because the cost was three routes and no migration.
+
+Not verified here: the browser suite could not be run (no Playwright in this environment), so the
+new owner controls are covered by 10 source tests, the element-id static check and `node --check`.
+The ledger counts no browser checkpoint for this slice.
+
+
 ## 2.0.0-candidate.10 — reissue after the describe-a-photo slice (2026-09-18)
 
 Source baseline: `b1bda66793f2729b8c802dac67d7a425d8259a8b`.
