@@ -13,7 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 
 PRE_MANAGEMENT = 'c7f4a9e2b610'
-MANAGEMENT_HEAD = 'd8e5b2f7a904'
+# The upgrade test below targets head, so this tracks the current head rather than the revision
+# that any single migration produced.
+CURRENT_HEAD = 'f2a6d8b4c915'
 OWNERSHIP_TABLES = {'access_person_libraries', 'access_album_libraries'}
 
 
@@ -134,7 +136,7 @@ class ManagementMigrationTests(unittest.TestCase):
         with self.engine.connect() as connection:
             self.assertEqual(
                 connection.exec_driver_sql('SELECT version_num FROM alembic_version').scalar_one(),
-                MANAGEMENT_HEAD)
+                CURRENT_HEAD)
             self.assertEqual(self.legacy_snapshot(connection), before)
             for table in OWNERSHIP_TABLES:
                 self.assertEqual(connection.exec_driver_sql('SELECT count(*) FROM ' + table).scalar_one(), 0)

@@ -213,10 +213,14 @@ class UploadTests(unittest.TestCase):
 
     def client(self, upload_runtime='configured'):
         from app.main import create_app
-        return TestClient(
+        client = TestClient(
             create_app(access_runtime=self.access,
                        upload_runtime=self.runtime if upload_runtime == 'configured' else upload_runtime),
             base_url='https://photohouse.test', client=('192.0.2.20', 23456))
+        # Close it: an unclosed client leaks a connection whose ResourceWarning surfaces later,
+        # during some other test's stderr capture, and those tests assert stderr is empty.
+        self.addCleanup(client.close)
+        return client
 
     def headers(self, **overrides):
         base = {'Authorization': 'Bearer ' + self.member_token,

@@ -1,12 +1,40 @@
-# Protected native profile 2.0.0-candidate.6
+# Protected native profile 2.0.0-candidate.7
 
-Backend source: `0ea007535545003b0c7fc2bae5efad6b75132278`.
-Database migration head: `d8e5b2f7a904`. This is a backend-owned candidate
+Backend source: `a8b1d74a6e953f9567beee4f237a8985e0c4412e`.
+Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+## Reissue — 2.0.0-candidate.7
+
+`2.0.0-candidate.6` pinned source `0ea0075`. This reissue carries the member-upload slice, and
+it is a **wire** change rather than a hash drift: two existing responses move and one route is
+added.
+
+- **`POST /auth/register` now requires `name`.** A display name is required because the family
+  has to recognise a member by something other than a phone number, and the name is the source of
+  that member's incoming upload folder label. An invalid name is refused the same
+  non-enumerating way as a bad phone or a bad code, so registration still reveals nothing about
+  which invitations exist. Four cases move: `registration_requires_invitation`,
+  `registration_password_7`, `registration_password_129`, `invited_registration_8`.
+- **`GET /auth/session` now returns `display_name`.** Three cases move:
+  `invited_viewer_session`, `accepted_second_library_session`,
+  `revoked_session_still_authenticated`.
+- **`POST /uploads` is mounted in the default application.** It answers `503` until a deployment
+  opts in with an explicit incoming root, so no existing deployment gains a write surface by
+  accident. It is deliberately **not** library-scoped: an accepted photo is written into the
+  uploader's own incoming folder and into **no** library, so it is invisible to every member
+  until an operator promotes and assigns it. One case is added: `upload_requires_opt_in`.
+- **The migration head moves `d8e5b2f7a904` → `f2a6d8b4c915`**, adding a nullable
+  `access_accounts.display_name` and the `access_uploads` provenance table. This is the first
+  reissue in this pack that a deployment **cannot** adopt without a database migration, and the
+  worker gates (`scoped_face_worker`, `run_face_worker`, `run_caption_worker`,
+  `apply_access_schema`) move with the head. The agreed order is **migrate first, then deploy**.
+
+Case count moves **60 → 61**.
 
 ## Reissue — 2.0.0-candidate.6
 

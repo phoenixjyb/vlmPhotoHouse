@@ -18,9 +18,9 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 38 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 38 of 39 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 150 | `id="…"` in `backend/app/ui/access/index.html` |
+| Protected control ids | 151 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 49 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
@@ -37,11 +37,17 @@ or anything about deployment. A control in the legacy page is evidence that the 
 UI *attempted* a feature, not proof it worked. Neither column is device or TV
 acceptance.
 
-**Every protected route is now reachable from the protected UI.** The last two that were
-not — `GET /libraries/{id}/discovery/v1/facets` and `POST /libraries/{id}/discovery/v1/search`
-— gained a control in the 2026-09-17 date/media filter slice (see below). Being reachable is
-a source-level property only: it does not mean the capability is switched on in any given
-deployment.
+**One protected route is deliberately not reachable from the protected UI:** `POST /uploads`,
+added 2026-09-18. There is no upload control, and there is deliberately no UI surface that serves
+an **unmapped** asset — a pending upload is in no library, so it cannot be rendered, and the
+family reviews incoming photos by opening the folder plus an operator listing instead. Building
+that surface would be the first route serving an asset with no library, which is a new
+authorization surface and belongs in its own reviewed slice.
+
+The two routes that were previously unreachable — `GET /libraries/{id}/discovery/v1/facets` and
+`POST …/discovery/v1/search` — gained controls in the 2026-09-17 date/media filter slice (see
+below). Being reachable is a source-level property only: it does not mean the capability is
+switched on in any given deployment.
 
 The filter is offered **only where the deployment has opted in**. `RuntimeConfiguration.
 discovery_indexes` defaults to empty, and an artifact must be produced offline and loaded by
@@ -84,7 +90,7 @@ of the filter is a deployment state, not an error a member can act on.
 
 | Capability | Legacy evidence | Protected status | Disposition |
 | --- | --- | --- | --- |
-| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | none | **GAP·CONTRACT** — contract **decided** in `PROTECTED_UPLOAD_CONTRACT.md` (2026-09-17). Any approved member may submit, with no cap or quota, face detection allowed, and bytes land in a **per-member folder under `INCOMING`** with **no library**; the family reviews by opening the folder plus an operator listing, and decides later. Requires a **display name on accounts**, a provenance table, and two new sealed-plan operations (promote-and-assign, and a bounded reassign for reversibility). Not implemented; needs a migration, so this slice does drift the pin. Multipart and `/ingest/scan` stay out of scope. |
+| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | member-visible `POST /uploads` → `backend/app/access/upload_transport.py` | **CLOSED as source 2026-09-18** for single-file upload, per `PROTECTED_UPLOAD_CONTRACT.md`. Any approved member may submit; no cap or quota (owner decision), face detection allowed, and bytes land in a **per-member folder under the incoming root** with **no library**, so the photo is invisible to every member until an operator promotes and assigns it. Review is filesystem browsing plus an operator listing; there is deliberately no UI surface that serves an unmapped asset. The route answers `503` until a deployment opts in with an incoming root, and `upload.submit` is enabled in no profile. **Still absent:** multipart, `/ingest/scan`, resumable chunks, cancel of an incomplete item, quotas, and any client adoption. |
 | Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
 | Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
 | Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | none | **GAP·CONTRACT** |

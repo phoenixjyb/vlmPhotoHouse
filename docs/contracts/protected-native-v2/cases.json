@@ -1,5 +1,5 @@
 {
-  "contract_version": "2.0.0-candidate.6",
+  "contract_version": "2.0.0-candidate.7",
   "synthetic_only": true,
   "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
   "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim",
@@ -53,7 +53,8 @@
           "phone": "+12025550105",
           "password": "Test1234",
           "code": "00000000000000000000000000000000",
-          "transport": "native"
+          "transport": "native",
+          "name": "Synthetic Member"
         }
       },
       "response": {
@@ -101,7 +102,8 @@
           "phone": "+12025550105",
           "password": "aaaaaaa",
           "code": "11111111-22222222-33333333-44444444",
-          "transport": "native"
+          "transport": "native",
+          "name": "Synthetic Member"
         }
       },
       "response": {
@@ -126,7 +128,8 @@
           "phone": "+12025550105",
           "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "code": "11111111-22222222-33333333-44444444",
-          "transport": "native"
+          "transport": "native",
+          "name": "Synthetic Member"
         }
       },
       "response": {
@@ -151,7 +154,8 @@
           "phone": "+12025550105",
           "password": "Test1234",
           "code": "11111111-22222222-33333333-44444444",
-          "transport": "native"
+          "transport": "native",
+          "name": "Synthetic Member"
         }
       },
       "response": {
@@ -236,6 +240,7 @@
         "body": {
           "account_id": "00000000-0000-0000-0000-000000000004",
           "phone_login": "+12025550105",
+          "display_name": "Synthetic Member",
           "memberships": [
             {
               "library_id": "family-a",
@@ -422,6 +427,7 @@
         "body": {
           "account_id": "00000000-0000-0000-0000-000000000004",
           "phone_login": "+12025550105",
+          "display_name": "Synthetic Member",
           "memberships": [
             {
               "library_id": "family-a",
@@ -1499,6 +1505,26 @@
       }
     },
     {
+      "id": "upload_requires_opt_in",
+      "request": {
+        "method": "POST",
+        "path": "/uploads",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access unavailable"
+        }
+      }
+    },
+    {
       "id": "revoked_session_still_authenticated",
       "request": {
         "method": "GET",
@@ -1515,6 +1541,7 @@
         "body": {
           "account_id": "00000000-0000-0000-0000-000000000004",
           "phone_login": "+12025550105",
+          "display_name": "Synthetic Member",
           "memberships": [
             {
               "library_id": "family-a",

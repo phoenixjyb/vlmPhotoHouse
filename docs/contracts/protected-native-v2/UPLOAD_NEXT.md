@@ -1,22 +1,53 @@
 # Next proposed slice: authenticated resumable contribution core
 
-Proposal only. No upload route is implemented or advertised by this pack. The
-existing legacy upload/transcription routes remain closed. This narrows the
-September 15 phone-family-contributions plan to a reviewable backend-first slice.
+Proposal only for the **resumable** core. It is no longer true that no upload route exists: a
+first, deliberately narrower slice shipped in candidate.7, and it is described here so the
+remaining proposal is read against what is actually built.
 
-Before adding routes, review a distinct `media.upload` permission and owner grant
-workflow; viewer access, story.write and anonymous TV access do not imply upload.
-Use one current authenticated account/library scope at every operation. Propose
-operations before freezing endpoint names: create batch/item, query received
-offset, append bounded chunk, finalize, read processing state, cancel incomplete
-item. Return typed machine errors and authoritative server limits in that new
-contract. These capabilities must stay off until their implementation is adopted.
+## What candidate.7 implements
+
+`POST /uploads` — one whole-file request, no chunks and no resume. It is mounted in the default
+application but answers `503` until a deployment opts in with an explicit incoming root, so no
+existing deployment gains a write surface by accident.
+
+- **Not library-scoped.** The photo is written into the uploader's own incoming folder and into
+  **no** library, so it is invisible to every member until an operator promotes and assigns it.
+  That is what makes accepting uploads from any approved member safe, and it is why the route
+  carries no library in its path.
+- **The incoming root must sit outside every original root**, enforced at construction, so an
+  unassigned upload is unservable by construction rather than by an authorization check.
+- **Type comes from the leading bytes, not the declared filename.** Only JPEG and PNG are
+  accepted, because the protected renderer supports those two. A per-file byte cap and a
+  decoded-pixel cap are enforced before anything is written, from a bounded header parse with no
+  decoder for a decompression bomb to target.
+- **Provenance** is recorded per upload (account, label, batch, original name, SHA-256, bytes) and
+  an audit row is written. Dedup is scoped to the uploader's own incoming uploads, so a hash that
+  matches an asset already in a library never returns that asset's ID.
+- **Promotion is a separate reviewed operation** (`promote_and_assign_uploads`) that moves the
+  bytes into the originals root and writes the mapping in one step — assigning without promoting
+  would leave `assets.path` outside `original_roots`, so the photo would be in a library and
+  unviewable. `unassign_library_assets` reverses it, including the file move, and
+  `reassign_library_assets` moves a photo between libraries.
+
+**Deliberately absent, and still unbuilt:** resumable chunks, offset/hash negotiation, cancel of
+an incomplete item, quotas, incomplete-item expiry, batch-to-many-assets Stories linking, and
+audio/transcription. The owner has explicitly declined caps and quotas for now, so the per-file
+byte cap and the audit row are the only controls.
+
+## What the rest of this proposal still asks for
+
+The remaining work is the resumable core. Before adding routes, review a distinct upload grant
+workflow; viewer access, story.write and anonymous TV access do not imply upload. Use one current
+authenticated account scope at every operation. Propose operations before freezing endpoint
+names: create batch/item, query received offset, append bounded chunk, finalize, read processing
+state, cancel incomplete item. Return typed machine errors and authoritative server limits in that
+new contract. These capabilities must stay off until their implementation is adopted.
 
 Suggested pilot: one active transfer per phone and at most 4 MiB per chunk. Exact
-file/batch/account/global storage quotas, incomplete-item expiry and duration
-limits need review; they are not approved production defaults. No one-minute
-video limit is assumed. An authenticated limits response must not reserve storage
-or create an upload. Quotas must also be enforced independently on the server.
+file/batch/account/global storage quotas, incomplete-item expiry and duration limits need review;
+they are not approved production defaults. No one-minute video limit is assumed. An authenticated
+limits response must not reserve storage or create an upload. Quotas must also be enforced
+independently on the server.
 
 Implement with synthetic SQLite and temporary files first:
 

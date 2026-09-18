@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.6'
+VERSION = '2.0.0-candidate.7'
 
 
 def capture():
@@ -67,7 +67,10 @@ def capture():
 
         call('anonymous_session', 'GET', '/auth/session', 401)
         call('anonymous_library', 'GET', '/assets?library=family-a', 401)
-        denied = {'phone': '+12025550105', 'password': 'Test1234', 'code': '0' * 32, 'transport': 'native'}
+        # A display name is required at registration: it is how the family recognises a member,
+        # and it is the source of that member's incoming upload folder label.
+        denied = {'phone': '+12025550105', 'password': 'Test1234', 'code': '0' * 32,
+                  'transport': 'native', 'name': 'Synthetic Member'}
         call('registration_requires_invitation', 'POST', '/auth/register', 401, body=denied)
         with env.connection() as db:
             assert not db.execute('SELECT 1 FROM access_accounts WHERE phone_login=?', (denied['phone'],)).fetchone()
@@ -170,6 +173,11 @@ def capture():
              body={'text': '新故事', 'source': 'family', 'media': 'all', 'page': '1'})
         for path in ('/upload', '/voice/transcribe', '/auth/refresh'):
             call('closed_' + path.strip('/').replace('/', '_'), 'POST', path, 403, token=native, body={})
+        # The member upload route is mounted in the default app but answers 503 until a
+        # deployment opts in with an incoming root, so no existing deployment gains a write
+        # surface by accident. It is not library-scoped: the accepted photo is in no library
+        # until an operator promotes and assigns it.
+        call('upload_requires_opt_in', 'POST', '/uploads', 503, token=native, body={})
         env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?", (new_id,))
         call('revoked_session_still_authenticated', 'GET', '/auth/session', 200, token=native)
         call('revoked_story_list', 'GET', '/assets/101/stories?library=family-a', 401, token=native)

@@ -1,5 +1,57 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.7 — reissue after the member-upload slice (2026-09-18)
+
+Source baseline: `a8b1d74a6e953f9567beee4f237a8985e0c4412e`.
+Branch: `master`. The slice commits and this reissue are local at the time of writing.
+
+**This is the first reissue in this pack that is not wire-neutral.** Unlike candidates.3–.6,
+which added routes outside the documented surface, this one moves two existing responses and
+adds one route inside it. The change was measured by regenerating `cases.json` from a live
+capture against the new source and diffing against candidate.6: **7 cases changed, 1 added, 0
+removed**, 60 → 61 cases.
+
+- **`POST /auth/register` now requires `name`.** A display name is required because the family has
+  to recognise a member by something other than a phone number, and the name is the source of that
+  member's incoming upload folder label. An invalid name is refused the same non-enumerating way
+  as a bad phone or a bad code, so registration still reveals nothing about which invitations
+  exist. Four cases move: `registration_requires_invitation`, `registration_password_7`,
+  `registration_password_129`, `invited_registration_8` — all four still return their previous
+  statuses (401, 401, 401, 201).
+- **`GET /auth/session` now returns `display_name`.** Three cases move:
+  `invited_viewer_session`, `accepted_second_library_session`,
+  `revoked_session_still_authenticated`.
+- **`POST /uploads` is mounted in the default application** and answers `503` until a deployment
+  opts in with an explicit incoming root, so no existing deployment gains a write surface by
+  accident. It is deliberately **not** library-scoped: an accepted photo is written into the
+  uploader's own incoming folder and into **no** library, so it is invisible to every member until
+  an operator promotes and assigns it. One case is added: `upload_requires_opt_in`. The live route
+  count moves **48 → 49**.
+
+**A client tested against candidate.6 must be updated**: registration must send `name`, and a
+session reader may now see `display_name`. This is a deliberate, reviewed break rather than a
+drift, and it is why the pack is still `candidate_requires_coordinator_adoption`.
+
+The pinned source closure moves **101 → 107 files**: six added, none changed in identity and none
+removed — `backend/app/access/upload_schema.py`, `upload.py`, `upload_transport.py`,
+`promotion.py`, `task_recovery.py`, and
+`backend/migrations/versions/f2a6d8b4c915_protected_upload.py`. Many existing files did change
+content, so most hashes move; the closure *set* is what grew by six.
+
+**The migration head moves `d8e5b2f7a904` → `f2a6d8b4c915`**, adding a nullable
+`access_accounts.display_name` and the `access_uploads` provenance table. This reissue therefore
+**cannot be adopted without a database migration**, and the worker gates move with the head:
+`scoped_face_worker`, `run_face_worker.REVISION`, `run_caption_worker.REVISIONS` and
+`apply_access_schema.TO_REVISION`. A payload carrying the new head **refuses to run against an
+un-migrated database**, so the agreed order is **migrate first, then deploy**. `library.upload`
+and the new `upload.submit` remain disabled in every profile.
+
+The migration is additive and was verified against both build paths: a database built from
+migrations already carries `display_name` because the foundation migration composes
+`access/schema.py`, so the `ADD COLUMN` is conditional; a database that predates the revision
+(the deployed one) gains it. A test drops the column to reproduce the older shape and proves the
+conditional branch does the work rather than being dead code.
+
 ## 2.0.0-candidate.6 — reissue after the protected discovery wiring slice (2026-09-17)
 
 Source baseline: `0ea007535545003b0c7fc2bae5efad6b75132278`.
