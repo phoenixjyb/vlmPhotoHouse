@@ -732,13 +732,13 @@ let browser;
   await firstCard.locator('img').evaluate(img=>img.decode());
   assert.equal(await page.locator('#directory-list .directory-card').count(),25);
   assert.equal(await page.locator('#directory-page-label').textContent(),'Page 1 of 2');
-  const shownNames=await page.locator('#directory-list .directory-card h3').allTextContents();
+  const shownNames=await page.locator('#directory-list .directory-card .person-name').allTextContents();
   assert(shownNames.every(name=>name.length>0));
   assert(shownNames.some(name=>/^Person \d\d$/.test(name)));
   assert.equal(await page.locator('#directory-list .directory-card',{hasText:'Unnamed person'}).count(),0);
-  // A name stored as markup stays text: no heading has element children and no injected
-  // img[src=x] exists anywhere in the directory.
-  assert.equal(await page.locator('#directory-list h3').evaluateAll(nodes=>nodes.every(node=>node.children.length===0)),true);
+  // A name stored as markup stays text: the control that opens a person has no element
+  // children, and no injected img[src=x] exists anywhere in the directory.
+  assert.equal(await page.locator('#directory-list .person-name').evaluateAll(nodes=>nodes.every(node=>node.children.length===0)),true);
   assert.equal(await page.locator('#directory-list img[src="x"]').count(),0);
   // The owner surfaces stay hidden while a member reads the directory.
   assert.equal(await page.locator('#directory-list input').count(),0);
@@ -751,9 +751,22 @@ let browser;
   assert.equal(await page.locator('#directory-next').isDisabled(),true);
   // An unnamed cluster would render as an empty heading, so a blank name on either page
   // is exactly the leak this checkpoint exists to catch.
-  const lateNames=await page.locator('#directory-list .directory-card h3').allTextContents();
+  const lateNames=await page.locator('#directory-list .directory-card .person-name').allTextContents();
   assert(lateNames.every(name=>name.length>0));
   await page.screenshot({path:path.join(artifacts,'member-people-directory.png'),fullPage:true});
+  // Opening one person's photos. The route is member-scoped and read-only, so the panel
+  // gains a list and a pager and still no form and no owner control.
+  await page.locator('#directory-list .directory-card .person-name').first().click();
+  await page.locator('#person-assets .person-asset-card').first().waitFor();
+  assert((await page.locator('#person-assets .person-asset-card').count())>=1);
+  await page.locator('#person-assets .person-asset-card img').first().evaluate(img=>img.decode());
+  assert.equal(await page.locator('#person-assets input').count(),0);
+  assert.equal(await page.locator('#person-assets form').count(),0);
+  // Closing the person leaves the directory exactly as it was.
+  await page.locator('#person-assets h4 button').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#person-assets .person-asset-card').length===0);
+  assert((await page.locator('#directory-list .directory-card').count())>=1);
+  checkpoint('Member opens the photos of a person listed in the directory');
   await page.locator('#directory-panel > summary').click();
   checkpoint('Member browses the library people directory by name with thumbnails and no owner controls');
   // Read-only tag catalog. The panel is a sibling of the owner panels, so a member can open

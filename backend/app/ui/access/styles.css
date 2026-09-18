@@ -62,3 +62,8 @@
 #tag-assets h4{flex-basis:100%;margin:0}
 #tag-assets .tag-asset-card{margin:0;padding:.75rem;border:1px solid var(--line);border-radius:8px;width:11rem;display:flex;flex-direction:column;gap:.5rem;align-items:flex-start}
 #tag-assets .tag-asset-crop{width:100%;height:8rem;object-fit:cover;border-radius:6px;background:var(--line)}
+#person-assets{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem}
+#person-assets h4{flex-basis:100%;margin:0}
+#person-assets .person-asset-card{margin:0;padding:.75rem;border:1px solid var(--line);border-radius:8px;width:11rem;display:flex;flex-direction:column;gap:.5rem;align-items:flex-start}
+#person-assets .person-asset-crop{width:100%;height:8rem;object-fit:cover;border-radius:6px;background:var(--line)}
+#directory-list .person-name{padding:0;border:0;background:none;color:inherit;cursor:pointer}

@@ -14,7 +14,7 @@
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
   const peopleState={page:1,total:0,load:0,query:'',named:'all'};
-  const directoryState={page:1,total:0,load:0,query:''};
+  const directoryState={page:1,total:0,load:0,query:'',person:null,assetLoad:0,assetPage:1,assetTotal:0};
   const tagState={page:1,total:0,load:0,query:'',tag:null,tagLoad:0,tagPage:1,tagTotal:0,open:null};
   // Date/media narrowing. `binding` is issued by the facets route and must be echoed to
   // the search route; `fingerprint` chains a later page to the exact filter it paginates.
@@ -44,7 +44,9 @@
   Object.assign(words.zh,{displayName:'您的名字',displayNameHelp:'家人将以此称呼您，最多 64 个字符。',invalidName:'请输入您的名字后再加入。',filterByDate:'按日期和媒体筛选',discoveryHelp:'按拍摄时间和媒体类型缩小本资料库范围。此处为只读：不会更改或隐藏任何照片。',mediaKind:'媒体',mediaAll:'照片和视频',mediaImage:'仅照片',mediaVideo:'仅视频',dateFrom:'从',dateTo:'到',applyFilter:'应用',clearFilter:'清除',discoveryHint:'请选择日期范围或媒体类型，然后应用。',discoveryRange:'请输入起始日期不晚于结束日期的范围。',discoveryNone:'本资料库中没有符合该筛选的照片。',discoveryChanged:'准备筛选后本资料库已发生变化。请重新打开面板后再应用。',discoveryResult:'筛选出的照片'});
   Object.assign(words.en,{peopleFilter:'Show',peopleAll:'Named and unnamed',peopleNamed:'Named only',peopleUnnamed:'Unnamed only',unassignedFaces:'Unassigned faces · Owner worklist',unassignedHelp:'Faces that no saved person claims yet, across this library. Assigning one keeps the rest of the list.',noUnassignedFaces:'No unassigned faces in this library.',sourcePhoto:'Photo',openPhoto:'Open this photo'});
   Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
+  Object.assign(words.en,{personPhotos:'Photos of this person',noPersonPhotos:'No photo in this library is labelled with this person yet.',clearPerson:'Close',personPhotosHelp:'Read-only. A face label is a guess the library made; it can be wrong.'});
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
+  Object.assign(words.zh,{personPhotos:'此人的照片',noPersonPhotos:'本家庭库中还没有标记为此人的照片。',clearPerson:'关闭',personPhotosHelp:'只读。人脸标记是系统自动判断的结果，可能不准确。'});
   Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
   Object.assign(words.en,{tagsInLibrary:'Tags in this library',tagsHelp:'Tags already attached to photos in this library. Read-only: no tag can be added or removed here.',findTag:'Find a tag',noTagsInLibrary:'No tags in this library yet.',assetsCount:'photos',tagAssets:'Photos with this tag',noTaggedAssets:'No photo in this library carries this tag.',clearTag:'Close'});
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
@@ -129,7 +131,7 @@
     $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
     peopleState.page=1;peopleState.query='';peopleState.named='all';$('people-query').value='';$('people-named').value='all';
     unassignedState.page=1;$('unassigned-list').replaceChildren();
-    directoryState.page=1;directoryState.query='';directoryState.total=0;
+    directoryState.page=1;directoryState.query='';directoryState.total=0;directoryState.person=null;directoryState.assetPage=1;directoryState.assetTotal=0;
     $('directory-query').value='';$('directory-list').replaceChildren();$('directory-status').textContent='';$('directory-pages').hidden=true;
     tagState.page=1;tagState.query='';tagState.total=0;tagState.tag=null;tagState.tagPage=1;tagState.tagTotal=0;tagState.open=null;
     $('tag-query').value='';$('tag-list').replaceChildren();$('tag-status').textContent='';$('tag-pages').hidden=true;$('tag-assets').replaceChildren();
@@ -804,9 +806,20 @@
       directoryState.total=result.total;$('directory-status').textContent=result.total?'':t('noPeopleInLibrary');
       for(const person of result.items){
         const row=document.createElement('article');row.className='directory-card';row.dataset.personId=person.id;
-        const title=document.createElement('h3');title.textContent=person.display_name;
+        if(directoryState.person===person.id)row.classList.add('tag-selected');
+        // The name is the control that opens this person's photos. The route behind it is
+        // member-scoped and read-only, so there is nothing on the card to submit.
+        const button=document.createElement('button');button.type='button';button.className='quiet person-name';
+        button.textContent=person.display_name;
         const count=document.createElement('small');count.textContent=`${person.face_count} ${t('facesCount')}`;
-        row.append(title,count);
+        row.append(button,count);
+        button.addEventListener('click',()=>{
+          if(state.busy||state.locked)return;
+          directoryState.person=person.id;directoryState.assetPage=1;
+          for(const other of $('directory-list').children)other.classList.remove('tag-selected');
+          row.classList.add('tag-selected');
+          void loadPersonAssets();
+        });
         // The server supplies the crop URL so the client never reconstructs one; only
         // a same-origin path is accepted, so no unexpected origin can be loaded.
         if(typeof person.thumbnail_url==='string'&&person.thumbnail_url.startsWith('/faces/')){
@@ -821,6 +834,47 @@
       $('directory-previous').disabled=directoryState.page===1;$('directory-next').disabled=directoryState.page>=pages;
       $('directory-page-label').textContent=`${t('page')} ${directoryState.page} ${t('of')} ${pages}`;
     }catch(error){if(current()){$('directory-status').textContent=t(errorStatus(error));await failure(error,epoch);}}
+  }
+  // Photos of one person, from the member-scoped route. Read-only by construction: the
+  // route returns photos this library already maps and nothing about faces, so there is no
+  // control here beyond opening one. An empty page keeps the total visible.
+  async function loadPersonAssets(){
+    if(state.locked||directoryState.person===null||!$('directory-panel').open)return;
+    const epoch=state.generation,library=state.library,person=directoryState.person,load=++directoryState.assetLoad;
+    $('person-assets').replaceChildren();$('person-pages').hidden=true;
+    const current=()=>!stale(epoch)&&load===directoryState.assetLoad&&person===directoryState.person&&library===state.library;
+    try{
+      const result=await request(libraryPath(`/people/${person}/assets`,{page:String(directoryState.assetPage)}),{epoch});
+      if(!current())return;
+      directoryState.assetTotal=result.total;
+      const heading=document.createElement('h4');heading.textContent=t('personPhotos');
+      heading.append(' ',storyButton('clearPerson',()=>{
+        directoryState.person=null;directoryState.assetTotal=0;$('person-assets').replaceChildren();
+        $('person-pages').hidden=true;void loadDirectory();
+      }));
+      $('person-assets').append(heading);
+      if(!result.total){const empty=document.createElement('p');empty.className='fine';empty.textContent=t('noPersonPhotos');$('person-assets').append(empty);}
+      for(const asset of result.items){
+        const row=document.createElement('article');row.className='person-asset-card';row.dataset.assetId=asset.id;
+        // Only a same-origin thumbnail path is accepted, so no unexpected origin is loaded.
+        if(typeof asset.thumbnail_url==='string'&&asset.thumbnail_url.startsWith('/assets/')){
+          const image=document.createElement('img');image.className='person-asset-crop';image.loading='lazy';
+          image.alt=`${t('personPhotos')} · ${asset.id}`;
+          image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+          image.src=asset.thumbnail_url;row.append(image);
+        }
+        row.append(storyButton('openPhoto',async()=>{
+          if(!current()||state.locked||state.busy||!abandonStory())return;
+          try{const detail=await request(libraryPath(`/assets/detail/${asset.id}`),{epoch});if(current())await openAsset(detail.asset);}
+          catch(error){await failure(error,epoch);}
+        }));
+        $('person-assets').append(row);
+      }
+      const pages=Math.max(1,Math.ceil(result.total/25));$('person-pages').hidden=result.total===0;
+      $('person-previous').disabled=directoryState.assetPage===1;
+      $('person-next').disabled=directoryState.assetPage>=pages;
+      $('person-page-label').textContent=`${t('page')} ${directoryState.assetPage} ${t('of')} ${pages}`;
+    }catch(error){if(current())await failure(error,epoch);}
   }
   // Member-facing tag catalog. Read-only by construction: both routes are GET-only and
   // the server returns a name plus a count of this library's own photos, so there is no
@@ -1001,6 +1055,8 @@
   $('directory-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;directoryState.query=$('directory-query').value.trim();directoryState.page=1;void loadDirectory();});
   $('directory-previous').addEventListener('click',()=>{if(!state.busy&&directoryState.page>1){directoryState.page--;void loadDirectory();}});
   $('directory-next').addEventListener('click',()=>{if(!state.busy&&directoryState.page*25<directoryState.total){directoryState.page++;void loadDirectory();}});
+  $('person-previous').addEventListener('click',()=>{if(!state.busy&&directoryState.assetPage>1){directoryState.assetPage--;void loadPersonAssets();}});
+  $('person-next').addEventListener('click',()=>{if(!state.busy&&directoryState.assetPage*25<directoryState.assetTotal){directoryState.assetPage++;void loadPersonAssets();}});
   $('tags-panel').addEventListener('toggle',()=>{if($('tags-panel').open)void loadTags();});
   $('tag-search').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;tagState.query=$('tag-query').value.trim();tagState.page=1;void loadTags();});
   $('tag-previous').addEventListener('click',()=>{if(!state.busy&&tagState.page>1){tagState.page--;void loadTags();}});

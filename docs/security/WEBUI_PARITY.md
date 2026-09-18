@@ -18,9 +18,9 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 38 of 39 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 39 of 40 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
-| Protected control ids | 151 | `id="…"` in `backend/app/ui/access/index.html` |
+| Protected control ids | 156 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 49 checkpoints, exit 0 | `node tests/security/test_web_browser.cjs` |
 | Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
 
@@ -77,7 +77,7 @@ of the filter is a deployment state, not an error a member can act on.
 | Search: family stories and AI/earlier captions | `/search/captions` | `POST /library/search` | **PARITY** |
 | Search: local path / filename | `search-mode`, `library-result-meta` | none | **GAP·CONTRACT** |
 | Search: smart, vector, video, video segments | `/search/smart`, `/search/vector`, `/search/video`, `/search/video-segments` | none | **GAP·CONTRACT** |
-| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails); photos-of-a-person and vector search absent | **GAP·CONTRACT** — the name+thumbnail half is now implemented; "all photos of this person" (`/search/person/{id}`) and face **vector** search are still not offered, deliberately |
+| Search: person by name or face | `/search/person/name/{name}`, `/search/person/{id}`, `/search/person/vector` | member-visible `GET /people` (names + thumbnails) and `GET /people/{id}/assets` (that person's photos) | **CLOSED 2026-09-18** for browsing by name and opening a person's photos. The read is scoped to the library and to people the directory already lists, returns one row per **photo**, and carries no face id, bounding box, confidence or vector. Face **vector** search and cross-library person identity remain absent, deliberately |
 | Tags catalog and tag-to-asset browsing | `/tags`, `/tags/{id}/assets`, `/search/tags`, `tag-*` | member-visible `GET /tags` and `GET /tags/{tag_id}/assets` (25/page, library-scoped) | **GAP·CONTRACT** — the catalog and tag-to-asset halves are now implemented (see "Closed in the member tag-catalog slice"); `/search/tags` autocomplete is still absent and tag **writes** stay EXCLUDED |
 | Date / media filtering | `/albums/time` | member-visible `#discovery-panel` → `GET /libraries/{id}/discovery/v1/facets` + `POST …/search` | **CLOSED 2026-09-17** for capture date and media kind (see "Closed in the member date/media filter slice"). It requires an operator index opt-in; without one the panel is hidden. A calendar or month view is still absent, so the *browsing* half of `/albums/time` is not reproduced. |
 | Map / geolocation browsing | `/assets/geo`, `geo-map` | **none — and no data path**: the protected asset projection is `a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at`, so no coordinate is ever selected | **GAP·CONTRACT** — needs a coarse-location privacy contract. The legacy endpoint returned raw `gps_lat`/`gps_lon` floats **and the asset's filesystem `path`**, up to 20,000 points per call; porting it as-is would leak precise location and server paths, and neither is replicated. `gps_lat`/`gps_lon` exist only in the original `0001_initial` schema; no protected code reads them. |
@@ -366,9 +366,10 @@ no other row changed disposition as a result of this review.
    **deployment**: an operator produces an artifact with `scripts/prepare_access_discovery_index.py`
    and sets `RuntimeConfiguration.discovery_indexes`. Until then the routes answer `503` and
    the panel stays hidden, which is the intended state rather than a defect.
-2. **Member-visible person browsing (names + thumbnails)** — **done** (`99078f1`, the
-   member people-directory slice; see "Closed in the member people-directory slice").
-   Person *editing* stays owner-only.
+2. **Member-visible person browsing** — **done**, and now **complete**: `99078f1` added the
+   directory (names + thumbnails), and the 2026-09-18 slice added `GET /people/{id}/assets`
+   so a member can open a listed person's photos. Person *editing* stays owner-only, and the
+   directory was a dead end before this slice — a member could see 49 names and open none.
 3. **Tags catalog** — **done** (`2ced43e`, the member tag-catalog slice; see "Closed in
    the member tag-catalog slice"). Tag writes stay excluded. Unlike item 1 this needed no
    provider: `tags` and `asset_tags` are already in the protected read schema
