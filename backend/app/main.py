@@ -16,6 +16,7 @@ from .access.boundary import ClosedBoundary
 from .access.discovery_transport import router as discovery_router
 from .access.upload_transport import router as upload_router
 from .access.duplicates import router as duplicate_router
+from .access.captions import router as caption_router
 from .routers.ui import router as ui_router
 
 
@@ -38,6 +39,7 @@ def create_app(*, access_runtime=None, media_runtime=None, discovery_runtime=Non
     app.include_router(discovery_router)
     app.include_router(upload_router)
     app.include_router(duplicate_router)
+    app.include_router(caption_router)
     app.add_middleware(ClosedBoundary, routes=app.routes)
     return app
 

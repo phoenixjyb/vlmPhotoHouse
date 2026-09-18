@@ -18,7 +18,7 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | --- | --- | --- |
 | Legacy-surface routes | 114 | Route decorators under `backend/app/**` excluding `access/`, excluding `@*.head` |
 | Protected routes | 38 | Route decorators under `backend/app/access/`, excluding `@*.head` |
-| Protected routes reachable from the protected UI | 40 of 41 | Route static segments matched against `access/app.js` |
+| Protected routes reachable from the protected UI | 41 of 42 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 163 | `id="…"` in `backend/app/ui/access/index.html` |
 | Browser suite | 49 checkpoints, exit 0 — **plus 2 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person and duplicate-group checkpoints were written 2026-09-18 but could not be run (no Playwright in that environment), so neither is counted until it passes |
@@ -93,7 +93,7 @@ of the filter is a deployment state, not an error a member can act on.
 | Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | member-visible `POST /uploads` → `backend/app/access/upload_transport.py` | **CLOSED as source 2026-09-18** for single-file upload, per `PROTECTED_UPLOAD_CONTRACT.md`. Any approved member may submit; no cap or quota (owner decision), face detection allowed, and bytes land in a **per-member folder under the incoming root** with **no library**, so the photo is invisible to every member until an operator promotes and assigns it. Review is filesystem browsing plus an operator listing; there is deliberately no UI surface that serves an unmapped asset. The route answers `503` until a deployment opts in with an incoming root, and `upload.submit` is enabled in no profile. **Still absent:** multipart, `/ingest/scan`, resumable chunks, cancel of an incomplete item, quotas, and any client adoption. |
 | Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
 | Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
-| Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | none | **GAP·CONTRACT** |
+| Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | member-visible `POST /assets/{id}/captions` (describe a photo that has none) | **CLOSED 2026-09-18 for filling a gap.** **3,203 of 27,842** active assets carry no caption and **556** caption tasks failed **permanently** on policy validation (283 English policy, 201 Chinese policy, 41 format, 24 word-count), so those photos stay undescribed forever unless the family can write one. The route refuses an asset that already has a caption (409) rather than replacing it, so it cannot take a description away, and writes `user_edited=1`, which the generation and refresh paths already honour rather than overwriting. The actor is recorded in `access_audit`. **Still absent:** replacing or removing an existing caption (so a *wrong* AI description cannot be corrected), `/regenerate`, and any moderation or rate limit. |
 
 ### People and albums
 

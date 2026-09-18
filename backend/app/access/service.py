@@ -403,6 +403,10 @@ class AccessService:
             return member
         if capability == 'story.write' and member['role'] in {'owner', 'contributor'}:
             return member
+        if capability == 'caption.write':
+            # Any approved member, matching the upload decision. Contributor-only would be
+            # unreachable: an invitation creates a viewer and no route changes a role.
+            return member
         # Upload/curation/destruction/voice grants remain disabled in the first release.
         raise AccessDenied('Access denied')
 

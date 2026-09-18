@@ -148,6 +148,12 @@ let browser;
   await page.locator('#close-viewer').click();await page.locator('.asset').filter({hasText:'102'}).click();
   await page.locator('#captions p').waitFor({state:'attached'});oldViewer.release();await pause(150);
   assert.equal(await page.locator('#captions p').textContent(),'caption-102');
+  // The describe control is offered only where a photo has no description, and every fixture
+  // asset has one, so opening this photo must show its caption and no form. The write path
+  // itself is covered by the source tests; this only pins that the control is not offered
+  // where the route would refuse it.
+  assert.equal(await page.locator('#captions form').count(),0);
+  assert.equal(await page.locator('#captions input').count(),0);
   await page.locator('#close-viewer').click();
   checkpoint('Delayed closed viewer cannot overwrite a newer asset');
   await page.setViewportSize({width:390,height:844});await page.locator('#language').click();

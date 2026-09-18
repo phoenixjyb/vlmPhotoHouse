@@ -49,8 +49,10 @@
   Object.assign(words.en,{peopleInLibrary:'People in this library',peopleDirectoryHelp:'Names saved in this library, with one face photo each. Only the owner can change a name.',findPersonInLibrary:'Find a person',noPeopleInLibrary:'No saved person names in this library yet.'});
   Object.assign(words.zh,{personPhotos:'此人的照片',noPersonPhotos:'本家庭库中还没有标记为此人的照片。',clearPerson:'关闭',personPhotosHelp:'只读。人脸标记是系统自动判断的结果，可能不准确。'});
   Object.assign(words.zh,{peopleInLibrary:'本家庭库的人物',peopleDirectoryHelp:'本家庭库中已保存的人名，每位配一张人脸照片。只有主人可以修改姓名。',findPersonInLibrary:'查找人物',noPeopleInLibrary:'本家庭库还没有保存的人名。'});
+  Object.assign(words.en,{describePhoto:'Describe this photo',saveCaption:'Save description',captionSaved:'Saved. Thank you.',captionConflict:'This photo already has a description.'});
   Object.assign(words.en,{duplicatesInLibrary:'Photos saved twice',duplicatesHelp:'Photos this library holds more than once, because the same picture was imported twice. Read-only: nothing here deletes, hides or merges a copy.',savedTimes:'Saved',noDuplicatesInLibrary:'No photo in this library is saved twice.'});
   Object.assign(words.en,{tagsInLibrary:'Tags in this library',tagsHelp:'Tags already attached to photos in this library. Read-only: no tag can be added or removed here.',findTag:'Find a tag',noTagsInLibrary:'No tags in this library yet.',assetsCount:'photos',tagAssets:'Photos with this tag',noTaggedAssets:'No photo in this library carries this tag.',clearTag:'Close'});
+  Object.assign(words.zh,{describePhoto:'为这张照片写一句描述',saveCaption:'保存描述',captionSaved:'已保存，谢谢。',captionConflict:'这张照片已经有描述了。'});
   Object.assign(words.zh,{duplicatesInLibrary:'保存了两次的照片',duplicatesHelp:'本家庭库中保存了不止一次的相同照片，通常是因为同一批照片被导入过两次。只读：这里不会删除、隐藏或合并任何一份。',savedTimes:'保存份数',noDuplicatesInLibrary:'本家庭库中没有重复保存的照片。'});
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
@@ -283,7 +285,35 @@
       if(stale(epoch)||viewerGeneration!==state.viewerGeneration||!$('viewer').open)return;
       storyState.asset=detail.asset;$('viewer-title').textContent=assetLabel(detail.asset);showPhoto(detail.asset,url);
       if(detail.originals_allowed) { $('original').href=safeMediaURL(item.id,'media',{download:'true'});$('original').hidden=false; }
-      if(!captions.items.length) {const p=document.createElement('p');p.textContent=t('noCaptions');$('captions').append(p);}
+      if(!captions.items.length) {
+        const p=document.createElement('p');p.textContent=t('noCaptions');$('captions').append(p);
+        // A member may describe a photo that has none. The route refuses an asset that already
+        // has a caption, so the control is offered only where it can actually succeed.
+        const form=document.createElement('form');form.className='caption-form';
+        const label=document.createElement('label');label.htmlFor='caption-text';label.textContent=t('describePhoto');
+        const input=document.createElement('input');input.id='caption-text';input.maxLength=1024;input.autocomplete='off';
+        const button=document.createElement('button');button.type='submit';button.className='primary';button.textContent=t('saveCaption');
+        form.append(label,input,button);
+        const status=document.createElement('p');status.className='fine';status.setAttribute('role','status');
+        form.addEventListener('submit',async event=>{
+          event.preventDefault();
+          const text=input.value.trim();
+          if(!text||state.busy||state.locked)return;
+          state.busy=true;button.disabled=true;
+          try{
+            const saved=await request(libraryPath(`/assets/${item.id}/captions`),{method:'POST',epoch,body:{text}});
+            if(stale(epoch)||viewerGeneration!==state.viewerGeneration)return;
+            // Show what was saved without reopening the viewer: the route allows one write per
+            // photo, so there is nothing left to submit and the form is replaced in place.
+            const written=document.createElement('small');written.textContent=t('edited');
+            const written_text=document.createElement('p');written_text.textContent=saved.caption.text;
+            form.replaceWith(written,written_text);
+            status.textContent=t('captionSaved');
+          }catch(error){status.textContent=t(errorStatus(error));}
+          finally{state.busy=false;button.disabled=false;}
+        });
+        $('captions').append(form,status);
+      }
       for(const caption of captions.items) {
         const label=document.createElement('small');label.textContent=t(caption.user_edited?'edited':'generated');
         const p=document.createElement('p');p.textContent=caption.text;
