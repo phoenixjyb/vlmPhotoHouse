@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +28,26 @@ import prepare_access_discovery_index as producer
 
 
 class ProducerTests(unittest.TestCase):
+    def test_schema_or_configuration_refusal_closes_database_handle(self):
+        empty = self.tmp / 'empty.sqlite'
+        sqlite3.connect(empty).close()
+        connect = sqlite3.connect
+        opened = []
+        def tracking(*args, **kwargs):
+            db = connect(*args, **kwargs)
+            opened.append(db)
+            return db
+        with patch.object(producer.sqlite3, 'connect', side_effect=tracking):
+            with self.assertRaises(producer.Refused):
+                producer.open_read_only(empty, time.monotonic())
+            with patch.object(producer, 'configure', side_effect=RuntimeError('synthetic configuration error')):
+                with self.assertRaises(RuntimeError):
+                    producer.open_read_only(self.database, time.monotonic())
+        self.assertEqual(len(opened), 2)
+        for db in opened:
+            with self.assertRaises(sqlite3.ProgrammingError):
+                db.execute('SELECT 1')
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp()).resolve()
         self.addCleanup(shutil.rmtree, self.tmp, True)

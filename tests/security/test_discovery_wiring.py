@@ -4,7 +4,7 @@ Synthetic SQLite and in-process ASGI only. These tests drive the *default* app
 (`app.main.create_app`) rather than the standalone candidate factory, so they cover
 the wiring the candidate capsule deliberately left out.
 """
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import asdict
 import json
 from pathlib import Path
@@ -43,7 +43,7 @@ class WiringFixture:
     def __init__(self, directory):
         self.directory = directory
         self.database = directory / 'synthetic.sqlite'
-        with sqlite3.connect(self.database) as db:
+        with closing(sqlite3.connect(self.database)) as db, db:
             create(db)
             self.index = reviewed(AccessService(db, clock=lambda: NOW))
         self.path = artifact(self.index, directory)
@@ -159,7 +159,7 @@ class DiscoveryWiringTests(unittest.TestCase):
         runtime = self.fixture.runtime()
         client = self.client(self.fixture.app(discovery_runtime=runtime))
         self.assertEqual(client.get(BASE + '/facets', headers=self.auth).status_code, 200)
-        with sqlite3.connect(self.fixture.database) as db:
+        with closing(sqlite3.connect(self.fixture.database)) as db, db:
             db.execute("INSERT INTO assets VALUES(777,'not-a-real-path','active','image/jpeg',8,8,NULL,NULL)")
             db.execute("INSERT INTO access_asset_libraries VALUES(777,'family-a')")
         response = client.get(BASE + '/facets', headers=self.auth)
@@ -172,7 +172,7 @@ class DiscoveryIndexLoaderTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name).resolve()
-        with sqlite3.connect(self.directory / 'synthetic.sqlite') as db:
+        with closing(sqlite3.connect(self.directory / 'synthetic.sqlite')) as db, db:
             create(db)
             self.index = reviewed(AccessService(db, clock=lambda: NOW))
         self.path = artifact(self.index, self.directory)

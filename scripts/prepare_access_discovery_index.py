@@ -86,13 +86,18 @@ def open_read_only(path, start):
     record = path.lstat()
     if not stat.S_ISREG(record.st_mode) or path.resolve(strict=True) != path:
         raise Refused('Direct regular database required')
-    db = configure(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=3), start)
-    found = dict(db.execute("SELECT name,type FROM sqlite_master WHERE name IN ({})".format(
-        ','.join('?' * len(REQUIRED_TABLES))), REQUIRED_TABLES))
-    if found != {name: 'table' for name in REQUIRED_TABLES}:
-        raise Refused('Reviewed library schema required')
-    db.set_authorizer(authorize)
-    return db
+    db = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=3)
+    try:
+        configure(db, start)
+        found = dict(db.execute("SELECT name,type FROM sqlite_master WHERE name IN ({})".format(
+            ','.join('?' * len(REQUIRED_TABLES))), REQUIRED_TABLES))
+        if found != {name: 'table' for name in REQUIRED_TABLES}:
+            raise Refused('Reviewed library schema required')
+        db.set_authorizer(authorize)
+        return db
+    except BaseException:
+        db.close()
+        raise
 
 
 def authorize(action, first, second, *rest):

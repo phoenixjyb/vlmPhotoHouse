@@ -1,6 +1,6 @@
 """Candidate HTTP contract on synthetic SQLite and in-process ASGI only."""
 import asyncio
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -31,7 +31,7 @@ BASE='/libraries/family-a/discovery/v1'
 class Fixture:
     def __init__(self,path):
         self.path=path
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             create(db);self.index=reviewed(AccessService(db,clock=lambda:NOW))
         self.provider=MemoryIndexProvider((self.index,))
         self.access=AccessRuntime(self.connection,ORIGIN,clock=lambda:NOW)
@@ -45,7 +45,7 @@ class Fixture:
         try:yield db
         finally:db.close()
     def update(self,sql):
-        with sqlite3.connect(self.path) as db:db.execute(sql)
+        with closing(sqlite3.connect(self.path)) as db, db:db.execute(sql)
 
 
 class PhoneDiscoveryHttpTests(unittest.TestCase):
