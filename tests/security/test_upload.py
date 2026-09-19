@@ -122,8 +122,9 @@ class UploadTests(unittest.TestCase):
     def test_uploaded_asset_is_invisible_to_the_library_read(self):
         """The gallery read is the real path a member would use, so assert against it."""
         result = self.upload(png(640, 480))
-        reads = LibraryReads(AccessService(self.connection(), clock=lambda: NOW))
-        gallery = reads.gallery(self.member_token, 'family-a')
+        with closing(self.connection()) as db:
+            reads = LibraryReads(AccessService(db, clock=lambda: NOW))
+            gallery = reads.gallery(self.member_token, 'family-a')
         self.assertEqual([str(item['id']) for item in gallery['items']], ['900'])
         self.assertNotIn(result['asset_id'], [str(item['id']) for item in gallery['items']])
 
@@ -271,9 +272,10 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
                                    (asset_id,)), [])
         # And the library read still does not offer it.
-        reads = LibraryReads(AccessService(self.connection(), clock=lambda: NOW))
-        self.assertNotIn(str(asset_id),
-                         [str(item['id']) for item in reads.gallery(self.member_token, 'family-a')['items']])
+        with closing(self.connection()) as db:
+            reads = LibraryReads(AccessService(db, clock=lambda: NOW))
+            self.assertNotIn(str(asset_id),
+                             [str(item['id']) for item in reads.gallery(self.member_token, 'family-a')['items']])
 
     def test_runtime_configuration_refuses_an_incoming_root_inside_an_original_root(self):
         from app.access.runtime import RuntimeConfiguration

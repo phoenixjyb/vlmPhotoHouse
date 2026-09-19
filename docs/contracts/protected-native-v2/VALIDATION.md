@@ -1,5 +1,30 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.12 — readiness repairs (2026-09-19)
+
+Source baseline: `45f2123ad3447213aad68010154a6d14ff3613f9`. Branch: `codex/readiness-deploy-20260919`.
+The 61 ASGI captures were regenerated and their case arrays compared exactly with
+candidate.11: no changed, added or removed cases. Only version metadata changes.
+Migration head remains `f2a6d8b4c915`; source closure remains 109 entries.
+
+Fresh synthetic evidence: 39 deployment configuration/migration checks and 46
+promotion/transfer checks pass. Chromium completes **53 checkpoints**, including
+people photos, exact duplicates, writing an absent caption, and visible album
+archive/restore. Rendered archive and saved-caption screenshots were inspected.
+The harness models Fetch Metadata for its pipe transport; it proves no real
+network header emission, Windows ACL behavior, phone or TV acceptance.
+
+The whole-suite result and immutable package hashes are recorded in
+[the rollout return](../../security/READINESS_DEPLOYMENT_20260919.md). Two historical
+process-inspection errors do not reproduce in this environment. The order-dependent
+exception mismatch was repaired at the originating reload test; traced synthetic
+SQLite leaks were fixed without suppressing their warnings.
+
+Windows deployment remains blocked on connectivity. No real database, model, media,
+credential, service or client profile was changed. Existing Android candidate.1
+registration is incompatible with the required name field until the client adopts it.
+
+
 ## 2.0.0-candidate.11 — reissue after the album archive slice (2026-09-18)
 
 Source baseline: `4674685cae782827cec6604ade1811e8e7ce23eb`.

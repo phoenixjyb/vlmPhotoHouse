@@ -1,21 +1,21 @@
 {
-  "backend_source_commit": "4674685cae782827cec6604ade1811e8e7ce23eb",
+  "backend_source_commit": "45f2123ad3447213aad68010154a6d14ff3613f9",
   "case_count": 61,
   "client_profile_defaults": {
     "protected_native_v2": false,
     "protected_photo_display": false,
     "protected_story_read": false
   },
-  "contract_version": "2.0.0-candidate.11",
+  "contract_version": "2.0.0-candidate.12",
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "79f8481909bcc4c9c475dea1303bdbf2a56b8fec695d2c406ad6351097e3dc45",
-    "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "2c57749fb18ccf1170bdec0d9cb4be7113dc1cca45a2475dffd32b2bd671c374",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "da7518a70e4f8155cdcb492610d32361216cdbc826a6e66d123d010118a9ceb8",
-    "docs/contracts/protected-native-v2/cases.json": "f7cc7992282a1cf9af893e6ba1bac3540ac463d5c7b37d65e6945beba01de305",
-    "scripts/verify_protected_native_contract.py": "0bd8d970b6e667cc71893669f20f22f140ed7433864d8b5ea411eaa6a5547d81",
-    "tests/security/native_contract_v2_probe.py": "e6f2e721340083a86756195e44ed47864cb06f13496cdb64622bd9d1822ba343",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "54036f9520bdebf59e85f4794e7b6bba4e475fcf6ca936074f0f43bb8ea7b8aa",
+    "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "81b72802c2b2ea1ed0795bd0fc335323110853016acf75958e520f85a11d0936",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "9947c1f10290a87c8a6906653e3a57decffb32bd8d5316c80d25c2312d4a9afb",
+    "docs/contracts/protected-native-v2/cases.json": "927fa4bbf7c861093ff3d1af3a522903b4c3c1506df9349f283213cfa8cc2c97",
+    "scripts/verify_protected_native_contract.py": "0fe08f7f9fcefe89753f08dde15c1dfac5e5f734917898de6fabfa03dba0186e",
+    "tests/security/native_contract_v2_probe.py": "147d2dd0bee5333f6e63571affc08e451b036cd2ac9efb3a2ea5f49d0731f391",
     "tests/security/test_protected_native_contract.py": "151ded7458d534dc7bc8315abadc6f51096600fd353958b533e491b62fef6968"
   },
   "source_sha256": {
@@ -43,7 +43,7 @@
     "backend/app/access/owner_recovery.py": "a978677755d4c16f536000db575b4ea0221266ac00d77b899c69dd20699a1f07",
     "backend/app/access/ownership_repair.py": "7ac69e511bfb8f39bfcf7124ca6edb1256817e6759618973f4bf3fc4e8324a1e",
     "backend/app/access/people.py": "031f18845f626093080440c4679d6ebe10a7230e335c57713f9f1e9237807947",
-    "backend/app/access/promotion.py": "d0c5b4e42b9977a72e48ae0284a19a66e0676269957e53868cc610e734a2691e",
+    "backend/app/access/promotion.py": "aad5158a9fdeb637eed14c696a17aa11592d740d970139ebedc49ce859db0925",
     "backend/app/access/provisioning.py": "9c7528f3f38f93801de5d4d1c87a87fc8cf70dfb8caa521dff5028f1709c5415",
     "backend/app/access/provisioning_apply.py": "9f082a6b5ef26244fbb15f9de6699a261e60e02b61a56daa6223ec6842775a84",
     "backend/app/access/recovery.py": "66e6ca07e55c412ac1521defdbbe6112eabafd7a37d0c8fb28ec80ed2bb9fe97",
