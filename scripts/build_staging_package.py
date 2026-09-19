@@ -24,6 +24,9 @@ FILES = tuple(sorted([
         'boundary','service','bootstrap','stories','story_schema','people','management_schema','albums','management_import','face_jobs',
         'ownership_repair','tags',
         'discovery','discovery_provider','discovery_transport','discovery_index')),
+    *('backend/app/access/'+name+'.py' for name in (
+        'upload','upload_schema','upload_transport','duplicates','captions',
+        'promotion','task_recovery')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (

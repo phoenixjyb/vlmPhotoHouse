@@ -65,6 +65,17 @@ class RuntimeAdapterTests(unittest.TestCase):
              patch('pathlib.Path.lstat',side_effect=AssertionError('Filesystem during build')), \
              patch.dict('os.environ',{'DATABASE_URL':'sqlite:///must-never-be-opened.sqlite'}):
             import app.access.runtime as runtime
+            # ``reload`` mutates the existing module object in place.  Restore
+            # the identity-bearing classes afterwards so tests that imported
+            # RuntimeUnavailable/ExistingDatabase keep matching the globals
+            # used by their methods.  Without this, the result depends on
+            # unittest's module order: a later stale-database check sees a
+            # freshly reloaded exception class and reports an unexpected error.
+            original = {name: getattr(runtime, name) for name in
+                        ('ExistingDatabase', 'RuntimeConfiguration', 'RuntimeUnavailable',
+                         'REQUIRED_REVISION')}
+            self.addCleanup(lambda: [setattr(runtime, name, value)
+                                     for name, value in original.items()])
             importlib.reload(runtime)
             self.settings.build_app()
             self.assertIsNone(create_app().state.access_runtime)

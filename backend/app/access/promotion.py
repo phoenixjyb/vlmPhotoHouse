@@ -19,7 +19,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sqlite3
 import stat
 import time
 import uuid
@@ -261,25 +260,88 @@ class PromotionPlanner(_PromotionState):
 
 def _place(source, destination):
     """Move a file, refusing to overwrite and never leaving a half-written destination."""
+    def remove_owned(path, identity):
+        current = os.lstat(path)
+        if (current.st_dev, current.st_ino) != identity:
+            raise PlanRejected('Move cleanup path changed; manual recovery required')
+        os.unlink(path)
+
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
+    if os.path.lexists(destination):
         raise PlanRejected('Destination already exists')
+    source_info = os.lstat(source)
+    source_identity = (source_info.st_dev, source_info.st_ino)
     try:
-        os.replace(source, destination)
+        # A hard-link install is atomic and cannot clobber a destination that appears after
+        # the preflight check.  Removing the source completes the same-filesystem move.
+        os.link(source, destination)
+        try:
+            remove_owned(source, source_identity)
+        except BaseException as error:
+            try:
+                remove_owned(destination, source_identity)
+            except BaseException as cleanup_error:
+                raise PlanRejected('Move cleanup failed; manual recovery required') from cleanup_error
+            raise error
     except OSError as error:
         if error.errno != errno.EXDEV:
             raise
-        # Cross-filesystem: land a complete copy first, then replace, so a partial file is
-        # never visible under the final name.
-        partial = destination.with_name(destination.name + '.part')
+        # Cross-filesystem: land a complete copy first, then install it without replacing an
+        # existing destination, so a partial file is never visible under the final name.
+        partial = destination.with_name('.' + destination.name + '.' + uuid.uuid4().hex + '.part')
+        descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        partial_info = os.fstat(descriptor)
+        partial_identity = (partial_info.st_dev, partial_info.st_ino)
         try:
-            shutil.copyfile(source, partial)
-            os.replace(partial, destination)
+            with os.fdopen(descriptor, 'wb') as output, open(source, 'rb') as input_stream:
+                shutil.copyfileobj(input_stream, output)
+                output.flush()
+                os.fsync(output.fileno())
         except BaseException:
-            partial.unlink(missing_ok=True)
+            remove_owned(partial, partial_identity)
             raise
-        source.unlink()
+        try:
+            os.link(partial, destination)
+        except BaseException:
+            remove_owned(partial, partial_identity)
+            raise
+        try:
+            remove_owned(partial, partial_identity)
+        except BaseException as error:
+            try:
+                remove_owned(destination, partial_identity)
+            except BaseException as cleanup_error:
+                raise PlanRejected('Move cleanup failed; manual recovery required') from cleanup_error
+            raise error
+        try:
+            remove_owned(source, source_identity)
+        except BaseException as error:
+            try:
+                remove_owned(destination, partial_identity)
+            except BaseException as cleanup_error:
+                raise PlanRejected('Move cleanup failed; manual recovery required') from cleanup_error
+            raise error
     return destination
+
+
+def _restore_moves(moved):
+    """Reverse completed moves without replacing an existing path.
+
+    A rollback must never overwrite a file that appeared while the transfer was in
+    progress.  Missing source/destination paths are failures too: silently carrying
+    on would leave SQLite and the filesystem describing different states.
+    """
+    failures = []
+    for source, destination in reversed(moved):
+        try:
+            if os.path.lexists(source) or not os.path.lexists(destination):
+                raise PlanRejected('Rollback path changed; manual recovery required')
+            _place(destination, source)
+        except BaseException as error:
+            failures.append(error)
+    if failures:
+        names = ', '.join(type(error).__name__ for error in failures)
+        raise PlanRejected('Rollback failed; manual recovery required (' + names + ')')
 
 
 def _checked_envelope(envelope, review, operation):
@@ -333,6 +395,7 @@ def promote_and_assign(envelope, *, review, clock=time.time):
     if incoming.resolve().is_relative_to(originals.resolve()) or originals.resolve().is_relative_to(incoming.resolve()):
         raise PlanRejected('The incoming root must sit outside every original root')
     moved = []
+    committed = False
     try:
         with ExistingDatabase(review.database)() as db:
             state = _PromotionState(db, clock=clock)
@@ -350,6 +413,7 @@ def promote_and_assign(envelope, *, review, clock=time.time):
                     FROM assets a JOIN access_uploads u ON u.asset_id=a.id
                     WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
                     ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
+                transfers = []
                 for asset_id, path, label, batch, digest, size in rows:
                     source = Path(path)
                     # The recorded path must be inside the configured incoming root; otherwise the
@@ -360,6 +424,10 @@ def promote_and_assign(envelope, *, review, clock=time.time):
                     if not stat.S_ISREG(info.st_mode) or info.st_size != size:
                         raise PlanRejected('Uploaded file changed since planning')
                     destination = originals / PROMOTED_FOLDER / label / batch / source.name
+                    if os.path.lexists(destination):
+                        raise PlanRejected('Destination already exists')
+                    transfers.append((asset_id, source, destination, label, batch, digest, size))
+                for asset_id, source, destination, label, batch, digest, size in transfers:
                     _place(source, destination)
                     moved.append((source, destination))
                     db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
@@ -373,17 +441,19 @@ def promote_and_assign(envelope, *, review, clock=time.time):
                 _assert_unexpired(state, plan)
                 if db.execute('PRAGMA foreign_key_check').fetchone():
                     raise PlanRejected('Promotion barrier failed')
+            committed = True
             return receipt
-    except sqlite3.Error:
-        # The rows rolled back. Put the bytes back so the incoming area still reflects the
-        # database, which is the whole point of moving them after validation and before rows.
-        for source, destination in reversed(moved):
+    except BaseException as error:
+        # The rows roll back for every exception. Put the bytes back so the incoming area still
+        # reflects the database; if that recovery fails, surface it instead of hiding a split
+        # filesystem/database state.
+        if moved and not committed:
             try:
-                if destination.exists() and not source.exists():
-                    _place(destination, source)
-            except OSError:
-                pass
-        raise PlanRejected('Promotion failed; no partial operation committed') from None
+                _restore_moves(moved)
+            except BaseException as recovery_error:
+                raise PlanRejected('Promotion failed; rollback failed after '
+                                   + type(error).__name__) from recovery_error
+        raise
 
 
 def unassign_assets(envelope, *, review, clock=time.time):
@@ -403,6 +473,7 @@ def unassign_assets(envelope, *, review, clock=time.time):
     if incoming.resolve().is_relative_to(originals.resolve()) or originals.resolve().is_relative_to(incoming.resolve()):
         raise PlanRejected('The incoming root must sit outside every original root')
     returned = []
+    committed = False
     try:
         with ExistingDatabase(review.database)() as db:
             state = _PromotionState(db, clock=clock)
@@ -420,6 +491,7 @@ def unassign_assets(envelope, *, review, clock=time.time):
                     FROM assets a JOIN access_uploads u ON u.asset_id=a.id
                     WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
                     ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
+                transfers = []
                 for asset_id, path, label, batch, size in rows:
                     source = Path(path)
                     # The recorded path must be inside the originals root, or the operator is
@@ -430,6 +502,10 @@ def unassign_assets(envelope, *, review, clock=time.time):
                     if not stat.S_ISREG(info.st_mode) or info.st_size != size:
                         raise PlanRejected('Promoted file changed since planning')
                     destination = incoming / label / batch / source.name
+                    if os.path.lexists(destination):
+                        raise PlanRejected('Destination already exists')
+                    transfers.append((asset_id, source, destination, label, batch, size))
+                for asset_id, source, destination, label, batch, size in transfers:
                     _place(source, destination)
                     returned.append((source, destination))
                     db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
@@ -442,15 +518,16 @@ def unassign_assets(envelope, *, review, clock=time.time):
                 _assert_unexpired(state, plan)
                 if db.execute('PRAGMA foreign_key_check').fetchone():
                     raise PlanRejected('Unassignment barrier failed')
+            committed = True
             return receipt
-    except sqlite3.Error:
-        for source, destination in reversed(returned):
+    except BaseException as error:
+        if returned and not committed:
             try:
-                if destination.exists() and not source.exists():
-                    _place(destination, source)
-            except OSError:
-                pass
-        raise PlanRejected('Unassignment failed; no partial operation committed') from None
+                _restore_moves(returned)
+            except BaseException as recovery_error:
+                raise PlanRejected('Unassignment failed; rollback failed after '
+                                   + type(error).__name__) from recovery_error
+        raise
 
 
 def reassign_assets(envelope, *, review, clock=time.time):

@@ -309,6 +309,7 @@
             // photo, so there is nothing left to submit and the form is replaced in place.
             const written=document.createElement('small');written.textContent=t('edited');
             const written_text=document.createElement('p');written_text.textContent=saved.caption.text;
+            p.remove();
             form.replaceWith(written,written_text);
             status.textContent=t('captionSaved');
           }catch(error){status.textContent=t(errorStatus(error));}
@@ -707,6 +708,7 @@
   }
   $('album-editor').addEventListener('cancel',event=>{event.preventDefault();if(!state.busy&&(!albumState.draft?.dirty||window.confirm(t('discardAlbum')))){albumState.draft=null;$('album-editor').close();$('album-editor').replaceChildren();}});
   $('albums-panel').addEventListener('toggle',()=>{if($('albums-panel').open)void loadAlbums();});
+  $('album-archived-panel').addEventListener('toggle',()=>{if($('album-archived-panel').open)void loadArchivedAlbums();});
   $('album-create').addEventListener('click',()=>editAlbum());
   $('album-previous').addEventListener('click',()=>{if(albumState.page>1){albumState.page--;void loadAlbums();}});
   $('album-next').addEventListener('click',()=>{if(albumState.page*10<albumState.total){albumState.page++;void loadAlbums();}});

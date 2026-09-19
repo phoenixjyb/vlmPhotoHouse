@@ -126,6 +126,18 @@ try:
                 (derived/'thumbnails/1024').mkdir(parents=True,exist_ok=True)
                 image=Image.open(derived/'thumbnails/256/101.jpg')
                 image.resize((1024,768)).save(derived/'thumbnails/1024/101.jpg')
+            elif scenario=='missing-caption':
+                # Add the same active, undescribed photo used by the caption-write
+                # contract so the browser can exercise the real positive form path.
+                from PIL import Image
+                with fixture.connection() as db:
+                    db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                        VALUES(104,'private-synthetic/104.jpg','private-hash-104','active','image/jpeg',
+                               640,480,'2026-01-04')''')
+                    db.execute("INSERT INTO access_asset_libraries VALUES (104,'family-a')")
+                    db.commit()
+                with Image.open(derived/'thumbnails/256/101.jpg') as image:
+                    image.save(derived/'thumbnails/256/104.jpg')
             elif scenario=='many-assets':
                 # Grows family-a past one gallery page at page_size 24. taken_at keeps
                 # 102/101 ahead of the new rows, so page 1 order is unchanged.

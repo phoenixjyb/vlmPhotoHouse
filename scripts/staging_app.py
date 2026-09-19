@@ -21,7 +21,7 @@ FIELDS = {'format_version', 'database', 'web_origin', 'original_roots', 'derived
 # Optional on purpose. A configuration written before member upload existed must keep loading,
 # and an operator who has not created an incoming area must not be forced to invent one: absent
 # means the upload route answers 503 and no deployment gains a write surface by accident.
-OPTIONAL_FIELDS = {'incoming_root'}
+OPTIONAL_FIELDS = {'incoming_root', 'discovery_indexes'}
 PRIVATE_NETWORKS = tuple(map(ipaddress.ip_network,
     ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10',
      '127.0.0.0/8', 'fc00::/7', '::1/128')))
@@ -54,6 +54,7 @@ class StagingConfiguration:
     tls_certificate: Path
     tls_private_key: Path
     incoming_root: Path | None = None
+    discovery_indexes: tuple[Path, ...] = ()
 
     def __post_init__(self):
         try:
@@ -101,6 +102,16 @@ class StagingConfiguration:
                 if any(self.incoming_root.is_relative_to(other) or other.is_relative_to(self.incoming_root)
                        for other in (*media, *files)):
                     raise InvalidConfiguration()
+            if (type(self.discovery_indexes) is not tuple or len(self.discovery_indexes) > 8
+                    or len(set(self.discovery_indexes)) != len(self.discovery_indexes)):
+                raise InvalidConfiguration()
+            protected = (*media, *files, *((self.incoming_root,) if self.incoming_root else ()))
+            for index in self.discovery_indexes:
+                if not isinstance(index, Path) or _path(str(index)) != index:
+                    raise InvalidConfiguration()
+                if any(index.is_relative_to(other) or other.is_relative_to(index)
+                       for other in protected):
+                    raise InvalidConfiguration()
         except (TypeError, ValueError):
             raise InvalidConfiguration() from None
 
@@ -110,7 +121,7 @@ class StagingConfiguration:
         from app.access.runtime import RuntimeConfiguration
         return RuntimeConfiguration(database=self.database, web_origin=self.web_origin,
             original_roots=self.original_roots, derived_root=self.derived_root,
-            incoming_root=self.incoming_root).build_app()
+            incoming_root=self.incoming_root, discovery_indexes=self.discovery_indexes).build_app()
 
     def server_options(self):
         return dict(host=self.bind_host, port=self.port, ssl_certfile=str(self.tls_certificate),
@@ -129,11 +140,15 @@ def parse_configuration(value):
                 or type(value['original_roots']) is not list):
             raise InvalidConfiguration()
         incoming = value.get('incoming_root')
+        indexes = value.get('discovery_indexes', [])
+        if type(indexes) is not list:
+            raise InvalidConfiguration()
         return StagingConfiguration(database=_path(value['database']), web_origin=value['web_origin'],
             original_roots=tuple(_path(p) for p in value['original_roots']),
             derived_root=_path(value['derived_root']), bind_host=value['bind_host'], port=value['port'],
             tls_certificate=_path(value['tls_certificate']), tls_private_key=_path(value['tls_private_key']),
-            incoming_root=None if incoming is None else _path(incoming))
+            incoming_root=None if incoming is None else _path(incoming),
+            discovery_indexes=tuple(_path(p) for p in indexes))
     except (TypeError, ValueError, KeyError):
         raise InvalidConfiguration() from None
 
@@ -161,7 +176,8 @@ def load_configuration(path):
         # A config file must not be reachable as an original or cached image.
         if any(path.is_relative_to(root) for root in (*config.original_roots, config.derived_root)):
             raise InvalidConfiguration()
-        if path in (config.database, config.tls_certificate, config.tls_private_key):
+        if path in (config.database, config.tls_certificate, config.tls_private_key,
+                    *config.discovery_indexes):
             raise InvalidConfiguration()
         return config
     except (OSError, ValueError, UnicodeError, RecursionError):

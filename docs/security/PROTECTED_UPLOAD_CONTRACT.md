@@ -1,8 +1,15 @@
-# Protected upload contract — proposed 2026-09-17
+# Protected upload contract
 
-**Status: PROPOSED, not implemented.** This is the contract the parity ledger's
-`GAP·CONTRACT` row for upload is gated on. It records the owner's decisions, the narrowings
-against the legacy surface, and the invariants the implementation must carry.
+**Status: implemented in source; deployment and client adoption require separate evidence.**
+The September 18 implementation accepts one JPEG/PNG per request into an explicitly
+configured incoming root. It limits each request to 25 MiB and declared dimensions to
+64 × 1024 × 1024 pixels; there is no aggregate member quota. These parser/resource
+bounds narrow the original no-quota decision below. Header validation is not a full
+image decode or an assurance that every accepted file can be displayed.
+
+Uploads default off. Promotion/reassignment are offline reviewed operator operations;
+there is no member upload UI, resumable transfer, video upload or automatic promotion.
+The following design records the owner decisions and authorization invariants.
 
 ## Why this is a contract and not a port
 

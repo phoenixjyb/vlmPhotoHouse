@@ -154,6 +154,52 @@ class PromotionTests(unittest.TestCase):
         # The incoming copy is gone, so nothing is left behind to be reviewed twice.
         self.assertEqual(list(self.incoming.rglob('*.png')), [])
 
+    def test_expired_promotion_after_move_restores_file_and_rows(self):
+        uploaded = self.upload()
+        asset_id = int(uploaded['asset_id'])
+        envelope = self.planned('promote', library_id='family-a',
+                                operator_account_id=self.owner_id, asset_ids=[asset_id])
+        calls = 0
+        def clock():
+            nonlocal calls
+            calls += 1
+            return NOW if calls <= 4 else NOW + 901
+        with self.assertRaises(PlanRejected):
+            promote_and_assign(envelope, review=self.review(envelope), clock=clock)
+        stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (asset_id,))[0][0])
+        self.assertTrue(stored.exists())
+        self.assertEqual(self.rows('SELECT state FROM access_uploads WHERE asset_id=?', (asset_id,))[0][0],
+                         'incoming')
+        self.assertEqual(self.rows('SELECT 1 FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,)), [])
+        self.assertEqual(list(self.originals.rglob('*.png')), [])
+
+    def test_promotion_failure_after_first_move_restores_all_files_and_rows(self):
+        first = int(self.upload(data=png(640, 480))['asset_id'])
+        second = int(self.upload(data=png(641, 480))['asset_id'])
+        envelope = self.planned('promote', library_id='family-a',
+                                operator_account_id=self.owner_id, asset_ids=[first, second])
+        from app.access import promotion as implementation
+        real_place = implementation._place
+        calls = 0
+        def fail_second(source, destination):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError('synthetic second-source failure')
+            return real_place(source, destination)
+        with patch('app.access.promotion._place', side_effect=fail_second):
+            with self.assertRaises(OSError):
+                promote_and_assign(envelope, review=self.review(envelope), clock=lambda: NOW)
+        for asset_id in (first, second):
+            stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (asset_id,))[0][0])
+            self.assertTrue(stored.exists())
+            self.assertEqual(self.rows('SELECT state FROM access_uploads WHERE asset_id=?',
+                                       (asset_id,))[0][0], 'incoming')
+            self.assertEqual(self.rows('SELECT 1 FROM access_asset_libraries WHERE asset_id=?',
+                                       (asset_id,)), [])
+        self.assertEqual(list(self.originals.rglob('*.png')), [])
+
     def test_an_upload_can_only_be_promoted_once(self):
         uploaded = self.upload()
         asset_id = int(uploaded['asset_id'])
@@ -284,6 +330,56 @@ class PromotionTests(unittest.TestCase):
         self.assertIn(str(asset_id), self.gallery(self.owner_token))
         # Three receipts: the first promotion, the un-assignment, and the second promotion.
         self.assertEqual(len(self.rows('SELECT 1 FROM access_provisioning_receipts')), 3)
+
+    def test_expired_unassignment_after_move_restores_file_and_rows(self):
+        asset_id = int(self.upload()['asset_id'])
+        self.promote(asset_id)
+        envelope = self.planned('unassign', library_id='family-a',
+                                operator_account_id=self.owner_id, asset_ids=[asset_id])
+        calls = 0
+        def clock():
+            nonlocal calls
+            calls += 1
+            return NOW if calls <= 4 else NOW + 901
+        with self.assertRaises(PlanRejected):
+            unassign_assets(envelope, review=self.review(envelope), clock=clock)
+        stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (asset_id,))[0][0])
+        self.assertTrue(stored.exists())
+        self.assertTrue(stored.is_relative_to(self.originals.resolve()), stored)
+        self.assertEqual(self.rows('SELECT state FROM access_uploads WHERE asset_id=?', (asset_id,))[0][0],
+                         'assigned')
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                   (asset_id,))[0][0], 'family-a')
+        self.assertEqual(list(self.incoming.rglob('*.png')), [])
+
+    def test_unassignment_failure_after_first_move_restores_all_files_and_rows(self):
+        first = int(self.upload(data=png(640, 480))['asset_id'])
+        second = int(self.upload(data=png(641, 480))['asset_id'])
+        self.promote(first)
+        self.promote(second)
+        envelope = self.planned('unassign', library_id='family-a',
+                                operator_account_id=self.owner_id, asset_ids=[first, second])
+        from app.access import promotion as implementation
+        real_place = implementation._place
+        calls = 0
+        def fail_second(source, destination):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError('synthetic second-source failure')
+            return real_place(source, destination)
+        with patch('app.access.promotion._place', side_effect=fail_second):
+            with self.assertRaises(OSError):
+                unassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW)
+        for asset_id in (first, second):
+            stored = Path(self.rows('SELECT path FROM assets WHERE id=?', (asset_id,))[0][0])
+            self.assertTrue(stored.exists())
+            self.assertTrue(stored.is_relative_to(self.originals.resolve()), stored)
+            self.assertEqual(self.rows('SELECT state FROM access_uploads WHERE asset_id=?',
+                                       (asset_id,))[0][0], 'assigned')
+            self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                       (asset_id,))[0][0], 'family-a')
+        self.assertEqual(list(self.incoming.rglob('*.png')), [])
 
     def test_unassign_refuses_an_asset_that_never_came_through_upload(self):
         """An asset with no provenance row could never be promoted again, so this is a one-way door."""

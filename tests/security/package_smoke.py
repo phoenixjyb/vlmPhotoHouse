@@ -19,7 +19,11 @@ with ExitStack() as guards:
     import provision_access
     import staging_app
     import prepare_access_database
-    for module in (app,provision_access,staging_app,prepare_access_database):
+    from app.access import (captions, duplicates, promotion, task_recovery,
+                            upload, upload_schema, upload_transport)
+    for module in (app,provision_access,staging_app,prepare_access_database,
+                   captions, duplicates, promotion, task_recovery,
+                   upload, upload_schema, upload_transport):
         assert Path(module.__file__).resolve().is_relative_to(root)
     with tempfile.TemporaryDirectory(prefix='photohouse-package-db-') as directory:
         data=Path(directory).resolve(); database=data/'synthetic.sqlite'

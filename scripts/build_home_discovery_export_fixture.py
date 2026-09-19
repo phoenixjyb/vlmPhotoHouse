@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build synthetic SQLite + candidate + request. Never approve a real review."""
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -19,7 +20,7 @@ def create(root):
     control=json.loads((candidate/'control.json').read_text());control['enabled']=False
     (candidate/'control.json').write_bytes(packed(control))
     db=root/'snapshot.sqlite'
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn:
         conn.executescript('''
 CREATE TABLE assets(id INTEGER PRIMARY KEY,status TEXT,taken_at TEXT);
 CREATE TABLE captions(id INTEGER PRIMARY KEY,asset_id INTEGER,text TEXT,user_edited INTEGER,superseded INTEGER);

@@ -1,5 +1,5 @@
 """Standalone synthetic snapshots only; no live SQLite or network."""
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import copy
 import json
 from pathlib import Path
@@ -29,7 +29,7 @@ class ExportTests(unittest.TestCase):
         value=json.loads(self.request.read_text());fn(value);self.request.write_bytes(exp.packed(value))
 
     def sql(self, text):
-        with sqlite3.connect(self.db) as c:c.executescript(text)
+        with closing(sqlite3.connect(self.db)) as c, c:c.executescript(text)
 
     def build(self):return exp.build(self.db,self.candidate,self.request)
 
@@ -82,7 +82,7 @@ class ExportTests(unittest.TestCase):
     def test_schema_missing_columns_views_and_write_trigger_not_used(self):
         self.sql("CREATE TABLE audit(id INTEGER); CREATE TRIGGER watch AFTER UPDATE ON assets BEGIN INSERT INTO audit VALUES(1); END;")
         self.build()
-        with sqlite3.connect(self.db) as c:self.assertEqual(c.execute('SELECT count(*) FROM audit').fetchone()[0],0)
+        with closing(sqlite3.connect(self.db)) as c, c:self.assertEqual(c.execute('SELECT count(*) FROM audit').fetchone()[0],0)
         self.sql('ALTER TABLE captions RENAME COLUMN text TO old_text')
         with self.assertRaises(sqlite3.DatabaseError):self.build()
         self.sql('DROP TABLE captions; CREATE VIEW captions AS SELECT 1 AS id;')
@@ -104,7 +104,7 @@ class ExportTests(unittest.TestCase):
         self.sql("INSERT INTO captions VALUES(8,104,'second edit',1,0)")
         p,_=self.build();self.assertEqual(p['plan']['coverage']['caption_states']['ambiguous'],2)
         self.sql('DELETE FROM captions WHERE id=8')
-        with sqlite3.connect(self.db) as c:c.execute('UPDATE captions SET text=? WHERE id=7',('字'*1366,))
+        with closing(sqlite3.connect(self.db)) as c, c:c.execute('UPDATE captions SET text=? WHERE id=7',('字'*1366,))
         p,_=self.build();self.assertEqual(p['plan']['coverage']['caption_states']['oversized'],1)
         self.assertEqual(p['plan']['coverage']['caption_exclusions']['superseded'],1)
 
