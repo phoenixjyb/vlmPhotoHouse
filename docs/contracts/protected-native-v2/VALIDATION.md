@@ -20,9 +20,12 @@ process-inspection errors do not reproduce in this environment. The order-depend
 exception mismatch was repaired at the originating reload test; traced synthetic
 SQLite leaks were fixed without suppressing their warnings.
 
-Windows deployment remains blocked on connectivity. No real database, model, media,
-credential, service or client profile was changed. Existing Android candidate.1
-registration is incompatible with the required name field until the client adopts it.
+Windows was subsequently woken on owner instruction and the prepared rollout completed;
+see [the Windows return](../../security/WINDOWS_READINESS_ROLLOUT_20260919.md).
+The existing account data was preserved through migration. No model, media or client
+profile was changed. Existing Android candidate.1 registration is incompatible with
+the required name field until the client adopts it. Authenticated/device acceptance
+remains separate from the recorded native and public transport checks.
 
 
 ## 2.0.0-candidate.11 — reissue after the album archive slice (2026-09-18)

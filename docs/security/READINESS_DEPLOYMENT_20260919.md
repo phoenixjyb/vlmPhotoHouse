@@ -8,11 +8,16 @@ is recorded below.
 
 ## Deployment state
 
-**Not deployed.** The documented first SSH hop succeeds, but the Windows hop returns
-`Host is down` or times out. The owner has been asked to bring Windows online. No Windows database,
-payload, process, scheduled task, credential, model or media has been changed.
-The last documented protected payload remains `e718b84` with schema `d8e5b2f7a904`;
-neither that payload nor the reported caption stall has been freshly inspected.
+**Deployed on Windows at 23:19 China time, September 19.** The owner identified the
+existing Mac-mini Wake-on-LAN method; wake succeeded and the documented SSH route
+reconnected. The protected API now serves source `45f2123` with schema `f2a6d8b4c915`.
+The original source, task definitions and a verified stopped-boundary database backup
+are retained on Windows. The caption worker is staged for the new schema but remains
+fenced because its existing local model endpoint is unavailable. No model was loaded.
+
+See [the Windows rollout return](WINDOWS_READINESS_ROLLOUT_20260919.md) for native,
+service-account and public-HTTPS evidence. Authenticated owner/device acceptance is
+still pending; the earlier connectivity block below has been resolved.
 
 ## Source repairs
 
@@ -54,7 +59,8 @@ neither that payload nor the reported caption stall has been freshly inspected.
 - Promotion/transfer fault tests: **46 pass**; configuration and schema tests:
   **39 pass**. A failed compensation now reports manual recovery instead of hiding it.
   This is exception recovery, not a durable filesystem/SQLite crash transaction;
-  power loss and native Windows filesystem behavior still need separate qualification.
+  power loss and the actual incoming/original-root ACL and cross-volume round trip still
+  need separate qualification. Five transfer fault tests subsequently passed on Windows.
 - Native pack: **candidate.12**, 61 captures unchanged from candidate.11, 109 source
   hashes and 7 payload hashes verified; all client profile defaults remain off.
 - Extracted immutable package smoke: **pass**, 7 ASGI checks, 19 operator commands,
@@ -66,8 +72,10 @@ neither that payload nor the reported caption stall has been freshly inspected.
 | `worker-45f2123.zip` | 15 | 196,341 | `2736e53b8ac41bb442a7f0c21aba00cf3391ed9c3c96aa3473517f62bb7a0687` |
 
 File counts exclude each archive's manifest. These are source-only bundles, retained in the workspace's private handoff directory.
-Neither bundle has been deployed or activated. The worker bundle has not been
-qualified on Windows. An API artifact alone cannot make the absent model endpoint ready.
+The protected bundle is now active on Windows. The worker bundle and compatible
+configuration are staged, but worker execution remains fenced and unqualified against
+the unavailable model endpoint. Immutable archive manifests retain their build-time
+source-only labels; the separate rollout receipt records activation.
 
 The local checks use the existing Workbuddy Python 3.13.12 environment, with no
 dependency installation or upgrade. Reproduce from this worktree using that interpreter:
@@ -83,7 +91,11 @@ Chromium uses the existing `playwright-core` installation and
 and `PH_BROWSER_ARTIFACTS` selecting a synthetic evidence directory. The browser
 talks to an ASGI pipe bridge; these checks open no HTTP listener.
 
-## Windows rollout after connectivity returns
+## Windows rollout procedure and deferred steps
+
+Steps 1–5 are complete; step 6 has native/public transport and file-access evidence,
+with authenticated acceptance pending. Steps 7–8 remain deferred. Do not replay the
+migration: the live database is already on the new revision.
 
 1. Re-read the private access runbook and inspect the actual host, task actions,
    payload manifests, launch assertions, environment/config pins, TLS, schema and
@@ -120,7 +132,9 @@ SMB services are separate; this rollout must not broaden their access or restart
 
 ## Remaining delivery gates
 
-- Fresh Windows state and service-principal qualification are still unavailable.
+- Authenticated owner/member journeys and phone/TV acceptance remain pending.
+- The caption model endpoint is down; 3,029 caption tasks remain pending and the
+  compatible caption worker remains fenced. No model startup or retry was performed.
 - Discovery artifact freshness must be qualified alongside caption and metadata writes
   before enabling its deployment configuration.
 - Upload header checks are not a full decode, an aggregate quota or a durable transfer
@@ -146,7 +160,9 @@ membership handling and default-off profile flags. The new people/duplicates/cap
 album endpoints need their own client adoption; unchanged old captured cases do not
 prove support for these features. Upload remains a separately disabled capability.
 
-After backend runtime verification, build and test a matching APK. Emulator fixtures,
+The backend rollout now makes the required registration name live. Existing login
+remains supported, but the inspected old Android registration request must be updated.
+Build and test a matching APK against this deployed source. Emulator fixtures,
 installed-phone interaction and TV playback remain distinct evidence. No Android
 source, contract pin, APK or device was changed by this backend task.
 
@@ -158,7 +174,8 @@ The original application checkout remains unchanged.
 
 - `14bd371`: deployment packaging, configuration, migration, promotion and UI repairs.
 - `45f2123`: refused-discovery and environment-check connection cleanup.
-- The commit containing this receipt adds candidate.12, final evidence and upload-test cleanup.
+- `ec7b960`: candidate.12, final local evidence and upload-test cleanup.
+- The subsequent rollout receipt records the successful Windows migration and activation.
 
 Changed files relative to `9d7e1d0`:
 
@@ -173,6 +190,7 @@ Changed files relative to `9d7e1d0`:
 - `docs/security/READINESS_DEPLOYMENT_20260919.md`
 - `docs/security/SCHEMA_APPLICATION.md`
 - `docs/security/WEBUI_PARITY.md`
+- `docs/security/WINDOWS_READINESS_ROLLOUT_20260919.md`
 - `scripts/apply_access_schema.py`
 - `scripts/build_home_discovery_export_fixture.py`
 - `scripts/build_staging_package.py`

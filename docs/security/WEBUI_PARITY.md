@@ -56,6 +56,10 @@ discovery_indexes` defaults to empty, and an artifact must be produced offline a
 and the UI hides the panel entirely rather than showing a control that cannot work — absence
 of the filter is a deployment state, not an error a member can act on.
 
+Windows source `45f2123` was deployed September 19. Native and public HTTPS checks
+pass; authenticated owner/member and device acceptance remain pending. See the
+[Windows rollout return](WINDOWS_READINESS_ROLLOUT_20260919.md).
+
 ## Dispositions
 
 - **PARITY** — the capability is present in the protected UI.
