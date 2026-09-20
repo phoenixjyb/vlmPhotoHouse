@@ -184,12 +184,35 @@ def load_configuration(path):
         raise InvalidConfiguration() from None
 
 
-def serve(config, *, server_run=None, photo_cache=None):
+def delivery_paths(config, photo_cache=None, prepared_index=None, prepared_root=None, prepared_sha256=None):
+    selected = [p for p in (photo_cache, prepared_index, prepared_root) if p is not None]
+    if any(_path(str(p)) != p for p in selected): raise InvalidConfiguration()
+    if any(v is not None for v in (prepared_index, prepared_root, prepared_sha256)):
+        if (prepared_index is None or prepared_root is None or type(prepared_sha256) is not str
+                or not re.fullmatch('[0-9a-f]{64}', prepared_sha256)):
+            raise InvalidConfiguration()
+    protected = (*config.original_roots, config.derived_root, config.database,
+        config.tls_certificate, config.tls_private_key, *config.discovery_indexes,
+        *((config.incoming_root,) if config.incoming_root else ()))
+    for i, path in enumerate(selected):
+        if any(path.is_relative_to(other) or other.is_relative_to(path)
+               for other in (*protected, *selected[i+1:])):
+            raise InvalidConfiguration()
+
+
+def serve(config, *, server_run=None, photo_cache=None, prepared_index=None,
+          prepared_root=None, prepared_sha256=None):
+    delivery_paths(config, photo_cache, prepared_index, prepared_root, prepared_sha256)
     app = config.build_app()
     if photo_cache is not None:
         from dataclasses import replace
         from app.photo_delivery import PhotoCache
         app.state.media_runtime = replace(app.state.media_runtime, photo_cache=PhotoCache(photo_cache))
+    if prepared_index is not None:
+        from dataclasses import replace
+        from app.access.prepared_video import PreparedVideos
+        provider = PreparedVideos(prepared_index, prepared_sha256, prepared_root)
+        app.state.media_runtime = replace(app.state.media_runtime, prepared_videos=provider)
     if server_run is None:
         import uvicorn
         server_run = uvicorn.run
@@ -200,20 +223,25 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--photo-cache', type=Path, help='Opt-in bounded on-demand JPEG cache; separate from originals')
+    parser.add_argument('--prepared-index', type=Path)
+    parser.add_argument('--prepared-root', type=Path)
+    parser.add_argument('--prepared-sha256')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--check-config', action='store_true')
     mode.add_argument('--serve', action='store_true')
     args = parser.parse_args(argv)
     try:
         config = load_configuration(args.config)
-        if args.photo_cache is not None:
-            if not args.photo_cache.is_absolute() or any(args.photo_cache.is_relative_to(p) or p.is_relative_to(args.photo_cache) for p in config.original_roots):
-                raise InvalidConfiguration()
+        delivery_paths(config, args.photo_cache, args.prepared_index, args.prepared_root, args.prepared_sha256)
+        if any(args.config.is_relative_to(p) or p.is_relative_to(args.config)
+               for p in (args.photo_cache, args.prepared_index, args.prepared_root) if p is not None):
+            raise InvalidConfiguration()
         if args.check_config:
             print(json.dumps({'configuration_syntax': 'valid', 'storage_checked': False,
                 'certificate_checked': False, 'network_checked': False, 'listener_started': False}))
         else:
-            serve(config, photo_cache=args.photo_cache)
+            serve(config, photo_cache=args.photo_cache, prepared_index=args.prepared_index,
+                  prepared_root=args.prepared_root, prepared_sha256=args.prepared_sha256)
         return 0
     except InvalidConfiguration:
         print('Invalid staging configuration', file=sys.stderr)

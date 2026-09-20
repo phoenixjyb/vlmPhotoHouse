@@ -100,7 +100,7 @@ class ClosedBoundary:
         if method == 'POST' and re.fullmatch(r'/libraries/[^/]+/discovery/v1/search', path):
             return True
         return method in {'GET', 'HEAD'} and bool(re.fullmatch(
-            r'/(?:assets/[0-9]+/(?:media|thumbnail|display)|faces/[0-9]+/crop)', path))
+            r'/(?:assets/[0-9]+/(?:media|thumbnail|display|playback)|faces/[0-9]+/crop)', path))
 
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'websocket':

@@ -42,6 +42,8 @@ FILES = tuple(sorted([
     'scripts/check_access_environment.py', 'scripts/rehearse_fullsize_database.py',
     'scripts/apply_access_schema.py', 'docs/security/SCHEMA_APPLICATION.md',
     'backend/app/photo_delivery.py', 'backend/app/home_feed.py',
+    'backend/app/home_catalog.py', 'backend/app/access/prepared_video.py',
+    'scripts/export_protected_videos.py', 'docs/security/PROTECTED_PREPARED_MEDIA.md',
     'scripts/home_media_worker.py', 'scripts/home_preparation_resources.py',
     'backend/requirements-home-preparation.lock',
     'docs/security/ON_DEMAND_MEDIA.md',

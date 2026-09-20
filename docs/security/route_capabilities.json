@@ -3190,7 +3190,7 @@
    ],
    "scope": "Exact duplicate groups within one library: active assets this library maps that share a hash_sha256 with at least one other active asset in the same library.",
    "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other member reads; library.read rather than an owner capability, matching the tag catalog and the people directory; the repeat predicate is scoped to the library, so a copy that is deleted, in another library or unmapped never counts and never appears; 25 groups per page, 25 copies per group, bounded page number, 3-second query deadline. The response carries no filesystem path, no filename and no content hash: a group is identified by its lowest asset id, which is stable for paging without letting a caller test whether a known image is in the library.",
-   "gap": "Source/synthetic evidence only; no member UI control yet. Exact duplicates only — perceptual near-duplicates (legacy /duplicates/reduction/*) need the phash task output and an explicit threshold decision, and are a separate contract. Nothing here deletes, suppresses or merges a copy, and deletion stays EXCLUDED, so the view explains the duplication rather than resolving it. On the deployed library that is 3,081 groups covering 6,189 of 27,842 active assets, caused by the same material being imported twice under two naming schemes. No physical acceptance."
+   "gap": "Source/synthetic evidence only; no member UI control yet. Exact duplicates only \u2014 perceptual near-duplicates (legacy /duplicates/reduction/*) need the phash task output and an explicit threshold decision, and are a separate contract. Nothing here deletes, suppresses or merges a copy, and deletion stays EXCLUDED, so the view explains the duplication rather than resolving it. On the deployed library that is 3,081 groups covering 6,189 of 27,842 active assets, caused by the same material being imported twice under two naming schemes. No physical acceptance."
   },
   {
    "source": "backend/app/access/captions.py",
@@ -3247,6 +3247,34 @@
    "scope": "Albums the selected library has archived, so an archive can be undone.",
    "current_control": "Same reviewed closed boundary and shared bearer/cookie/CSRF policy as the other album routes; library.albums.manage, so owner only, and a separate route rather than a flag on the member list so an archived album stays invisible to members without a conditional capability; scoped by the same library-owned join the edit path uses; 10 per page, bounded page number, 3-second deadline. Returns no revision, because restoring does not take one.",
    "gap": "Source/synthetic evidence only; no UI control yet, and no album exists on the deployed library. Archived albums are excluded from every member-facing read by design, so this is the only surface that shows them and it is owner-only. No physical acceptance."
+  },
+  {
+   "source": "backend/app/access/media.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/assets/{asset_id}/playback",
+   "handler": "playback",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.read"
+   ],
+   "scope": "Current active parent asset in selected library; no original grant.",
+   "current_control": "Explicit private source-bound prepared index; session and membership checks before lookup and each hash-verified bounded chunk; Range/HEAD, no-store, four-reader bound.",
+   "gap": "Local candidate; operator export, service identity qualification and client/device adoption remain."
+  },
+  {
+   "source": "backend/app/access/media.py",
+   "owner": "router",
+   "method": "HEAD",
+   "path": "/assets/{asset_id}/playback",
+   "handler": "playback",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.read"
+   ],
+   "scope": "Current active parent asset in selected library; no original grant.",
+   "current_control": "Explicit private source-bound prepared index; session and membership checks before lookup and each hash-verified bounded chunk; Range/HEAD, no-store, four-reader bound.",
+   "gap": "Local candidate; operator export, service identity qualification and client/device adoption remain."
   }
  ]
 }
