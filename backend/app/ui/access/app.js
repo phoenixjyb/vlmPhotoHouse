@@ -2,7 +2,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const state = {language:'en', mode:'login', generation:0, controllers:new Set(), profile:null,
-    csrf:null, library:null, viewerGeneration:0, page:1, busy:false, locked:false, invite:null, memberPage:1, memberGeneration:0, memberTotal:0, total:0};
+    csrf:null, library:null, viewerGeneration:0, page:1, busy:false, locked:false, invite:null, memberPage:1, memberGeneration:0, memberTotal:0, total:0, videoRetryTimer:null, videoController:null};
   const words = {
     en: {manageMembers:'Review library members',revokeHelp:'Revoking access stops future requests to this library. Files already downloaded cannot be recalled.',revoke:'Revoke access',confirmRevoke:'Confirm revocation',cancel:'Cancel',confirmFor:'Revoke library access for',revoked:'Access revoked.',conflict:'Membership changed. Review the refreshed list before trying again.',owner:'Owner',viewer:'Viewer',contributor:'Contributor',approved:'Approved',requested:'Requested',rejected:'Rejected',unavailableMember:'Currently unavailable',memberRevoked:'Revoked',tagline:'A place for our memories',eyebrow:'YOUR FAMILY, TOGETHER',welcome:'The moments we keep close.',intro:'A private home for family photos. Sign in, or join with the invitation your library owner sent you.',signIn:'Sign in',join:'Join with an invitation',phone:'Phone number',phoneHelp:'Include the country code. Your phone number is your sign-in name.',password:'Password',passwordHelp:'Choose a passphrase of 8–128 characters.',invitation:'Invitation code',inviteHelp:'Use the code sent for this phone number. An accepted invitation opens that library.',help:'Need an invitation or help signing in? Contact your library owner.',yourLibrary:'YOUR FAMILY LIBRARY',gallery:'Little moments. Lasting memories.',signOut:'Sign out',libraryLabel:'Library',refresh:'Refresh',previous:'Previous',next:'Next',anotherInvite:'Have an invitation to another library?',accept:'Accept invitation',inviteSomeone:'Invite someone to this library',ownerHelp:'Create a code for their phone number, then send it privately. They join as a viewer. Original downloads are not included.',createInvite:'Create invitation',sendCode:'Send this code privately. It expires in 24 hours.',cancelInvite:'Cancel this invitation',close:'Close',download:'Download original',captionNote:'Generated descriptions may be inaccurate. Original downloads require separate permission.',footer:'PhotoHouse · Shared by invitation',checking:'Checking your session…',loading:'Loading your library…',denied:'Access could not be confirmed. Check your details or contact your library owner.',unavailable:'PhotoHouse is unavailable. Please try again later.',limited:'Too many attempts. Please wait before trying again.',changed:'Your access changed. Refresh or contact your library owner.',noLibrary:'No library is currently available. Ask your owner for an invitation.',noPhotos:'No photos are available in this library yet.',signedOut:'You are signed out.',logoutFailed:'Sign out could not be completed. Your photos are hidden; try Sign out again.',accepted:'Invitation accepted.',cancelled:'Invitation cancelled.',noCaptions:'No description is available yet.',edited:'Family description',generated:'Generated description',moreCaptions:'Only the first 20 descriptions are shown.',truncated:'Description shortened.',photo:'Photo',video:'Video',other:'Media',previewMissing:'Preview unavailable',working:'Please wait…',invalidPhone:'Include an explicit country code, for example +86.',invalidPassword:'Choose a passphrase of 8–128 characters.',page:'Page',of:'of',photos:'items'},
     zh: {manageMembers:'查看相册库成员',revokeHelp:'撤销权限后，对方的新请求将无法访问此相册库。已下载的文件无法收回。',revoke:'撤销访问权限',confirmRevoke:'确认撤销',cancel:'取消',confirmFor:'撤销以下成员的相册库访问权限：',revoked:'已撤销访问权限。',conflict:'成员信息已更新，请查看刷新后的列表再操作。',owner:'主人',viewer:'浏览者',contributor:'协作者',approved:'已批准',requested:'待批准',rejected:'已拒绝',unavailableMember:'当前不可访问',memberRevoked:'已撤销',tagline:'珍藏一家人的时光',eyebrow:'属于我们一家人的回忆',welcome:'把美好时光，留在身边。',intro:'一个私密的家庭相册。登录，或使用相册主人发给你的邀请码加入。',signIn:'登录',join:'使用邀请码加入',phone:'手机号码',phoneHelp:'请包含国家区号。手机号码用作登录名。',password:'密码',passwordHelp:'请设置 8–128 个字符的密码或短语。',invitation:'邀请码',inviteHelp:'请使用为此手机号码生成的邀请码。验证成功后即可访问对应相册。',help:'需要邀请码或登录帮助？请联系相册主人。',yourLibrary:'我们的家庭相册',gallery:'小小瞬间，长长回忆。',signOut:'退出登录',libraryLabel:'相册库',refresh:'刷新',previous:'上一页',next:'下一页',anotherInvite:'收到另一个相册库的邀请码？',accept:'接受邀请',inviteSomeone:'邀请家人加入这个相册库',ownerHelp:'为对方的手机号码生成邀请码，再私下发送。对方将以浏览者身份加入，不包含原文件下载权限。',createInvite:'生成邀请码',sendCode:'请私下发送此邀请码，有效期为 24 小时。',cancelInvite:'取消此邀请',close:'关闭',download:'下载原文件',captionNote:'自动生成的描述可能不准确。下载原文件需要单独授权。',footer:'PhotoHouse · 受邀共享的家庭相册',checking:'正在检查登录状态…',loading:'正在加载相册…',denied:'暂时无法确认访问权限。请检查信息或联系相册主人。',unavailable:'PhotoHouse 暂时不可用，请稍后重试。',limited:'尝试次数过多，请稍后再试。',changed:'访问权限已发生变化，请刷新或联系相册主人。',noLibrary:'目前没有可访问的相册库，请向相册主人索取邀请。',noPhotos:'这个相册库暂时没有可浏览的照片。',signedOut:'已退出登录。',logoutFailed:'暂时未能完成退出。照片已隐藏，请再次点击退出登录。',accepted:'已接受邀请。',cancelled:'已取消邀请。',noCaptions:'暂时没有描述。',edited:'家人描述',generated:'自动生成的描述',moreCaptions:'仅显示前 20 条描述。',truncated:'描述已缩短。',photo:'照片',video:'视频',other:'媒体',previewMissing:'预览暂不可用',working:'请稍候…',invalidPhone:'请包含国家区号，例如 +86。',invalidPassword:'请设置 8–128 个字符的密码或短语。',page:'第',of:'/',photos:'项'}
@@ -31,6 +31,8 @@
   Object.assign(words.zh,{viewEditing:'请先关闭故事编辑或人脸核对面板，再播放幻灯片。'});
   Object.assign(words.en,{viewFit:'Fit',viewWidth:'Fit width',viewHeight:'Fit height',viewActual:'Actual size',viewOut:'Zoom out',viewIn:'Zoom in',viewFullscreen:'Fullscreen',viewExitFullscreen:'Exit fullscreen',viewFullscreenFailed:'Fullscreen is unavailable in this browser.',viewHelp:'Scroll to zoom; drag to pan. Keyboard: + / − zoom, arrows pan, 0 fits.',viewQuality:'Thumbnail preview. Actual size means preview pixels, not the original photo.',assignmentRestricted:'This saved person cannot be assigned yet: their library ownership needs review. No changes were made.',assignmentChooseHelp:'Select a person, then review the face and press Confirm assignment.'});
   Object.assign(words.zh,{viewFit:'适合窗口',viewWidth:'适合宽度',viewHeight:'适合高度',viewActual:'实际大小',viewOut:'缩小',viewIn:'放大',viewFullscreen:'全屏',viewExitFullscreen:'退出全屏',viewFullscreenFailed:'此浏览器暂不支持全屏。',viewHelp:'滚轮缩放，拖动平移。键盘：+ / − 缩放，方向键平移，0 适合窗口。',viewQuality:'当前为缩略预览。“实际大小”指预览图像素，并非原始照片。',assignmentRestricted:'此人物暂不能分配：需先确认其家庭库归属。未作任何更改。',assignmentChooseHelp:'选择人物后，请核对人脸并点击“确认归属”。'});
+  Object.assign(words.en,{preparedPlayback:'Prepared video',videoChecking:'Checking protected video…',videoUnavailable:'This prepared video is unavailable.',videoNotPrepared:'This video is not prepared yet.',videoChanged:'This video changed. Close it and refresh the library.',videoBusy:'The prepared video is busy. Wait before retrying.',videoRetry:'Retry video',videoRetryLater:'Retry later',videoUnauthorized:'Your access changed. The video was closed.',videoInterrupted:'Playback was interrupted. Retry the video.'});
+  Object.assign(words.zh,{preparedPlayback:'已准备的视频',videoChecking:'正在检查受保护的视频…',videoUnavailable:'此准备好的视频暂不可用。',videoNotPrepared:'此视频尚未准备好。',videoChanged:'此视频已发生变化。请关闭后刷新相册库。',videoBusy:'准备好的视频当前繁忙，请稍后再试。',videoRetry:'重试视频',videoRetryLater:'稍后重试',videoUnauthorized:'访问权限已变化，视频已关闭。',videoInterrupted:'播放已中断，请重试视频。'});
   Object.assign(words.en,{newPerson:'Create a new person',createAssign:'Create and assign',unassignFace:'Remove this assignment',confirmUnassign:'Remove this face assignment? The saved person and photo will be kept.',albums:'Family albums',albumPrivacy:'Saved in this library, not automatically published to TV.',newAlbum:'Create album',editAlbum:'Edit album',albumTitle:'Album title',albumTitleZh:'Chinese title (optional)',albumDescription:'Description',albumTheme:'Theme',saveAlbum:'Save album',albumSaved:'Album saved.',noAlbums:'No library-owned albums yet. Earlier unowned albums need a reviewed import.',selectPhotos:'Choose photos/videos (up to 60)',selectedPhotos:'Selected order',moveUp:'Move earlier',moveDown:'Move later',remove:'Remove',setCover:'Use as cover',cover:'Cover',albumEmpty:'Empty album',albumChanged:'Album changed. Close this editor and reopen the current version before editing.',albumUncertain:'Save not confirmed. Retry this same save or close and review the saved albums.',discardAlbum:'Discard this unsaved album edit?',albumNeedsReview:'Some earlier selections are no longer available. Saving will remove unavailable entries.',newPersonHelp:'Use an existing saved person when possible. Creating a name does not merge duplicates.'});
   Object.assign(words.zh,{newPerson:'创建新人物',createAssign:'创建并分配',unassignFace:'取消此人脸归属',confirmUnassign:'取消此人脸归属？已保存的人物和照片将保留。',albums:'家庭主题相册',albumPrivacy:'保存在本家庭库，不会自动发布到电视。',newAlbum:'创建相册',editAlbum:'编辑相册',albumTitle:'相册标题',albumTitleZh:'中文标题（可选）',albumDescription:'描述',albumTheme:'主题',saveAlbum:'保存相册',albumSaved:'相册已保存。',noAlbums:'暂无属于本库的相册。旧的未归属相册需经确认后导入。',selectPhotos:'选择照片或视频（最多 60 项）',selectedPhotos:'已选顺序',moveUp:'向前移动',moveDown:'向后移动',remove:'移除',setCover:'设为封面',cover:'封面',albumEmpty:'空相册',albumChanged:'相册已更改，请关闭编辑器并打开最新版本后再编辑。',albumUncertain:'尚未确认保存成功。请重试同一次保存，或关闭并核对已保存相册。',discardAlbum:'放弃尚未保存的相册修改？',albumNeedsReview:'部分原选项已不可访问，保存将移除这些选项。',newPersonHelp:'请优先选择已有的人物。创建姓名不会自动合并重名人物。'});
   Object.assign(words.en,{closeSelection:'Close selection'});
@@ -89,6 +91,8 @@
     status(statusKey);
   }
   function closeViewer({keepFrame=false}={}) {
+    if(state.videoRetryTimer){clearTimeout(state.videoRetryTimer);state.videoRetryTimer=null;}
+    if(state.videoController){state.videoController.abort();state.videoController=null;}
     stopSlideshow();sequenceState.items=[];sequenceState.index=0;sequenceState.busy=false;updateSequence();
     resetPhotoView(keepFrame);
     faceState.load++;faceState.page=1;$('face-list').replaceChildren();$('face-panel').hidden=true;$('face-panel').open=false;$('face-status').textContent='';$('face-pages').hidden=true;
@@ -98,6 +102,7 @@
     if (!keepFrame&&$('viewer').open) $('viewer').close();
     $('viewer-media').querySelectorAll('video').forEach(video => {video.pause();video.removeAttribute('src');video.load();});
     $('viewer-media').replaceChildren(); $('captions').replaceChildren(); $('viewer-title').textContent='';
+    $('viewer-controls').hidden=false;$('viewer-sequence').hidden=true;$('view-help').hidden=false;
     $('original').removeAttribute('href'); $('original').hidden=true;
   }
   function clearPhotos() {
@@ -223,6 +228,77 @@
     image.addEventListener('error',()=>{if(photoState.image!==image)return;stopSlideshow();$('view-quality').textContent=t('previewMissing');});
     image.src=url;surface.append(image);$('viewer-media').append(surface);
   }
+  async function showPreparedVideo(item,epoch,viewerGeneration){
+    const current=()=>!stale(epoch)&&viewerGeneration===state.viewerGeneration&&$('viewer').open;
+    if(!current())return;
+    const media=$('viewer-media');
+    media.replaceChildren();
+    $('viewer-controls').hidden=true;$('viewer-sequence').hidden=true;$('view-help').hidden=true;
+    $('view-quality').textContent=t('videoChecking');
+    function offerRetry(message,retryHeader=null,status=0){
+      if(!current())return;
+      if(state.videoRetryTimer){clearTimeout(state.videoRetryTimer);state.videoRetryTimer=null;}
+      $('view-quality').textContent=t(message);
+      const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('videoRetry');
+      let wait=status===429?5000:0;
+      if(retryHeader!==null){
+        const value=retryHeader.trim();
+        if(/^\d+$/.test(value)){
+          const seconds=Number(value);wait=Number.isSafeInteger(seconds)&&seconds<=Number.MAX_SAFE_INTEGER/1000?seconds*1000:Infinity;
+        }else{
+          const date=Date.parse(value);wait=Number.isFinite(date)?Math.max(0,date-Date.now()):Infinity;
+        }
+      }
+      const readyAt=Date.now()+wait;
+      retry.disabled=wait>0;
+      if(!Number.isFinite(readyAt))retry.textContent=t('videoRetryLater');
+      function unlock(){
+        state.videoRetryTimer=null;
+        if(!current())return;
+        const remaining=readyAt-Date.now();
+        if(remaining<=0)retry.disabled=false;
+        else state.videoRetryTimer=setTimeout(unlock,Math.min(remaining,60000));
+      }
+      if(wait>0&&Number.isFinite(readyAt))state.videoRetryTimer=setTimeout(unlock,Math.min(wait,60000));
+      retry.addEventListener('click',()=>{if(retry.disabled||!current())return;retry.disabled=true;retry.remove();void showPreparedVideo(item,epoch,viewerGeneration);});
+      media.replaceChildren(retry);
+    }
+    const controller=new AbortController();state.controllers.add(controller);state.videoController=controller;
+    const path=safeMediaURL(item.id,'playback');
+    let response;
+    try{
+      response=await fetch(path,{method:'HEAD',credentials:'same-origin',cache:'no-store',redirect:'error',signal:controller.signal});
+    }catch(error){
+      if(error.name!=='AbortError')offerRetry('videoUnavailable');
+      return;
+    }finally{state.controllers.delete(controller);if(state.videoController===controller)state.videoController=null;}
+    if(!current())return;
+    const contentType=(response.headers.get('content-type')||'').split(';',1)[0].trim().toLowerCase();
+    const lengthText=response.headers.get('content-length')||'';
+    const length=Number(lengthText);
+    const validHeaders=response.status===200&&contentType==='video/mp4'&&
+      response.headers.get('cache-control')==='no-store'&&response.headers.get('accept-ranges')==='bytes'&&
+      !response.headers.has('content-range')&&(response.headers.get('content-encoding')||'identity')==='identity'&&
+      /^"[a-f0-9]{64}"$/.test(response.headers.get('etag')||'')&&/^\d+$/.test(lengthText)&&
+      Number.isSafeInteger(length)&&length>0&&length<=32*1024*1024*1024;
+    if(!validHeaders){
+      if(response.status===401||response.status===403){
+        const error=new Error('Prepared playback denied');error.status=response.status;
+        await failure(error,epoch);return;
+      }
+      offerRetry(response.status===404?'videoNotPrepared':response.status===409?'videoChanged':response.status===429?'videoBusy':'videoUnavailable',response.headers.get('retry-after'),response.status);
+      return;
+    }
+    const video=document.createElement('video');video.controls=true;video.preload='metadata';video.playsInline=true;video.setAttribute('aria-label',assetLabel(item));
+    const failedPlayback=()=>{
+      if(!current())return;
+      video.removeEventListener('error',failedPlayback);video.removeEventListener('abort',failedPlayback);
+      video.pause();video.removeAttribute('src');video.load();video.remove();
+      offerRetry('videoInterrupted');
+    };
+    video.addEventListener('error',failedPlayback);video.addEventListener('abort',failedPlayback);
+    video.src=path;media.append(video);$('view-quality').textContent=t('preparedPlayback');
+  }
   function updateFilmstrip(s){
     const strip=$('viewer-filmstrip');strip.setAttribute('aria-label',t('viewFilmstrip'));
     if(s.items.length<2){strip.replaceChildren();return;}
@@ -283,9 +359,18 @@
     $('face-panel').hidden=state.profile?.memberships.find(member=>member.library_id===state.library&&member.available)?.role!=='owner';
     try {
       const detail=await request(libraryPath(`/assets/detail/${item.id}`),{epoch});
-      const [captions,url]=await Promise.all([request(libraryPath(`/assets/${item.id}/captions`),{epoch}),previewURL(item.id,epoch)]);
+      const captions=await request(libraryPath(`/assets/${item.id}/captions`),{epoch});
       if(stale(epoch)||viewerGeneration!==state.viewerGeneration||!$('viewer').open)return;
-      storyState.asset=detail.asset;$('viewer-title').textContent=assetLabel(detail.asset);showPhoto(detail.asset,url);
+      storyState.asset=detail.asset;$('viewer-title').textContent=assetLabel(detail.asset);
+      if(detail.asset.kind==='video') {
+        await showPreparedVideo(detail.asset,epoch,viewerGeneration);
+        if(stale(epoch)||viewerGeneration!==state.viewerGeneration||!$('viewer').open)return;
+      }
+      else {
+        const url=await previewURL(item.id,epoch);
+        if(stale(epoch)||viewerGeneration!==state.viewerGeneration||!$('viewer').open)return;
+        showPhoto(detail.asset,url);
+      }
       if(detail.originals_allowed) { $('original').href=safeMediaURL(item.id,'media',{download:'true'});$('original').hidden=false; }
       if(!captions.items.length) {
         const p=document.createElement('p');p.textContent=t('noCaptions');$('captions').append(p);
@@ -325,7 +410,12 @@
       }
       if(captions.has_more) {const p=document.createElement('p');p.textContent=t('moreCaptions');$('captions').append(p);}
       return true;
-    } catch(error) {if(viewerGeneration===state.viewerGeneration){stopSlideshow();$('view-quality').textContent=t(errorStatus(error));}await failure(error,epoch);return false;}
+    } catch(error) {
+      if(viewerGeneration===state.viewerGeneration&&!stale(epoch)){
+        stopSlideshow();$('view-quality').textContent=t(errorStatus(error));
+      }
+      await failure(error,epoch);return false;
+    }
     finally{if(!stale(epoch)&&viewerGeneration===state.viewerGeneration){sequenceState.busy=false;updateSequence();scheduleSlideshow();}}
   }
   function storyButton(label, action){const button=document.createElement('button');button.type='button';button.className='quiet';button.textContent=t(label);button.addEventListener('click',action);return button;}
