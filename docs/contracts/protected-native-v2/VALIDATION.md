@@ -1,5 +1,40 @@
 # Validation receipt — 2026-09-16
 
+## 2.0.0-candidate.13 — protected prepared playback (2026-09-20)
+
+Local source candidate; deployed candidate.12 and Phone v12 are unchanged.
+Source pin: `1d9248e577947c4b8fea1a1551f11b2f78bc2781`. Schema remains `f2a6d8b4c915`.
+
+All 61 existing captured cases are unchanged; nine new real ASGI cases add provider
+absence, anonymous/foreign refusal, HEAD, member Range/suffix, EOF, original denial
+and source-change refusal (70 total). The source closure additionally pins the
+prepared-video module, fixture MP4, export/launcher/package code and detailed
+prepared-media contract. Default client profiles and unconfigured providers stay off.
+
+Focused tests cover source/hash/receipt export, concurrent DB writes during hashing,
+Range/If-Range, cancellation handoff, first/later corruption, changed source/index,
+revocation between requests and mid-stream, root escape, four-reader limit, privacy,
+closed route inventory, Home compatibility and explicit staging configuration.
+The real oriented-JPEG worker/cache test controls only the reported available RAM:
+the Mac was below the production 4-GiB floor and the first unmodified attempt correctly
+returned 503. The production floor, RSS/deadline/disk controls remain unchanged.
+This synthetic codec test is not Windows resource or service-principal qualification.
+
+Verification on this candidate:
+- Security sweep: 1,009 tests in 200.490 seconds; four Windows-only tests skipped.
+  One failure was the old 55-route expectation in `test_discovery_wiring`; changed
+  to 57 for the new GET/HEAD pair. Its suite plus the full native contract replay
+  then passed: 29 tests in 2.825 seconds. The full sweep was not repeated after this
+  test-only correction. No product-code failures remained.
+- Prepared-video suite: 11 tests, including cancellation and later corruption.
+- Export suite: eight tests, including concurrent database writes while hashing.
+- Extracted immutable 105-file source package smoke passed: seven ASGI checks,
+  19 operator commands, nine database-preparation commands, synthetic data only.
+- Contract verifier: 70 cases, 115 source hashes, seven payload hashes; defaults off.
+
+Windows export/ACL/readability, protected client adoption and physical phone playback
+remain open. No live credentials/media, deployment, worker control or installation.
+
 ## 2.0.0-candidate.12 — readiness repairs (2026-09-19)
 
 Source baseline: `45f2123ad3447213aad68010154a6d14ff3613f9`. Branch: `codex/readiness-deploy-20260919`.

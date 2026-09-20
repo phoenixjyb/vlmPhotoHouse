@@ -1,12 +1,23 @@
-# Protected native profile 2.0.0-candidate.12
+# Protected native profile 2.0.0-candidate.13
 
-Backend source: `45f2123ad3447213aad68010154a6d14ff3613f9`.
+Backend source: `1d9248e577947c4b8fea1a1551f11b2f78bc2781`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+
+## Reissue — 2.0.0-candidate.13 (September 20)
+
+Adds opt-in protected prepared-video GET/HEAD `/assets/{id}/playback?library=...`
+using `library.read` without original grants. The existing account, photo, original,
+story and discovery wire shapes are unchanged. Runtime route count is 57. Existing
+launchers remain unconfigured for prepared playback; no source changes enable it.
+See [Protected prepared media](../../security/PROTECTED_PREPARED_MEDIA.md) for exact
+Range, identity, readiness/error, private export and bounded-resource semantics.
+This is a local candidate, not the September 19 deployed candidate.12.
 
 ## Reissue — 2.0.0-candidate.12 (September 19)
 
@@ -454,7 +465,7 @@ unsatisfiable range with `Content-Range: bytes */N`. Any If-Range causes a full
 200 response. A client requesting a range must handle that without appending
 the full file at a partial offset. A weak ETag is not a content-integrity hash.
 HEAD does not return a body. Original/media readiness is not implied by listing.
-Protected prepared-video playback without an original grant is not implemented.
+Candidate.13 adds separately configured `/playback` for library readers without an original grant; `/media` remains original-only. See the prepared-media contract above.
 
 Authorization and file identity are rechecked before opening media. Revocation
 denies subsequent requests; already-delivered bytes cannot be recalled. Missing
@@ -530,7 +541,7 @@ authorization, deploy code or certify all routes. Important remaining gaps:
    source are outside this bounded mobile adoption.
 3. Invited viewers do not receive originals or write rights. No normal client
    flow grants contributor/original permissions. Prepared video without an
-   original grant requires a separately reviewed contract.
+   original grant uses the opt-in candidate.13 playback contract and private index.
 4. Real-device HTTPS/login/photo/story behavior, Windows service-account cache
    permissions and physical video decoding remain separate acceptance gates.
 5. Version compatibility is manually configured; mismatched deployment/client

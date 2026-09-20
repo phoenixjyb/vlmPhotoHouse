@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.12'
+VERSION = '2.0.0-candidate.13'
 
 
 def capture():
@@ -118,7 +118,7 @@ def capture():
         call('foreign_asset', 'GET', '/assets/detail/201?library=family-a', 401, token=native)
         call('captions', 'GET', '/assets/101/captions?library=family-a', 200, token=native)
 
-        root = env.path.parent
+        root = env.path.parent.resolve()
         originals, derived = root / 'originals', root / 'derived'
         originals.mkdir(); derived.mkdir()
         jpeg = (ROOT / 'tests/security/fixtures/home-8x8.jpg').read_bytes()
@@ -135,6 +135,33 @@ def capture():
             call('display_library_read', 'GET', '/assets/101/display?library=family-a', 200, token=native)
             thumb.unlink()
             call('thumbnail_on_demand', 'GET', '/assets/101/thumbnail?library=family-a', 200, token=native)
+        from app.access.prepared_video import PreparedVideos
+        from app.home_catalog import identity
+        from dataclasses import replace
+        movie = originals/'102.mov'; movie.write_bytes(b'synthetic-original-video')
+        env.mutate('UPDATE assets SET path=? WHERE id=102',(str(movie),))
+        call('playback_without_provider','HEAD','/assets/102/playback?library=family-a',503,token=native)
+        prepared = root/'prepared'; folder = prepared/'102-ready'; folder.mkdir(parents=True)
+        video_bytes = (ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
+        chunk_bytes = json.dumps([hashlib.sha256(video_bytes).hexdigest()]).encode()
+        (folder/'video.mp4').write_bytes(video_bytes); (folder/'video.chunks.json').write_bytes(chunk_bytes)
+        descriptor = dict(state='ready',mime='video/mp4',video_codec='h264',audio_codec=None,
+            width=320,height=180,duration_ms=500,bytes=len(video_bytes),sha256=hashlib.sha256(video_bytes).hexdigest(),
+            chunks_sha256=hashlib.sha256(chunk_bytes).hexdigest())
+        index = root/'protected-videos.json'
+        raw = json.dumps(dict(version=1,assets=[dict(id=102,source_identity=list(identity(movie)),
+            directory=folder.name,video=descriptor)])).encode(); index.write_bytes(raw)
+        provider = PreparedVideos(index,hashlib.sha256(raw).hexdigest(),prepared)
+        env.client.app.state.media_runtime = replace(env.client.app.state.media_runtime,prepared_videos=provider)
+        call('playback_anonymous','GET','/assets/102/playback?library=family-a',401)
+        call('playback_foreign','GET','/assets/201/playback?library=family-a',401,token=native)
+        call('playback_head','HEAD','/assets/102/playback?library=family-a',200,token=native)
+        call('playback_viewer_range','GET','/assets/102/playback?library=family-a',206,token=native,headers={'Range':'bytes=0-15'})
+        call('playback_suffix','GET','/assets/102/playback?library=family-a',206,token=native,headers={'Range':'bytes=-8'})
+        call('playback_range_eof','GET','/assets/102/playback?library=family-a',416,token=native,headers={'Range':'bytes=999999-'})
+        call('playback_original_still_denied','GET','/assets/102/media?library=family-a',401,token=native)
+        movie.write_bytes(b'changed-synthetic-original-video')
+        call('playback_source_changed','GET','/assets/102/playback?library=family-a',409,token=native)
         call('original_without_grant', 'GET', '/assets/101/media?library=family-a', 401, token=native)
         env.mutate('UPDATE access_memberships SET originals=1 WHERE account_id=?', (new_id,))
         call('original_range', 'GET', '/assets/101/media?library=family-a', 206, token=native, headers={'Range': 'bytes=0-15'})
