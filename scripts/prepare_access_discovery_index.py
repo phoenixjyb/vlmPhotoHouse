@@ -85,7 +85,10 @@ def review_json(path):
     if record.st_size > REVIEW_BYTES:
         raise Refused('Review file too large')
     try:
-        raw = path.read_bytes()
+        with path.open('rb') as handle:
+            raw = handle.read(REVIEW_BYTES + 1)
+        if len(raw) > REVIEW_BYTES:
+            raise Refused('Review file too large')
         return json.loads(raw.decode('utf-8'), object_pairs_hook=_unique,
                           parse_constant=_reject_constant)
     except (OSError, UnicodeError, ValueError, RecursionError):
@@ -170,19 +173,24 @@ def _review_ids(value, maximum):
     return tuple(result)
 
 
-def reviewed_index(value, identifier, revision_value, scope, source_digest):
+def reviewed_index(value, identifier, revision_value, scope, source_digest, source):
     """Convert explicit JSON review data through the service's provider types."""
     from app.access.discovery_provider import ReviewedFace, ReviewedPerson, ReviewedPlace
     if type(value) is not dict or set(value) != REVIEW_KEYS:
         raise Refused('Review fields are incomplete')
     if value['library_id'] != identifier or value['source_digest'] != source_digest:
         raise Refused('Review is for a different source')
+    for key in ('indexed_ids', 'pinned_ids', 'people', 'assignments', 'places', 'regions'):
+        if type(value[key]) is not list:
+            raise Refused('Invalid review arrays')
     indexed = _review_ids(value['indexed_ids'], len(scope))
     if not set(indexed) <= set(scope):
         raise Refused('Review scope is not current')
     enabled = value['enabled']
-    if type(enabled) is not list or not enabled or len(set(enabled)) != len(enabled):
+    if type(enabled) is not list or not enabled or any(type(field) is not str for field in enabled):
         raise Refused('Invalid review fields')
+    if len(set(enabled)) != len(enabled):
+        raise Refused('Duplicate review field')
     if any(type(field) is not str or field not in REVIEW_FIELDS for field in enabled) or 'media' not in enabled:
         raise Refused('Invalid review fields')
     source_fields = value['source_fields']
@@ -219,6 +227,13 @@ def reviewed_index(value, identifier, revision_value, scope, source_digest):
             raise Refused('Invalid reviewed region')
         regions.append((_review_string(item[0], 19), _review_string(item[1], 19)))
     from app.access.discovery_provider import ReviewedIndex
+    face_rows = {str(row[0]): (str(row[1]), str(row[2]), row[3]) for row in source['faces']}
+    for assignment in assignments:
+        if face_rows.get(assignment.id) != (assignment.asset_id, assignment.person_id, assignment.source):
+            raise Refused('Reviewed assignment does not match source')
+    assigned_people = {assignment.person_id for assignment in assignments}
+    if any(not person.allow_zero and person.id not in assigned_people for person in people):
+        raise Refused('Reviewed person has no approved assignment')
     return ReviewedIndex(identifier, revision_value, tuple(scope), indexed, source_digest,
                          tuple(people), _review_ids(value['pinned_ids'], 32), tuple(assignments),
                          tuple(places), tuple(regions), tuple(enabled))
@@ -236,7 +251,7 @@ def derive(db, identifier, revision_value, review=None):
         if not scope:
             raise Refused('No visible assets for this library')
         source_digest = d.digest(source)
-    index = (reviewed_index(review, identifier, revision_value, scope, source_digest)
+    index = (reviewed_index(review, identifier, revision_value, scope, source_digest, source)
              if review is not None else
              ReviewedIndex(library_id=identifier, revision=revision_value, scope_ids=scope,
                            indexed_ids=scope, source_digest=source_digest, enabled=ENABLED))
@@ -278,8 +293,8 @@ def main(argv=None):
         completed = True
         print(json.dumps({'command': 'prepare-access-discovery-index', 'completed': True,
                           'existing_database_modified': False, 'library_id': identifier,
-                          'revision': revision_value, 'enabled': list(ENABLED),
-                          'catalog_assets': catalog_assets, 'indexed_assets': catalog_assets,
+                          'revision': revision_value, 'enabled': list(index.enabled),
+                          'catalog_assets': catalog_assets, 'indexed_assets': len(index.indexed_ids),
                           'source_digest': index.source_digest, 'output_sha256': digest,
                           'output_bytes': len(payload)}, sort_keys=True))
         return 0

@@ -151,9 +151,15 @@ class ProducerTests(unittest.TestCase):
 
     def test_explicit_review_enables_people_caption_tags_and_places(self):
         self.write_review()
-        _, out, _ = self.produce()
+        review = json.loads(self.review_path.read_text(encoding='utf-8'))
+        review['indexed_ids'] = ['101', '102', '103']
+        review['regions'] = [['101', '601'], ['103', '601']]
+        self.review_path.write_text(json.dumps(review), encoding='utf-8')
+        _, out, receipt = self.produce()
         _, index = self.artifact(out)
         self.assertEqual(index.enabled, ('people', 'date', 'caption', 'tags', 'locations', 'media'))
+        self.assertEqual(receipt['enabled'], ['people', 'date', 'caption', 'tags', 'locations', 'media'])
+        self.assertEqual(receipt['indexed_assets'], 3)
         service = self.service(index)
         self.assertEqual([item['id'] for item in service.facets(TOKEN, 'family-a', facet='people')['items']], ['301', '302'])
         self.assertEqual([item['id'] for item in service.facets(TOKEN, 'family-a', facet='locations')['items']], ['601'])
@@ -161,6 +167,13 @@ class ProducerTests(unittest.TestCase):
                                        'tags': {'ids': ['501'], 'match': 'any'},
                                        'locations': ['601'], 'caption': 'family'})
         self.assertEqual(self.ids(result), ['103'])
+
+    def test_review_rejects_assignment_not_matching_source_face(self):
+        self.write_review()
+        value = json.loads(self.review_path.read_text(encoding='utf-8'))
+        value['assignments'][0]['id'] = '999'
+        self.review_path.write_text(json.dumps(value), encoding='utf-8')
+        self.refuse()
 
     def test_review_requires_explicit_native_caption_and_tag_declarations(self):
         self.write_review(source_fields={})
