@@ -1,5 +1,5 @@
 """Synthetic-only isolated process for the actual standalone queue runner."""
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import importlib.util
 import json
 from pathlib import Path
@@ -127,7 +127,7 @@ with ExitStack() as guards:
         result = worker.run(args)
         assert result['drained']
 
-with sqlite3.connect(database) as db:
+with closing(sqlite3.connect(database)) as db:
     assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[3],)).fetchone()==('finished' if supervisor_path else 'pending',)
     assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[4],)).fetchone()==('pending',)
     assert db.execute('SELECT count(*) FROM tasks').fetchone()[0]==(2 if mode=='idle' else 3)

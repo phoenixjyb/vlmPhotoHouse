@@ -1,12 +1,54 @@
-# Protected native profile 2.0.0-candidate.11
+# Protected native profile 2.0.0-candidate.14
 
-Backend source: `4674685cae782827cec6604ade1811e8e7ce23eb`.
+Backend source: `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
+
+
+## Reissue — 2.0.0-candidate.14 (September 20)
+
+Adds the optional protected gallery query `media=all|image|video` to
+`GET /assets?library=...`. Omitted `media` and explicit `media=all` preserve the
+existing response and ordering. Image/video predicates are applied to both the
+count and page query, so page totals remain correct when matching rows fall beyond
+the first mixed page. Invalid, duplicate and unknown media values return `400`;
+authorization remains the same library-read transaction and original grants are
+unchanged. Eight additive real ASGI captures bring the pack from 70 to 78 cases;
+the original 70 case bodies are byte-identical. No migration, provider, cache or
+client profile change is included.
+
+## Reissue — 2.0.0-candidate.13 (September 20)
+
+Adds opt-in protected prepared-video GET/HEAD `/assets/{id}/playback?library=...`
+using `library.read` without original grants. The existing account, photo, original,
+story and discovery wire shapes are unchanged. Runtime route count is 57. Existing
+launchers remain unconfigured for prepared playback; no source changes enable it.
+See [Protected prepared media](../../security/PROTECTED_PREPARED_MEDIA.md) for exact
+Range, identity, readiness/error, private export and bounded-resource semantics.
+This is a local candidate, not the September 19 deployed candidate.12.
+
+## Reissue — 2.0.0-candidate.12 (September 19)
+
+This repair reissue preserves all **61 captured request/response cases** from candidate.11.
+It fixes offline upload promotion/unassignment compensation when expiry or file errors occur
+following a move, and updates deployment packaging, explicit existing-account migration,
+discovery configuration, test isolation and the archive/restore WebUI. The native account
+transport table below now correctly includes required registration `name` and nullable session
+`display_name`; the breaking change was introduced in candidate.7, not this repair.
+
+The migration head remains `f2a6d8b4c915`. A deployed `d8e5b2f7a904` database still needs the
+reviewed existing-account upgrade. Unchanged wire captures do not waive that upgrade, establish
+Windows deployment, or qualify the new routes absent from those captures. Upload and discovery
+remain explicit operator opt-ins. Client profiles remain off until coordinator adoption.
+
+The source closure has 109 entries; promotion is the only application Python change from
+candidate.11. UI and deployment scripts are shipped in the separately verified staging bundle,
+not the native Python closure. See [VALIDATION.md](VALIDATION.md) and
+[the rollout return](../../security/READINESS_DEPLOYMENT_20260919.md).
 
 ## Reissue — 2.0.0-candidate.11
 
@@ -358,7 +400,7 @@ surrogates or duplicate keys. Account bodies are limited to 2,048 bytes.
 
 | Method/path | Body | Success |
 | --- | --- | --- |
-| POST `/auth/register` | phone, password, code, transport | 201 token |
+| POST `/auth/register` | phone, password, code, name, transport | 201 token |
 | POST `/auth/login` | phone, password, transport | 200 token |
 | GET `/auth/session` | none | 200 profile |
 | POST `/auth/logout` | none | 200 `{ok:true}`; idempotent |
@@ -382,7 +424,9 @@ the invited library with no original-media grant. An existing account accepts
 another invitation through `/auth/invitations/accept` rather than registering again.
 There is no public approval, role promotion or original-grant mutation endpoint.
 
-Profile: `{account_id,phone_login,memberships}`. Each membership has `library_id`,
+Profile: `{account_id,phone_login,display_name,memberships}`. `display_name` may be null
+for an account created before the upload migration; new registration requires `name`.
+Each membership has `library_id`,
 `status`, `role`, numeric `revision`, nullable epoch-second `expires_at`, integer
 `originals` (0/1), and boolean `available`. Use `available`, not merely approved
 status. Revoked library membership can coexist with a valid account session.
@@ -433,7 +477,7 @@ unsatisfiable range with `Content-Range: bytes */N`. Any If-Range causes a full
 200 response. A client requesting a range must handle that without appending
 the full file at a partial offset. A weak ETag is not a content-integrity hash.
 HEAD does not return a body. Original/media readiness is not implied by listing.
-Protected prepared-video playback without an original grant is not implemented.
+Candidate.13 adds separately configured `/playback` for library readers without an original grant; `/media` remains original-only. See the prepared-media contract above.
 
 Authorization and file identity are rechecked before opening media. Revocation
 denies subsequent requests; already-delivered bytes cannot be recalled. Missing
@@ -509,7 +553,7 @@ authorization, deploy code or certify all routes. Important remaining gaps:
    source are outside this bounded mobile adoption.
 3. Invited viewers do not receive originals or write rights. No normal client
    flow grants contributor/original permissions. Prepared video without an
-   original grant requires a separately reviewed contract.
+   original grant uses the opt-in candidate.13 playback contract and private index.
 4. Real-device HTTPS/login/photo/story behavior, Windows service-account cache
    permissions and physical video decoding remain separate acceptance gates.
 5. Version compatibility is manually configured; mismatched deployment/client

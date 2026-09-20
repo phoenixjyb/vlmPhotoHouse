@@ -6,6 +6,7 @@ PhotoHouse, discovers configuration, opens a real database, loads keys, or liste
 Use an isolated CPython 3.12 venv (-I); macOS is explicitly a local-test target only.
 """
 import argparse
+from contextlib import closing
 import hashlib
 import importlib.metadata
 import json
@@ -93,7 +94,7 @@ def capability_checks():
                              n=2**17, r=8, p=1, maxmem=256*1024*1024, dklen=32)
     if len(derived) != 32:
         raise ValueError('KDF cost unsupported')
-    with sqlite3.connect(':memory:') as db:
+    with closing(sqlite3.connect(':memory:')) as db:
         db.execute('PRAGMA foreign_keys=ON')
         db.execute('CREATE TABLE parent(id INTEGER PRIMARY KEY)')
         db.execute('CREATE TABLE child(id INTEGER REFERENCES parent(id))')

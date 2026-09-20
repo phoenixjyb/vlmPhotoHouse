@@ -1,7 +1,8 @@
 # Offline access-schema application
 
 `scripts/apply_access_schema.py` applies only the reviewed additive transition from
-`d2b7e4f6a901` to `d8e5b2f7a904`. It is an operator tool, not an API/startup hook.
+`d2b7e4f6a901` to `f2a6d8b4c915`, or the explicitly selected existing-account
+transition from `d8e5b2f7a904` to `f2a6d8b4c915`. It is an operator tool, not an API/startup hook.
 It creates no account, password, session, library, media mapping or HTTP listener.
 The default operation reviews the selected target and separate backup read-only.
 
@@ -47,6 +48,28 @@ unexpired plan and hidden interactive password confirmation. No password argumen
 stored password file or HTTP bootstrap shortcut is introduced. Do not claim the
 legacy unauthenticated UI is protected merely because access tables now exist.
 Protected serving, legacy route isolation and media mapping remain distinct gates.
+
+## Upgrading an existing protected installation
+
+Use `--from-revision d8e5b2f7a904` for an installation that already has accounts.
+The default remains the original pre-access transition and refuses such a database.
+The explicit upgrade preserves every pre-existing table and column value, including
+password hashes, sessions, invitations, memberships, admission keys and media mappings.
+It adds nullable `display_name` and empty upload provenance; it creates no grants and
+does not enable uploads. Synthetic tests cover the actual old shape without the name
+column, full logical preservation, repeated/stale/running-task refusal and rollback
+of both DDL and an injected account mutation.
+
+The same stopped-writer, fresh matching backup, exclusive transaction and preservation
+checks apply. Do not use `migrate-candidate` or the recovery rehearsal as the production
+upgrade: those workflows deliberately quarantine authentication state.
+
+The rollout must also stage a caption worker that admits the new revision and update
+its reviewed `expected_revision` configuration and launcher pins before restarting it.
+Restoring only the old API payload after migration will fail its old schema gate.
+Retain the previous payload/configuration and stopped-boundary database backup together;
+after writes resume, restoring that database would lose those writes and requires a
+separate recovery decision. Windows qualification remains a distinct deployment check.
 
 Tests use only synthetic catalogs and cover default read-only behavior, successful
 preservation, empty grants, refused running/WAL/stale/repeated targets, explicit

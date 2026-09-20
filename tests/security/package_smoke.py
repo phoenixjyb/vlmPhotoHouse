@@ -18,8 +18,14 @@ with ExitStack() as guards:
     from app.access.runtime import RuntimeConfiguration, REQUIRED_REVISION
     import provision_access
     import staging_app
+    import export_protected_videos
+    import app.access.prepared_video as prepared_video
     import prepare_access_database
-    for module in (app,provision_access,staging_app,prepare_access_database):
+    from app.access import (captions, duplicates, promotion, task_recovery,
+                            upload, upload_schema, upload_transport)
+    for module in (app,provision_access,staging_app,prepare_access_database,export_protected_videos,prepared_video,
+                   captions, duplicates, promotion, task_recovery,
+                   upload, upload_schema, upload_transport):
         assert Path(module.__file__).resolve().is_relative_to(root)
     with tempfile.TemporaryDirectory(prefix='photohouse-package-db-') as directory:
         data=Path(directory).resolve(); database=data/'synthetic.sqlite'

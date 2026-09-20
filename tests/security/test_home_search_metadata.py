@@ -1,3 +1,4 @@
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -29,7 +30,7 @@ class MetadataTests(unittest.TestCase):
         self.assertFalse(receipt['media_copied']);self.assertFalse(receipt['activated'])
         self.assertEqual(before,{p:p.read_bytes() for p in self.root.rglob('*') if p.is_file()})
     def test_conflicts_are_excluded_and_unreviewed_people_remain_absent(self):
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.execute("INSERT INTO captions VALUES(5,101,'Other active caption',0,0)")
             c.execute("INSERT INTO asset_tags VALUES(6,101,302,'img')")
         raw,r=self.build();a=json.loads(raw)['assets'][0]
@@ -38,10 +39,10 @@ class MetadataTests(unittest.TestCase):
     def test_hidden_scope_and_resource_budget_refuse(self):
         with patch.object(export,'MAX_ROWS',2):
             with self.assertRaisesRegex(ValueError,'row_budget'): self.build()
-        with sqlite3.connect(self.db) as c:c.execute("UPDATE assets SET status='hidden' WHERE id=101")
+        with closing(sqlite3.connect(self.db)) as c, c:c.execute("UPDATE assets SET status='hidden' WHERE id=101")
         with self.assertRaisesRegex(ValueError,'hidden_selected'): self.build()
     def test_roster_overflow_disables_whole_tag_capability_without_truncation(self):
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.executemany('INSERT INTO tags VALUES(?,?,?)',[(i,'Synthetic '+str(i),'scene') for i in range(1000,6001)])
             c.executemany('INSERT INTO asset_tags VALUES(?,?,?,?)',[(i,101,i,'manual') for i in range(1000,6001)])
         raw,r=self.build();v=json.loads(raw)
@@ -51,7 +52,7 @@ class MetadataTests(unittest.TestCase):
     def test_tag_lookup_exports_full_roster_above_legacy_limit(self):
         catalog=json.loads(self.catalog.read_text())
         template=catalog['assets'][0]
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             for aid in range(1000,1060):
                 catalog['assets'].append(dict(template,id=aid))
                 c.execute("INSERT INTO assets(id,status,taken_at) VALUES(?,?,?)",(aid,'active',None))
@@ -67,7 +68,7 @@ class MetadataTests(unittest.TestCase):
         old,_=self.build();self.assertNotIn('tags',json.loads(old)['enabled_filters'])
 
     def test_view_refused(self):
-        with sqlite3.connect(self.db) as c:
+        with closing(sqlite3.connect(self.db)) as c, c:
             c.execute('ALTER TABLE captions RENAME TO originals');c.execute('CREATE VIEW captions AS SELECT * FROM originals')
         with self.assertRaisesRegex(ValueError,'schema_not_table'):self.build()
 if __name__=='__main__':unittest.main()

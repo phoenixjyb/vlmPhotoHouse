@@ -1,8 +1,8 @@
 {
-  "contract_version": "2.0.0-candidate.11",
+  "contract_version": "2.0.0-candidate.14",
   "synthetic_only": true,
   "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
-  "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim",
+  "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim",
   "cases": [
     {
       "id": "anonymous_session",
@@ -669,6 +669,268 @@
       }
     },
     {
+      "id": "gallery_media_default",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 50,
+          "total": 4,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "104",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-03",
+              "thumbnail_url": "/assets/104/thumbnail?library=family-a"
+            },
+            {
+              "id": "105",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02T12:00:00",
+              "thumbnail_url": "/assets/105/thumbnail?library=family-a"
+            },
+            {
+              "id": "102",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02",
+              "thumbnail_url": "/assets/102/thumbnail?library=family-a"
+            },
+            {
+              "id": "101",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-01",
+              "thumbnail_url": "/assets/101/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_media_all",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=all",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 50,
+          "total": 4,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "104",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-03",
+              "thumbnail_url": "/assets/104/thumbnail?library=family-a"
+            },
+            {
+              "id": "105",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02T12:00:00",
+              "thumbnail_url": "/assets/105/thumbnail?library=family-a"
+            },
+            {
+              "id": "102",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02",
+              "thumbnail_url": "/assets/102/thumbnail?library=family-a"
+            },
+            {
+              "id": "101",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-01",
+              "thumbnail_url": "/assets/101/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_media_image",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=image&page=1&page_size=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 1,
+          "total": 2,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "105",
+              "kind": "image",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-02T12:00:00",
+              "thumbnail_url": "/assets/105/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_media_video_page_one",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=video&page=1&page_size=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 1,
+          "page_size": 1,
+          "total": 2,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "104",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-03",
+              "thumbnail_url": "/assets/104/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_media_video_page_two",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=video&page=2&page_size=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "library_id": "family-a",
+          "page": 2,
+          "page_size": 1,
+          "total": 2,
+          "originals_allowed": false,
+          "items": [
+            {
+              "id": "101",
+              "kind": "video",
+              "width": 640,
+              "height": 480,
+              "duration_sec": null,
+              "taken_at": "2026-01-01",
+              "thumbnail_url": "/assets/101/thumbnail?library=family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gallery_media_invalid",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=audio",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid request"
+        }
+      }
+    },
+    {
+      "id": "gallery_media_duplicate",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=image&media=video",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid request"
+        }
+      }
+    },
+    {
       "id": "cached_thumbnail",
       "request": {
         "method": "GET",
@@ -769,6 +1031,191 @@
           "data": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDqaKKK4DE//9k=",
           "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
           "bytes": 632
+        }
+      }
+    },
+    {
+      "id": "playback_without_provider",
+      "request": {
+        "method": "HEAD",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": null
+      }
+    },
+    {
+      "id": "playback_anonymous",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "none",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "playback_foreign",
+      "request": {
+        "method": "GET",
+        "path": "/assets/201/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "playback_head",
+      "request": {
+        "method": "HEAD",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "video/mp4",
+          "cache-control": "no-store",
+          "accept-ranges": "bytes"
+        },
+        "body": null
+      }
+    },
+    {
+      "id": "playback_viewer_range",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=0-15"
+        }
+      },
+      "response": {
+        "status": 206,
+        "headers": {
+          "content-type": "video/mp4",
+          "cache-control": "no-store",
+          "content-range": "bytes 0-15/24336",
+          "accept-ranges": "bytes"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "AAAAIGZ0eXBpc29tAAACAA==",
+          "sha256": "9ed32ed8c758438dcb73636d080fa4ffe65b94b8c737e0c3aa5199a3a7fb36b5",
+          "bytes": 16
+        }
+      }
+    },
+    {
+      "id": "playback_suffix",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=-8"
+        }
+      },
+      "response": {
+        "status": 206,
+        "headers": {
+          "content-type": "video/mp4",
+          "cache-control": "no-store",
+          "content-range": "bytes 24328-24335/24336",
+          "accept-ranges": "bytes"
+        },
+        "body": {
+          "encoding": "base64",
+          "data": "d3d3EDZmZuA=",
+          "sha256": "54966ea1d3c74a0c9c2474d60230fdc25a7ca2607743266d8a94bc9074c30e9d",
+          "bytes": 8
+        }
+      }
+    },
+    {
+      "id": "playback_range_eof",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Range": "bytes=999999-"
+        }
+      },
+      "response": {
+        "status": 416,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+          "content-range": "bytes */24336"
+        },
+        "body": {
+          "detail": "Range not satisfiable"
+        }
+      }
+    },
+    {
+      "id": "playback_original_still_denied",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/media?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "playback_source_changed",
+      "request": {
+        "method": "GET",
+        "path": "/assets/102/playback?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 409,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Media changed"
         }
       }
     },
@@ -1696,6 +2143,25 @@
         "method": "GET",
         "path": "/auth/session",
         "credential": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "gallery_media_revoked",
+      "request": {
+        "method": "GET",
+        "path": "/assets?library=family-a&media=video",
+        "credential": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
         "headers": {}
       },
       "response": {

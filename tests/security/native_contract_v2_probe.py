@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.11'
+VERSION = '2.0.0-candidate.14'
 
 
 def capture():
@@ -118,7 +118,23 @@ def capture():
         call('foreign_asset', 'GET', '/assets/detail/201?library=family-a', 401, token=native)
         call('captions', 'GET', '/assets/101/captions?library=family-a', 200, token=native)
 
-        root = env.path.parent
+        # Additive gallery media captures use rows introduced after the existing
+        # gallery cases, so all prior candidate cases retain their exact wire data.
+        env.mutate("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at) VALUES (104,'private-synthetic/104.mp4','private-hash-104','active','video/mp4',640,480,'2026-01-03')")
+        env.mutate("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at) VALUES (105,'private-synthetic/105.jpg','private-hash-105','active','image/jpeg',640,480,'2026-01-02T12:00:00')")
+        env.mutate("INSERT INTO access_asset_libraries VALUES (104,'family-a')")
+        env.mutate("INSERT INTO access_asset_libraries VALUES (105,'family-a')")
+        env.mutate("UPDATE assets SET mime='video/mp4' WHERE id=101")
+        call('gallery_media_default', 'GET', '/assets?library=family-a', 200, token=native)
+        call('gallery_media_all', 'GET', '/assets?library=family-a&media=all', 200, token=native)
+        call('gallery_media_image', 'GET', '/assets?library=family-a&media=image&page=1&page_size=1', 200, token=native)
+        call('gallery_media_video_page_one', 'GET', '/assets?library=family-a&media=video&page=1&page_size=1', 200, token=native)
+        call('gallery_media_video_page_two', 'GET', '/assets?library=family-a&media=video&page=2&page_size=1', 200, token=native)
+        call('gallery_media_invalid', 'GET', '/assets?library=family-a&media=audio', 400, token=native)
+        call('gallery_media_duplicate', 'GET', '/assets?library=family-a&media=image&media=video', 400, token=native)
+        env.mutate("UPDATE assets SET mime='image/jpeg' WHERE id=101")
+
+        root = env.path.parent.resolve()
         originals, derived = root / 'originals', root / 'derived'
         originals.mkdir(); derived.mkdir()
         jpeg = (ROOT / 'tests/security/fixtures/home-8x8.jpg').read_bytes()
@@ -135,6 +151,33 @@ def capture():
             call('display_library_read', 'GET', '/assets/101/display?library=family-a', 200, token=native)
             thumb.unlink()
             call('thumbnail_on_demand', 'GET', '/assets/101/thumbnail?library=family-a', 200, token=native)
+        from app.access.prepared_video import PreparedVideos
+        from app.home_catalog import identity
+        from dataclasses import replace
+        movie = originals/'102.mov'; movie.write_bytes(b'synthetic-original-video')
+        env.mutate('UPDATE assets SET path=? WHERE id=102',(str(movie),))
+        call('playback_without_provider','HEAD','/assets/102/playback?library=family-a',503,token=native)
+        prepared = root/'prepared'; folder = prepared/'102-ready'; folder.mkdir(parents=True)
+        video_bytes = (ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
+        chunk_bytes = json.dumps([hashlib.sha256(video_bytes).hexdigest()]).encode()
+        (folder/'video.mp4').write_bytes(video_bytes); (folder/'video.chunks.json').write_bytes(chunk_bytes)
+        descriptor = dict(state='ready',mime='video/mp4',video_codec='h264',audio_codec=None,
+            width=320,height=180,duration_ms=500,bytes=len(video_bytes),sha256=hashlib.sha256(video_bytes).hexdigest(),
+            chunks_sha256=hashlib.sha256(chunk_bytes).hexdigest())
+        index = root/'protected-videos.json'
+        raw = json.dumps(dict(version=1,assets=[dict(id=102,source_identity=list(identity(movie)),
+            directory=folder.name,video=descriptor)])).encode(); index.write_bytes(raw)
+        provider = PreparedVideos(index,hashlib.sha256(raw).hexdigest(),prepared)
+        env.client.app.state.media_runtime = replace(env.client.app.state.media_runtime,prepared_videos=provider)
+        call('playback_anonymous','GET','/assets/102/playback?library=family-a',401)
+        call('playback_foreign','GET','/assets/201/playback?library=family-a',401,token=native)
+        call('playback_head','HEAD','/assets/102/playback?library=family-a',200,token=native)
+        call('playback_viewer_range','GET','/assets/102/playback?library=family-a',206,token=native,headers={'Range':'bytes=0-15'})
+        call('playback_suffix','GET','/assets/102/playback?library=family-a',206,token=native,headers={'Range':'bytes=-8'})
+        call('playback_range_eof','GET','/assets/102/playback?library=family-a',416,token=native,headers={'Range':'bytes=999999-'})
+        call('playback_original_still_denied','GET','/assets/102/media?library=family-a',401,token=native)
+        movie.write_bytes(b'changed-synthetic-original-video')
+        call('playback_source_changed','GET','/assets/102/playback?library=family-a',409,token=native)
         call('original_without_grant', 'GET', '/assets/101/media?library=family-a', 401, token=native)
         env.mutate('UPDATE access_memberships SET originals=1 WHERE account_id=?', (new_id,))
         call('original_range', 'GET', '/assets/101/media?library=family-a', 206, token=native, headers={'Range': 'bytes=0-15'})
@@ -189,9 +232,13 @@ def capture():
         call('login_rate_limited', 'POST', '/auth/login', 429, body=login_body)
         env.now += 86401
         call('expired_session', 'GET', '/auth/session', 401, token=logged['access_token'])
+        env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?",
+                   (fixture.LibraryReadTests.member_id,))
+        call('gallery_media_revoked', 'GET', '/assets?library=family-a&media=video', 401,
+             token=env.member_token)
         return {'contract_version': VERSION, 'synthetic_only': True,
                 'normalization': 'random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator',
-                'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim',
+                'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim',
                 'cases': normalize(cases)}
     finally:
         env.doCleanups()

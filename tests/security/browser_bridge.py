@@ -3,7 +3,9 @@
 Only run from the browser security test. All storage lives in temporary fixtures.
 """
 import base64
+import hashlib
 import json
+import shutil
 from pathlib import Path
 import sys
 
@@ -126,6 +128,48 @@ try:
                 (derived/'thumbnails/1024').mkdir(parents=True,exist_ok=True)
                 image=Image.open(derived/'thumbnails/256/101.jpg')
                 image.resize((1024,768)).save(derived/'thumbnails/1024/101.jpg')
+            elif scenario=='missing-caption':
+                # Add the same active, undescribed photo used by the caption-write
+                # contract so the browser can exercise the real positive form path.
+                from PIL import Image
+                with fixture.connection() as db:
+                    db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                        VALUES(104,'private-synthetic/104.jpg','private-hash-104','active','image/jpeg',
+                               640,480,'2026-01-04')''')
+                    db.execute("INSERT INTO access_asset_libraries VALUES (104,'family-a')")
+                    db.commit()
+                with Image.open(derived/'thumbnails/256/101.jpg') as image:
+                    image.save(derived/'thumbnails/256/104.jpg')
+            elif scenario=='prepared-video-unavailable':
+                # Synthetic video row for the WebUI contract: the default browser app has
+                # no prepared provider configured, so playback must remain visibly unavailable
+                # and must never fall back to the original path.
+                with fixture.connection() as db:
+                    db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                        VALUES(105,'private-synthetic/105.mp4','private-video-hash-105','active','video/mp4',640,360,'2027-01-01')''')
+                    db.execute("INSERT INTO access_asset_libraries VALUES (105,'family-a')")
+                    db.commit()
+                (originals/'105.mp4').write_bytes(b'ftyp synthetic protected-video fixture')
+                fixture.mutate('UPDATE assets SET path=? WHERE id=105',(str(originals/'105.mp4'),))
+                Image.open(derived/'thumbnails/256/101.jpg').save(derived/'thumbnails/256/105.jpg')
+            elif scenario=='prepared-video-ready':
+                from app.access.media import MediaRuntime
+                from app.access.prepared_video import PreparedVideos
+                raw=Path(__file__).resolve().parent/'fixtures'/'home-video.mp4'
+                source=originals/'105.mp4';shutil.copyfile(raw,source)
+                fixture.mutate('UPDATE assets SET path=?,hash_sha256=? WHERE id=105',(str(source),hashlib.sha256(source.read_bytes()).hexdigest()))
+                prepared_root=(derived.parent/'prepared-videos-root').resolve();prepared_root.mkdir(parents=True,exist_ok=True)
+                folder=(prepared_root/'asset-105').resolve();folder.mkdir(parents=True,exist_ok=True)
+                output=folder/'video.mp4';shutil.copyfile(raw,output)
+                digest=hashlib.sha256(output.read_bytes()).hexdigest();chunks=[digest]
+                chunk_file=folder/'video.chunks.json';chunk_raw=json.dumps(chunks,separators=(',',':')).encode();chunk_file.write_bytes(chunk_raw)
+                info=source.stat();video_raw=output.read_bytes()
+                metadata={'state':'ready','mime':'video/mp4','video_codec':'h264','audio_codec':'aac','width':320,'height':180,'duration_ms':1000,'bytes':len(video_raw),'sha256':digest,'chunks_sha256':hashlib.sha256(chunk_raw).hexdigest()}
+                index_value={'version':1,'assets':[{'id':105,'source_identity':[info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns],'directory':folder.name,'video':metadata}]}
+                index_raw=json.dumps(index_value,separators=(',',':')).encode();index=(derived.parent/'prepared-video-index.json').resolve();index.write_bytes(index_raw)
+                fixture.client.close();fixture.client=build_client()
+                provider=PreparedVideos(index,hashlib.sha256(index_raw).hexdigest(),prepared_root)
+                fixture.client.app.state.media_runtime=MediaRuntime((originals,),derived,prepared_videos=provider)
             elif scenario=='many-assets':
                 # Grows family-a past one gallery page at page_size 24. taken_at keeps
                 # 102/101 ahead of the new rows, so page 1 order is unchanged.

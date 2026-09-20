@@ -18,7 +18,7 @@ existing deployment gains a write surface by accident.
   unassigned upload is unservable by construction rather than by an authorization check.
 - **Type comes from the leading bytes, not the declared filename.** Only JPEG and PNG are
   accepted, because the protected renderer supports those two. A per-file byte cap and a
-  decoded-pixel cap are enforced before anything is written, from a bounded header parse with no
+  header-declared pixel cap are enforced before anything is written, from a bounded header parse with no
   decoder for a decompression bomb to target.
 - **Provenance** is recorded per upload (account, label, batch, original name, SHA-256, bytes) and
   an audit row is written. Dedup is scoped to the uploader's own incoming uploads, so a hash that

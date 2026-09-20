@@ -24,6 +24,9 @@ FILES = tuple(sorted([
         'boundary','service','bootstrap','stories','story_schema','people','management_schema','albums','management_import','face_jobs',
         'ownership_repair','tags',
         'discovery','discovery_provider','discovery_transport','discovery_index')),
+    *('backend/app/access/'+name+'.py' for name in (
+        'upload','upload_schema','upload_transport','duplicates','captions',
+        'promotion','task_recovery')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -39,6 +42,8 @@ FILES = tuple(sorted([
     'scripts/check_access_environment.py', 'scripts/rehearse_fullsize_database.py',
     'scripts/apply_access_schema.py', 'docs/security/SCHEMA_APPLICATION.md',
     'backend/app/photo_delivery.py', 'backend/app/home_feed.py',
+    'backend/app/home_catalog.py', 'backend/app/access/prepared_video.py',
+    'scripts/export_protected_videos.py', 'docs/security/PROTECTED_PREPARED_MEDIA.md',
     'scripts/home_media_worker.py', 'scripts/home_preparation_resources.py',
     'backend/requirements-home-preparation.lock',
     'docs/security/ON_DEMAND_MEDIA.md',

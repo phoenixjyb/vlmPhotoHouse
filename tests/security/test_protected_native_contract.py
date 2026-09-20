@@ -57,6 +57,24 @@ class ProtectedNativeContractTests(unittest.TestCase):
         self.assertEqual(self.cases['original_if_range_full']['response']['status'], 200)
         self.assertEqual(self.body('original_if_range_full')['bytes'], len(data))
 
+    def test_prepared_video_keeps_originals_denied_and_source_bound(self):
+        self.assertEqual(self.cases['playback_head']['response']['status'],200)
+        self.assertEqual(self.cases['playback_viewer_range']['response']['status'],206)
+        self.assertEqual(self.cases['playback_original_still_denied']['response']['status'],401)
+        self.assertEqual(self.cases['playback_source_changed']['response']['status'],409)
+        self.assertEqual(self.cases['playback_without_provider']['response']['status'],503)
+
+    def test_gallery_media_filter_cases_preserve_default_and_scope(self):
+        default = self.body('gallery_media_default')
+        explicit = self.body('gallery_media_all')
+        self.assertEqual(default, explicit)
+        self.assertEqual((self.body('gallery_media_image')['total'],
+                          self.body('gallery_media_video_page_one')['total']), (2, 2))
+        self.assertEqual([item['id'] for item in self.body('gallery_media_video_page_two')['items']], ['101'])
+        self.assertEqual(self.cases['gallery_media_invalid']['response']['status'], 400)
+        self.assertEqual(self.cases['gallery_media_duplicate']['response']['status'], 400)
+        self.assertEqual(self.cases['gallery_media_revoked']['response']['status'], 401)
+
     def test_read_only_story_pages_conflicts_and_retry_semantics(self):
         first, second = self.body('story_list_page_one'), self.body('story_list_page_two')
         self.assertEqual((len(first['items']), len(second['items'])), (5, 1))

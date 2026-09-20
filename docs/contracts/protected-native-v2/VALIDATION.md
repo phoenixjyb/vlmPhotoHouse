@@ -1,4 +1,87 @@
-# Validation receipt — 2026-09-16
+# Validation receipt — 2026-09-20
+
+## 2.0.0-candidate.14 — protected gallery media filter (2026-09-20)
+
+Local source candidate at `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`. The gallery adds optional `media=all|image|video`
+filtering while preserving the omitted/default response and existing ordering.
+Filtering is parameterized and applied to both count and page queries after the
+same authorization transaction. Duplicate, unknown and malformed values return
+`400`; foreign, inactive and revoked rows remain excluded.
+
+Verification on this candidate:
+- Focused suites: 27 passed, 1 deselected using the existing Mac venv at
+  `fullsize-migration-preparation/.venv`.
+- Native probe regenerated 78 real synthetic ASGI cases: all 70 candidate.13
+  cases are unchanged, with eight additive default/image/video/invalid/duplicate/
+  revoked gallery captures.
+- Python compilation and diff whitespace checks passed. The contract verifier
+  passes with 78 cases, 116 source hashes and seven payload hashes.
+
+No live DB, service, deployment, credentials, client adoption or device/physical
+playback evidence is claimed.
+
+## 2.0.0-candidate.13 — protected prepared playback (2026-09-20)
+
+Local source candidate; deployed candidate.12 and Phone v12 are unchanged.
+Source pin: `1d9248e577947c4b8fea1a1551f11b2f78bc2781`. Schema remains `f2a6d8b4c915`.
+
+All 61 existing captured cases are unchanged; nine new real ASGI cases add provider
+absence, anonymous/foreign refusal, HEAD, member Range/suffix, EOF, original denial
+and source-change refusal (70 total). The source closure additionally pins the
+prepared-video module, fixture MP4, export/launcher/package code and detailed
+prepared-media contract. Default client profiles and unconfigured providers stay off.
+
+Focused tests cover source/hash/receipt export, concurrent DB writes during hashing,
+Range/If-Range, cancellation handoff, first/later corruption, changed source/index,
+revocation between requests and mid-stream, root escape, four-reader limit, privacy,
+closed route inventory, Home compatibility and explicit staging configuration.
+The real oriented-JPEG worker/cache test controls only the reported available RAM:
+the Mac was below the production 4-GiB floor and the first unmodified attempt correctly
+returned 503. The production floor, RSS/deadline/disk controls remain unchanged.
+This synthetic codec test is not Windows resource or service-principal qualification.
+
+Verification on this candidate:
+- Security sweep: 1,009 tests in 200.490 seconds; four Windows-only tests skipped.
+  One failure was the old 55-route expectation in `test_discovery_wiring`; changed
+  to 57 for the new GET/HEAD pair. Its suite plus the full native contract replay
+  then passed: 29 tests in 2.825 seconds. The full sweep was not repeated after this
+  test-only correction. No product-code failures remained.
+- Prepared-video suite: 11 tests, including cancellation and later corruption.
+- Export suite: eight tests, including concurrent database writes while hashing.
+- Extracted immutable 105-file source package smoke passed: seven ASGI checks,
+  19 operator commands, nine database-preparation commands, synthetic data only.
+- Contract verifier: 70 cases, 115 source hashes, seven payload hashes; defaults off.
+
+Windows export/ACL/readability, protected client adoption and physical phone playback
+remain open. No live credentials/media, deployment, worker control or installation.
+
+## 2.0.0-candidate.12 — readiness repairs (2026-09-19)
+
+Source baseline: `45f2123ad3447213aad68010154a6d14ff3613f9`. Branch: `codex/readiness-deploy-20260919`.
+The 61 ASGI captures were regenerated and their case arrays compared exactly with
+candidate.11: no changed, added or removed cases. Only version metadata changes.
+Migration head remains `f2a6d8b4c915`; source closure remains 109 entries.
+
+Fresh synthetic evidence: 39 deployment configuration/migration checks and 46
+promotion/transfer checks pass. Chromium completes **53 checkpoints**, including
+people photos, exact duplicates, writing an absent caption, and visible album
+archive/restore. Rendered archive and saved-caption screenshots were inspected.
+The harness models Fetch Metadata for its pipe transport; it proves no real
+network header emission, Windows ACL behavior, phone or TV acceptance.
+
+The whole-suite result and immutable package hashes are recorded in
+[the rollout return](../../security/READINESS_DEPLOYMENT_20260919.md). Two historical
+process-inspection errors do not reproduce in this environment. The order-dependent
+exception mismatch was repaired at the originating reload test; traced synthetic
+SQLite leaks were fixed without suppressing their warnings.
+
+Windows was subsequently woken on owner instruction and the prepared rollout completed;
+see [the Windows return](../../security/WINDOWS_READINESS_ROLLOUT_20260919.md).
+The existing account data was preserved through migration. No model, media or client
+profile was changed. Existing Android candidate.1 registration is incompatible with
+the required name field until the client adopts it. Authenticated/device acceptance
+remains separate from the recorded native and public transport checks.
+
 
 ## 2.0.0-candidate.11 — reissue after the album archive slice (2026-09-18)
 

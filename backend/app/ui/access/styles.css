@@ -12,6 +12,8 @@
 #viewer-media.dragging{cursor:grabbing}
 .viewer-surface{position:relative;overflow:hidden;min-width:100%;min-height:100%}
 #viewer-media .viewer-surface img{position:absolute;display:block;max-width:none;max-height:none;width:auto;object-fit:fill;user-select:none;-webkit-user-drag:none}
+#viewer-media video{width:100%;height:100%;max-height:none;object-fit:contain;background:#1f1b18}
+#viewer-media>button{display:block;margin:1rem auto}
 #photo-viewer:fullscreen{display:flex;flex-direction:column;background:var(--paper);padding:16px;width:100%;height:100%;overflow:auto}
 #photo-viewer:fullscreen #viewer-media{flex:1;min-height:100px;height:auto}
 #photo-viewer:fullscreen .fine{margin:5px 0;flex-shrink:0}

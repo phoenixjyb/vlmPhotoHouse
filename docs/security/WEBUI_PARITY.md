@@ -11,8 +11,8 @@ It is a **decided ledger**, not a to-do list. Every legacy capability that is no
 present in the protected UI carries an explicit disposition and the dependency that
 blocks it, so "parity" means a recorded decision rather than a pending question.
 
-Measured counts on this source (`cf5e23b`, refreshed after the discovery wiring slice, its
-contract reissue, the Windows payload upgrade and the caption-worker resume):
+Static route/control counts rechecked on September 19 against the readiness branch.
+Runtime and historical test receipts below are separate evidence:
 
 | Measure | Value | How it was derived |
 | --- | --- | --- |
@@ -21,12 +21,12 @@ contract reissue, the Windows payload upgrade and the caption-worker resume):
 | Protected routes reachable from the protected UI | 44 of 45 | Route static segments matched against `access/app.js` |
 | Legacy control ids | 184 | `id="…"` in `backend/app/ui/index.html` |
 | Protected control ids | 166 | `id="…"` in `backend/app/ui/access/index.html` |
-| Browser suite | 49 checkpoints, exit 0 — **plus 2 unexecuted** | `node tests/security/test_web_browser.cjs`. The photos-of-a-person and duplicate-group checkpoints were written 2026-09-18 but could not be run (no Playwright in that environment), so neither is counted until it passes |
-| Python security suite | 836 collected, 3 errors, 7 skipped | `python -m unittest discover -s tests/security -t tests/security`; the 3 are pre-existing and unrelated (see "Known-red tests") |
+| Browser suite | 53 checkpoints, exit 0 | September 19 Chromium/ASGI synthetic run; includes people photos, duplicates, missing-caption write and album archive/restore |
+| Python security suite | 986 run, 0 failures, 0 errors, 7 skipped | September 19 full unittest run; native Windows and unavailable optional-runtime tests remain separate gates |
 
 **The contract pin is Python-only.** The pinned closure is `backend/app/**/*.py` plus
 `backend/migrations/**/*.py`, `backend/alembic.ini`, the two requirements locks and one test
-JPEG — 97 Python files and no UI asset. `app.js`, `index.html` and `styles.css` are **not**
+JPEG — 109 pinned source entries and no UI asset. `app.js`, `index.html` and `styles.css` are **not**
 pinned, so a slice that changes only the protected UI needs **no reissue**; the date/media
 filter slice below was pin-neutral for exactly that reason. A slice that adds or changes a
 *route* does drift the pin, because routes live in Python.
@@ -55,6 +55,10 @@ discovery_indexes` defaults to empty, and an artifact must be produced offline a
 `validate` and index budget. With no opt-in the routes refuse `503 discovery_unavailable`
 and the UI hides the panel entirely rather than showing a control that cannot work — absence
 of the filter is a deployment state, not an error a member can act on.
+
+Windows source `45f2123` was deployed September 19. Native and public HTTPS checks
+pass; authenticated owner/member and device acceptance remain pending. See the
+[Windows rollout return](WINDOWS_READINESS_ROLLOUT_20260919.md).
 
 ## Dispositions
 
@@ -90,7 +94,7 @@ of the filter is a deployment state, not an error a member can act on.
 
 | Capability | Legacy evidence | Protected status | Disposition |
 | --- | --- | --- | --- |
-| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | member-visible `POST /uploads` → `backend/app/access/upload_transport.py` | **CLOSED as source 2026-09-18** for single-file upload, per `PROTECTED_UPLOAD_CONTRACT.md`. Any approved member may submit; no cap or quota (owner decision), face detection allowed, and bytes land in a **per-member folder under the incoming root** with **no library**, so the photo is invisible to every member until an operator promotes and assigns it. Review is filesystem browsing plus an operator listing; there is deliberately no UI surface that serves an unmapped asset. The route answers `503` until a deployment opts in with an incoming root, and `upload.submit` is enabled in no profile. **Still absent:** multipart, `/ingest/scan`, resumable chunks, cancel of an incomplete item, quotas, and any client adoption. |
+| Upload (single and multipart) and ingest scan | `/assets/upload`, `/assets/upload/multipart`, `/ingest/scan`, `btn-ingest` | member-visible `POST /uploads` → `backend/app/access/upload_transport.py` | **CLOSED as source 2026-09-18** for single-file upload, per `PROTECTED_UPLOAD_CONTRACT.md`. Any approved member may submit; no aggregate quota (owner decision); requests are bounded to 25 MiB and header-declared dimensions to 64 × 1024 × 1024 pixels, face detection allowed, and bytes land in a **per-member folder under the incoming root** with **no library**, so the photo is invisible to every member until an operator promotes and assigns it. Review is filesystem browsing plus an operator listing; there is deliberately no UI surface that serves an unmapped asset. The route answers `503` until a deployment opts in with an incoming root, and `upload.submit` is enabled in no profile. **Still absent:** multipart, `/ingest/scan`, resumable chunks, cancel of an incomplete item, quotas, and any client adoption. |
 | Family Stories on an asset | `/albums/stories` | `assets/{id}/stories`, `/stories/{id}`, `/stories/{id}/history` | **AHEAD** (conflict-safe revisions and retained history) |
 | Caption read | `/assets/{id}/captions` | `assets/{id}/captions` (bounded, read-only) | **PARITY** |
 | Caption edit, delete, regenerate | `PATCH|DELETE /captions/{id}`, `/assets/{id}/captions/regenerate`, `btn-caption-regenerate` | member-visible `POST /assets/{id}/captions` (describe a photo that has none) | **CLOSED 2026-09-18 for filling a gap.** **3,203 of 27,842** active assets carry no caption and **556** caption tasks failed **permanently** on policy validation (283 English policy, 201 Chinese policy, 41 format, 24 word-count), so those photos stay undescribed forever unless the family can write one. The route refuses an asset that already has a caption (409) rather than replacing it, so it cannot take a description away, and writes `user_edited=1`, which the generation and refresh paths already honour rather than overwriting. The actor is recorded in `access_audit`. **Still absent:** replacing or removing an existing caption (so a *wrong* AI description cannot be corrected), `/regenerate`, and any moderation or rate limit. |
@@ -156,30 +160,26 @@ These are intentional and should not be "fixed" toward the legacy behaviour:
   an out-of-range one"*. The page-jump checkpoint runs last because it grows the
   fixture library past one page, which would change what every earlier checkpoint sees.
 
-## Known-red tests
+## Test reconciliation — September 19
 
-The Python suite reports **3 errors** against this source (`962 collected, 3 errors,
-7 skipped` as of the 2026-09-18 slices; it was `836 collected` when this section was written,
-and the *non-passing set* has not changed since). They are errors rather than failures because
-each raises in fixture setup, not in an assertion. All three reproduce at the pre-slice tip in
-a clean control worktree (`794 passed, 3 errors, 7 skipped`; 804 collected), with the *same
-three node ids*, and none touch the WebUI:
+The current suite completes **986 tests, 0 failures, 0 errors, 7 skipped**. The three
+errors reported on September 18 are no longer the current status:
 
-- `test_home_library…test_native_memory_observation_reports_current_process` — sandbox
-  process inspection is unavailable (`/bin/ps` is blocked).
-- `test_home_media_profiles…test_large_baseline_jpeg_is_subsampled…` — environment
-  dependent; same blocked `/bin/ps` resource observation.
-- `test_suppressed_ownership_repair…test_stale_audience_backup_expiry_and_schema_are_refused`
-  — passes in isolation and fails only in full-suite order; a pre-existing order
-  dependence, not a regression.
+- Both native process-observation checks run successfully in this unrestricted Mac
+  environment. They were not disabled or converted into skips.
+- The ownership-repair schema-refusal check failed only after another test reloaded
+  `app.access.runtime`, replacing its exception class. Restoring the identity-bearing
+  symbols after the import-side-effect test fixes the pollution without weakening the
+  refused-schema assertion.
+- SQLite fixture cleanup warnings are tracked separately from assertion outcomes.
+  The traced discovery/export fixtures now explicitly close connections and preserve
+  transaction commits. See the current [readiness return](READINESS_DEPLOYMENT_20260919.md)
+  for final warning and platform qualification limits.
 
-The growth from 804 to 962 collected tests is the discovery wiring slice's loader and wiring
-tests, the discovery-index producer slice's, and then the 2026-09-18 slices — upload, photos of a
-person, duplicate review, caption write and album archive — which added **126** tests between them
-and no new failure. Only `test_suppressed_ownership_repair` passes in isolation and fails in
-full-suite order; the other two fail either way. Because the *non-passing set* is
-identical on both sides, every slice since is behaviour-neutral with respect to everything
-else in the tree.
+The browser suite now runs the previously unexecuted person and duplicate checkpoints.
+Positive caption and archive/restore flows add two checks, for **53** total. They exposed
+and fixed a missing archived-panel toggle loader and a stale empty-caption message after
+save. Rendered synthetic screenshots were inspected; no physical phone/TV result is implied.
 
 ## Closed in the owner-tools slice
 

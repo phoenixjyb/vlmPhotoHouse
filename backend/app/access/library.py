@@ -37,16 +37,21 @@ class LibraryReads:
     def __init__(self, service):
         self.access = service
 
-    def gallery(self, token, library_id, *, page=1, page_size=50):
+    def gallery(self, token, library_id, *, page=1, page_size=50, media='all'):
         if type(page) is not int or not 1 <= page <= 100000 or type(page_size) is not int or not 1 <= page_size <= 100:
             raise ValueError('Invalid pagination')
+        if type(media) is not str or media not in {'all', 'image', 'video'}:
+            raise ValueError('Invalid media')
         with self.access._transaction():
             member = self.access._require(token, library_id, 'library.read')
             db = self.access.db
-            total = db.execute('SELECT count(*)' + SOURCE, (library_id,)).fetchone()[0]
+            media_sql = '' if media == 'all' else ' AND a.mime GLOB ?'
+            media_arg = () if media == 'all' else (media + '/*',)
+            total = db.execute('SELECT count(*)' + SOURCE + media_sql,
+                               (library_id,) + media_arg).fetchone()[0]
             rows = db.execute('SELECT ' + FIELDS + SOURCE +
-                ' ORDER BY a.taken_at DESC,a.id DESC LIMIT ? OFFSET ?',
-                (library_id, page_size, (page - 1) * page_size)).fetchall()
+                media_sql + ' ORDER BY a.taken_at DESC,a.id DESC LIMIT ? OFFSET ?',
+                (library_id,) + media_arg + (page_size, (page - 1) * page_size)).fetchall()
             return {'library_id': library_id, 'page': page, 'page_size': page_size,
                     'total': total, 'originals_allowed': bool(member['originals']),
                     'items': [_asset(row, library_id) for row in rows]}
@@ -122,10 +127,12 @@ def _integer(value, maximum):
 @router.get('/assets')
 async def gallery(request: Request):
     token, _ = credentials_from_request(request, allow_query=True)
-    query = _query(request, {'library', 'page', 'page_size'})
+    query = _query(request, {'library', 'page', 'page_size', 'media'})
+    if query.get('media', 'all') not in {'all', 'image', 'video'}:
+        raise TransportError(400, 'Invalid request')
     result = await run_in_threadpool(_read, _runtime(request, allow_query=True), 'gallery', token,
         query['library'], page=_integer(query.get('page', '1'), 100000),
-        page_size=_integer(query.get('page_size', '50'), 100))
+        page_size=_integer(query.get('page_size', '50'), 100), media=query.get('media', 'all'))
     return JSONResponse(result)
 
 

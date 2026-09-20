@@ -8,6 +8,7 @@ configuration written before member upload existed keeps loading.
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -33,7 +34,28 @@ class StagingConfigurationTests(unittest.TestCase):
     def test_a_configuration_written_before_upload_still_loads(self):
         configuration = s.parse_configuration(base())
         self.assertIsNone(configuration.incoming_root)
+        self.assertEqual(configuration.discovery_indexes, ())
         self.assertEqual(configuration.original_roots, (Path('/synthetic/01_INCOMING'),))
+
+    def test_discovery_paths_reach_runtime_only_when_explicitly_configured(self):
+        path = Path('/synthetic/indexes/family.json')
+        configuration = s.parse_configuration(dict(base(), discovery_indexes=[str(path)]))
+        with patch('app.access.runtime.RuntimeConfiguration') as runtime:
+            app = configuration.build_app()
+        self.assertEqual(runtime.call_args.kwargs['discovery_indexes'], (path,))
+        self.assertIs(app, runtime.return_value.build_app.return_value)
+
+    def test_discovery_artifacts_cannot_overlap_served_or_private_state(self):
+        invalid = (None, 'file.json', ['/synthetic/index.json'] * 2,
+                   [f'/synthetic/index-{n}.json' for n in range(9)],
+                   ['relative.json'], ['/synthetic/01_INCOMING/index.json'],
+                   ['/synthetic/VLM_DATA/derived/index.json'],
+                   ['/synthetic/databases/metadata.sqlite'], ['/synthetic/tls/server.key'],
+                   ['/synthetic/00_MEMBER_UPLOADS/index.json'])
+        for indexes in invalid:
+            with self.subTest(indexes=indexes), self.assertRaises(s.InvalidConfiguration):
+                s.parse_configuration(dict(base(), discovery_indexes=indexes,
+                                           incoming_root='/synthetic/00_MEMBER_UPLOADS'))
 
     def test_the_incoming_root_is_optional_and_accepted_when_present(self):
         configuration = s.parse_configuration(dict(base(), incoming_root='/synthetic/00_MEMBER_UPLOADS'))

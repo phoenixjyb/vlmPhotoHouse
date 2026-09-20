@@ -13,6 +13,22 @@ import build_staging_package as package
 
 
 class StagingPackageTests(unittest.TestCase):
+    def test_runtime_and_operator_import_closure_is_allowlisted(self):
+        required = {
+            'backend/app/access/prepared_video.py',
+            'backend/app/home_catalog.py',
+            'scripts/export_protected_videos.py',
+            'backend/app/access/upload.py',
+            'backend/app/access/upload_schema.py',
+            'backend/app/access/upload_transport.py',
+            'backend/app/access/duplicates.py',
+            'backend/app/access/captions.py',
+            'backend/app/access/promotion.py',
+            'backend/app/access/task_recovery.py',
+            'backend/migrations/versions/f2a6d8b4c915_protected_upload.py',
+        }
+        self.assertTrue(required <= set(package.FILES), required - set(package.FILES))
+
     def test_archive_is_deterministic_complete_and_contains_no_private_discovery(self):
         files={name:('synthetic source '+name).encode() for name in package.FILES}
         first=package.package_bytes('a'*40,files)

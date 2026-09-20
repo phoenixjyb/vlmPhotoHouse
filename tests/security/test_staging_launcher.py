@@ -141,6 +141,26 @@ class StagingLauncherTests(unittest.TestCase):
             self.assertFalse(config.server_options()['proxy_headers'])
             self.assertEqual(config.server_options()['forwarded_allow_ips'], '')
 
+    def test_delivery_paths_require_complete_selection_and_separate_private_storage(self):
+        config = staging_app.parse_configuration(self.value)
+        good = dict(photo_cache=self.root/'photo-cache', prepared_index=self.root/'private-index.json',
+                    prepared_root=self.root/'prepared', prepared_sha256='a'*64)
+        staging_app.delivery_paths(config, **good)
+        for change in ({'prepared_sha256':None}, {'prepared_root':None}, {'prepared_sha256':'bad'},
+                       {'photo_cache':config.derived_root}, {'prepared_root':config.original_roots[0]},
+                       {'prepared_index':good['prepared_root']/'index.json'},
+                       {'photo_cache':config.database}, {'prepared_root':Path('relative')}):
+            with self.subTest(change=change), self.assertRaises(staging_app.InvalidConfiguration):
+                staging_app.delivery_paths(config, **(good|change))
+
+    def test_check_media_flags_neither_loads_index_nor_starts_decoder(self):
+        self.write()
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(staging_app.main(['--config',str(self.path),'--check-config',
+                '--photo-cache',str(self.root/'photo-cache'), '--prepared-index',str(self.root/'index.json'),
+                '--prepared-root',str(self.root/'prepared'), '--prepared-sha256','a'*64]),0)
+        self.assertEqual(list(self.root.iterdir()),[self.path])
+
     def test_mocked_serve_constructs_only_explicit_protected_app_with_tls(self):
         config = staging_app.parse_configuration(self.value)
         server = Mock()

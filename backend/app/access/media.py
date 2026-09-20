@@ -29,6 +29,7 @@ class MediaRuntime:
     original_roots: tuple[Path, ...]
     derived_root: Path
     photo_cache: object = None
+    prepared_videos: object = None
 
     def __post_init__(self):
         if not self.original_roots or any(not isinstance(p, Path) or not p.is_absolute()
@@ -192,71 +193,76 @@ class AuthorizedMediaResponse(Response):
                 media = getattr(self.request.app.state, 'media_runtime', None)
                 if not isinstance(media, MediaRuntime):
                     raise TransportError(503, 'Access unavailable')
-                if self.variant == 'display':
-                    from ..home_feed import Refused
-                    try:
-                        raw = await run_in_threadpool(media.preview_bytes, access, self.token, self.library, self.object_id, 'display')
-                    except Refused as error:
-                        raise TransportError(error.status, 'Photo unavailable') from None
-                    await Response(raw,media_type='image/jpeg',headers=PRIVACY_HEADERS)(scope,receive,send)
-                    return
-                # Deferred until response execution: an earlier route check is never
-                # retained as permission to open a file after logout or revocation.
-                def open_for_response():
-                    return lease.accept(media.open_file(access, self.token, self.library,
-                        self.object_id, self.variant, self.size))
-                try:
-                    opened, info, extension = await run_in_threadpool(open_for_response)
-                except FileNotFoundError:
-                    if self.variant != 'thumbnail' or media.photo_cache is None: raise
-                    from ..home_feed import Refused
-                    try:
-                        raw = await run_in_threadpool(media.preview_bytes, access, self.token, self.library, self.object_id, 'grid')
-                    except Refused as error:
-                        raise TransportError(error.status, 'Photo unavailable') from None
-                    await Response(raw,media_type='image/jpeg',headers=PRIVACY_HEADERS)(scope,receive,send)
-                    return
-                length = info.st_size
-                # Metadata is not a content hash: advertise only a weak validator.
-                # Conditional resume conservatively returns the complete response.
-                etag = 'W/"' + hashlib.sha256(f'{info.st_mtime_ns}:{length}'.encode()).hexdigest() + '"'
-                headers = dict(PRIVACY_HEADERS, **{'Accept-Ranges': 'bytes', 'ETag': etag,
-                    'Content-Length': str(length)})
-                lower, upper, status = 0, length, 200
-                requested, conditional = _single(self.request, 'range'), _single(self.request, 'if-range')
-                if requested is not None and conditional is None:
-                    try:
-                        lower, upper = byte_range(requested, length)
-                    except TransportError as exc:
-                        if exc.status == 416:
-                            exc.content_range = f'bytes */{length}'
-                        raise
-                    status = 206
-                    headers['Content-Range'] = f'bytes {lower}-{upper-1}/{length}'
-                    headers['Content-Length'] = str(upper-lower)
-                mime = MIME.get(extension, 'application/octet-stream')
-                if self.download or mime == 'application/octet-stream':
-                    safe_extension = extension if extension in MIME else '.bin'
-                    headers['Content-Disposition'] = f'attachment; filename="asset-{self.object_id}{safe_extension}"'
-                if scope['method'] == 'HEAD':
-                    response = Response(status_code=status, media_type=mime, headers=headers)
+                if self.variant == 'playback':
+                    response = await self.playback(media, access, lease, scope)
                 else:
-                    await run_in_threadpool(opened.seek, lower)
-                    async def chunks():
-                        remaining = upper - lower
-                        while remaining:
-                            chunk = await run_in_threadpool(opened.read, min(65536, remaining))
-                            if not chunk:
-                                raise RuntimeError('Authorized media changed during response')
-                            remaining -= len(chunk)
-                            yield chunk
-                    response = StreamingResponse(chunks(), status_code=status, media_type=mime, headers=headers)
-                # Headers have not been sent yet. Failures during streaming cannot be
-                # replaced with an error body or accidentally reopen a path.
+                    if self.variant == 'display':
+                        from ..home_feed import Refused
+                        try:
+                            raw = await run_in_threadpool(media.preview_bytes, access, self.token, self.library, self.object_id, 'display')
+                        except Refused as error:
+                            raise TransportError(error.status, 'Photo unavailable') from None
+                        await Response(raw,media_type='image/jpeg',headers=PRIVACY_HEADERS)(scope,receive,send)
+                        return
+                    # Deferred until response execution: an earlier route check is never
+                    # retained as permission to open a file after logout or revocation.
+                    def open_for_response():
+                        return lease.accept(media.open_file(access, self.token, self.library,
+                            self.object_id, self.variant, self.size))
+                    try:
+                        opened, info, extension = await run_in_threadpool(open_for_response)
+                    except FileNotFoundError:
+                        if self.variant != 'thumbnail' or media.photo_cache is None: raise
+                        from ..home_feed import Refused
+                        try:
+                            raw = await run_in_threadpool(media.preview_bytes, access, self.token, self.library, self.object_id, 'grid')
+                        except Refused as error:
+                            raise TransportError(error.status, 'Photo unavailable') from None
+                        await Response(raw,media_type='image/jpeg',headers=PRIVACY_HEADERS)(scope,receive,send)
+                        return
+                    length = info.st_size
+                    # Metadata is not a content hash: advertise only a weak validator.
+                    # Conditional resume conservatively returns the complete response.
+                    etag = 'W/"' + hashlib.sha256(f'{info.st_mtime_ns}:{length}'.encode()).hexdigest() + '"'
+                    headers = dict(PRIVACY_HEADERS, **{'Accept-Ranges': 'bytes', 'ETag': etag,
+                        'Content-Length': str(length)})
+                    lower, upper, status = 0, length, 200
+                    requested, conditional = _single(self.request, 'range'), _single(self.request, 'if-range')
+                    if requested is not None and conditional is None:
+                        try:
+                            lower, upper = byte_range(requested, length)
+                        except TransportError as exc:
+                            if exc.status == 416:
+                                exc.content_range = f'bytes */{length}'
+                            raise
+                        status = 206
+                        headers['Content-Range'] = f'bytes {lower}-{upper-1}/{length}'
+                        headers['Content-Length'] = str(upper-lower)
+                    mime = MIME.get(extension, 'application/octet-stream')
+                    if self.download or mime == 'application/octet-stream':
+                        safe_extension = extension if extension in MIME else '.bin'
+                        headers['Content-Disposition'] = f'attachment; filename="asset-{self.object_id}{safe_extension}"'
+                    if scope['method'] == 'HEAD':
+                        response = Response(status_code=status, media_type=mime, headers=headers)
+                    else:
+                        await run_in_threadpool(opened.seek, lower)
+                        async def chunks():
+                            remaining = upper - lower
+                            while remaining:
+                                chunk = await run_in_threadpool(opened.read, min(65536, remaining))
+                                if not chunk:
+                                    raise RuntimeError('Authorized media changed during response')
+                                remaining -= len(chunk)
+                                yield chunk
+                        response = StreamingResponse(chunks(), status_code=status, media_type=mime, headers=headers)
+                    # Headers have not been sent yet. Failures during streaming cannot be
+                    # replaced with an error body or accidentally reopen a path.
             except AccessDenied:
                 response = JSONResponse({'detail': 'Access denied'}, status_code=401, headers=PRIVACY_HEADERS)
             except TransportError as exc:
                 error_headers = dict(PRIVACY_HEADERS)
+                if exc.status == 429:
+                    error_headers['Retry-After'] = '2'
                 if exc.status == 416:
                     error_headers['Content-Range'] = exc.content_range
                 response = JSONResponse({'detail': exc.message}, status_code=exc.status, headers=error_headers)
@@ -269,10 +275,76 @@ class AuthorizedMediaResponse(Response):
             lease.close()
 
 
+    async def playback(self, media, access, lease, scope):
+        from .prepared_video import PreparedVideos, pin
+        from ..home_catalog import CHUNK_BYTES
+        provider = media.prepared_videos
+
+        def authorize():
+            # Uses library.read, never media.original.read; no original bytes read.
+            source, info, extension = media.open_file(access, self.token, self.library,
+                self.object_id, 'display_source', 256)
+            source.close()
+            if extension not in ('.mp4', '.mov', '.webm'):
+                raise TransportError(404, 'Video unavailable')
+            return pin(info)
+
+        source_pin = await run_in_threadpool(authorize)
+        if not isinstance(provider, PreparedVideos):
+            raise TransportError(503, 'Prepared playback unavailable')
+        # Reject a provider that could expose files from originals/cache trees.
+        roots = (*media.original_roots, media.derived_root)
+        for path in (provider.root, provider.index):
+            if any(path.is_relative_to(root.resolve(strict=True)) or root.resolve(strict=True).is_relative_to(path) for root in roots):
+                raise TransportError(503, 'Prepared playback unavailable')
+        reader, = await run_in_threadpool(lambda: lease.accept((provider.open(self.object_id, source_pin),)))
+        length = reader.meta['bytes']
+        lower, upper, status = 0, length, 200
+        headers = dict(PRIVACY_HEADERS, **{'Accept-Ranges': 'bytes',
+            'ETag': '"' + reader.meta['sha256'] + '"', 'Content-Length': str(length)})
+        requested, conditional = _single(self.request, 'range'), _single(self.request, 'if-range')
+        # Resume only an exact strong validator; otherwise return the full file.
+        if requested is not None and (conditional is None or conditional == headers['ETag']):
+            try:
+                lower, upper = byte_range(requested, length)
+            except TransportError as error:
+                if error.status == 416: error.content_range = f'bytes */{length}'
+                raise
+            status = 206
+            headers.update({'Content-Range': f'bytes {lower}-{upper-1}/{length}', 'Content-Length': str(upper-lower)})
+
+        def checked_chunk(index):
+            if authorize() != source_pin: raise TransportError(409, 'Media changed')
+            data = reader.chunk(index)
+            # Check again after disk/hash work, before bytes can leave this worker.
+            if authorize() != source_pin: raise TransportError(409, 'Media changed')
+            return data
+
+        # Verify the first requested chunk before committing success headers, HEAD
+        # included. Later corruption/revocation aborts streaming; it never falls back.
+        first_index = lower // CHUNK_BYTES
+        first = await run_in_threadpool(checked_chunk, first_index)
+        if scope['method'] == 'HEAD':
+            return Response(status_code=status, media_type='video/mp4', headers=headers)
+
+        async def chunks():
+            nonlocal first
+            index, position = first_index, lower
+            while position < upper:
+                data = first if first is not None else await run_in_threadpool(checked_chunk, index)
+                first = None
+                start = position - index * CHUNK_BYTES
+                count = min(len(data)-start, upper-position)
+                yield data[start:start+count]
+                position += count
+                index += 1
+        return StreamingResponse(chunks(), status_code=status, media_type='video/mp4', headers=headers)
+
+
 def media_response(request, object_id, variant):
     token, _ = credentials_from_request(request, allow_query=True)
     parameters = request.query_params
-    allowed = {'library', 'download'} if variant == 'original' else {'library'} if variant == 'display' else {'library', 'size'}
+    allowed = {'library', 'download'} if variant == 'original' else {'library'} if variant in {'display', 'playback'} else {'library', 'size'}
     if (set(parameters) - allowed or any(len(parameters.getlist(k)) != 1 for k in parameters)
             or not parameters.get('library') or len(parameters['library']) > 128):
         raise TransportError(400, 'Invalid request')
@@ -315,3 +387,9 @@ async def crop(face_id: int, request: Request):
 @router.head('/assets/{asset_id}/display')
 async def display(asset_id: int, request: Request):
     return media_response(request, asset_id, 'display')
+
+
+@router.get('/assets/{asset_id}/playback')
+@router.head('/assets/{asset_id}/playback')
+async def playback(asset_id: int, request: Request):
+    return media_response(request, asset_id, 'playback')

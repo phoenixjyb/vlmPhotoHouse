@@ -31,6 +31,8 @@ let hold=null,abortLogout=false,loseStorySave=false,loseStoryDelete=false;
 let loseFaceSave=false;
 let loseAlbumSave=false;
 let failNextPath=null;
+let failNextPlaybackGet=false;
+const playbackOverrides=[];
 let assignmentPosts=0;
 const external=[],errors=[],checks=[],browserRequests=[];let syntheticFetchMetadata=0;
 function checkpoint(name){checks.push(name);console.log('PASS '+name);}
@@ -58,14 +60,16 @@ async function context(browser){
     }
     delete headers['content-length']; // TestClient recalculates bytes forwarded on the pipe.
     const response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
+    if(request.method()==='HEAD'&&url.pathname==='/assets/105/playback'&&playbackOverrides.length){const override=playbackOverrides.shift();response.status=override.status;response.headers={...response.headers,...override.headers};response.body='';}
     if(failNextPath&&url.pathname===failNextPath){failNextPath=null;await route.abort();return;}
+    if(failNextPlaybackGet&&request.method()==='GET'&&url.pathname==='/assets/105/playback'){failNextPlaybackGet=false;await route.abort();return;}
     if(loseStorySave&&request.method()==='POST'&&url.pathname.endsWith('/stories')){loseStorySave=false;await route.abort();return;}
     if(loseStoryDelete&&request.method()==='DELETE'&&url.pathname.startsWith('/stories/')){loseStoryDelete=false;await route.abort();return;}
     if(request.method()==='POST'&&url.pathname.endsWith('/assignment'))assignmentPosts++;
     if(loseFaceSave&&request.method()==='POST'&&url.pathname.endsWith('/assignment')){loseFaceSave=false;await route.abort();return;}
     if(loseAlbumSave&&request.method()==='POST'&&url.pathname==='/admin/albums'){loseAlbumSave=false;await route.abort();return;}
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
-    const outputHeaders={...response.headers};delete outputHeaders['content-length'];delete outputHeaders['content-encoding'];
+    const outputHeaders={...response.headers};if(request.method()!=='HEAD')delete outputHeaders['content-length'];delete outputHeaders['content-encoding'];
     try {await route.fulfill({status:response.status,headers:outputHeaders,body:Buffer.from(response.body,'base64')});}
     catch(error){if(!/closed|handled|canceled|cancelled|Invalid InterceptionId/.test(error.message))throw error;}
   });
@@ -75,9 +79,9 @@ async function context(browser){
 async function auth(page,phone=MEMBER,code){
   await page.goto('https://photohouse.test/ui');
   await page.locator('#auth').waitFor({state:'visible'});
-  if(code)await page.locator('#register-tab').click();
+  await page.locator(code?'#register-tab':'#login-tab').click();
   await page.locator('#phone').fill(phone);await page.locator('#password').fill(PASSWORD);
-  if(code)await page.locator('#code').fill(code);
+  if(code){await page.locator('#code').fill(code);await page.locator('#name').fill('Synthetic joined member');}
   await page.locator('#auth-submit').click();
   await page.waitForFunction(()=>!document.getElementById('library').hidden||document.getElementById('status').textContent.includes('could not be confirmed')||document.getElementById('status').textContent.includes('unavailable'));
   assert.equal(await page.locator('#library').isVisible(),true,await page.locator('#status').textContent());
@@ -345,7 +349,7 @@ let browser;
   await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='家人新名字');
   await owner.locator('#close-viewer').click();
   checkpoint('New named person remains selectable after removing their last face assignment');
-  await owner.locator('#albums-panel summary').click();await owner.locator('#album-create').click();
+  await owner.locator('#albums-panel > summary').click();await owner.locator('#album-create').click();
   await owner.locator('#album-title').fill('Our seaside trip');await owner.locator('#album-title_zh').fill('全家的海边旅行');
   await owner.locator('#album-description').fill('A weekend together. 一起看海。');await owner.locator('#album-theme').selectOption('trip');
   await owner.locator('#album-choices [data-asset-id="101"]').click();await owner.locator('#album-choices [data-asset-id="102"]').click();
@@ -358,13 +362,24 @@ let browser;
   assert.equal(await owner.locator('#album-title').isDisabled(),true);
   await owner.locator('#album-save').click();await owner.locator('#album-editor').waitFor({state:'hidden'});
   await owner.locator('.album-card').waitFor();assert.equal(await owner.locator('.album-card').count(),1);
-  await page.locator('#albums-panel summary').click();await page.locator('.album-card').waitFor();
+  await page.locator('#albums-panel > summary').click();await page.locator('.album-card').waitFor();
   assert.equal(await page.locator('#album-create').isVisible(),false);assert.equal(await page.getByRole('button',{name:'Edit album',exact:true}).count(),0);
   await page.locator('.album-strip button').first().click();await page.locator('#viewer').waitFor({state:'visible'});await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   assert.equal(await page.locator('#view-position').textContent(),'This album · 1 / 2');
   assert.equal(await page.locator('#view-previous').isDisabled(),true);await page.locator('#view-next').click();await page.locator('.viewer-surface img').evaluate(img=>img.decode());
   assert.match(await page.locator('#viewer-title').textContent(),/101/);assert.equal(await page.locator('#view-next').isDisabled(),true);await page.locator('#close-viewer').click();
   checkpoint('Owner builds a bilingual themed album with ordered photos and cover; creation retry is not duplicated; members can view');
+  owner.once('dialog',dialog=>dialog.accept());
+  await owner.locator('.album-card').getByRole('button',{name:'Put away',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelectorAll('#album-list .album-card').length===0);
+  await owner.locator('#album-archived-panel > summary').click();
+  await owner.locator('.album-archived-card').waitFor();
+  assert.equal(await owner.locator('.album-archived-card h3').textContent(),'Our seaside trip');
+  await owner.locator('#album-archived-panel').screenshot({path:path.join(artifacts,'archived-album.png')});
+  await owner.locator('.album-archived-card').getByRole('button',{name:'Bring back',exact:true}).click();
+  await owner.locator('.album-card').waitFor();
+  assert.equal(await owner.locator('.album-card h3').textContent(),'Our seaside trip');
+  checkpoint('Owner can put an album away and bring it back without losing its photos');
   await owner.getByRole('button',{name:'Edit album',exact:true}).click();await owner.locator('#album-title').fill('Unsaved private draft');
   await owner.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
   assert.equal(await owner.locator('#album-editor').isVisible(),false);assert.equal(await owner.locator('#album-title').count(),0);
@@ -377,7 +392,7 @@ let browser;
   await owner.waitForFunction(()=>document.getElementById('album-editor-status').textContent.includes('Album changed'));
   assert.equal(await owner.locator('#album-save').isDisabled(),true);
   owner.once('dialog',dialog=>dialog.accept());await owner.locator('#album-editor').getByRole('button',{name:'Cancel',exact:true}).click();
-  await owner.locator('#albums-panel summary').click();await owner.locator('#albums-panel summary').click();
+  await owner.locator('#albums-panel > summary').click();await owner.locator('#albums-panel > summary').click();
   await owner.waitForFunction(()=>document.querySelector('.album-card h3')?.textContent==='Changed elsewhere');
   await owner.getByRole('button',{name:'Edit album',exact:true}).click();
   await owner.locator('#album-selected').getByRole('button',{name:'Remove',exact:true}).first().click();
@@ -422,7 +437,7 @@ let browser;
   const cancelled=await owner.locator('#created-code').inputValue();await owner.locator('#cancel-invite').click();
   await owner.locator('#invitation-result').waitFor({state:'hidden'});
   await joined.locator('#logout').click();await joined.locator('#auth').waitFor({state:'visible'});
-  await joined.locator('#register-tab').click();await joined.locator('#phone').fill('+12025550104');await joined.locator('#password').fill(PASSWORD);await joined.locator('#code').fill(cancelled);await joined.locator('#auth-submit').click();
+  await joined.locator('#register-tab').click();await joined.locator('#phone').fill('+12025550104');await joined.locator('#password').fill(PASSWORD);await joined.locator('#name').fill('Cancelled invite member');await joined.locator('#code').fill(cancelled);await joined.locator('#auth-submit').click();
   await joined.waitForFunction(()=>document.getElementById('status').textContent.includes('could not be confirmed'));
   assert.equal(await joined.locator('.asset').count(),0);
   checkpoint('Cancelled invitation cannot register or disclose photos');
@@ -771,6 +786,9 @@ let browser;
   // Closing the person leaves the directory exactly as it was.
   await page.locator('#person-assets h4 button').click();
   await page.waitForFunction(()=>document.querySelectorAll('#person-assets .person-asset-card').length===0);
+  await page.locator('#directory-panel > summary').click();
+  await page.locator('#directory-panel > summary').click();
+  await page.locator('#directory-list .directory-card').first().waitFor();
   assert((await page.locator('#directory-list .directory-card').count())>=1);
   checkpoint('Member opens the photos of a person listed in the directory');
   await page.locator('#directory-panel > summary').click();
@@ -925,8 +943,90 @@ let browser;
   await owner.waitForFunction(()=>document.querySelectorAll('.unassigned-card').length===0);
   await owner.locator('#unassigned-section summary').click();
   checkpoint('Owner works the unassigned-face list and assigns without leaving it');
+  await mutate('missing-caption');
+  await owner.locator('#refresh').click();
+  await owner.locator('.asset').filter({hasText:'104'}).waitFor();
+  await owner.locator('.asset').filter({hasText:'104'}).click();
+  if(await owner.locator('.ai-descriptions').getAttribute('open')===null)
+    await owner.locator('.ai-descriptions > summary').click();
+  await owner.locator('#captions form').waitFor();
+  await owner.locator('#caption-text').fill('Grandma at the beach');
+  await owner.locator('#captions form').getByRole('button',{name:'Save description',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('#captions p[role="status"]')?.textContent==='Saved. Thank you.');
+  assert.equal(await owner.locator('#captions form').count(),0);
+  assert.equal(await owner.locator('#captions p').filter({hasText:'No description is available yet.'}).count(),0);
+  assert.equal(await owner.locator('#captions p').filter({hasText:'Grandma at the beach'}).textContent(),'Grandma at the beach');
+  await owner.locator('#captions').screenshot({path:path.join(artifacts,'saved-caption.png')});
+  await owner.locator('#close-viewer').click();
+  checkpoint('Member can fill an absent caption and the saved text is rendered after the write');
+  await mutate('prepared-video-unavailable');
+  await owner.locator('#refresh').click();
+  await owner.locator('.asset').filter({hasText:'105'}).waitFor();
+  const videoRequestsStart=browserRequests.length;
+  await owner.locator('.asset').filter({hasText:'105'}).click();
+  await owner.waitForFunction(()=>document.getElementById('view-quality').textContent.includes('unavailable'));
+  assert.equal(await owner.locator('#viewer-media video').count(),0);
+  assert.equal(await owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true}).count(),1);
+  const videoRequests=browserRequests.slice(videoRequestsStart);
+  assert(videoRequests.some(item=>item.method==='HEAD'&&item.path==='/assets/105/playback?library=family-a'));
+  assert(!videoRequests.some(item=>item.method==='GET'&&item.path.includes('/assets/105/media')));
+  await owner.screenshot({path:path.join(artifacts,'prepared-video-unavailable.png'),fullPage:true});
+  await owner.locator('#close-viewer').click();
+  const delayedVideo=delayNext(url=>url.pathname==='/assets/105/playback');
+  await owner.locator('.asset').filter({hasText:'105'}).click();await delayedVideo.seen;
+  await owner.locator('#close-viewer').click();delayedVideo.release();await pause(150);
+  assert.equal(await owner.locator('#viewer-media video').count(),0);
+  assert.equal(await owner.locator('#viewer').isVisible(),false);
+  checkpoint('Prepared video performs protected HEAD readiness, shows unavailable without original fallback, and cannot reappear after close');
+  // The same viewer path stays bounded when the readiness HEAD is offline: an
+  // explicit retry can fail again without an unhandled promise or stale DOM write.
+  failNextPath='/assets/105/playback';
+  await owner.locator('.asset').filter({hasText:'105'}).click();
+  await owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true}).waitFor();
+  failNextPath='/assets/105/playback';
+  await owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true}).click();
+  await owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true}).waitFor();
+  await owner.locator('#close-viewer').click();
+  checkpoint('Initial and repeated offline playback retries remain explicit, bounded, and page-error free');
+  await mutate('prepared-video-ready');
+  await owner.locator('#refresh').click();await owner.locator('.asset').filter({hasText:'105'}).click();
+  const video=owner.locator('#viewer-media video');await video.waitFor();
+  await owner.waitForFunction(()=>document.querySelector('#viewer-media video')?.readyState>=1);
+  await video.evaluate(async element=>{element.muted=true;await element.play();});
+  await owner.waitForFunction(()=>document.querySelector('#viewer-media video')?.currentTime>0);
+  const duration=await video.evaluate(element=>element.duration);assert(duration>0);
+  const seekTarget=Math.max(0.05,duration/2);
+  await video.evaluate((element,target)=>new Promise(resolve=>{const finish=()=>resolve();if(Math.abs(target-element.currentTime)<0.02)finish();else element.addEventListener('seeked',finish,{once:true});element.currentTime=target;}),seekTarget);
+  assert(Math.abs(await video.evaluate(element=>element.currentTime)-seekTarget)<0.2);
+  const playbackRequests=browserRequests.slice(videoRequestsStart);
+  assert(playbackRequests.some(item=>item.method==='HEAD'&&item.path==='/assets/105/playback?library=family-a'));
+  assert(playbackRequests.some(item=>item.method==='GET'&&item.path==='/assets/105/playback?library=family-a'));
+  await owner.screenshot({path:path.join(artifacts,'prepared-video-playing.png'),fullPage:true});
+  await owner.locator('#close-viewer').click();
+  checkpoint('Prepared video passes HEAD metadata validation, native decode/play, and seek against synthetic MP4');
+  failNextPlaybackGet=true;await owner.locator('.asset').filter({hasText:'105'}).click();
+  await owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true}).waitFor();
+  assert.equal(await owner.locator('#viewer-media video').count(),0);await owner.locator('#close-viewer').click();
+  checkpoint('Native playback failure releases the video source and offers a fresh retry');
+  const expectPlaybackError=async(status,headers,text)=>{
+    playbackOverrides.push({status,headers});
+    await owner.locator('.asset').filter({hasText:'105'}).click();
+    if(status===401||status===403){await owner.locator('#viewer').waitFor({state:'hidden'});await owner.locator('#library').waitFor({state:'visible'});await owner.locator('#refresh').click();await owner.locator('.asset').first().waitFor();return;}
+    await owner.waitForFunction(value=>document.getElementById('view-quality').textContent.includes(value),text);
+    assert.equal(await owner.locator('#viewer-media video').count(),0);
+    await owner.locator('#close-viewer').click();
+  };
+  await expectPlaybackError(404,{},'not prepared');
+  await expectPlaybackError(409,{},'changed');
+  playbackOverrides.push({status:429,headers:{'Retry-After':'1'}});await owner.locator('.asset').filter({hasText:'105'}).click();
+  const retryButton=owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true});await retryButton.waitFor();assert.equal(await retryButton.isDisabled(),true);await owner.waitForTimeout(1100);assert.equal(await retryButton.isDisabled(),false);await owner.locator('#close-viewer').click();
+  playbackOverrides.push({status:429,headers:{'Retry-After':new Date(Date.now()+3000).toUTCString()}});await owner.locator('.asset').filter({hasText:'105'}).click();
+  const dateRetry=owner.locator('#viewer-media').getByRole('button',{name:'Retry video',exact:true});await dateRetry.waitFor();assert.equal(await dateRetry.isDisabled(),true);await owner.waitForTimeout(3100);assert.equal(await dateRetry.isDisabled(),false);await owner.locator('#close-viewer').click();
+  playbackOverrides.push({status:200,headers:{'content-type':'text/plain'}});await owner.locator('.asset').filter({hasText:'105'}).click();await owner.waitForFunction(()=>document.getElementById('view-quality').textContent.includes('unavailable'));assert.equal(await owner.locator('#viewer-media video').count(),0);await owner.locator('#close-viewer').click();
+  await expectPlaybackError(403,{},'');
+  checkpoint('Prepared playback rejects 404, 409, 429 seconds/date waits, malformed success metadata, and 403 without fallback');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG only'},null,2));
+  fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG/MP4 only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   if(hold){hold=null;}

@@ -21,7 +21,7 @@ FIELDS = {'format_version', 'database', 'web_origin', 'original_roots', 'derived
 # Optional on purpose. A configuration written before member upload existed must keep loading,
 # and an operator who has not created an incoming area must not be forced to invent one: absent
 # means the upload route answers 503 and no deployment gains a write surface by accident.
-OPTIONAL_FIELDS = {'incoming_root'}
+OPTIONAL_FIELDS = {'incoming_root', 'discovery_indexes'}
 PRIVATE_NETWORKS = tuple(map(ipaddress.ip_network,
     ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10',
      '127.0.0.0/8', 'fc00::/7', '::1/128')))
@@ -54,6 +54,7 @@ class StagingConfiguration:
     tls_certificate: Path
     tls_private_key: Path
     incoming_root: Path | None = None
+    discovery_indexes: tuple[Path, ...] = ()
 
     def __post_init__(self):
         try:
@@ -101,6 +102,16 @@ class StagingConfiguration:
                 if any(self.incoming_root.is_relative_to(other) or other.is_relative_to(self.incoming_root)
                        for other in (*media, *files)):
                     raise InvalidConfiguration()
+            if (type(self.discovery_indexes) is not tuple or len(self.discovery_indexes) > 8
+                    or len(set(self.discovery_indexes)) != len(self.discovery_indexes)):
+                raise InvalidConfiguration()
+            protected = (*media, *files, *((self.incoming_root,) if self.incoming_root else ()))
+            for index in self.discovery_indexes:
+                if not isinstance(index, Path) or _path(str(index)) != index:
+                    raise InvalidConfiguration()
+                if any(index.is_relative_to(other) or other.is_relative_to(index)
+                       for other in protected):
+                    raise InvalidConfiguration()
         except (TypeError, ValueError):
             raise InvalidConfiguration() from None
 
@@ -110,7 +121,7 @@ class StagingConfiguration:
         from app.access.runtime import RuntimeConfiguration
         return RuntimeConfiguration(database=self.database, web_origin=self.web_origin,
             original_roots=self.original_roots, derived_root=self.derived_root,
-            incoming_root=self.incoming_root).build_app()
+            incoming_root=self.incoming_root, discovery_indexes=self.discovery_indexes).build_app()
 
     def server_options(self):
         return dict(host=self.bind_host, port=self.port, ssl_certfile=str(self.tls_certificate),
@@ -129,11 +140,15 @@ def parse_configuration(value):
                 or type(value['original_roots']) is not list):
             raise InvalidConfiguration()
         incoming = value.get('incoming_root')
+        indexes = value.get('discovery_indexes', [])
+        if type(indexes) is not list:
+            raise InvalidConfiguration()
         return StagingConfiguration(database=_path(value['database']), web_origin=value['web_origin'],
             original_roots=tuple(_path(p) for p in value['original_roots']),
             derived_root=_path(value['derived_root']), bind_host=value['bind_host'], port=value['port'],
             tls_certificate=_path(value['tls_certificate']), tls_private_key=_path(value['tls_private_key']),
-            incoming_root=None if incoming is None else _path(incoming))
+            incoming_root=None if incoming is None else _path(incoming),
+            discovery_indexes=tuple(_path(p) for p in indexes))
     except (TypeError, ValueError, KeyError):
         raise InvalidConfiguration() from None
 
@@ -161,19 +176,43 @@ def load_configuration(path):
         # A config file must not be reachable as an original or cached image.
         if any(path.is_relative_to(root) for root in (*config.original_roots, config.derived_root)):
             raise InvalidConfiguration()
-        if path in (config.database, config.tls_certificate, config.tls_private_key):
+        if path in (config.database, config.tls_certificate, config.tls_private_key,
+                    *config.discovery_indexes):
             raise InvalidConfiguration()
         return config
     except (OSError, ValueError, UnicodeError, RecursionError):
         raise InvalidConfiguration() from None
 
 
-def serve(config, *, server_run=None, photo_cache=None):
+def delivery_paths(config, photo_cache=None, prepared_index=None, prepared_root=None, prepared_sha256=None):
+    selected = [p for p in (photo_cache, prepared_index, prepared_root) if p is not None]
+    if any(_path(str(p)) != p for p in selected): raise InvalidConfiguration()
+    if any(v is not None for v in (prepared_index, prepared_root, prepared_sha256)):
+        if (prepared_index is None or prepared_root is None or type(prepared_sha256) is not str
+                or not re.fullmatch('[0-9a-f]{64}', prepared_sha256)):
+            raise InvalidConfiguration()
+    protected = (*config.original_roots, config.derived_root, config.database,
+        config.tls_certificate, config.tls_private_key, *config.discovery_indexes,
+        *((config.incoming_root,) if config.incoming_root else ()))
+    for i, path in enumerate(selected):
+        if any(path.is_relative_to(other) or other.is_relative_to(path)
+               for other in (*protected, *selected[i+1:])):
+            raise InvalidConfiguration()
+
+
+def serve(config, *, server_run=None, photo_cache=None, prepared_index=None,
+          prepared_root=None, prepared_sha256=None):
+    delivery_paths(config, photo_cache, prepared_index, prepared_root, prepared_sha256)
     app = config.build_app()
     if photo_cache is not None:
         from dataclasses import replace
         from app.photo_delivery import PhotoCache
         app.state.media_runtime = replace(app.state.media_runtime, photo_cache=PhotoCache(photo_cache))
+    if prepared_index is not None:
+        from dataclasses import replace
+        from app.access.prepared_video import PreparedVideos
+        provider = PreparedVideos(prepared_index, prepared_sha256, prepared_root)
+        app.state.media_runtime = replace(app.state.media_runtime, prepared_videos=provider)
     if server_run is None:
         import uvicorn
         server_run = uvicorn.run
@@ -184,20 +223,25 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--photo-cache', type=Path, help='Opt-in bounded on-demand JPEG cache; separate from originals')
+    parser.add_argument('--prepared-index', type=Path)
+    parser.add_argument('--prepared-root', type=Path)
+    parser.add_argument('--prepared-sha256')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--check-config', action='store_true')
     mode.add_argument('--serve', action='store_true')
     args = parser.parse_args(argv)
     try:
         config = load_configuration(args.config)
-        if args.photo_cache is not None:
-            if not args.photo_cache.is_absolute() or any(args.photo_cache.is_relative_to(p) or p.is_relative_to(args.photo_cache) for p in config.original_roots):
-                raise InvalidConfiguration()
+        delivery_paths(config, args.photo_cache, args.prepared_index, args.prepared_root, args.prepared_sha256)
+        if any(args.config.is_relative_to(p) or p.is_relative_to(args.config)
+               for p in (args.photo_cache, args.prepared_index, args.prepared_root) if p is not None):
+            raise InvalidConfiguration()
         if args.check_config:
             print(json.dumps({'configuration_syntax': 'valid', 'storage_checked': False,
                 'certificate_checked': False, 'network_checked': False, 'listener_started': False}))
         else:
-            serve(config, photo_cache=args.photo_cache)
+            serve(config, photo_cache=args.photo_cache, prepared_index=args.prepared_index,
+                  prepared_root=args.prepared_root, prepared_sha256=args.prepared_sha256)
         return 0
     except InvalidConfiguration:
         print('Invalid staging configuration', file=sys.stderr)

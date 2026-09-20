@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '4674685cae782827cec6604ade1811e8e7ce23eb'
+SOURCE = '1ee1af8d6efb1fac0546bf9013ad4e044aa554e5'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text())
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.11':
+    if manifest['contract_version'] != '2.0.0-candidate.14':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,
@@ -50,9 +50,13 @@ def verify(root=ROOT):
         if '__pycache__' not in path.parts
     }
     expected_sources |= {'tests/security/test_library_reads.py',
+                         'tests/security/test_gallery_media_filter.py',
                          'tests/security/test_access_foundation.py',
                          'tests/security/test_orm_migrations.py',
-                         'tests/security/fixtures/home-8x8.jpg', 'backend/alembic.ini',
+                         'tests/security/fixtures/home-8x8.jpg', 'tests/security/fixtures/home-video.mp4',
+                         'scripts/export_protected_videos.py', 'scripts/staging_app.py',
+                         'scripts/build_staging_package.py', 'docs/security/PROTECTED_PREPARED_MEDIA.md',
+                         'backend/alembic.ini',
                          'scripts/home_media_worker.py', 'backend/requirements-access.lock',
                          'backend/requirements-access-test.lock'}
     if set(manifest['source_sha256']) != expected_sources:
