@@ -93,3 +93,18 @@ preserving inode/size/timestamps; prepared bytes additionally have per-chunk has
 
 Rollback: restore the previous launcher/package and remove the new optional flags.
 No schema migration, original modification or grant change is required.
+
+## Prepared gallery filter (candidate 15)
+
+`GET /assets?library=...&media=prepared_video` lists only active, authorized video
+IDs in the configured immutable prepared index. Filtering precedes counting and
+pagination. It does not probe video bytes, encode files, add permissions or expose
+paths. Membership authorization happens before catalog inspection. No provider
+returns 503; a changed index returns 409 rather than a misleading empty library.
+An empty valid index returns an empty page. Existing all/image/video requests are
+unchanged. This is preparation catalog membership, not a promise of uninterrupted
+playback: source identity, file access, hashes and authorization are rechecked by
+the existing playback route. Clients must still handle its refusal states.
+
+The phone control is a separate off-by-default build option, enabled only after
+candidate 15 is deployed. Earlier configured apps remain compatible.

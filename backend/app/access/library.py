@@ -1,9 +1,11 @@
 """Bounded library reads through the same current account/membership policy.
 
 Only migrated metadata and explicit asset mappings are read. No ORM/configuration,
-filesystem, vector index, model, provider or processing side effects are imported.
+media bytes, vector index, model or processing side effects are imported.
+Optional prepared browsing reads only the pinned catalog identity after authorization.
 """
 from urllib.parse import urlencode
+import json
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -34,24 +36,37 @@ def _asset(row, library_id):
 
 
 class LibraryReads:
-    def __init__(self, service):
+    def __init__(self, service, prepared=None):
         self.access = service
+        self.prepared = prepared
 
     def gallery(self, token, library_id, *, page=1, page_size=50, media='all'):
         if type(page) is not int or not 1 <= page <= 100000 or type(page_size) is not int or not 1 <= page_size <= 100:
             raise ValueError('Invalid pagination')
-        if type(media) is not str or media not in {'all', 'image', 'video'}:
+        if type(media) is not str or media not in {'all', 'image', 'video', 'prepared_video'}:
             raise ValueError('Invalid media')
         with self.access._transaction():
             member = self.access._require(token, library_id, 'library.read')
             db = self.access.db
             media_sql = '' if media == 'all' else ' AND a.mime GLOB ?'
-            media_arg = () if media == 'all' else (media + '/*',)
+            media_arg = () if media == 'all' else (('video' if media == 'prepared_video' else media) + '/*',)
+            if media == 'prepared_video':
+                # Resolve availability only after current library authorization.
+                # This is a pinned preparation catalog, not a playback guarantee:
+                # opening media still checks source identity, bytes and access.
+                from .prepared_video import PreparedVideos
+                if not isinstance(self.prepared, PreparedVideos):
+                    raise TransportError(503, 'Prepared playback unavailable')
+                self.prepared.current()
+                media_sql += ' AND a.id IN (SELECT value FROM json_each(?))'
+                media_arg += (json.dumps(list(self.prepared.entries)),)
             total = db.execute('SELECT count(*)' + SOURCE + media_sql,
                                (library_id,) + media_arg).fetchone()[0]
             rows = db.execute('SELECT ' + FIELDS + SOURCE +
                 media_sql + ' ORDER BY a.taken_at DESC,a.id DESC LIMIT ? OFFSET ?',
                 (library_id,) + media_arg + (page_size, (page - 1) * page_size)).fetchall()
+            if media == 'prepared_video':
+                self.prepared.current()
             return {'library_id': library_id, 'page': page, 'page_size': page_size,
                     'total': total, 'originals_allowed': bool(member['originals']),
                     'items': [_asset(row, library_id) for row in rows]}
@@ -97,11 +112,11 @@ class LibraryReads:
             return result
 
 
-def _read(runtime, action, *args, **kwargs):
+def _read(runtime, action, *args, prepared=None, **kwargs):
     if action not in {'gallery', 'detail', 'captions'}:
         raise AccessDenied('Access denied')
     with runtime.connection_factory() as connection:
-        reads = LibraryReads(AccessService(connection, clock=runtime.clock))
+        reads = LibraryReads(AccessService(connection, clock=runtime.clock), prepared)
         return getattr(reads, action)(*args, **kwargs)
 
 
@@ -128,11 +143,12 @@ def _integer(value, maximum):
 async def gallery(request: Request):
     token, _ = credentials_from_request(request, allow_query=True)
     query = _query(request, {'library', 'page', 'page_size', 'media'})
-    if query.get('media', 'all') not in {'all', 'image', 'video'}:
+    if query.get('media', 'all') not in {'all', 'image', 'video', 'prepared_video'}:
         raise TransportError(400, 'Invalid request')
     result = await run_in_threadpool(_read, _runtime(request, allow_query=True), 'gallery', token,
         query['library'], page=_integer(query.get('page', '1'), 100000),
-        page_size=_integer(query.get('page_size', '50'), 100), media=query.get('media', 'all'))
+        page_size=_integer(query.get('page_size', '50'), 100), media=query.get('media', 'all'),
+        prepared=getattr(getattr(request.app.state, 'media_runtime', None), 'prepared_videos', None))
     return JSONResponse(result)
 
 
