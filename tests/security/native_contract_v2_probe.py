@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.13'
+VERSION = '2.0.0-candidate.14'
 
 
 def capture():
@@ -118,6 +118,22 @@ def capture():
         call('foreign_asset', 'GET', '/assets/detail/201?library=family-a', 401, token=native)
         call('captions', 'GET', '/assets/101/captions?library=family-a', 200, token=native)
 
+        # Additive gallery media captures use rows introduced after the existing
+        # gallery cases, so all prior candidate cases retain their exact wire data.
+        env.mutate("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at) VALUES (104,'private-synthetic/104.mp4','private-hash-104','active','video/mp4',640,480,'2026-01-03')")
+        env.mutate("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at) VALUES (105,'private-synthetic/105.jpg','private-hash-105','active','image/jpeg',640,480,'2026-01-02T12:00:00')")
+        env.mutate("INSERT INTO access_asset_libraries VALUES (104,'family-a')")
+        env.mutate("INSERT INTO access_asset_libraries VALUES (105,'family-a')")
+        env.mutate("UPDATE assets SET mime='video/mp4' WHERE id=101")
+        call('gallery_media_default', 'GET', '/assets?library=family-a', 200, token=native)
+        call('gallery_media_all', 'GET', '/assets?library=family-a&media=all', 200, token=native)
+        call('gallery_media_image', 'GET', '/assets?library=family-a&media=image&page=1&page_size=1', 200, token=native)
+        call('gallery_media_video_page_one', 'GET', '/assets?library=family-a&media=video&page=1&page_size=1', 200, token=native)
+        call('gallery_media_video_page_two', 'GET', '/assets?library=family-a&media=video&page=2&page_size=1', 200, token=native)
+        call('gallery_media_invalid', 'GET', '/assets?library=family-a&media=audio', 400, token=native)
+        call('gallery_media_duplicate', 'GET', '/assets?library=family-a&media=image&media=video', 400, token=native)
+        env.mutate("UPDATE assets SET mime='image/jpeg' WHERE id=101")
+
         root = env.path.parent.resolve()
         originals, derived = root / 'originals', root / 'derived'
         originals.mkdir(); derived.mkdir()
@@ -216,9 +232,13 @@ def capture():
         call('login_rate_limited', 'POST', '/auth/login', 429, body=login_body)
         env.now += 86401
         call('expired_session', 'GET', '/auth/session', 401, token=logged['access_token'])
+        env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?",
+                   (fixture.LibraryReadTests.member_id,))
+        call('gallery_media_revoked', 'GET', '/assets?library=family-a&media=video', 401,
+             token=env.member_token)
         return {'contract_version': VERSION, 'synthetic_only': True,
                 'normalization': 'random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator',
-                'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; no decoder/device claim',
+                'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim',
                 'cases': normalize(cases)}
     finally:
         env.doCleanups()

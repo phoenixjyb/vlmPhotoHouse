@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.13
+# Protected native profile 2.0.0-candidate.14
 
-Backend source: `1d9248e577947c4b8fea1a1551f11b2f78bc2781`.
+Backend source: `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,18 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.14 (September 20)
+
+Adds the optional protected gallery query `media=all|image|video` to
+`GET /assets?library=...`. Omitted `media` and explicit `media=all` preserve the
+existing response and ordering. Image/video predicates are applied to both the
+count and page query, so page totals remain correct when matching rows fall beyond
+the first mixed page. Invalid, duplicate and unknown media values return `400`;
+authorization remains the same library-read transaction and original grants are
+unchanged. Eight additive real ASGI captures bring the pack from 70 to 78 cases;
+the original 70 case bodies are byte-identical. No migration, provider, cache or
+client profile change is included.
 
 ## Reissue — 2.0.0-candidate.13 (September 20)
 

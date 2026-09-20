@@ -1,4 +1,24 @@
-# Validation receipt — 2026-09-16
+# Validation receipt — 2026-09-20
+
+## 2.0.0-candidate.14 — protected gallery media filter (2026-09-20)
+
+Local source candidate at `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`. The gallery adds optional `media=all|image|video`
+filtering while preserving the omitted/default response and existing ordering.
+Filtering is parameterized and applied to both count and page queries after the
+same authorization transaction. Duplicate, unknown and malformed values return
+`400`; foreign, inactive and revoked rows remain excluded.
+
+Verification on this candidate:
+- Focused suites: 27 passed, 1 deselected using the existing Mac venv at
+  `fullsize-migration-preparation/.venv`.
+- Native probe regenerated 78 real synthetic ASGI cases: all 70 candidate.13
+  cases are unchanged, with eight additive default/image/video/invalid/duplicate/
+  revoked gallery captures.
+- Python compilation and diff whitespace checks passed. The contract verifier
+  passes with 78 cases, 116 source hashes and seven payload hashes.
+
+No live DB, service, deployment, credentials, client adoption or device/physical
+playback evidence is claimed.
 
 ## 2.0.0-candidate.13 — protected prepared playback (2026-09-20)
 

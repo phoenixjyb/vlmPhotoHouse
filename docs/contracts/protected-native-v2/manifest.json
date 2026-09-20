@@ -1,22 +1,22 @@
 {
-  "backend_source_commit": "1d9248e577947c4b8fea1a1551f11b2f78bc2781",
-  "case_count": 70,
+  "backend_source_commit": "1ee1af8d6efb1fac0546bf9013ad4e044aa554e5",
+  "case_count": 78,
   "client_profile_defaults": {
     "protected_native_v2": false,
     "protected_photo_display": false,
     "protected_story_read": false
   },
-  "contract_version": "2.0.0-candidate.13",
+  "contract_version": "2.0.0-candidate.14",
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "8f10498aa34dea547781512029f4ac0fe42ae71668dbfacfb96e6de7346ca5c6",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "af5d0853fe67c0106777200a2bdb6ec58cf3bbe00a9e5e2ab78d780d3403853c",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "81b72802c2b2ea1ed0795bd0fc335323110853016acf75958e520f85a11d0936",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "a024980940a1e14473714aa76c380147392f3465122e3a4f4e09895f67da1f8f",
-    "docs/contracts/protected-native-v2/cases.json": "c2561e4c71bc5bbe209d95e73af09e552342d21f28caf5269202b8789aed079a",
-    "scripts/verify_protected_native_contract.py": "ca487d3ca972cdf846e14e3e2c933985bff227cb3234a5132085dd1254ccb006",
-    "tests/security/native_contract_v2_probe.py": "d6685eb8146bcf9c9093121679f054878305898ca580ad0a9dbe7da586249617",
-    "tests/security/test_protected_native_contract.py": "62369f65795c040e8cbce0848129714dd257d7196dfbec1ea267895dd442f24f"
+    "docs/contracts/protected-native-v2/VALIDATION.md": "bb3f74714c7a37f9961c79e4d5aa17af186209c1858c373e44be340292461755",
+    "docs/contracts/protected-native-v2/cases.json": "7e45c49722d32312b68f9ead200ccb2f3f21f38252b9c4d268936c8762bba3d0",
+    "scripts/verify_protected_native_contract.py": "ed8c2a4e5a85151b2dcbbbe11a928df09af6f72e13fcfaee13d658583decb94c",
+    "tests/security/native_contract_v2_probe.py": "d218864addd284e922112180bb9512ee9f0a369bc8266fc1559eabee9dbdd4cb",
+    "tests/security/test_protected_native_contract.py": "b79a8bc7c5b3680c9ed60d673453b11e2a6355f6aa0b27e43b6e6c7c7b0788e7"
   },
   "source_sha256": {
     "backend/alembic.ini": "00797ba09e2df360339fd89185dcc8c08e5434c59e26e723f8804604a74e4768",
@@ -34,7 +34,7 @@
     "backend/app/access/discovery_transport.py": "ea0ed43d6cb79138de3f2ec1c940b4cc615bb2a6ffe0792299b590c51faf9c89",
     "backend/app/access/duplicates.py": "685296fe257e5c3e3c112474ccb831666c7580f5d986a862c40727467a305656",
     "backend/app/access/face_jobs.py": "8a9c8c13dc5280935b39e510462e5518df006e464cb2b006a3d4c1067390db63",
-    "backend/app/access/library.py": "5c280e0047771a43274615b77617f896ef2ef075b4fa3f926ae05bf8c49372fe",
+    "backend/app/access/library.py": "115ae360ceda7c11445c2f7e453ebd10a2e16f80430eec1ca1925dd5039e698c",
     "backend/app/access/management_import.py": "0327e9251b1bda088491ed918eae156ec8fc0cb46cd9fc12c4e7acf1dbcdf0e9",
     "backend/app/access/management_schema.py": "8ad058d760f569e6ecebb4351792109fc1ba52711593afca66910edd95da36ba",
     "backend/app/access/media.py": "cd82fc1896970eccbbff338b2e65e7a6189148a9fb6a1aa0f233dd2324d3042a",
@@ -132,6 +132,7 @@
     "tests/security/fixtures/home-8x8.jpg": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
     "tests/security/fixtures/home-video.mp4": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
     "tests/security/test_access_foundation.py": "ff83fd4736a790319683ae909d5b04cd1a919f4c00d8d0e302c1eeea234e9dae",
+    "tests/security/test_gallery_media_filter.py": "2f0bbf69a5c6cda94e3f279fec3e5931d541b913e96847a9e7dae9d514bc4714",
     "tests/security/test_library_reads.py": "fb506b990d40b44fb29448bc26270389e54c7d28ff5bffcaac3ec830bda64886",
     "tests/security/test_orm_migrations.py": "978d2e73b4c9cda3a6624352d8446f7254617277eddb128af88d5059412d0cdf"
   },
