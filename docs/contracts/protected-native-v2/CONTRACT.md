@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.14
+# Protected native profile 2.0.0-candidate.15
 
-Backend source: `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`.
+Backend source: `789bdf0ca9f69787fa3e5d13db3d666f4931e0a3`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,16 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.15 (September 20)
+
+Adds opt-in `media=prepared_video` gallery filtering against the configured pinned
+prepared index, after library authorization and before count/pagination. Existing
+78 captures are unchanged; eight new captures cover scope, pagination, missing
+provider and invalid queries. Responses retain video asset kind and original
+grants. This is catalog membership, not a fresh decode or source-integrity proof;
+playback revalidates every existing boundary. See the prepared media contract.
+No index is automatically enabled and no schema migration is required.
 
 ## Reissue — 2.0.0-candidate.14 (September 20)
 

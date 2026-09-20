@@ -1,5 +1,15 @@
 # Validation receipt — 2026-09-20
 
+## 2.0.0-candidate.15 — prepared-video browsing
+
+Source `789bdf0ca9f69787fa3e5d13db3d666f4931e0a3`. Thirteen focused gallery tests pass, covering
+prepared pagination/counting, authorization before catalog access, missing and
+changed providers, hidden/foreign assets, and unchanged media filters. The native
+probe captures 86 ASGI exchanges; all 78 prior exchanges are byte-identical.
+Prepared browsing introduces no migration, encoding or original-media permission.
+Runtime activation, expanded index qualification and physical devices remain
+separate gates. Client prepared browsing is opt-in and defaults off.
+
 ## 2.0.0-candidate.14 — protected gallery media filter (2026-09-20)
 
 Local source candidate at `1ee1af8d6efb1fac0546bf9013ad4e044aa554e5`. The gallery adds optional `media=all|image|video`

@@ -75,6 +75,16 @@ class ProtectedNativeContractTests(unittest.TestCase):
         self.assertEqual(self.cases['gallery_media_duplicate']['response']['status'], 400)
         self.assertEqual(self.cases['gallery_media_revoked']['response']['status'], 401)
 
+    def test_prepared_gallery_is_opt_in_scoped_and_counted_before_paging(self):
+        one = self.body('prepared_gallery_page_one')
+        self.assertEqual(one['total'], 1)
+        self.assertEqual([a['id'] for a in one['items']], ['102'])
+        self.assertFalse(one['originals_allowed'])
+        self.assertEqual(self.body('prepared_gallery_page_two')['items'], [])
+        for name in ('prepared_gallery_foreign', 'prepared_gallery_anonymous', 'prepared_gallery_revoked'):
+            self.assertEqual(self.cases[name]['response']['status'], 401)
+        self.assertEqual(self.cases['prepared_gallery_without_provider']['response']['status'], 503)
+
     def test_read_only_story_pages_conflicts_and_retry_semantics(self):
         first, second = self.body('story_list_page_one'), self.body('story_list_page_two')
         self.assertEqual((len(first['items']), len(second['items'])), (5, 1))

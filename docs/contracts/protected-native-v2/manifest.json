@@ -1,22 +1,22 @@
 {
-  "backend_source_commit": "1ee1af8d6efb1fac0546bf9013ad4e044aa554e5",
-  "case_count": 78,
+  "backend_source_commit": "789bdf0ca9f69787fa3e5d13db3d666f4931e0a3",
+  "case_count": 86,
   "client_profile_defaults": {
     "protected_native_v2": false,
     "protected_photo_display": false,
     "protected_story_read": false
   },
-  "contract_version": "2.0.0-candidate.14",
+  "contract_version": "2.0.0-candidate.15",
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "af5d0853fe67c0106777200a2bdb6ec58cf3bbe00a9e5e2ab78d780d3403853c",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "f73308b0dd086b6c2f3debb23319e40c60ab75d8f791564096604d7fe98de1ef",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "81b72802c2b2ea1ed0795bd0fc335323110853016acf75958e520f85a11d0936",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "bb3f74714c7a37f9961c79e4d5aa17af186209c1858c373e44be340292461755",
-    "docs/contracts/protected-native-v2/cases.json": "7e45c49722d32312b68f9ead200ccb2f3f21f38252b9c4d268936c8762bba3d0",
-    "scripts/verify_protected_native_contract.py": "ed8c2a4e5a85151b2dcbbbe11a928df09af6f72e13fcfaee13d658583decb94c",
-    "tests/security/native_contract_v2_probe.py": "d218864addd284e922112180bb9512ee9f0a369bc8266fc1559eabee9dbdd4cb",
-    "tests/security/test_protected_native_contract.py": "b79a8bc7c5b3680c9ed60d673453b11e2a6355f6aa0b27e43b6e6c7c7b0788e7"
+    "docs/contracts/protected-native-v2/VALIDATION.md": "fff66c65c2a6d7106aa38c48b02a741218c8c042eeb31ad6f8398908f7bacf5a",
+    "docs/contracts/protected-native-v2/cases.json": "8440fc84e64685f333d2137006279bdd4824a9e89b22333d29acd3fa882ab597",
+    "scripts/verify_protected_native_contract.py": "052fb92bfeeb88c02e54ee076913a22063a9a0a6e9aa553acd55ce47182e9061",
+    "tests/security/native_contract_v2_probe.py": "f0821db4ba40ccb556e5c6a3cba0c43faea2f96dc039c12cc5f5f3c79ed94ee1",
+    "tests/security/test_protected_native_contract.py": "277055fbabb01e15eff751902319cd6527d405016f15e29965b98ea9665b47e2"
   },
   "source_sha256": {
     "backend/alembic.ini": "00797ba09e2df360339fd89185dcc8c08e5434c59e26e723f8804604a74e4768",
@@ -34,7 +34,7 @@
     "backend/app/access/discovery_transport.py": "ea0ed43d6cb79138de3f2ec1c940b4cc615bb2a6ffe0792299b590c51faf9c89",
     "backend/app/access/duplicates.py": "685296fe257e5c3e3c112474ccb831666c7580f5d986a862c40727467a305656",
     "backend/app/access/face_jobs.py": "8a9c8c13dc5280935b39e510462e5518df006e464cb2b006a3d4c1067390db63",
-    "backend/app/access/library.py": "115ae360ceda7c11445c2f7e453ebd10a2e16f80430eec1ca1925dd5039e698c",
+    "backend/app/access/library.py": "984eb2df49bab0fcd46659bacd6a54be404cb187ca8054a979a48e6d05162243",
     "backend/app/access/management_import.py": "0327e9251b1bda088491ed918eae156ec8fc0cb46cd9fc12c4e7acf1dbcdf0e9",
     "backend/app/access/management_schema.py": "8ad058d760f569e6ecebb4351792109fc1ba52711593afca66910edd95da36ba",
     "backend/app/access/media.py": "cd82fc1896970eccbbff338b2e65e7a6189148a9fb6a1aa0f233dd2324d3042a",
@@ -124,7 +124,7 @@
     "backend/migrations/versions/f4c1a8d2e703_access_admission.py": "79f50add07ed79921745e798f2b905ba0700192d6c23fdd2c82a3c3d26059636",
     "backend/requirements-access-test.lock": "ded98cb724b9ad408683824bab31c249fbf1a905658dbfc90776bce07ce1c1c5",
     "backend/requirements-access.lock": "b4e4e92f67dd3740986494ff3c8cc4b10557fd41329efee030dda03e05897a42",
-    "docs/security/PROTECTED_PREPARED_MEDIA.md": "b802ea1792bdd0a98f491e4f5873cd560606662052c0f2cb149b2736d44b7e8f",
+    "docs/security/PROTECTED_PREPARED_MEDIA.md": "d2cf4f66066f857e09e48d4ee4593f3b4c79843e7fec27ee7269b08b3d84d47d",
     "scripts/build_staging_package.py": "70d576c7ab93e02a8241f7347e3efdc60215791a5ad5f2dc0f6c016c77c888d5",
     "scripts/export_protected_videos.py": "266833d3a450ef90062be3f3324c8d7d6e3eaa1fe42bc01f15e300d8406313d7",
     "scripts/home_media_worker.py": "767fc8d3550ec8049aebb84ddeb4d40d8e46ff0903661d6ed1ad8355ec8c335d",

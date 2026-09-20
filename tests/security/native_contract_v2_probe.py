@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.14'
+VERSION = '2.0.0-candidate.15'
 
 
 def capture():
@@ -157,6 +157,7 @@ def capture():
         movie = originals/'102.mov'; movie.write_bytes(b'synthetic-original-video')
         env.mutate('UPDATE assets SET path=? WHERE id=102',(str(movie),))
         call('playback_without_provider','HEAD','/assets/102/playback?library=family-a',503,token=native)
+        call('prepared_gallery_without_provider','GET','/assets?library=family-a&media=prepared_video',503,token=native)
         prepared = root/'prepared'; folder = prepared/'102-ready'; folder.mkdir(parents=True)
         video_bytes = (ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
         chunk_bytes = json.dumps([hashlib.sha256(video_bytes).hexdigest()]).encode()
@@ -169,6 +170,16 @@ def capture():
             directory=folder.name,video=descriptor)])).encode(); index.write_bytes(raw)
         provider = PreparedVideos(index,hashlib.sha256(raw).hexdigest(),prepared)
         env.client.app.state.media_runtime = replace(env.client.app.state.media_runtime,prepared_videos=provider)
+        with env.connection() as db:
+            previous_mime = db.execute('SELECT mime FROM assets WHERE id=102').fetchone()[0]
+        env.mutate("UPDATE assets SET mime='video/mp4' WHERE id=102")
+        call('prepared_gallery_page_one','GET','/assets?library=family-a&media=prepared_video&page_size=1',200,token=native)
+        call('prepared_gallery_page_two','GET','/assets?library=family-a&media=prepared_video&page_size=1&page=2',200,token=native)
+        call('prepared_gallery_foreign','GET','/assets?library=family-unavailable&media=prepared_video',401,token=native)
+        call('prepared_gallery_anonymous','GET','/assets?library=family-a&media=prepared_video',401)
+        call('prepared_gallery_duplicate','GET','/assets?library=family-a&media=prepared_video&media=all',400,token=native)
+        call('prepared_gallery_invalid','GET','/assets?library=family-a&media=prepared',400,token=native)
+        env.mutate('UPDATE assets SET mime=? WHERE id=102',(previous_mime,))
         call('playback_anonymous','GET','/assets/102/playback?library=family-a',401)
         call('playback_foreign','GET','/assets/201/playback?library=family-a',401,token=native)
         call('playback_head','HEAD','/assets/102/playback?library=family-a',200,token=native)
@@ -236,6 +247,7 @@ def capture():
                    (fixture.LibraryReadTests.member_id,))
         call('gallery_media_revoked', 'GET', '/assets?library=family-a&media=video', 401,
              token=env.member_token)
+        call('prepared_gallery_revoked','GET','/assets?library=family-a&media=prepared_video',401,token=env.member_token)
         return {'contract_version': VERSION, 'synthetic_only': True,
                 'normalization': 'random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator',
                 'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim',
