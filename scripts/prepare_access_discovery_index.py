@@ -7,13 +7,14 @@ ReviewedIndex artifact. It reads through the service's own scoped_source and
 digest and its own default read budget, so the artifact it emits is one the
 service can consume rather than a parallel reimplementation of that projection.
 
-This producer supplies no people, places, face or region review. It enables the
-date and media filters only, whose values are native library fields rather than
-operator assertions, so there is nothing here for an operator to approve. It is
-not incremental: scope_ids is the full ordered visible asset set and the digest
-covers the whole library projection, so any ingest, caption, tag or face
-assignment change invalidates the artifact and it must be re-derived. The
-service refuses a stale artifact with 409 instead of serving older results.
+By default this producer supplies no people, places, face or region review and
+enables date and media only. An explicit ``--review`` JSON file may add reviewed
+people, aliases, pins, manual face assignments, places and regions. It may also
+explicitly declare ``caption`` and ``tags`` as ``current_source`` fields; these
+are native values already projected by the service, not inferred approvals.
+The review file is bound to its library and the current source digest. It is not
+incremental: scope_ids is the full ordered visible asset set and the digest
+covers the whole library projection, so stale review input is refused.
 
 One library per invocation. Output is written once and never overwritten.
 """
@@ -38,6 +39,12 @@ MAX_REVISION = 2 ** 63 - 1
 REQUIRED_TABLES = ('assets', 'captions', 'face_detections', 'tags', 'asset_tags',
                    'asset_tag_blocks', 'access_asset_libraries')
 ENABLED = ('date', 'media')
+REVIEW_FIELDS = frozenset(('people', 'date', 'caption', 'tags', 'locations', 'media'))
+REVIEW_KEYS = frozenset(('library_id', 'source_digest', 'indexed_ids', 'enabled',
+                         'people', 'pinned_ids', 'assignments', 'places', 'regions',
+                         'source_fields'))
+SOURCE_FIELD_KEYS = frozenset(('caption', 'tags'))
+REVIEW_BYTES = 1024 * 1024
 ALLOWED_FUNCTIONS = frozenset({'length'})
 
 
@@ -67,6 +74,35 @@ def revision(value):
     if type(value) is not str or re.fullmatch(r'[1-9][0-9]{0,18}', value) is None or int(value) > MAX_REVISION:
         raise Refused('Positive decimal revision required')
     return value
+
+
+def review_json(path):
+    """Read one explicit review envelope without accepting duplicate keys."""
+    direct(path)
+    record = path.lstat()
+    if not stat.S_ISREG(record.st_mode) or path.resolve(strict=True) != path:
+        raise Refused('Direct regular review file required')
+    if record.st_size > REVIEW_BYTES:
+        raise Refused('Review file too large')
+    try:
+        raw = path.read_bytes()
+        return json.loads(raw.decode('utf-8'), object_pairs_hook=_unique,
+                          parse_constant=_reject_constant)
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        raise Refused('Invalid review file') from None
+
+
+def _unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate key')
+        result[key] = value
+    return result
+
+
+def _reject_constant(_):
+    raise ValueError('non-finite number')
 
 
 def configure(db, start):
@@ -113,7 +149,82 @@ def authorize(action, first, second, *rest):
     return sqlite3.SQLITE_DENY
 
 
-def derive(db, identifier, revision_value):
+def _review_string(value, maximum, *, nonempty=True):
+    if type(value) is not str or len(value.encode('utf-8')) > maximum:
+        raise Refused('Invalid review value')
+    if any(ord(c) < 32 and c not in '\n\t' for c in value) or (nonempty and not value.strip()):
+        raise Refused('Invalid review value')
+    return value
+
+
+def _review_ids(value, maximum):
+    if type(value) is not list or len(value) > maximum:
+        raise Refused('Invalid review ids')
+    result = []
+    for item in value:
+        if type(item) is not str or re.fullmatch(r'[1-9][0-9]{0,18}', item) is None:
+            raise Refused('Invalid review id')
+        result.append(item)
+    if len(set(result)) != len(result):
+        raise Refused('Duplicate review id')
+    return tuple(result)
+
+
+def reviewed_index(value, identifier, revision_value, scope, source_digest):
+    """Convert explicit JSON review data through the service's provider types."""
+    from app.access.discovery_provider import ReviewedFace, ReviewedPerson, ReviewedPlace
+    if type(value) is not dict or set(value) != REVIEW_KEYS:
+        raise Refused('Review fields are incomplete')
+    if value['library_id'] != identifier or value['source_digest'] != source_digest:
+        raise Refused('Review is for a different source')
+    indexed = _review_ids(value['indexed_ids'], len(scope))
+    if not set(indexed) <= set(scope):
+        raise Refused('Review scope is not current')
+    enabled = value['enabled']
+    if type(enabled) is not list or not enabled or len(set(enabled)) != len(enabled):
+        raise Refused('Invalid review fields')
+    if any(type(field) is not str or field not in REVIEW_FIELDS for field in enabled) or 'media' not in enabled:
+        raise Refused('Invalid review fields')
+    source_fields = value['source_fields']
+    if type(source_fields) is not dict or set(source_fields) - SOURCE_FIELD_KEYS:
+        raise Refused('Invalid source field declarations')
+    if any(field in enabled and source_fields.get(field) != 'current_source' for field in ('caption', 'tags')):
+        raise Refused('Caption and tag review declarations required')
+    people = []
+    for item in value['people']:
+        if type(item) is not dict or set(item) != {'id', 'label', 'aliases', 'allow_zero'}:
+            raise Refused('Invalid reviewed person')
+        aliases = item['aliases']
+        if type(aliases) is not list or len(aliases) > 8:
+            raise Refused('Invalid reviewed aliases')
+        if type(item['allow_zero']) is not bool:
+            raise Refused('Invalid reviewed person')
+        people.append(ReviewedPerson(identifier, _review_string(item['id'], 19),
+            _review_string(item['label'], 256), tuple(_review_string(alias, 128) for alias in aliases),
+            item['allow_zero']))
+    places = []
+    for item in value['places']:
+        if type(item) is not dict or set(item) != {'id', 'label'}:
+            raise Refused('Invalid reviewed place')
+        places.append(ReviewedPlace(identifier, _review_string(item['id'], 19), _review_string(item['label'], 256)))
+    assignments = []
+    for item in value['assignments']:
+        if type(item) is not dict or set(item) != {'id', 'asset_id', 'person_id', 'source'}:
+            raise Refused('Invalid reviewed assignment')
+        assignments.append(ReviewedFace(_review_string(item['id'], 19), _review_string(item['asset_id'], 19),
+                                        _review_string(item['person_id'], 19), item['source']))
+    regions = []
+    for item in value['regions']:
+        if type(item) is not list or len(item) != 2:
+            raise Refused('Invalid reviewed region')
+        regions.append((_review_string(item[0], 19), _review_string(item[1], 19)))
+    from app.access.discovery_provider import ReviewedIndex
+    return ReviewedIndex(identifier, revision_value, tuple(scope), indexed, source_digest,
+                         tuple(people), _review_ids(value['pinned_ids'], 32), tuple(assignments),
+                         tuple(places), tuple(regions), tuple(enabled))
+
+
+def derive(db, identifier, revision_value, review=None):
     """Project and validate through the service's own code and read budget."""
     from app.access import discovery as d
     from app.access.discovery_provider import ReviewedIndex
@@ -125,8 +236,10 @@ def derive(db, identifier, revision_value):
         if not scope:
             raise Refused('No visible assets for this library')
         source_digest = d.digest(source)
-    index = ReviewedIndex(library_id=identifier, revision=revision_value, scope_ids=scope,
-                          indexed_ids=scope, source_digest=source_digest, enabled=ENABLED)
+    index = (reviewed_index(review, identifier, revision_value, scope, source_digest)
+             if review is not None else
+             ReviewedIndex(library_id=identifier, revision=revision_value, scope_ids=scope,
+                           indexed_ids=scope, source_digest=source_digest, enabled=ENABLED))
     # Refuse to emit an artifact the service would itself reject.
     d.validate(index, identifier, budget.rows)
     if len(d.packed(asdict(index))) > budget.index_bytes:
@@ -150,13 +263,15 @@ def main(argv=None):
     parser.add_argument('--library', required=True)
     parser.add_argument('--revision', required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--review', type=Path)
     completed = False
     try:
         args = parser.parse_args(argv)
         identifier, revision_value = library(args.library), revision(args.revision)
+        review = review_json(args.review) if args.review is not None else None
         start = time.monotonic()
         with closing(open_read_only(args.database, start)) as db:
-            index, catalog_assets = derive(db, identifier, revision_value)
+            index, catalog_assets = derive(db, identifier, revision_value, review)
         payload = json.dumps(asdict(index), sort_keys=True, ensure_ascii=True,
                              separators=(',', ':'), allow_nan=False).encode()
         digest = write_new(args.out, payload)
