@@ -47,6 +47,15 @@ class Budget:
     jpeg_source_pixels: int = 0  # Zero inherits the ordinary source-pixel budget.
     decoded_pixels: int = 40000000
 
+@dataclass(frozen=True)
+class VideoQuality:
+    name: str
+    max_width: int
+    max_height: int
+    target_bitrate: str
+    max_bitrate: str
+    audio_bitrate: str
+
 
 MEDIA_WORKER = Path(__file__).with_name('home_media_worker.py')
 PROFILES = {
@@ -55,7 +64,26 @@ PROFILES = {
         duration_seconds=900, process_seconds=5400, asset_seconds=7200,
         hash_seconds=900, probe_seconds=30, decode_seconds=1800,
         jpeg_source_pixels=256000000, decoded_pixels=16000000),
+    'phone-sdr-v1': Budget(input_bytes=8*1024**3, output_bytes=4*1024**3,
+        duration_seconds=900, process_seconds=5400, asset_seconds=7200,
+        hash_seconds=900, probe_seconds=30, decode_seconds=1800,
+        jpeg_source_pixels=256000000, decoded_pixels=16000000),
 }
+VIDEO_QUALITIES = {
+    'library-sdr-v1': VideoQuality('library-sdr-v1', 1920, 1080, '2M', '8M', '128k'),
+    'phone-sdr-v1': VideoQuality('phone-sdr-v1', 1280, 720, '2M', '3M', '96k'),
+}
+def quality_config(value=None):
+    if value is None: return None
+    if isinstance(value, str):
+        try: value = VIDEO_QUALITIES[value]
+        except KeyError: raise ValueError('invalid_video_quality') from None
+    elif isinstance(value, dict):
+        try: value = VideoQuality(**value)
+        except (TypeError, KeyError): raise ValueError('invalid_video_quality') from None
+    if not isinstance(value, VideoQuality) or value.name not in VIDEO_QUALITIES or value != VIDEO_QUALITIES[value.name]:
+        raise ValueError('invalid_video_quality')
+    return value
 
 
 def canonical(path):
@@ -173,7 +201,8 @@ def probe(binary, source, directory, budget, guard=None):
     except (ValueError,UnicodeError) as error: raise PreparationError('probe_metadata_invalid') from error
 
 
-def normalized_probe(value, expected_duration):
+def normalized_probe(value, expected_duration, quality=None):
+    quality = quality_config(quality)
     streams = value.get('streams', [])
     videos = [s for s in streams if s.get('codec_type') == 'video']
     audios = [s for s in streams if s.get('codec_type') == 'audio']
@@ -187,6 +216,8 @@ def normalized_probe(value, expected_duration):
             or v.get('sample_aspect_ratio') not in ('1:1', None)
             or not math.isfinite(duration) or abs(duration-expected_duration) > max(0.25, min(1.0, expected_duration*.02))
             or any(a.get('codec_name') != 'aac' or a.get('profile') != 'LC' for a in audios)):
+        raise PreparationError()
+    if quality is not None and (int(v.get('width', 0)) > quality.max_width or int(v.get('height', 0)) > quality.max_height):
         raise PreparationError()
     # Standard muxer/codec descriptors only. No user tags, timestamps, GPS or display matrix.
     allowed_format = {'major_brand', 'minor_version', 'compatible_brands', 'encoder'}
@@ -237,22 +268,26 @@ def previews(directory):
     return result
 
 
-def video_encoder_args(encoder='libx264', gpu=0):
+def video_encoder_args(encoder='libx264', gpu=0, quality=None):
+    quality = quality_config(quality)
     if encoder not in ('libx264','h264_nvenc') or type(gpu) is not int or not 0 <= gpu <= 15:
         raise ValueError('invalid_video_encoder')
     if encoder == 'libx264':
         if gpu != 0: raise ValueError('cpu_encoder_has_no_gpu')
-        return ['-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1']
+        args = ['-c:v','libx264','-threads','1','-preset','fast']
+        args += (['-b:v',quality.target_bitrate,'-maxrate',quality.max_bitrate,'-bufsize','6M'] if quality and quality.name == 'phone-sdr-v1' else ['-crf','23'])
+        return args + ['-profile:v','high','-level:v','4.1']
     # Explicit device, no lookahead/AQ CUDA work. CPU decode/scale preserves the
     # tested orientation and range path; one NVENC session accelerates encoding.
     return ['-c:v','h264_nvenc','-gpu',str(gpu),'-preset','p4','-tune','hq',
-            '-rc','vbr','-cq','23','-b:v','0','-maxrate','8M','-bufsize','16M',
+            '-rc','vbr','-cq','23','-b:v',quality.target_bitrate if quality and quality.name == 'phone-sdr-v1' else '0','-maxrate',quality.max_bitrate if quality else '8M','-bufsize','6M' if quality and quality.name == 'phone-sdr-v1' else '16M',
             '-rc-lookahead','0','-spatial_aq','0','-temporal_aq','0','-bf','2',
             '-profile:v','high','-level:v','4.1']
 
 
-def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encoder='libx264', gpu=0):
-    encoder_args = video_encoder_args(encoder, gpu)
+def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encoder='libx264', gpu=0, quality=None):
+    quality = quality_config(quality)
+    encoder_args = video_encoder_args(encoder, gpu, quality)
     began = time.monotonic(); before = identity(source)
     def remaining():
         seconds = int(budget.asset_seconds-(time.monotonic()-began))
@@ -278,10 +313,10 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encod
         # alone can retain full-range H.264 VUI from a yuvj420p MOV source.
         args = [ffmpeg,'-hide_banner','-loglevel','error','-xerror','-err_detect','explode','-nostdin','-n','-threads','1','-filter_threads','1','-hwaccel','none','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',source,
                 '-map',f"0:{videos[0]['index']}",'-map','0:a:0?','-map_metadata','-1','-map_metadata:s','-1','-map_chapters','-1','-sn','-dn',
-                '-vf',"scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:in_range=auto:out_range=tv,setsar=1,fps=30,format=yuv420p",
+                '-vf',f"scale=w='min({quality.max_width if quality else 1920},iw)':h='min({quality.max_height if quality else 1080},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:in_range=auto:out_range=tv,setsar=1,fps=30,format=yuv420p",
                 *encoder_args,
                 '-color_range','tv',
-                '-c:a','aac','-b:a','128k','-ac','2','-ar','48000',
+                '-c:a','aac','-b:a',quality.audio_bitrate if quality else '128k','-ac','2','-ar','48000',
                 '-metadata:s:v:0','handler_name=VideoHandler','-metadata:s:a:0','handler_name=SoundHandler',
                 '-metadata:s','language=und','-movflags','+faststart',target]
         # Do not use -fs: it can return success after truncating a near-complete
@@ -293,7 +328,7 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encod
                 from home_preparation_resources import JobStopped
                 raise JobStopped('nvenc_encode_failed') from None
             raise
-        v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining(),guard=guard), duration)
+        v, actual_duration, audio = normalized_probe(probe(ffprobe,target,output,remaining(),guard=guard), duration, quality)
         faststart(target)
         # Full bounded decode, not merely an ffprobe/header success.
         run_process([ffmpeg,'-v','error','-xerror','-err_detect','explode','-nostdin','-threads','1','-protocol_whitelist','file','-f','mov','-enable_drefs','0','-use_absolute_path','0','-i',target,'-f','null','-'], output, replace(remaining(),process_seconds=min(remaining().process_seconds,budget.decode_seconds)), guard=guard)
@@ -314,10 +349,11 @@ def prepare_one(source, kind, output, ffmpeg, ffprobe, budget, guard=None, encod
     return result
 
 
-def verify_ready(directory, result, budget=Budget(), guard=None):
+def verify_ready(directory, result, budget=Budget(), guard=None, quality=None):
     if previews(directory) != result['previews']: raise PreparationError()
     if result['video']:
-        video = result['video']; validate_video(video)
+        video = result['video']; validate_video(video); quality = quality_config(quality)
+        if quality and (video['width'] > quality.max_width or video['height'] > quality.max_height): raise PreparationError()
         actual = file_fingerprint(directory/'video.mp4', video['bytes'],
                                   seconds=budget.hash_seconds, guard=guard, chunks=True)
         if actual['sha256'] != video['sha256']: raise PreparationError()
@@ -325,7 +361,8 @@ def verify_ready(directory, result, budget=Budget(), guard=None):
         if sha(raw) != video['chunks_sha256'] or actual['chunks'] != json.loads(raw): raise PreparationError()
 
 
-def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffprobe, budget=Budget(), retry_failed=False):
+def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffprobe, budget=Budget(), retry_failed=False, quality=None):
+    quality = quality_config(quality)
     for path in (database,source_root,base_catalog,ffmpeg,ffprobe): canonical(path)
     direct_path(workspace)
     if (workspace.is_relative_to(source_root) or source_root.is_relative_to(workspace)
@@ -343,6 +380,7 @@ def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffpro
         fingerprint = {'base_sha256':sha(base_raw),'database_path_sha256':sha(str(database).encode()),'source_root':str(source_root),
             'script_sha256':sha(Path(__file__).read_bytes()+MEDIA_WORKER.read_bytes()),'ffmpeg_sha256':file_hash(ffmpeg,256*1024**2),'ffprobe_sha256':file_hash(ffprobe,256*1024**2),
             'pillow_version':importlib.metadata.version('Pillow'),'budget':budget.__dict__}
+        if quality: fingerprint['quality'] = asdict(quality)
         journal = workspace/'journal.json'
         if journal.exists():
             state = json.loads(bounded_read(journal,MAX_CATALOG),object_pairs_hook=unique)
@@ -368,12 +406,12 @@ def run(database, source_root, base_catalog, workspace, asset_ids, ffmpeg, ffpro
                 if kind != by_id[aid]['kind']: raise PreparationError('unsupported')
                 if old and old['state']=='ready':
                     if file_hash(source,budget.input_bytes) != old['result']['source_sha256']: raise PreparationError()
-                    verify_ready(attempt_path(workspace,old['directory'],aid),old['result']); continue
+                    verify_ready(attempt_path(workspace,old['directory'],aid),old['result'],quality=quality); continue
                 # Unique directory: interrupted/unverified attempts are retained, never overwritten or adopted.
                 if shutil.disk_usage(workspace).free < budget.reserve_bytes+budget.output_bytes+14*1024**2: raise PreparationError()
                 attempt = Path(tempfile.mkdtemp(prefix=f'asset-{aid}-',dir=workspace))
-                result = prepare_one(source,kind,attempt,ffmpeg,ffprobe,budget)
-                verify_ready(attempt,result)
+                result = prepare_one(source,kind,attempt,ffmpeg,ffprobe,budget,quality=quality)
+                verify_ready(attempt,result,quality=quality)
                 state['items'][key] = {'state':'ready','directory':attempt.name,'result':result}
             except FileNotFoundError:
                 state['items'][key] = {'state':'unavailable','reason':'source_missing'}
@@ -451,13 +489,15 @@ def main(argv=None):
     prep = sub.add_parser('prepare')
     for name in ('database','source-root','base-catalog','workspace','ffmpeg','ffprobe'): prep.add_argument('--'+name,type=Path,required=True)
     prep.add_argument('--asset-ids',required=True);prep.add_argument('--retry-failed',action='store_true')
+    prep.add_argument('--profile',choices=PROFILES,default=None)
     pub = sub.add_parser('publish');pub.add_argument('--workspace',type=Path,required=True);pub.add_argument('--output',type=Path,required=True)
     args=parser.parse_args(argv)
     try:
         if args.command=='_photo': photo_worker(args.source,args.output,args.pixels);return 0
         if args.command=='publish': result=publish(args.workspace,args.output)
         else:
-            state=run(args.database,args.source_root,args.base_catalog,args.workspace,[int(s) for s in args.asset_ids.split(',')],args.ffmpeg,args.ffprobe,retry_failed=args.retry_failed)
+            selected=args.profile or 'pilot'
+            state=run(args.database,args.source_root,args.base_catalog,args.workspace,[int(s) for s in args.asset_ids.split(',')],args.ffmpeg,args.ffprobe,budget=PROFILES[selected],retry_failed=args.retry_failed,quality=VIDEO_QUALITIES.get(selected) if selected=='phone-sdr-v1' else None)
             result={'requested':len(args.asset_ids.split(',')),'ready':sum(i['state']=='ready' for i in state['items'].values()),'unavailable':sum(i['state']=='unavailable' for i in state['items'].values()),'live_publication_changed':False}
         print(json.dumps(result));return 0
     except Exception:

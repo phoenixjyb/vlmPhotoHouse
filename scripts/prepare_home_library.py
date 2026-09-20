@@ -121,6 +121,8 @@ class Seed:
             for name in ('base_sha256','database_path_sha256','script_sha256','ffmpeg_sha256','ffprobe_sha256'):
                 if type(fingerprint[name]) is not str or len(fingerprint[name])!=64:raise ValueError('seed_provenance_incomplete')
             profile(prep.Budget(**fingerprint['budget']))
+            if fingerprint.get('quality') != job.get('quality'):
+                raise ValueError('seed_quality_mismatch')
             if (prep.sha(raw)!=fingerprint['base_sha256'] or fingerprint['source_root']!=job['source_root']
                     or fingerprint['database_path_sha256']!=prep.sha(job['database'].encode())):
                 raise ValueError('seed_provenance_mismatch')
@@ -132,6 +134,7 @@ class Seed:
             if meta(self.c,'job_sha256')!=prep.sha((self.path/'job.json').read_bytes()):raise ValueError('seed_job_pin_mismatch')
             if old['database']!=job['database'] or old['source_root']!=job['source_root']:raise ValueError('seed_provenance_mismatch')
             if prep.sha(bounded_read(self.path/'base/catalog.json',MAX_CATALOG))!=old['base_sha256']:raise ValueError('seed_base_mismatch')
+            if old.get('quality') != job.get('quality'): raise ValueError('seed_quality_mismatch')
             self.revision=old['revision']
         if self.revision>=job['revision']:raise ValueError('revision_not_newer_than_seed')
 
@@ -152,14 +155,15 @@ class Seed:
 
 
 def create(database,source_root,workspace,ffmpeg,ffprobe,previous_publication,revision,
-           budget=prep.Budget(),seed=None,encoder='libx264',gpu=0):
+           budget=prep.Budget(),seed=None,encoder='libx264',gpu=0,quality=None):
     for path in (database,source_root,ffmpeg,ffprobe,previous_publication):prep.canonical(path)
     direct_path(workspace);prep.canonical(workspace.parent)
     for path in (source_root,database,previous_publication)+((Path(seed['path']),) if seed else ()):
         if path.is_relative_to(workspace) or workspace.is_relative_to(path):raise ValueError('workspace_overlap')
     previous=publication_pin(previous_publication)
     if type(revision) is not int or not previous['revision']<revision<=2**31-1:raise ValueError('revision_not_new')
-    prep.video_encoder_args(encoder,gpu)
+    quality=prep.quality_config(quality)
+    prep.video_encoder_args(encoder,gpu,quality)
     budgets=profile(budget)
     workspace.mkdir(mode=0o700) # Never adopt a foreign/half-initialized directory.
     with prep.workspace_lock(workspace):
@@ -169,6 +173,7 @@ def create(database,source_root,workspace,ffmpeg,ffprobe,previous_publication,re
              'encoder':{'name':encoder,'gpu':gpu},
              'ffmpeg':str(ffmpeg),'ffprobe':str(ffprobe),'ffmpeg_sha256':prep.file_hash(ffmpeg,256*1024**2),
              'ffprobe_sha256':prep.file_hash(ffprobe,256*1024**2),'pillow':importlib.metadata.version('Pillow'),'code':code_pin()}
+        if quality: job['quality']=asdict(quality)
         with ExitStack() as stack:
             if seed:Seed(seed,job,stack)
         prep.atomic_json(workspace/'job.json',job)
@@ -192,7 +197,7 @@ def load_job(workspace):
     profile(prep.Budget(**job['budget']))
     encoding=job.get('encoder',{'name':'libx264','gpu':0})
     if type(encoding) is not dict or set(encoding)!={'name','gpu'}:raise ValueError('invalid_encoder_config')
-    prep.video_encoder_args(encoding['name'],encoding['gpu'])
+    prep.video_encoder_args(encoding['name'],encoding['gpu'],prep.quality_config(job.get('quality')))
     with closing(connect(workspace,True)) as c:
         if meta(c,'job_sha256')!=prep.sha((workspace/'job.json').read_bytes()):raise ValueError('job_changed')
     return job
@@ -298,7 +303,7 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
     if any(v is not None and (type(v) is not int or v<1) for v in (max_items,max_seconds)):raise ValueError('invalid_run_limit')
     if kind not in (None,'video','photo'):raise ValueError('invalid_kind_filter')
     selected_kind=kind
-    job=load_job(workspace);budget=prep.Budget(**job['budget'])
+    job=load_job(workspace);budget=prep.Budget(**job['budget']);quality=prep.quality_config(job.get('quality'))
     guard=guard or Guard(workspace,budget.reserve_bytes,max_seconds=max_seconds)
     database=Path(job['database']);source_root=Path(job['source_root']);ffmpeg=Path(job['ffmpeg']);ffprobe=Path(job['ffprobe'])
     processed=0
@@ -327,7 +332,7 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
                         if value and value['job_sha256']==meta(c,'job_sha256') and value['metadata_hash']==metadata_hash:
                             result=value['result'];validate_result(result,kind)
                             if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)==result['source_sha256']:
-                                prep.verify_ready(directory,result,budget,guard)
+                                prep.verify_ready(directory,result,budget,guard,quality)
                                 complete(c,aid,result,value['origin']);continue
                         if item['status']=='ready' and not value:raise ValueError('ready_receipt_missing')
                     # Pin each attempt before work. A verified receipt permits crash recovery
@@ -346,8 +351,8 @@ def run(workspace,retry_errors=False,max_items=None,max_seconds=None,guard=None,
                         if reason:mark(c,aid,'deferred',reason);processed+=1;continue
                         encoding=job.get('encoder',{'name':'libx264','gpu':0})
                         options={} if encoding['name']=='libx264' else {'encoder':encoding['name'],'gpu':encoding['gpu']}
-                        result=prep.prepare_one(source,item['kind'],directory,ffmpeg,ffprobe,budget,guard=guard,**options)
-                    validate_result(result,kind);prep.verify_ready(directory,result,budget,guard)
+                        result=prep.prepare_one(source,item['kind'],directory,ffmpeg,ffprobe,budget,guard=guard,quality=quality,**options)
+                    validate_result(result,kind);prep.verify_ready(directory,result,budget,guard,quality)
                     if source_row(database,aid,source_root,kind)!=(source,metadata_hash):raise ValueError('source_changed_during_attempt')
                     if prep.file_hash(source,max(budget.input_bytes,identity(source)[2]),seconds=budget.hash_seconds,guard=guard)!=result['source_sha256']:raise ValueError('source_changed_during_attempt')
                     prep.atomic_json(directory/'receipt.json',{'job_sha256':meta(c,'job_sha256'),'metadata_hash':metadata_hash,'result':result,'origin':origin})
@@ -374,7 +379,7 @@ def publish(workspace,output,allow_partial=False,guard=None):
     job=load_job(workspace);direct_path(output);prep.canonical(output.parent)
     for p in (workspace,Path(job['source_root']),Path(job['database']),Path(job['previous']['path'])):
         if output.is_relative_to(p) or p.is_relative_to(output):raise ValueError('publication_overlap')
-    budget=prep.Budget(**job['budget']);guard=guard or Guard(workspace,budget.reserve_bytes)
+    budget=prep.Budget(**job['budget']);quality=prep.quality_config(job.get('quality'));guard=guard or Guard(workspace,budget.reserve_bytes)
     with prep.workspace_lock(workspace),closing(connect(workspace)) as c, publication_status(c,guard):
         if meta(c,'publication'):raise ValueError('published_job_is_immutable')
         if job['seed'] and not meta(c,'seed_verified'):raise ValueError('seed_run_not_verified')
@@ -397,7 +402,7 @@ def publish(workspace,output,allow_partial=False,guard=None):
                 receipt=read_json(directory/'receipt.json',1024**2)
                 if (receipt['job_sha256']!=meta(c,'job_sha256') or receipt['result']!=result
                         or receipt['metadata_hash']!=item['metadata_hash']):raise ValueError('receipt_mismatch')
-                prep.verify_ready(directory,result,budget,guard)
+                prep.verify_ready(directory,result,budget,guard,quality)
                 asset.update(previews=result['previews'],video=result['video'])
                 total+=sum(m['bytes'] for m in result['previews'].values())+(result['video']['bytes'] if result['video'] else 0)
                 ready.append((asset['id'],directory,result));guard(force=True)
@@ -488,7 +493,8 @@ def main(argv=None):
                 if not all((args.carry_workspace,args.carry_sha256,args.carry_kind)):raise ValueError('all_carry_fields_required')
                 seed=seed_description(args.carry_workspace,args.carry_sha256,args.carry_kind)
             budget=prep.Budget(**read_json(args.budget_json,4096)) if args.budget_json else prep.PROFILES[args.profile or 'pilot']
-            result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed,args.encoder,args.gpu)
+            selected_quality=prep.VIDEO_QUALITIES.get(args.profile) if args.profile=='phone-sdr-v1' else None
+            result=create(args.database,args.source_root,args.workspace,args.ffmpeg,args.ffprobe,args.previous_publication,args.revision,budget,seed,args.encoder,args.gpu,selected_quality)
         elif args.command=='run':result=run(args.workspace,args.retry_errors,args.max_items,args.max_seconds,qualification=args.qualification_plan,kind=args.kind)
         elif args.command=='status':result=status(args.workspace)
         else:result=publish(args.workspace,args.output,args.allow_partial)

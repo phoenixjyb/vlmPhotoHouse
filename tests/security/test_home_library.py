@@ -43,6 +43,34 @@ class LibraryTests(unittest.TestCase):
     def item(self,aid):
         with closing(library.connect(self.job,True)) as c:return dict(c.execute('SELECT * FROM items WHERE id=?',(aid,)).fetchone())
 
+    def test_phone_quality_is_persisted_and_tampering_is_rejected(self):
+        library.create(self.db,self.sources,self.job,self.ffmpeg,self.ffprobe,self.base,2,
+                       self.budget,quality=prep.VIDEO_QUALITIES['phone-sdr-v1'])
+        job=json.loads((self.job/'job.json').read_text())
+        self.assertEqual(job['quality'],{'name':'phone-sdr-v1','max_width':1280,'max_height':720,
+                                         'target_bitrate':'2M','max_bitrate':'3M','audio_bitrate':'96k'})
+        job['quality']['max_height']=1080
+        prep.atomic_json(self.job/'job.json',job)
+        with self.assertRaises(ValueError):library.load_job(self.job)
+
+    def test_matching_phone_seed_is_accepted_for_new_phone_revision(self):
+        phone=prep.VIDEO_QUALITIES['phone-sdr-v1']
+        library.create(self.db,self.sources,self.job,self.ffmpeg,self.ffprobe,self.base,2,self.budget,quality=phone)
+        self.assertTrue(library.run(self.job,guard=self.guard())['all_ready'])
+        seed=library.seed_description(self.job,prep.file_hash(self.job/'state.sqlite',256*1024**2),'library')
+        next_job=self.root/'phone-revision-3'
+        library.create(self.db,self.sources,next_job,self.ffmpeg,self.ffprobe,self.base,3,self.budget,seed=seed,quality=phone)
+        self.assertEqual(json.loads((next_job/'job.json').read_text())['quality']['name'],'phone-sdr-v1')
+
+    def test_default_seed_is_refused_when_creating_phone_revision(self):
+        library.create(self.db,self.sources,self.job,self.ffmpeg,self.ffprobe,self.base,2,self.budget)
+        self.assertTrue(library.run(self.job,guard=self.guard())['all_ready'])
+        seed=library.seed_description(self.job,prep.file_hash(self.job/'state.sqlite',256*1024**2),'library')
+        phone_job=self.root/'phone-from-default'
+        with self.assertRaisesRegex(ValueError,'seed_quality_mismatch'):
+            library.create(self.db,self.sources,phone_job,self.ffmpeg,self.ffprobe,self.base,3,self.budget,seed=seed,quality=prep.VIDEO_QUALITIES['phone-sdr-v1'])
+        self.assertFalse((phone_job/'job.json').exists())
+
     def test_automatically_traverses_more_than_sixteen_and_resume_never_reconverts(self):
         with closing(sqlite3.connect(self.db)) as c,c:
             c.executemany('INSERT INTO assets VALUES(?,?,?,?,?,?)',[(i,str(self.photo),'image/jpeg',80,40,'active') for i in range(103,122)])
