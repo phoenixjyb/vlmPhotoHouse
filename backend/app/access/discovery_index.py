@@ -21,7 +21,7 @@ import re
 import stat
 
 from . import discovery as d
-from .discovery_provider import (MemoryIndexProvider, ProjectedIndex, ReviewedFace, ReviewedIndex,
+from .discovery_provider import (MemoryIndexProvider, ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedFace, ReviewedIndex,
                                  ReviewedPerson, ReviewedPlace)
 from .discovery_transport import DiscoveryRuntime
 
@@ -115,9 +115,11 @@ def parse(payload):
                            parse_constant=reject_constant)
     except (ValueError, UnicodeError, RecursionError):
         raise DiscoveryIndexRefused() from None
-    if type(value) is not dict or set(value) not in (INDEX_KEYS, INDEX_KEYS | {'projection'}):
+    if type(value) is not dict or set(value) not in (INDEX_KEYS, INDEX_KEYS | {'projection'}, INDEX_KEYS | {'projection', 'region_rules', 'refresh_policy'}):
         raise DiscoveryIndexRefused()
     if 'projection' in value and value['projection'] != 'enabled-v2':
+        raise DiscoveryIndexRefused()
+    if 'refresh_policy' in value and value['refresh_policy'] != 'current-library-regions-v1':
         raise DiscoveryIndexRefused()
     return value
 
@@ -159,7 +161,19 @@ def index(payload, limit):
     if DIGEST.fullmatch(text(record['source_digest'], 64)) is None:
         raise DiscoveryIndexRefused()
     constructor = ProjectedIndex if 'projection' in record else ReviewedIndex
+    extra = {}
+    if 'region_rules' in record:
+        constructor = RefreshingPlaceIndex
+        rules = []
+        for rule in sequence(record['region_rules'], 128):
+            mapping(rule, {'place_id', 'south', 'west', 'north', 'east'})
+            parsed = RegionRule(**rule)
+            try: d.validate_region_rule(parsed)
+            except d.DiscoveryInvalid: raise DiscoveryIndexRefused() from None
+            rules.append(parsed)
+        extra = {'region_rules': tuple(rules)}
     return constructor(
+        **extra,
         library_id=record['library_id'], revision=record['revision'],
         scope_ids=tuple(identifier(v) for v in sequence(record['scope_ids'], limit)),
         indexed_ids=tuple(identifier(v) for v in sequence(record['indexed_ids'], limit)),

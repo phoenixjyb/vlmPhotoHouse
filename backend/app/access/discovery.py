@@ -5,7 +5,7 @@ No SQL writes, filesystem/index loading, models, HTTP routes or original grants.
 """
 from collections import Counter, defaultdict
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime
 import hashlib
 import json
@@ -17,7 +17,7 @@ from time import monotonic
 import unicodedata
 
 from .credentials import session_digest
-from .discovery_provider import ProjectedIndex, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
+from .discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
 from .library import _asset
 from .service import AccessService, AccessDenied
 
@@ -165,12 +165,12 @@ def projected_source(library, read, enabled):
 
 def index_source(index, read):
     return (projected_source(index.library_id, read, index.enabled)
-            if type(index) is ProjectedIndex else scoped_source(index.library_id, read))
+            if isinstance(index, ProjectedIndex) else scoped_source(index.library_id, read))
 
 
 def validate(index, library, limit):
-    require(type(index) in (ReviewedIndex, ProjectedIndex) and index.library_id==library)
-    if type(index) is ProjectedIndex: require(index.projection == 'enabled-v2')
+    require(type(index) in (ReviewedIndex, ProjectedIndex, RefreshingPlaceIndex) and index.library_id==library)
+    if isinstance(index, ProjectedIndex): require(index.projection == 'enabled-v2')
     identifier(index.revision); require(hashed(index.source_digest))
     scope=ids(index.scope_ids,limit,ordered=True); selected=ids(index.indexed_ids,limit,ordered=True)
     require(selected<=scope)
@@ -187,7 +187,7 @@ def validate(index, library, limit):
         require(type(place) is ReviewedPlace and place.library_id==library)
         identifier(place.id); require(place.id not in places);text(place.label,256);places[place.id]=place
     require(ids(index.pinned_ids,32)<=set(people))
-    if type(index) is ProjectedIndex:
+    if isinstance(index, ProjectedIndex):
         require('people' in index.enabled or not (index.people or index.pinned_ids or index.assignments))
         require('locations' in index.enabled or not (index.places or index.regions))
     require(type(index.assignments) is tuple and len(index.assignments)<=limit)
@@ -203,7 +203,49 @@ def validate(index, library, limit):
         require(type(pair) is tuple and len(pair)==2)
         for value in pair:identifier(value)
         require(pair not in pairs and pair[0] in selected and pair[1] in places);pairs.add(pair)
+    if type(index) is RefreshingPlaceIndex:
+        require(index.refresh_policy == 'current-library-regions-v1')
+        require(set(index.enabled) == {'date', 'locations', 'media'})
+        require(index.indexed_ids == index.scope_ids)
+        require(type(index.region_rules) is tuple and 1 <= len(index.region_rules) <= 128)
+        seen_rules = set()
+        for rule in index.region_rules:
+            validate_region_rule(rule)
+            require(rule.place_id in places and rule.place_id not in seen_rules)
+            seen_rules.add(rule.place_id)
+        require(seen_rules == set(places))
     return people,places
+
+
+def validate_region_rule(rule):
+    require(type(rule) is RegionRule)
+    identifier(rule.place_id)
+    for key in ('south', 'west', 'north', 'east'):
+        value = getattr(rule, key); limit = 90 if key in ('south', 'north') else 180
+        require(type(value) in (int, float) and math.isfinite(value) and -limit <= value <= limit)
+    require(rule.south < rule.north and rule.west != rule.east)
+    require(not (rule.west == 180 and rule.east == -180))
+
+
+def region_contains(rule, lat, lon):
+    longitude = (rule.west <= lon <= rule.east if rule.west < rule.east
+                 else lon >= rule.west or lon <= rule.east)
+    return rule.south <= lat <= rule.north and longitude
+
+
+def refreshed_index(index, source, check, maximum):
+    """No provider mutation, cache, write or cross-request state. Same transaction."""
+    scope = tuple(str(row[0]) for row in source['assets'])
+    pairs = []
+    for aid, lat, lon in source['coordinates']:
+        check()
+        if lat is None or lon is None: continue
+        for rule in index.region_rules:
+            if region_contains(rule, lat, lon):
+                if len(pairs) >= maximum: raise DiscoveryUnavailable()
+                pairs.append((str(aid), rule.place_id))
+    return replace(index, scope_ids=scope, indexed_ids=scope,
+                   source_digest=digest(source), regions=tuple(pairs))
 
 
 def taken_day(value):
@@ -245,6 +287,10 @@ class DiscoveryReads:
                     if len(packed(asdict(index)))>self.budget.index_bytes: raise DiscoveryUnavailable()
                 except (DiscoveryInvalid,TypeError,KeyError,RecursionError): raise DiscoveryUnavailable() from None
                 source=index_source(index,read);check()
+                if type(index) is RefreshingPlaceIndex:
+                    index=refreshed_index(index,source,check,self.budget.rows)
+                    if len(packed(asdict(index)))>self.budget.index_bytes: raise DiscoveryUnavailable()
+                    check()
                 if tuple(str(r[0]) for r in source['assets'])!=index.scope_ids or digest(source)!=index.source_digest: raise DiscoveryChanged()
                 binding=digest({'policy':POLICY,'library':library,'session':session_digest(token),'account':member['account_id'],
                                 'membership':member['revision'],'originals':member['originals'],'index':asdict(index)})

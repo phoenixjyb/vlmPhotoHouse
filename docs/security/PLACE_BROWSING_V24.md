@@ -1,5 +1,9 @@
 # Browse by place — first source slice
 
+For the later explicit current-library refresh policy, see
+[place refresh v25](PLACE_REFRESH_V25.md). The static-artifact behavior below
+remains supported; it is not automatically upgraded.
+
 This slice adds named-place discovery, not map/radius search. Secured WebUI and
 Android reuse their existing `locations` facets and combined search contract.
 A named place can be combined with date and photo/video filters. Counts include

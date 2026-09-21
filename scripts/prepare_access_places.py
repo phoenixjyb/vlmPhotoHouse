@@ -17,7 +17,7 @@ import time
 
 import prepare_access_discovery_index as producer
 from app.access import discovery as d
-from app.access.discovery_provider import ProjectedIndex, ReviewedPlace
+from app.access.discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedPlace
 
 MAX_REGIONS = 128
 ENABLED = ('date', 'locations', 'media')
@@ -43,18 +43,19 @@ def regions(value):
             if type(v) not in (int, float) or not math.isfinite(v) or not -limit <= v <= limit:
                 raise producer.Refused('Invalid bounds')
         # West > east denotes a region crossing the antimeridian.
-        if item['south'] >= item['north'] or item['west'] == item['east']:
-            raise producer.Refused('Empty bounds')
+        d.validate_region_rule(rule_for(item))
     return tuple(entries)
 
 
+def rule_for(region):
+    return RegionRule(region['id'], region['south'], region['west'], region['north'], region['east'])
+
+
 def contains(region, lat, lon):
-    longitude = (region['west'] <= lon <= region['east'] if region['west'] < region['east']
-                 else lon >= region['west'] or lon <= region['east'])
-    return region['south'] <= lat <= region['north'] and longitude
+    return d.region_contains(rule_for(region), lat, lon)
 
 
-def derive(db, library, revision, definitions=(), *, audit=False):
+def derive(db, library, revision, definitions=(), *, audit=False, refresh=False):
     budget = d.ReadBudget()
     with budget.attempt(db, lambda: False) as (check, read):
         source = d.projected_source(library, read, ENABLED)
@@ -78,7 +79,9 @@ def derive(db, library, revision, definitions=(), *, audit=False):
             return None, receipt
         if not scope:
             raise producer.Refused('No visible assets')
-        index = ProjectedIndex(library_id=library, revision=revision, scope_ids=scope,
+        constructor = RefreshingPlaceIndex if refresh else ProjectedIndex
+        extra = {'region_rules': tuple(rule_for(r) for r in definitions)} if refresh else {}
+        index = constructor(**extra, library_id=library, revision=revision, scope_ids=scope,
             indexed_ids=scope, source_digest=d.digest(source), enabled=ENABLED,
             places=tuple(ReviewedPlace(library, r['id'], r['label']) for r in definitions),
             regions=tuple(pairs))
@@ -96,6 +99,8 @@ def main(argv=None):
     parser.add_argument('--database', type=Path, required=True)
     parser.add_argument('--library', required=True)
     parser.add_argument('--audit', action='store_true')
+    parser.add_argument('--refresh-current-library', action='store_true',
+                        help='Explicitly apply these region rules to future active assets in this protected library')
     parser.add_argument('--regions', type=Path)
     parser.add_argument('--revision')
     parser.add_argument('--out', type=Path)
@@ -103,7 +108,7 @@ def main(argv=None):
         args = parser.parse_args(argv)
         library = producer.library(args.library)
         if args.audit:
-            if any(v is not None for v in (args.regions, args.revision, args.out)):
+            if args.refresh_current_library or any(v is not None for v in (args.regions, args.revision, args.out)):
                 raise producer.Refused('Audit writes no artifact')
             definitions, revision = (), '1'
         else:
@@ -112,7 +117,7 @@ def main(argv=None):
             definitions = regions(producer.review_json(args.regions))
             revision = producer.revision(args.revision)
         with closing(producer.open_read_only(args.database, time.monotonic())) as db:
-            index, receipt = derive(db, library, revision, definitions, audit=args.audit)
+            index, receipt = derive(db, library, revision, definitions, audit=args.audit, refresh=args.refresh_current_library)
         if index is not None:
             payload = d.packed(asdict(index))
             receipt.update({'output_sha256': producer.write_new(args.out, payload),
@@ -120,6 +125,7 @@ def main(argv=None):
                             'source_digest': index.source_digest})
         print(json.dumps({'command': 'prepare-access-places', 'completed': True,
                           'existing_database_modified': False, 'audit_only': args.audit,
+                          'refresh_current_library': args.refresh_current_library,
                           **receipt}, sort_keys=True))
         return 0
     except KeyboardInterrupt:
