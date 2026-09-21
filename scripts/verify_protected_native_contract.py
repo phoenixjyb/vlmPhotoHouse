@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '7321f3c3b4c9fd534d5555efa27636fcff3c132f'
+SOURCE = '808abfe134273d4fa208c14199422dd81ea45d38'
 
 
 def verify(root=ROOT):

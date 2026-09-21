@@ -1,5 +1,16 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.16 maintenance — existing task-table defaults
+
+Source `808abfe134273d4fa208c14199422dd81ea45d38`. A real phone attempt left
+complete incoming bytes but rolled back database registration: the live legacy
+`tasks` table has required `retry_count` and `cancel_requested` without SQL defaults.
+The new synthetic regression reproduces the NOT NULL failure before the fix and
+passes after both fields are explicitly initialized. Upload/promotion suites: 80
+passed. No user files were removed or production rows manually repaired. Wire
+replay remains 89 byte-identical cases. Runtime activation and phone acceptance
+are recorded separately from these source checks.
+
 ## 2.0.0-candidate.16 — atomic upload retries
 
 Source `7321f3c3b4c9fd534d5555efa27636fcff3c132f`. Local upload/promotion suites: 79 tests pass,

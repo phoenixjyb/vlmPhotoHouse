@@ -1,5 +1,5 @@
 {
-  "backend_source_commit": "7321f3c3b4c9fd534d5555efa27636fcff3c132f",
+  "backend_source_commit": "808abfe134273d4fa208c14199422dd81ea45d38",
   "case_count": 89,
   "client_profile_defaults": {
     "protected_native_v2": false,
@@ -10,11 +10,11 @@
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "6740ffbf9106a3e21f1a5cde7837cf9706d3e2ac3af9172006ea90920ac8922a",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "d5e5d1445cae0e7c82dbffc2a9614d6820f00ddc430448e001687a6ede3fc993",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "2ea8ce05cd9c2336c725793812eac10f5b7a2315bdf72c155959adf7b9a9d1bd",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "915ec9fe9161a884ce13ebda41936fe7f432464123d0c706da33ac09d10cf5ae",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "dcd25c36c86cfe3a5feac79384ae01f59fe47531141c96274954f7219bf6102c",
     "docs/contracts/protected-native-v2/cases.json": "13f4c6a9af089cfb461409bfb97333cdc8a760b71c5afa5c9509bbfec3af33cd",
-    "scripts/verify_protected_native_contract.py": "a3b4a28dbad32e137d11618cc49a060618e894f540a99e79bc7a4d4797ce39ad",
+    "scripts/verify_protected_native_contract.py": "2fe1faf14b65bc41e455e2b2fda62b9be482fa9274c09ffad68321ff166e8c39",
     "tests/security/native_contract_v2_probe.py": "8862b3b6bea7201d230ef9946afb058876891755a5962438ff322f51b2942ffa",
     "tests/security/test_protected_native_contract.py": "a63f3ba338a9d3133b19f025de2a7925e686e344485629364fe8f5e0276076c8"
   },
@@ -50,7 +50,7 @@
     "backend/app/access/recovery.py": "66e6ca07e55c412ac1521defdbbe6112eabafd7a37d0c8fb28ec80ed2bb9fe97",
     "backend/app/access/runtime.py": "4a2def55a98310413eae1c88e5c7d006ffcc18edb3fe0755926b5181d4b6eaab",
     "backend/app/access/schema.py": "0a6eac6c8c26e57b242801b4e7ea87631de81512224dbdad06a6400bcab5931a",
-    "backend/app/access/service.py": "e5c52aaecb3d99d87ec4085d00178e1802e47a86a75985f7dbd507859f42b5b7",
+    "backend/app/access/service.py": "e588334b541f29371b89da9a96bc9e8c0338423d32520b0ef5a4a4e060685d2f",
     "backend/app/access/stories.py": "340ca10ae4cfce5a08497aae2a4a9b43846a70faa32cd9e431d2822ea70e609c",
     "backend/app/access/story_schema.py": "de338f0d23ccedc1bea18b07729dbb51df5cdad39b9e9678accc2f9428bd656b",
     "backend/app/access/tags.py": "83d35266a1f489f1dbdf86cbb88f9246763991f7a26cbd825f00f15789aa5bd4",

@@ -1,6 +1,6 @@
 # Protected native profile 2.0.0-candidate.16
 
-Backend source: `7321f3c3b4c9fd534d5555efa27636fcff3c132f`.
+Backend source: `808abfe134273d4fa208c14199422dd81ea45d38`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,13 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Candidate.16 maintenance — existing Windows job schema
+
+Upload task insertion explicitly supplies `retry_count=0` and `cancel_requested=0`.
+Existing ORM-created databases require these fields without SQL defaults, whereas
+fresh migration fixtures provide defaults. No schema migration or wire change.
+The same 89 captures remain authoritative; source and payload pins are reissued together.
 
 ## Reissue — 2.0.0-candidate.16 (September 21)
 
