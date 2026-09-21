@@ -94,3 +94,10 @@ speech-to-text and optional polishing are deferred. Preserve original audio/text
 raw transcript, proposed polish and accepted revision separately. Any future
 inference stays on the home Windows machine with explicit resource admission;
 no third-party processing or hidden cloud fallback.
+
+## Candidate.17 admin review
+
+The secured WebUI now offers an explicitly enabled operator/owner upload inbox.
+The same phone upload is still accepted privately; only a confirmed admin review
+moves it into the selected family library. See `docs/security/ADMIN_UPLOAD_REVIEW.md`
+for activation, authorization and the still-separate native admin/status UI scope.

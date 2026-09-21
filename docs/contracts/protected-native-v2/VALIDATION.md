@@ -1,5 +1,16 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.17 — admin upload review
+
+Source `2a684832148c667834213ad6e4915f1724f62a88`. Focused Python suite: 176 passes, with one additional
+shared-cache launcher test passing afterward (31 relevant checks rerun). Existing
+WebUI browser suite: 58 checkpoints. The new actual Chromium/ASGI workflow passes
+private serialized previews, target/audience confirmation, desktop/phone layouts,
+lost-response retry, gallery visibility and revocation cleanup. Synthetic resource
+admission is explicit in the browser harness. All 89 existing native wire cases
+remain byte-identical; only the candidate version/source closure changes.
+Windows activation and real family approval remain separate delivery gates.
+
 ## Candidate.16 maintenance — existing task-table defaults
 
 Source `808abfe134273d4fa208c14199422dd81ea45d38`. A real phone attempt left

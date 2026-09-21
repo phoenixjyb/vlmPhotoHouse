@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.16
+# Protected native profile 2.0.0-candidate.17
 
-Backend source: `808abfe134273d4fa208c14199422dd81ea45d38`.
+Backend source: `2a684832148c667834213ad6e4915f1724f62a88`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -15,6 +15,15 @@ Upload task insertion explicitly supplies `retry_count=0` and `cancel_requested=
 Existing ORM-created databases require these fields without SQL defaults, whereas
 fresh migration fixtures provide defaults. No schema migration or wire change.
 The same 89 captures remain authoritative; source and payload pins are reissued together.
+
+## Reissue — 2.0.0-candidate.17 (September 21)
+
+The explicitly enabled operator/owner upload inbox adds secured WebUI review and
+single-photo approval. See [admin upload review](../../security/ADMIN_UPLOAD_REVIEW.md).
+It is disabled by default and does not change the native upload request or any of
+the 89 existing captured exchanges. Current phone upload clients remain compatible;
+this reissue pins the reviewed server source closure, not native admin UI parity.
+No migration, TV publication or live activation is implied.
 
 ## Reissue — 2.0.0-candidate.16 (September 21)
 
