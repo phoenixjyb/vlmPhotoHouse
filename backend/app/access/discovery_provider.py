@@ -47,6 +47,12 @@ class ReviewedIndex:
     enabled: tuple[str, ...] = ('people', 'date', 'caption', 'tags', 'locations', 'media')
 
 
+@dataclass(frozen=True)
+class ProjectedIndex(ReviewedIndex):
+    """Opt-in dependency-specific projection; legacy artifact identity stays intact."""
+    projection: str = 'enabled-v2'
+
+
 class IndexProvider(Protocol):
     def get(self, library_id: str) -> ReviewedIndex | None: ...
 
@@ -54,7 +60,7 @@ class IndexProvider(Protocol):
 class MemoryIndexProvider:
     """Construction supplies already-reviewed internal inputs; no automatic discovery."""
     def __init__(self, indexes: tuple[ReviewedIndex, ...]):
-        if type(indexes) is not tuple or any(type(i) is not ReviewedIndex for i in indexes):
+        if type(indexes) is not tuple or any(type(i) not in (ReviewedIndex, ProjectedIndex) for i in indexes):
             raise ValueError('Explicit reviewed indexes required')
         if len(indexes) > 32 or len({i.library_id for i in indexes}) != len(indexes):
             raise ValueError('Bounded unique library indexes required')

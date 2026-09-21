@@ -15,6 +15,9 @@ import build_staging_package as package
 class StagingPackageTests(unittest.TestCase):
     def test_runtime_and_operator_import_closure_is_allowlisted(self):
         required = {
+            'scripts/prepare_access_places.py',
+            'scripts/prepare_access_discovery_index.py',
+            'docs/security/PLACE_BROWSING_V24.md',
             'backend/app/access/prepared_video.py',
             'backend/app/home_catalog.py',
             'scripts/export_protected_videos.py',

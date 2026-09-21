@@ -17,7 +17,7 @@ from time import monotonic
 import unicodedata
 
 from .credentials import session_digest
-from .discovery_provider import ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
+from .discovery_provider import ProjectedIndex, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
 from .library import _asset
 from .service import AccessService, AccessDenied
 
@@ -139,8 +139,38 @@ def scoped_source(library, read):
     return {'assets':assets,'captions':captions,'faces':faces,'links':links,'blocks':blocks,'tags':tags}
 
 
+def projected_source(library, read, enabled):
+    """Read only dependencies of enabled facets. Never relax current scope checks.
+
+    Reviewed regions also depend on recorded coordinates. Changes to unrelated
+    captions/faces/tags cannot invalidate date/media/location-only artifacts.
+    All reads remain inside the existing authorization transaction and budget.
+    """
+    source = {key: [] for key in ('assets', 'captions', 'faces', 'links', 'blocks', 'tags')}
+    source['assets'] = read("SELECT a.id,CASE WHEN length(CAST(a.mime AS BLOB))<=256 THEN a.mime END,a.width,a.height,a.duration_sec,CASE WHEN length(CAST(a.taken_at AS BLOB))<=64 THEN a.taken_at END,length(CAST(a.taken_at AS BLOB)) FROM access_asset_libraries m JOIN assets a ON a.id=m.asset_id WHERE m.library_id=? AND (a.status='active' OR a.status IS NULL) ORDER BY m.asset_id", (library,))
+    if 'caption' in enabled:
+        source['captions'] = read('SELECT x.id,x.asset_id,CASE WHEN length(CAST(x.text AS BLOB))<=4096 THEN x.text END,length(CAST(x.text AS BLOB)),length(CAST(x.text AS BLOB)),x.user_edited,x.superseded FROM captions x'+SCOPE+' ORDER BY x.id', (library,))
+    if 'people' in enabled:
+        source['faces'] = read('SELECT x.id,x.asset_id,x.person_id,x.label_source FROM face_detections x'+SCOPE+' ORDER BY x.id', (library,))
+    if 'tags' in enabled:
+        source['links'] = read('SELECT x.id,x.asset_id,x.tag_id,x.source FROM asset_tags x'+SCOPE+' ORDER BY x.id', (library,))
+        source['blocks'] = read('SELECT x.id,x.asset_id,x.tag_id FROM asset_tag_blocks x'+SCOPE+' ORDER BY x.id', (library,))
+        source['tags'] = read("SELECT DISTINCT t.id,CASE WHEN length(CAST(t.name AS BLOB))<=256 THEN t.name END,CASE WHEN length(CAST(t.type AS BLOB))<=32 THEN t.type END,length(CAST(t.name AS BLOB)) FROM tags t JOIN asset_tags x ON x.tag_id=t.id"+SCOPE+' ORDER BY t.id', (library,))
+    if 'locations' in enabled:
+        # Normalize invalid/missing pairs together. A zero coordinate is valid.
+        valid = "typeof(a.gps_lat) IN ('integer','real') AND typeof(a.gps_lon) IN ('integer','real') AND a.gps_lat BETWEEN -90 AND 90 AND a.gps_lon BETWEEN -180 AND 180"
+        source['coordinates'] = read(f"SELECT a.id,CASE WHEN {valid} THEN a.gps_lat END,CASE WHEN {valid} THEN a.gps_lon END FROM access_asset_libraries m JOIN assets a ON a.id=m.asset_id WHERE m.library_id=? AND (a.status='active' OR a.status IS NULL) ORDER BY m.asset_id", (library,))
+    return source
+
+
+def index_source(index, read):
+    return (projected_source(index.library_id, read, index.enabled)
+            if type(index) is ProjectedIndex else scoped_source(index.library_id, read))
+
+
 def validate(index, library, limit):
-    require(type(index) is ReviewedIndex and index.library_id==library)
+    require(type(index) in (ReviewedIndex, ProjectedIndex) and index.library_id==library)
+    if type(index) is ProjectedIndex: require(index.projection == 'enabled-v2')
     identifier(index.revision); require(hashed(index.source_digest))
     scope=ids(index.scope_ids,limit,ordered=True); selected=ids(index.indexed_ids,limit,ordered=True)
     require(selected<=scope)
@@ -157,6 +187,9 @@ def validate(index, library, limit):
         require(type(place) is ReviewedPlace and place.library_id==library)
         identifier(place.id); require(place.id not in places);text(place.label,256);places[place.id]=place
     require(ids(index.pinned_ids,32)<=set(people))
+    if type(index) is ProjectedIndex:
+        require('people' in index.enabled or not (index.people or index.pinned_ids or index.assignments))
+        require('locations' in index.enabled or not (index.places or index.regions))
     require(type(index.assignments) is tuple and len(index.assignments)<=limit)
     seen=set()
     for face in index.assignments:
@@ -211,7 +244,7 @@ class DiscoveryReads:
                     people,places=validate(index,library,self.budget.rows)
                     if len(packed(asdict(index)))>self.budget.index_bytes: raise DiscoveryUnavailable()
                 except (DiscoveryInvalid,TypeError,KeyError,RecursionError): raise DiscoveryUnavailable() from None
-                source=scoped_source(library,read);check()
+                source=index_source(index,read);check()
                 if tuple(str(r[0]) for r in source['assets'])!=index.scope_ids or digest(source)!=index.source_digest: raise DiscoveryChanged()
                 binding=digest({'policy':POLICY,'library':library,'session':session_digest(token),'account':member['account_id'],
                                 'membership':member['revision'],'originals':member['originals'],'index':asdict(index)})

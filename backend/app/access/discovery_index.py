@@ -21,7 +21,7 @@ import re
 import stat
 
 from . import discovery as d
-from .discovery_provider import (MemoryIndexProvider, ReviewedFace, ReviewedIndex,
+from .discovery_provider import (MemoryIndexProvider, ProjectedIndex, ReviewedFace, ReviewedIndex,
                                  ReviewedPerson, ReviewedPlace)
 from .discovery_transport import DiscoveryRuntime
 
@@ -115,7 +115,11 @@ def parse(payload):
                            parse_constant=reject_constant)
     except (ValueError, UnicodeError, RecursionError):
         raise DiscoveryIndexRefused() from None
-    return mapping(value, INDEX_KEYS)
+    if type(value) is not dict or set(value) not in (INDEX_KEYS, INDEX_KEYS | {'projection'}):
+        raise DiscoveryIndexRefused()
+    if 'projection' in value and value['projection'] != 'enabled-v2':
+        raise DiscoveryIndexRefused()
+    return value
 
 
 def person(record):
@@ -154,7 +158,8 @@ def index(payload, limit):
     identifier(record['revision'])
     if DIGEST.fullmatch(text(record['source_digest'], 64)) is None:
         raise DiscoveryIndexRefused()
-    return ReviewedIndex(
+    constructor = ProjectedIndex if 'projection' in record else ReviewedIndex
+    return constructor(
         library_id=record['library_id'], revision=record['revision'],
         scope_ids=tuple(identifier(v) for v in sequence(record['scope_ids'], limit)),
         indexed_ids=tuple(identifier(v) for v in sequence(record['indexed_ids'], limit)),

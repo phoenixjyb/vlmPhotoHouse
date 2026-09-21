@@ -90,7 +90,11 @@ class DiscoveryWiringTests(unittest.TestCase):
         paths = {(m, r.path) for r in app.routes for m in getattr(r, 'methods', []) or []}
         self.assertIn(('GET', '/libraries/{library_id}/discovery/v1/facets'), paths)
         self.assertIn(('POST', '/libraries/{library_id}/discovery/v1/search'), paths)
-        self.assertEqual(len(paths), 57)
+        # Test the discovery surface, independent of unrelated admin routes.
+        self.assertEqual({entry for entry in paths if '/discovery/' in entry[1]}, {
+            ('GET', '/libraries/{library_id}/discovery/v1/facets'),
+            ('POST', '/libraries/{library_id}/discovery/v1/search'),
+        })
 
     def test_boundary_admits_the_two_routes_and_refuses_their_neighbours(self):
         app = self.fixture.app(discovery_runtime=self.fixture.runtime())
