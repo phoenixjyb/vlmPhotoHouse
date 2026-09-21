@@ -1,5 +1,14 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.19 — named-place browsing foundation
+
+Source `bcf359e2b45a8099858139c40705af2c26d9afcd`. Fifteen new GPS/projection checks, 136 existing
+discovery checks, four package checks and 58 Chromium/ASGI browser checkpoints
+passed. Synthetic 30,004-asset place preparation and facet listing stay inside
+unchanged budgets. Native replay retains all 89 exchanges, with only the candidate
+label changed; the profile stays off by default. Runtime activation, actual GPS
+coverage, automatic refresh and phone/projector family acceptance remain separate.
+
 ## Candidate.18 — approved upload gallery visibility
 
 Source `213195564850521706c50ed4309a97d1c757eeca`. Gallery, media-filter, upload review, promotion,
