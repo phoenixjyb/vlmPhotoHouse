@@ -46,6 +46,32 @@ class UploadRetryTests(unittest.TestCase):
     def canonical_path(self, result):
         return Path(self.rows('SELECT path FROM assets WHERE id=?', (int(result['asset_id']),))[0][0])
 
+    def test_upload_initializes_required_legacy_job_fields(self):
+        # Existing ORM-created Windows tables have client-side defaults only.
+        # Fresh migration fixtures supply server defaults and masked this failure.
+        with closing(self.connection()) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM tasks').fetchone()[0], 0)
+            db.execute('DROP TABLE tasks')
+            db.execute("""CREATE TABLE tasks (
+                id INTEGER PRIMARY KEY NOT NULL,
+                type VARCHAR(32) NOT NULL, payload_json JSON NOT NULL,
+                state VARCHAR(16) NOT NULL, priority INTEGER NOT NULL,
+                retry_count INTEGER NOT NULL, cancel_requested BOOLEAN NOT NULL,
+                last_error TEXT, progress_current INTEGER, progress_total INTEGER,
+                scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME, started_at DATETIME, finished_at DATETIME)""")
+            db.commit()
+        data = base.png(64, 64)
+        first = self.upload(data, batch='8' * 32)
+        retry = self.upload(data, batch='9' * 32)
+        self.assertEqual(retry, {**first, 'tasks_enqueued': 0})
+        jobs = self.rows('SELECT type,state,retry_count,cancel_requested FROM tasks ORDER BY type')
+        self.assertEqual([tuple(row) for row in jobs],
+                         [(kind, 'pending', 0, 0) for kind in ('caption', 'embed', 'face', 'phash', 'thumb')])
+        self.assertEqual(self.rows('SELECT count(*) FROM access_uploads')[0][0], 1)
+        self.assertEqual(len([p for p in self.fixture.incoming.rglob('*') if p.is_file()]), 1)
+
     def test_different_batch_concurrent_retries_publish_one_canonical_file(self):
         data = base.png(640, 480)
         batches = [format(i, '032x') for i in range(1, 3)]

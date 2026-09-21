@@ -324,8 +324,8 @@ class AccessService:
             payload = {'asset_id': asset_id}
             if extra:
                 payload.update(extra)
-            self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,
-                scheduled_at,created_at) VALUES (?,?,'pending',?,datetime('now'),datetime('now'))''',
+            self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,retry_count,cancel_requested,
+                scheduled_at,created_at) VALUES (?,?,'pending',?,0,0,datetime('now'),datetime('now'))''',
                 (kind, json.dumps(payload, sort_keys=True), priority))
             enqueued += 1
         return self._upload_result(asset_id, label, batch, digest, size_bytes, mime, size,
