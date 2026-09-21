@@ -26,7 +26,7 @@ FILES = tuple(sorted([
         'discovery','discovery_provider','discovery_transport','discovery_index')),
     *('backend/app/access/'+name+'.py' for name in (
         'upload','upload_schema','upload_transport','duplicates','captions',
-        'promotion','task_recovery')),
+        'promotion','task_recovery','upload_review')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -53,7 +53,7 @@ FILES = tuple(sorted([
     'docs/security/staging-config.example.json', 'docs/security/OPERATOR_TOOL.md',
     'docs/security/DATABASE_PREPARATION.md', 'docs/security/FULLSIZE_REHEARSAL.md',
     'docs/security/CAPTION_WORKER.md', 'docs/security/OWNER_RECOVERY.md', 'docs/FAMILY_STORIES.md',
-    'docs/security/OWNER_PEOPLE_REVIEW.md', 'docs/security/OWNER_FACE_ASSIGNMENT.md',
+    'docs/security/ADMIN_UPLOAD_REVIEW.md', 'docs/security/OWNER_PEOPLE_REVIEW.md', 'docs/security/OWNER_FACE_ASSIGNMENT.md',
     'docs/security/OWNER_SETUP_GATE.md', 'docs/security/LIBRARY_MANAGEMENT.md',
     'docs/security/MANAGEMENT_IMPORT.md',
     'docs/security/OWNERSHIP_REPAIR.md',

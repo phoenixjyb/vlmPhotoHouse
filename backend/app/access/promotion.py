@@ -1,6 +1,6 @@
-"""Offline promotion of member uploads into a library, and bounded reassignment.
+"""Reviewed promotion of member uploads into a library, and bounded reassignment.
 
-Two operations, both sealed plans in the existing offline family and neither mounted on HTTP:
+Sealed plans shared by the offline tool and the explicitly enabled admin upload inbox:
 
 * **promote_and_assign** moves bytes out of the incoming area into the originals root and writes
   the library mapping. It is deliberately **one** operation: assigning without promoting would
@@ -372,7 +372,8 @@ def _record(state, plan, receipt):
     db = state.access.db
     db.execute('INSERT INTO access_provisioning_receipts VALUES (?,?,?)',
                (plan['plan_id'], receipt['plan_digest'], _json(receipt).decode()))
-    state.access._audit(plan['target']['operator_account_id'], 'offline.' + plan['operation'],
+    audit_prefix = 'web.' if receipt.get('channel') == 'web' else 'offline.'
+    state.access._audit(plan['target']['operator_account_id'], audit_prefix + plan['operation'],
                         plan['target']['library_id'], None)
 
 
@@ -408,7 +409,7 @@ def _file_transaction(access, moves, operation):
         raise
 
 
-def promote_and_assign(envelope, *, review, clock=time.time):
+def promote_and_assign(envelope, *, review, clock=time.time, authorize=None, allow_replay=False):
     """Move each selected upload into the originals root and map it into the library.
 
     One operation, not two. Assigning without promoting would leave `assets.path` pointing
@@ -429,8 +430,23 @@ def promote_and_assign(envelope, *, review, clock=time.time):
             if _identity(review.database) != review.database_identity:
                 raise PlanRejected('Promotion target changed')
             plan = envelope['plan']
-            if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
-                          (plan['plan_id'], review.plan_digest)).fetchone():
+            # HTTP callers recheck the live session, operator, owner and uploader scope
+            # inside the same writer reservation as all file and mapping changes.
+            if authorize is not None:
+                authorize(state.access, plan)
+            prior = db.execute('SELECT plan_digest,receipt FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
+                               (plan['plan_id'], review.plan_digest)).fetchone()
+            if prior:
+                if allow_replay and authorize is not None and prior[0] == review.plan_digest:
+                    # A later offline unassignment/reassignment must never be reported
+                    # as this old approval still being applied.
+                    for asset in plan['target']['asset_ids']:
+                        current = db.execute('''SELECT u.state,m.library_id FROM access_uploads u
+                            LEFT JOIN access_asset_libraries m ON m.asset_id=u.asset_id
+                            WHERE u.asset_id=?''', (int(asset),)).fetchone()
+                        if current != ('assigned', plan['target']['library_id']):
+                            raise PlanRejected('Applied upload changed; review again')
+                    return json.loads(prior[1])
                 raise PlanRejected('Plan already applied')
             state._validate_in_transaction(envelope)
             target = plan['target']
@@ -463,6 +479,9 @@ def promote_and_assign(envelope, *, review, clock=time.time):
                 'library_id': library, 'asset_count': len(rows),
                 'bytes_promoted': sum(row[5] for row in rows),
                 'promoted_folder': PROMOTED_FOLDER, 'media_writes': True})
+            if authorize is not None:
+                authorize(state.access, plan)
+                receipt['channel'] = 'web'
             _record(state, plan, receipt)
             _assert_unexpired(state, plan)
             if db.execute('PRAGMA foreign_key_check').fetchone():
