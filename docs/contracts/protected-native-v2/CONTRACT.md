@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.20
+# Protected native profile 2.0.0-candidate.21
 
-Backend source: `c056c758d3e1f3611521ec726a3ea231a2a0dec0`.
+Backend source: `d2e5eaffdc18436123d697aaab2d49df1de19145`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,18 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.21 (September 21)
+
+The protected discovery locations facet accepts optional `q` (128 UTF-8 bytes)
+for local Chinese/English name and alias lookup. Only `facet=locations` accepts
+this field. Suggestions retain the existing label/ID/count response shape;
+selection feeds the unchanged combined asset search. Blank/no-query calls and
+all 89 native captures retain their previous semantics. `NamedPlace` adds opt-in
+operator aliases without changing legacy place serialization. A public nine-area
+starter catalogue documents approximate rectangles and their government sources.
+No online geocoder or automatic geographic inference from captions is used.
+See [query contract and catalogue](../../security/PLACE_NAME_SEARCH_V26.md).
 
 ## Reissue — 2.0.0-candidate.20 (September 21)
 
