@@ -1,5 +1,16 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.20 — current-library place refresh
+
+Source `c056c758d3e1f3611521ec726a3ea231a2a0dec0`. Thirteen new refresh checks,
+15 existing GPS/projection checks and 136 existing discovery checks passed.
+Tests cover newly mapped uploads, GPS/date/scope changes, revoked access, stale
+bindings, strict loading, legacy artifacts and unchanged resource limits.
+The native replay retains all 89 exchanges with only the candidate label changed.
+The manifest pins 121 source files and seven payloads; profile defaults remain off.
+Windows aggregate/performance qualification is recorded in the private operator
+handoff. It does not establish authenticated HTTP or phone/projector acceptance.
+
 ## Candidate.19 — named-place browsing foundation
 
 Source `bcf359e2b45a8099858139c40705af2c26d9afcd`. Fifteen new GPS/projection checks, 136 existing

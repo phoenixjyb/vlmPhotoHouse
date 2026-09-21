@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.19
+# Protected native profile 2.0.0-candidate.20
 
-Backend source: `bcf359e2b45a8099858139c40705af2c26d9afcd`.
+Backend source: `c056c758d3e1f3611521ec726a3ea231a2a0dec0`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,17 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.20 (September 21)
+
+Explicit current-library region rules can refresh place membership and date bounds
+from current authorized metadata inside the same bounded read transaction. Newly
+mapped uploads and GPS changes appear after a fresh facets request; stale search
+bindings return 409. Static artifacts retain their existing behavior. No public
+wire shape, endpoint, schema, anonymous Home publication or client default changes.
+All 89 captured native exchanges remain unchanged apart from the candidate label.
+See [refresh policy and checks](../../security/PLACE_REFRESH_V25.md). Named regions,
+production activation and real-device acceptance remain separate operator steps.
 
 ## Reissue — 2.0.0-candidate.19 (September 21)
 
