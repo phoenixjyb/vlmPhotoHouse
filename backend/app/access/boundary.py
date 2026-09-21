@@ -17,6 +17,7 @@ from .upload_transport import router as upload_router
 from .upload_review import router as upload_review_router
 from .duplicates import router as duplicate_router
 from .captions import router as caption_router
+from .library_organization import router as organization_router
 from ..routers.ui import router as ui_router
 
 
@@ -31,7 +32,7 @@ class ClosedBoundary:
     UI = {'/ui', '/ui/app.js', '/ui/styles.css', '/ui/photohouse-icon.png', '/ui/search', '/ui/admin'}
 
     REVIEWED = {(method, route.path, route.endpoint)
-                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router, upload_router, upload_review_router, duplicate_router, caption_router)
+                for router in (account_router, media_router, library_router, member_router, story_router, people_router, tag_router, album_router, ui_router, discovery_router, upload_router, upload_review_router, duplicate_router, caption_router, organization_router)
                 for route in router.routes for method in route.methods}
 
     def __init__(self, app, routes):
@@ -50,6 +51,8 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method == 'GET' and path in ('/library-catalogue', '/admin/library-transfers'): return True
+        if method == 'POST' and path in ('/admin/library-transfers/review', '/admin/library-transfers/confirm'): return True
         if method == 'GET' and (path == '/admin/uploads' or re.fullmatch(r'/admin/uploads/[0-9]+/preview', path)): return True
         if method == 'POST' and re.fullmatch(r'/admin/uploads/[0-9]+/(review|approve)', path): return True
         if method == 'POST' and path == '/uploads':

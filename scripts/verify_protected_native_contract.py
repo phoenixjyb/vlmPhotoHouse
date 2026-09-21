@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = 'd2e5eaffdc18436123d697aaab2d49df1de19145'
+SOURCE = 'd6192b91bc0983ab7b67aa14458eb052ed3c0ee6'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text(encoding='utf-8'))
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.21':
+    if manifest['contract_version'] != '2.0.0-candidate.22':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,
@@ -50,6 +50,8 @@ def verify(root=ROOT):
         if '__pycache__' not in path.parts
     }
     expected_sources |= {'scripts/prepare_access_places.py',
+                         'scripts/create_library_presets.py',
+                         'docs/security/LIBRARY_ORGANIZATION_V27.md',
                          'scripts/prepare_access_discovery_index.py',
                          'docs/security/PLACE_BROWSING_V24.md',
                          'docs/security/PLACE_REFRESH_V25.md',
@@ -57,6 +59,9 @@ def verify(root=ROOT):
                          'docs/security/place-catalogue-china-starter.json',
                          'docs/security/PLACE_CATALOGUE_SOURCES.md',
                          'tests/security/test_place_name_search.py',
+                         'tests/security/test_library_organization.py',
+                         'tests/security/test_promotion.py',
+                         'docs/security/route_capabilities.json',
                          'tests/security/test_phone_discovery_http.py',
                          'tests/security/phone_discovery_fixture.py',
                          'tests/security/test_library_reads.py',

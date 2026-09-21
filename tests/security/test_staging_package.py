@@ -15,6 +15,9 @@ import build_staging_package as package
 class StagingPackageTests(unittest.TestCase):
     def test_runtime_and_operator_import_closure_is_allowlisted(self):
         required = {
+            'backend/app/access/library_organization.py',
+            'scripts/create_library_presets.py',
+            'docs/security/LIBRARY_ORGANIZATION_V27.md',
             'scripts/prepare_access_places.py',
             'scripts/prepare_access_discovery_index.py',
             'docs/security/PLACE_BROWSING_V24.md',
