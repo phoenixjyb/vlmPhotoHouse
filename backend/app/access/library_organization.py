@@ -4,6 +4,9 @@ No startup provisioning, membership copying, media writes or Home publication.
 Names are public product presets; authorization always uses stored memberships.
 """
 import json
+import logging
+import sqlite3
+import traceback
 import time
 
 from fastapi import APIRouter, Request
@@ -171,6 +174,16 @@ def _call(runtime, action, *args):
         return getattr(LibraryOrganization(runtime), action)(*args)
     except PlanRejected:
         raise TransportError(409, 'Asset or audience changed; review again') from None
+    except Exception as error:
+        # Diagnose failed writes without recording credentials, plans, SQL or media.
+        # Only fixed action names, exception classes and source line numbers are logged.
+        frames = traceback.extract_tb(error.__traceback__)
+        line = frames[-1].lineno if frames else 0
+        kind = type(error).__name__
+        code = getattr(error, 'sqlite_errorcode', 0) if isinstance(error, sqlite3.Error) else 0
+        logging.getLogger(__name__).warning('Library operation failed action=%s kind=%s code=%s line=%s',
+                                           action, kind, code, line)
+        raise
 
 
 @router.get('/library-catalogue')

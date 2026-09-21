@@ -311,12 +311,53 @@ class People:
     def unassign(self, token, library, face, body):
         return self.change(token, library, face, body)
 
+    def _face_job_conflict(self, asset):
+        """Return whether queued face work can race this asset mutation.
+
+        Detection and embedding jobs are bounded to one asset/face. Assignment
+        jobs operate on a library-wide cohort and therefore remain global
+        barriers. Unknown or oversized task metadata fails closed.
+        """
+        rows = self.db.execute("""SELECT type,substr(payload_json,1,8193) FROM tasks
+            WHERE state IN ('pending','running')
+            AND type IN ('face','face_embed','person_cluster','person_recluster','person_label_propagate')
+            ORDER BY id LIMIT 1001""").fetchall()
+        if len(rows) > 1000:
+            return True
+        for kind, raw in rows:
+            if kind in ('person_cluster', 'person_recluster', 'person_label_propagate'):
+                return True
+            if not isinstance(raw, (str, bytes)) or len(raw.encode('utf-8') if isinstance(raw, str) else raw) > 8192:
+                return True
+            try:
+                payload = json.loads(raw) if isinstance(raw, str) else raw
+            except (RecursionError, TypeError, ValueError):
+                return True
+            if not isinstance(payload, dict):
+                return True
+            key = 'asset_id' if kind == 'face' else 'face_id'
+            value = payload.get(key)
+            if (isinstance(value, bool) or not isinstance(value, int)
+                    or value < 1 or value > 2**63 - 1):
+                return True
+            if kind == 'face':
+                if self.db.execute('SELECT 1 FROM assets WHERE id=?', (value,)).fetchone() is None:
+                    return True
+                if value == asset:
+                    return True
+            else:
+                linked = self.db.execute('SELECT asset_id FROM face_detections WHERE id=?', (value,)).fetchone()
+                if linked is None:
+                    return True
+                if linked[0] == asset:
+                    return True
+        return False
+
     def _mutate_face(self, member, library, row, person):
         face = row[0]
-        # Global legacy face writers are not library-scoped. Never race known
-        # queued/in-flight jobs or enqueue propagation from this protected UI.
-        if self.db.execute("""SELECT 1 FROM tasks WHERE state IN ('pending','running')
-            AND type IN ('face','face_embed','person_cluster','person_recluster','person_label_propagate') LIMIT 1""").fetchone():
+        # Asset-local legacy writers can race this face; assignment workers are
+        # library-wide. Never race queued/in-flight work from this protected UI.
+        if self._face_job_conflict(row[1]):
             raise TransportError(409, 'Face processing active; review later')
         if row[2] == person and row[3] == 'manual':
             return self._present_face(row, library)
