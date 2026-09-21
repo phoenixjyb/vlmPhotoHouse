@@ -12,7 +12,7 @@
   "payload_sha256": {
     "docs/contracts/protected-native-v2/CONTRACT.md": "5f8aadca34a8b664a847835cba3aec1c840324d7e476dd1b625a9f71fc65c713",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "9c52e0d9338ba49c2e8c74c5e4622294307bd67a024fe769a77b2a5fe1c82b12",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "cb7515b470fbdfa3f20fbd63c9263585a543d4902a1fcd6271a82e57303710f3",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "98f9bf5f53b46bcb8a9610bce11c1e62bfa611cc601eed885cba437c3d040712",
     "docs/contracts/protected-native-v2/cases.json": "c6cb8adfd4c62e0cfd5333fa8b15692b165f6ede13064c356dda44260e89cf44",
     "scripts/verify_protected_native_contract.py": "c1739172c6fa028a3f85d3844cca58f043d8cfee05d6bc1479d10be7a6bddbac",
     "tests/security/native_contract_v2_probe.py": "9c730cc763f900041cc848b877550d4c8aef24f8f38dcdd2f1076a301626cb79",
