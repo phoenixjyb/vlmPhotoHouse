@@ -851,6 +851,19 @@ let browser;
   await page.locator('#discovery-panel').waitFor({state:'visible'});
   assert.equal(await page.locator('#discovery-panel').isVisible(),true);
   await page.locator('#discovery-panel > summary').click();
+  // Reviewed named places are offered from the locations facet, with their server
+  // counts. Selecting one is read-only and joins the existing date/media filters.
+  await page.locator('#discovery-place-list .place-choice').first().waitFor();
+  assert.equal(await page.locator('#discovery-place-list .place-choice').count(),1);
+  assert.match(await page.locator('#discovery-place-list .place-choice').first().textContent(),/Example region/);
+  await page.locator('#discovery-place-list .place-choice').first().click();
+  assert.equal(await page.locator('#discovery-place-list .place-choice').first().getAttribute('aria-pressed'),'true');
+  await page.locator('#discovery-media').selectOption('image');
+  await page.locator('#discovery-from').fill('2025-12-01');
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
+  await page.locator('#discovery-clear').click();
   // Nothing is listed until a filter is chosen: the panel narrows, it does not duplicate
   // the gallery below it.
   assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);

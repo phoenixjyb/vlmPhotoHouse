@@ -19,7 +19,7 @@
   const duplicateState={page:1,total:0,load:0};
   // Date/media narrowing. `binding` is issued by the facets route and must be echoed to
   // the search route; `fingerprint` chains a later page to the exact filter it paginates.
-  const discoveryState={binding:null,page:1,total:0,load:0,fingerprint:null,applied:false};
+  const discoveryState={binding:null,page:1,total:0,load:0,fingerprint:null,applied:false,placePage:1,placeTotal:0,places:[],selectedPlaces:new Set(),placesAvailable:false};
   const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
   const albumState={page:1,total:0,load:0,draft:null,archivedLoad:0};
@@ -43,8 +43,8 @@
   Object.assign(words.zh,{managePeople:'管理人物 · 主人',peopleHelp:'查看本家庭库中已保存的人名和人脸。修改姓名不会合并人物或更改人脸归属。',findPerson:'查找已保存的人名',peopleEmpty:'没有匹配的人名。暂不包含未分配的人脸或尚未关联到本家庭库的人名。',personName:'显示姓名',unnamedPerson:'未命名人物',reviewFaces:'查看人脸',saveName:'保存姓名',nameSaved:'姓名已保存。',nameConflict:'该人物已更改，请查看刷新后的记录再编辑。',nameUnavailable:'此记录需另行确认归属后才能修改姓名。',facesCount:'张本库人脸',moreFaces:'更多人脸',nameShortened:'原姓名较长，此处缩短显示。',nameSaveFailed:'尚未确认保存成功，请刷新记录后再试。'});
   Object.assign(words.en,{viewFilmstrip:'Photos in this view',viewFilmstripItem:'Photo',goToPage:'Go to page',go:'Go',pageRange:'Enter a page number between 1 and the last page.'});
   Object.assign(words.zh,{viewFilmstrip:'当前视图中的照片',viewFilmstripItem:'照片',goToPage:'跳转到页码',go:'前往',pageRange:'请输入有效范围内的页码。'});
-  Object.assign(words.en,{displayName:'Your name',displayNameHelp:'How your family will see you, up to 64 characters.',invalidName:'Enter your name to join.',filterByDate:'Filter by date and media',discoveryHelp:'Narrow this library by when a photo was taken and whether it is a photo or a video. Read-only: nothing here changes or hides a photo.',mediaKind:'Media',mediaAll:'Photos and videos',mediaImage:'Photos only',mediaVideo:'Videos only',dateFrom:'From',dateTo:'To',applyFilter:'Apply',clearFilter:'Clear',discoveryHint:'Choose a date range or a media kind, then apply.',discoveryRange:'Enter a range whose first date is not after the second.',discoveryNone:'No photo in this library matches that filter.',discoveryChanged:'This library changed since the filter was prepared. Reopen the panel and apply again.',discoveryResult:'Filtered photo'});
-  Object.assign(words.zh,{displayName:'您的名字',displayNameHelp:'家人将以此称呼您，最多 64 个字符。',invalidName:'请输入您的名字后再加入。',filterByDate:'按日期和媒体筛选',discoveryHelp:'按拍摄时间和媒体类型缩小本资料库范围。此处为只读：不会更改或隐藏任何照片。',mediaKind:'媒体',mediaAll:'照片和视频',mediaImage:'仅照片',mediaVideo:'仅视频',dateFrom:'从',dateTo:'到',applyFilter:'应用',clearFilter:'清除',discoveryHint:'请选择日期范围或媒体类型，然后应用。',discoveryRange:'请输入起始日期不晚于结束日期的范围。',discoveryNone:'本资料库中没有符合该筛选的照片。',discoveryChanged:'准备筛选后本资料库已发生变化。请重新打开面板后再应用。',discoveryResult:'筛选出的照片'});
+  Object.assign(words.en,{displayName:'Your name',displayNameHelp:'How your family will see you, up to 64 characters.',invalidName:'Enter your name to join.',filterByDate:'Filter by date, places and media',discoveryHelp:'Narrow this library by when a photo was taken, a reviewed place, and whether it is a photo or a video. Read-only: nothing here changes or hides a photo.',places:'Places',placesHelp:'Choose a named place from reviewed library metadata. Places are shown only when this library has them.',placesNone:'No named places are available in this library.',placesUnavailable:'Named places are not available for this library.',placesLoading:'Loading named places…',placesRetry:'Retry places',placesCount:'photos',placeSelected:'Selected',mediaKind:'Media',mediaAll:'Photos and videos',mediaImage:'Photos only',mediaVideo:'Videos only',dateFrom:'From',dateTo:'To',applyFilter:'Apply',clearFilter:'Clear',discoveryHint:'Choose a date range, named place or media kind, then apply.',discoveryRange:'Enter a range whose first date is not after the second.',discoveryNone:'No photo in this library matches that filter.',discoveryChanged:'This library changed since the filter was prepared. Reopen the panel and apply again.',discoveryResult:'Filtered photo'});
+  Object.assign(words.zh,{displayName:'您的名字',displayNameHelp:'家人将以此称呼您，最多 64 个字符。',invalidName:'请输入您的名字后再加入。',filterByDate:'按日期、地点和媒体筛选',discoveryHelp:'按拍摄时间、已审核的地点和媒体类型缩小本资料库范围。此处为只读：不会更改或隐藏任何照片。',places:'地点',placesHelp:'选择本家庭库已审核元数据中的命名地点。只有本库存在地点信息时才会显示。',placesNone:'本家庭库暂无可用的命名地点。',placesUnavailable:'本家庭库暂不提供命名地点。',placesLoading:'正在加载命名地点…',placesRetry:'重试地点',placesCount:'张照片',placeSelected:'已选择',mediaKind:'媒体',mediaAll:'照片和视频',mediaImage:'仅照片',mediaVideo:'仅视频',dateFrom:'从',dateTo:'到',applyFilter:'应用',clearFilter:'清除',discoveryHint:'请选择日期范围、命名地点或媒体类型，然后应用。',discoveryRange:'请输入起始日期不晚于结束日期的范围。',discoveryNone:'本资料库中没有符合该筛选的照片。',discoveryChanged:'准备筛选后本资料库已发生变化。请重新打开面板后再应用。',discoveryResult:'筛选出的照片'});
   Object.assign(words.en,{peopleFilter:'Show',peopleAll:'Named and unnamed',peopleNamed:'Named only',peopleUnnamed:'Unnamed only',unassignedFaces:'Unassigned faces · Owner worklist',unassignedHelp:'Faces that no saved person claims yet, across this library. Assigning one keeps the rest of the list.',noUnassignedFaces:'No unassigned faces in this library.',sourcePhoto:'Photo',openPhoto:'Open this photo'});
   Object.assign(words.zh,{peopleFilter:'显示',peopleAll:'已命名与未命名',peopleNamed:'仅已命名',peopleUnnamed:'仅未命名',unassignedFaces:'未分配人脸 · 主人工作清单',unassignedHelp:'本家庭库中尚未归属任何人的人脸。分配其中一张后，清单其余项保持不变。',noUnassignedFaces:'本家庭库中没有未分配的人脸。',sourcePhoto:'照片',openPhoto:'打开这张照片'});
   Object.assign(words.en,{personPhotos:'Photos of this person',noPersonPhotos:'No photo in this library is labelled with this person yet.',clearPerson:'Close',personPhotosHelp:'Read-only. A face label is a guess the library made; it can be wrong.'});
@@ -156,8 +156,8 @@
     $('directory-query').value='';$('directory-list').replaceChildren();$('directory-status').textContent='';$('directory-pages').hidden=true;
     tagState.page=1;tagState.query='';tagState.total=0;tagState.tag=null;tagState.tagPage=1;tagState.tagTotal=0;tagState.open=null;
     $('tag-query').value='';$('tag-list').replaceChildren();$('tag-status').textContent='';$('tag-pages').hidden=true;$('tag-assets').replaceChildren();
-    discoveryState.binding=null;discoveryState.page=1;discoveryState.total=0;discoveryState.fingerprint=null;discoveryState.applied=false;
-    $('discovery-panel').hidden=true;$('discovery-panel').open=false;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';$('discovery-list').replaceChildren();$('discovery-status').textContent='';$('discovery-pages').hidden=true;
+    discoveryState.binding=null;discoveryState.page=1;discoveryState.total=0;discoveryState.fingerprint=null;discoveryState.applied=false;discoveryState.placePage=1;discoveryState.placeTotal=0;discoveryState.places=[];discoveryState.selectedPlaces.clear();discoveryState.placesAvailable=false;
+    $('discovery-panel').hidden=true;$('discovery-panel').open=false;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';$('discovery-list').replaceChildren();$('discovery-status').textContent='';$('discovery-pages').hidden=true;$('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;$('discovery-places').hidden=true;$('discovery-places-status').textContent='';
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';$('name').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -1285,7 +1285,7 @@
     const current=()=>!stale(epoch)&&load===discoveryState.load&&library===state.library;
     try{
       const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+
-        new URLSearchParams({facet:'people',page:'1',page_size:'1'}),{epoch});
+        new URLSearchParams({facet:'locations',page:String(discoveryState.placePage),page_size:'24'}),{epoch});
       if(!current())return;
       if(!Array.isArray(result.enabled)||!result.enabled.includes('media')){$('discovery-panel').hidden=true;return;}
       discoveryState.binding=result.binding;
@@ -1296,8 +1296,33 @@
       const low=typeof bounds.from==='string'?bounds.from:'',high=typeof bounds.to==='string'?bounds.to:'';
       for(const id of ['discovery-from','discovery-to']){$(id).min=low;$(id).max=high;}
       $('discovery-panel').hidden=false;
+      discoveryState.placesAvailable=Array.isArray(result.enabled)&&result.enabled.includes('locations');
+      if(discoveryState.placesAvailable){
+        discoveryState.placeTotal=Number(result.total)||0;
+        discoveryState.places=Array.isArray(result.items)?result.items:[];
+        renderDiscoveryPlaces();
+      }else{$('discovery-places').hidden=true;$('discovery-places-status').textContent=t('placesUnavailable');}
       if(!discoveryState.applied)$('discovery-status').textContent=t('discoveryHint');
-    }catch(error){if(current()){$('discovery-panel').hidden=true;discoveryState.binding=null;}}
+    }catch(error){if(current()){$('discovery-panel').hidden=false;$('discovery-places').hidden=false;$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void openDiscovery());$('discovery-places-status').append(' ',retry);}}
+  }
+  function renderDiscoveryPlaces(){
+    if(!discoveryState.placesAvailable)return;
+    const list=$('discovery-place-list');list.replaceChildren();
+    if(!discoveryState.placeTotal){$('discovery-places').hidden=false;$('discovery-places-status').textContent=t('placesNone');$('discovery-place-pages').hidden=true;return;}
+    $('discovery-places').hidden=false;$('discovery-places-status').textContent='';
+    for(const place of discoveryState.places){
+      const button=document.createElement('button');button.type='button';button.className='place-choice';button.dataset.placeId=String(place.id);button.setAttribute('aria-pressed',String(discoveryState.selectedPlaces.has(String(place.id))));
+      const label=document.createElement('span');label.textContent=String(place.label||place.id);const count=document.createElement('small');count.textContent=`${Number(place.asset_count)||0} ${t('placesCount')}`;button.append(label,count);
+      button.addEventListener('click',()=>{if(state.busy||state.locked)return;const id=String(place.id);if(discoveryState.selectedPlaces.has(id))discoveryState.selectedPlaces.delete(id);else discoveryState.selectedPlaces.add(id);button.setAttribute('aria-pressed',String(discoveryState.selectedPlaces.has(id)));});list.append(button);
+    }
+    const pages=Math.max(1,Math.ceil(discoveryState.placeTotal/24));$('discovery-place-pages').hidden=pages<=1;$('discovery-place-previous').disabled=discoveryState.placePage===1;$('discovery-place-next').disabled=discoveryState.placePage>=pages;$('discovery-place-page-label').textContent=`${t('page')} ${discoveryState.placePage} ${t('of')} ${pages}`;
+  }
+  async function loadDiscoveryPlaces(){
+    if(state.locked||!state.library||!discoveryState.placesAvailable)return;
+    const epoch=state.generation,library=state.library,load=++discoveryState.load;const current=()=>!stale(epoch)&&load===discoveryState.load&&library===state.library;
+    $('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;$('discovery-places-status').textContent=t('placesLoading');
+    try{const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+new URLSearchParams({facet:'locations',page:String(discoveryState.placePage),page_size:'24',binding:discoveryState.binding}),{epoch});if(!current())return;discoveryState.placeTotal=Number(result.total)||0;discoveryState.places=Array.isArray(result.items)?result.items:[];renderDiscoveryPlaces();}
+    catch(error){if(current()){$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void loadDiscoveryPlaces());$('discovery-places-status').append(' ',retry);}}
   }
   async function loadDiscovery(){
     if(state.locked||!discoveryState.binding)return;
@@ -1305,6 +1330,7 @@
     if(from&&to&&from>to){$('discovery-status').textContent=t('discoveryRange');return;}
     const filters={};
     if($('discovery-media').value!=='all')filters.media=[$('discovery-media').value];
+    if(discoveryState.selectedPlaces.size)filters.locations=[...discoveryState.selectedPlaces];
     if(from||to)filters.date={from:from||null,to:to||null};
     if(!Object.keys(filters).length){
       discoveryState.applied=false;discoveryState.fingerprint=null;
@@ -1403,7 +1429,9 @@
     if(discoveryState.applied)void loadDiscovery();
   });
   $('discovery-form').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;discoveryState.page=1;void loadDiscovery();});
-  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.page=1;void loadDiscovery();});
+  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.selectedPlaces.clear();document.querySelectorAll('.place-choice').forEach(button=>button.setAttribute('aria-pressed','false'));discoveryState.page=1;void loadDiscovery();});
+  $('discovery-place-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage>1){discoveryState.placePage--;void loadDiscoveryPlaces();}});
+  $('discovery-place-next').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage*24<discoveryState.placeTotal){discoveryState.placePage++;void loadDiscoveryPlaces();}});
   $('discovery-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.page>1){discoveryState.page--;void loadDiscovery();}});
   $('discovery-next').addEventListener('click',()=>{if(!state.busy&&discoveryState.page*24<discoveryState.total){discoveryState.page++;void loadDiscovery();}});
   $('people-panel').addEventListener('toggle',()=>{if($('people-panel').open){void loadPeople();if($('unassigned-section').open)void loadUnassignedFaces();}});
