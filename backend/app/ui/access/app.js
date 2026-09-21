@@ -90,7 +90,10 @@
     }
   }
   let statusKey = '';
-  function status(key) { statusKey = key; $('status').textContent = key ? t(key) : ''; }
+  function status(key) {
+    statusKey = key;
+    for (const id of ['status','auth-feedback']) $(id).textContent = key ? t(key) : '';
+  }
   function translate() {
     document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
     document.querySelectorAll('[data-i18n]').forEach(node => {node.textContent=t(node.dataset.i18n);});
@@ -708,7 +711,7 @@
     $('register-tab').setAttribute('aria-pressed',String(mode==='register'));
     $('registration-fields').hidden=mode!=='register';$('code').required=mode==='register';$('name').required=mode==='register';
     $('password').autocomplete=mode==='register'?'new-password':'current-password';
-    $('password').minLength=mode==='register'?8:1;$('password').value='';$('code').value='';translate();
+    $('password').minLength=mode==='register'?8:1;$('password').value='';$('code').value='';status('');translate();
   }
   // UI convenience only: transport and stored identities remain explicit E.164.
   function phoneForRequest(value) {
@@ -719,8 +722,11 @@
   }
   Object.assign(words.en, {phoneHelp:'China (+86) is the default. For another country, enter + and its country code.',invalidPhone:'Enter an 11-digit number, or a full international number starting with +.'});
   Object.assign(words.zh, {phoneHelp:'默认中国区号 +86，无需输入。其他国家请填写以 + 和国家区号开头的完整号码。',invalidPhone:'请输入 11 位号码，或以 + 和国家区号开头的完整号码。'});
+  Object.assign(words.en, {invalidCode:'Enter the invitation code sent by your library owner.',enterPassword:'Enter your password.'});
+  Object.assign(words.zh, {invalidCode:'请输入相册主人发给你的邀请码。',enterPassword:'请输入密码。'});
   async function signIn(event) {
     event.preventDefault();if(state.busy)return;
+    status('');
     const phone=phoneForRequest($('phone').value),password=$('password').value;
     if(!phone) {status('invalidPhone');return;}
     if(state.mode==='register'&&(Array.from(password).length<8||Array.from(password).length>128)){status('invalidPassword');return;}
@@ -1596,6 +1602,12 @@
   $('auth-form').addEventListener('submit',event=>{void signIn(event);});
   $('login-tab').addEventListener('click',()=>setMode('login'));
   $('register-tab').addEventListener('click',()=>setMode('register'));
+  // Native validation can block submit entirely; mirror its first error near the button.
+  $('auth-form').addEventListener('invalid',event=>{
+    if(event.target!==$('auth-form').querySelector(':invalid'))return;
+    const key={phone:'invalidPhone',password:state.mode==='register'?'invalidPassword':'enterPassword',name:'invalidName',code:'invalidCode'}[event.target.id];
+    if(key)status(key);
+  },true);
   $('logout').addEventListener('click',()=>{void signOut();});
   $('refresh').addEventListener('click',()=>{if(!state.locked&&abandonStory()){state.page=1;void restore();}});
   $('library-select').addEventListener('change',()=>{if(state.locked||!abandonStory()){$('library-select').value=state.library||'';return;}storyState.search=null;storyState.suspended=null;$('search-text').value='';peopleState.page=1;peopleState.query='';$('people-query').value='';state.library=$('library-select').value;state.page=1;state.memberPage=1;uploadState.page=1;void restore();});
