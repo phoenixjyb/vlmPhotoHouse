@@ -1,5 +1,13 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.22 — library organization
+
+Source `d6192b91bc0983ab7b67aa14458eb052ed3c0ee6`. Eight new library-organization HTTP tests,
+139 affected promotion/story/album/refresh/boundary/package tests, and all 59
+Chromium/ASGI checkpoints passed. Desktop and narrow Chinese move screens inspected.
+The native profile preserves all 89 captures; version and source/payload checksums
+are reissued together. Live and physical-device acceptance remain separate.
+
 ## Candidate.21 — bilingual local place search
 
 Source `d2e5eaffdc18436123d697aaab2d49df1de19145`. Six new name-query checks,
