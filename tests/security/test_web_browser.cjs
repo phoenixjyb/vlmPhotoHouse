@@ -864,7 +864,14 @@ let browser;
   await page.locator('#discovery-form button[type="submit"]').click();
   await page.locator('#discovery-list .tag-asset-card').first().waitFor();
   assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
+  await page.screenshot({path:path.join(artifacts,'member-place-filter.png'),fullPage:true});
+  // Clearing filters cancels a pending result, even if its server response was
+  // already computed. A late response must not repopulate the cleared panel.
+  const oldDiscovery=delayNext(url=>url.pathname.endsWith('/discovery/v1/search'));
+  await page.locator('#discovery-form button[type="submit"]').click();
+  await oldDiscovery.seen;
   await page.locator('#discovery-clear').click();
+  oldDiscovery.release();await pause(180);
   // Nothing is listed until a filter is chosen: the panel narrows, it does not duplicate
   // the gallery below it.
   assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);
@@ -879,6 +886,9 @@ let browser;
   await page.locator('#discovery-list .tag-asset-card').first().waitFor();
   assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),24);
   assert.equal(await page.locator('#discovery-pages').isVisible(),true);
+  // Editing the draft without Apply must not change the query/fingerprint
+  // paginated by Next. This remains the second page of images.
+  await page.locator('#discovery-media').selectOption('video');
   await page.locator('#discovery-next').click();
   await page.waitForFunction(()=>document.getElementById('discovery-page-label').textContent==='2 / 2');
   assert(await page.locator('#discovery-list .tag-asset-card').count()>0);
@@ -916,7 +926,7 @@ let browser;
   assert.equal(await page.locator('#people-panel').isVisible(),false);
   await page.screenshot({path:path.join(artifacts,'member-discovery-filter.png'),fullPage:true});
   await page.locator('#discovery-panel > summary').click();
-  checkpoint('Member narrows the library by date and media without any write control');
+  checkpoint('Member combines named places/date/media; paging freezes applied filters and Clear rejects late results');
   await auth(owner,'+12025550100');
   await owner.locator('#people-panel > summary').click();
   await owner.locator('.person-card').first().waitFor();

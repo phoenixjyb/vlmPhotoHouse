@@ -83,3 +83,18 @@ preparation, and map/area/radius browsing remain separate work. Map rendering mu
 respect the local-only preference; no third-party tile/geocoding service is wired
 in by this slice. People/tag/caption combination remains supported where the
 corresponding separately qualified facets are enabled.
+
+## Source validation
+
+- 15 new GPS/projection checks and 136 existing discovery checks passed, plus four
+  source-package checks. The closed HTTP-boundary test covers authenticated
+  facets/search, private cache headers, coordinate non-disclosure and stale GPS.
+- A synthetic 30,004-asset library with 101,000 unrelated caption rows prepared
+  its location index in 0.284 seconds and listed facets in 0.534 seconds on the
+  Mac, within unchanged service budgets. These are synthetic timings.
+- Secured WebUI Chromium/real-ASGI harness: 58 checkpoints passed, including place
+  selection combined with date/media, frozen filters during result pagination,
+  late-result rejection after Clear, viewer, upload review and session cleanup.
+  Rendered named-place panel inspected with synthetic data.
+- Backend foundation independently reviewed; no blocking correctness/security
+  finding. No Windows activation, real GPS audit, TV export or device install.

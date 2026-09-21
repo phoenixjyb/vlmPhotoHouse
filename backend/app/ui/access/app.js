@@ -1275,13 +1275,15 @@
       }
     }catch(error){if(current())await failure(error,epoch);}
   }
-  // Date/media narrowing over the reviewed discovery index. The panel is offered only
-  // when the deployment has opted in with an index artifact: with no runtime the routes
-  // answer 503, and the filter simply stays hidden rather than appearing broken. Absence
-  // of the filter is a deployment state, not an error the member can act on.
+  // Named places and date/media narrowing share a reviewed snapshot. Reopening
+  // refreshes its binding; failed refreshes offer an explicit retry.
   async function openDiscovery(){
     if(state.locked||!state.library)return;
     const epoch=state.generation,library=state.library,load=++discoveryState.facetLoad;
+    const previousBinding=discoveryState.binding;
+    discoveryState.searchLoad++;discoveryState.binding=null;
+    $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
+    $('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;
     const current=()=>!stale(epoch)&&load===discoveryState.facetLoad&&library===state.library;
     try{
       const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+
@@ -1289,8 +1291,10 @@
       if(!current())return;
       if(!Array.isArray(result.enabled)||!result.enabled.includes('media')){$('discovery-panel').hidden=true;return;}
       discoveryState.binding=result.binding;
+      if(previousBinding&&previousBinding!==result.binding){
+        discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.selectedPlaces.clear();
+      }
       discoveryState.page=1;discoveryState.fingerprint=null;
-      discoveryState.searchLoad++;
       const bounds=result.captured_date_bounds||{};
       // Both inputs carry the same captured range as native bounds; the server
       // independently refuses an inverted or malformed range, so neither side is
@@ -1306,7 +1310,7 @@
         renderDiscoveryPlaces();
       }else{$('discovery-places').hidden=true;$('discovery-places-status').textContent=t('placesUnavailable');}
       if(!discoveryState.applied)$('discovery-status').textContent=t('discoveryHint');
-    }catch(error){if(current()){$('discovery-panel').hidden=false;$('discovery-places').hidden=false;discoveryState.binding=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.fingerprint=null;$('discovery-list').replaceChildren();$('discovery-pages').hidden=true;$('discovery-status').textContent=error&&error.status===409?t('discoveryChanged'):'';$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void openDiscovery());$('discovery-places-status').append(' ',retry);}}
+    }catch(error){if(current()){if(error&&(error.status===401||error.status===403)){await failure(error,epoch);return;}discoveryState.placesAvailable=false;$('discovery-panel').hidden=false;$('discovery-places').hidden=false;discoveryState.binding=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.fingerprint=null;$('discovery-list').replaceChildren();$('discovery-pages').hidden=true;$('discovery-status').textContent=error&&error.status===409?t('discoveryChanged'):'';$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void openDiscovery());$('discovery-places-status').append(' ',retry);}}
   }
   function renderDiscoveryPlaces(){
     if(!discoveryState.placesAvailable)return;
@@ -1338,6 +1342,7 @@
       if(discoveryState.selectedPlaces.size)filters.locations=[...discoveryState.selectedPlaces];
       if(from||to)filters.date={from:from||null,to:to||null};
       if(!Object.keys(filters).length){
+        discoveryState.searchLoad++;
         discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.fingerprint=null;
         $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
         $('discovery-status').textContent=t('discoveryHint');return;
