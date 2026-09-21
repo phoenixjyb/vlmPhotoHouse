@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.18
+# Protected native profile 2.0.0-candidate.21
 
-Backend source: `213195564850521706c50ed4309a97d1c757eeca`.
+Backend source: `d2e5eaffdc18436123d697aaab2d49df1de19145`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,40 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.21 (September 21)
+
+The protected discovery locations facet accepts optional `q` (128 UTF-8 bytes)
+for local Chinese/English name and alias lookup. Only `facet=locations` accepts
+this field. Suggestions retain the existing label/ID/count response shape;
+selection feeds the unchanged combined asset search. Blank/no-query calls and
+all 89 native captures retain their previous semantics. `NamedPlace` adds opt-in
+operator aliases without changing legacy place serialization. A public nine-area
+starter catalogue documents approximate rectangles and their government sources.
+No online geocoder or automatic geographic inference from captions is used.
+See [query contract and catalogue](../../security/PLACE_NAME_SEARCH_V26.md).
+
+## Reissue — 2.0.0-candidate.20 (September 21)
+
+Explicit current-library region rules can refresh place membership and date bounds
+from current authorized metadata inside the same bounded read transaction. Newly
+mapped uploads and GPS changes appear after a fresh facets request; stale search
+bindings return 409. Static artifacts retain their existing behavior. No public
+wire shape, endpoint, schema, anonymous Home publication or client default changes.
+All 89 captured native exchanges remain unchanged apart from the candidate label.
+See [refresh policy and checks](../../security/PLACE_REFRESH_V25.md). Named regions,
+production activation and real-device acceptance remain separate operator steps.
+
+## Reissue — 2.0.0-candidate.19 (September 21)
+
+Opt-in dependency-specific discovery snapshots support bounded GPS-derived named
+regions without unrelated caption/face/tag invalidation. Legacy snapshots and all
+89 existing wire exchanges remain unchanged. Named places use the existing
+locations facet and combined search; no coordinates, map or radius endpoint is
+added. Secured WebUI place selection/paging and Android clients retain their
+respective protected/Home boundaries. Place preparation is offline/read-only;
+activation, Home publication and real-library refresh remain explicit operations.
+See [source design and checks](../../security/PLACE_BROWSING_V24.md).
 
 ## Reissue — 2.0.0-candidate.18 (September 21)
 

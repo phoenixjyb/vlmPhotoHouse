@@ -1,5 +1,35 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.21 — bilingual local place search
+
+Source `d2e5eaffdc18436123d697aaab2d49df1de19145`. Six new name-query checks,
+28 existing place/projection/refresh checks, 136 discovery checks and four package
+checks passed. All 58 Chromium/ASGI checkpoints passed, including Chinese/English
+lookup, retained/removable selections, rejection of late query results and the
+responsive grid. Desktop and phone-sized renders inspected. The native capture
+retains 89 cases; its candidate label and source/payload checksums are reissued
+together. Production and Android acceptance remain separate recorded evidence.
+
+## Candidate.20 — current-library place refresh
+
+Source `c056c758d3e1f3611521ec726a3ea231a2a0dec0`. Thirteen new refresh checks,
+15 existing GPS/projection checks and 136 existing discovery checks passed.
+Tests cover newly mapped uploads, GPS/date/scope changes, revoked access, stale
+bindings, strict loading, legacy artifacts and unchanged resource limits.
+The native replay retains all 89 exchanges with only the candidate label changed.
+The manifest pins 121 source files and seven payloads; profile defaults remain off.
+Windows aggregate/performance qualification is recorded in the private operator
+handoff. It does not establish authenticated HTTP or phone/projector acceptance.
+
+## Candidate.19 — named-place browsing foundation
+
+Source `bcf359e2b45a8099858139c40705af2c26d9afcd`. Fifteen new GPS/projection checks, 136 existing
+discovery checks, four package checks and 58 Chromium/ASGI browser checkpoints
+passed. Synthetic 30,004-asset place preparation and facet listing stay inside
+unchanged budgets. Native replay retains all 89 exchanges, with only the candidate
+label changed; the profile stays off by default. Runtime activation, actual GPS
+coverage, automatic refresh and phone/projector family acceptance remain separate.
+
 ## Candidate.18 — approved upload gallery visibility
 
 Source `213195564850521706c50ed4309a97d1c757eeca`. Gallery, media-filter, upload review, promotion,

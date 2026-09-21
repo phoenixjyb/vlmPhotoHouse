@@ -5,7 +5,7 @@ No SQL writes, filesystem/index loading, models, HTTP routes or original grants.
 """
 from collections import Counter, defaultdict
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime
 import hashlib
 import json
@@ -17,7 +17,7 @@ from time import monotonic
 import unicodedata
 
 from .credentials import session_digest
-from .discovery_provider import ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
+from .discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace, NamedPlace
 from .library import _asset
 from .service import AccessService, AccessDenied
 
@@ -48,6 +48,12 @@ def require(value):
 def packed(value):
     try: return json.dumps(value,sort_keys=True,ensure_ascii=True,separators=(',', ':'),allow_nan=False).encode()
     except (ValueError,TypeError,UnicodeError,RecursionError): raise DiscoveryInvalid() from None
+
+
+def place_fold(value):
+    # Ignore case, width and combining accents, preserving Chinese characters.
+    return ' '.join(''.join(c for c in unicodedata.normalize('NFKD',value).casefold()
+                           if not unicodedata.combining(c)).split())
 
 
 def digest(value): return hashlib.sha256(packed(value)).hexdigest()
@@ -139,8 +145,38 @@ def scoped_source(library, read):
     return {'assets':assets,'captions':captions,'faces':faces,'links':links,'blocks':blocks,'tags':tags}
 
 
+def projected_source(library, read, enabled):
+    """Read only dependencies of enabled facets. Never relax current scope checks.
+
+    Reviewed regions also depend on recorded coordinates. Changes to unrelated
+    captions/faces/tags cannot invalidate date/media/location-only artifacts.
+    All reads remain inside the existing authorization transaction and budget.
+    """
+    source = {key: [] for key in ('assets', 'captions', 'faces', 'links', 'blocks', 'tags')}
+    source['assets'] = read("SELECT a.id,CASE WHEN length(CAST(a.mime AS BLOB))<=256 THEN a.mime END,a.width,a.height,a.duration_sec,CASE WHEN length(CAST(a.taken_at AS BLOB))<=64 THEN a.taken_at END,length(CAST(a.taken_at AS BLOB)) FROM access_asset_libraries m JOIN assets a ON a.id=m.asset_id WHERE m.library_id=? AND (a.status='active' OR a.status IS NULL) ORDER BY m.asset_id", (library,))
+    if 'caption' in enabled:
+        source['captions'] = read('SELECT x.id,x.asset_id,CASE WHEN length(CAST(x.text AS BLOB))<=4096 THEN x.text END,length(CAST(x.text AS BLOB)),length(CAST(x.text AS BLOB)),x.user_edited,x.superseded FROM captions x'+SCOPE+' ORDER BY x.id', (library,))
+    if 'people' in enabled:
+        source['faces'] = read('SELECT x.id,x.asset_id,x.person_id,x.label_source FROM face_detections x'+SCOPE+' ORDER BY x.id', (library,))
+    if 'tags' in enabled:
+        source['links'] = read('SELECT x.id,x.asset_id,x.tag_id,x.source FROM asset_tags x'+SCOPE+' ORDER BY x.id', (library,))
+        source['blocks'] = read('SELECT x.id,x.asset_id,x.tag_id FROM asset_tag_blocks x'+SCOPE+' ORDER BY x.id', (library,))
+        source['tags'] = read("SELECT DISTINCT t.id,CASE WHEN length(CAST(t.name AS BLOB))<=256 THEN t.name END,CASE WHEN length(CAST(t.type AS BLOB))<=32 THEN t.type END,length(CAST(t.name AS BLOB)) FROM tags t JOIN asset_tags x ON x.tag_id=t.id"+SCOPE+' ORDER BY t.id', (library,))
+    if 'locations' in enabled:
+        # Normalize invalid/missing pairs together. A zero coordinate is valid.
+        valid = "typeof(a.gps_lat) IN ('integer','real') AND typeof(a.gps_lon) IN ('integer','real') AND a.gps_lat BETWEEN -90 AND 90 AND a.gps_lon BETWEEN -180 AND 180"
+        source['coordinates'] = read(f"SELECT a.id,CASE WHEN {valid} THEN a.gps_lat END,CASE WHEN {valid} THEN a.gps_lon END FROM access_asset_libraries m JOIN assets a ON a.id=m.asset_id WHERE m.library_id=? AND (a.status='active' OR a.status IS NULL) ORDER BY m.asset_id", (library,))
+    return source
+
+
+def index_source(index, read):
+    return (projected_source(index.library_id, read, index.enabled)
+            if isinstance(index, ProjectedIndex) else scoped_source(index.library_id, read))
+
+
 def validate(index, library, limit):
-    require(type(index) is ReviewedIndex and index.library_id==library)
+    require(type(index) in (ReviewedIndex, ProjectedIndex, RefreshingPlaceIndex) and index.library_id==library)
+    if isinstance(index, ProjectedIndex): require(index.projection == 'enabled-v2')
     identifier(index.revision); require(hashed(index.source_digest))
     scope=ids(index.scope_ids,limit,ordered=True); selected=ids(index.indexed_ids,limit,ordered=True)
     require(selected<=scope)
@@ -154,9 +190,16 @@ def validate(index, library, limit):
         for alias in person.aliases: text(alias,128)
         require(len(set(person.aliases))==len(person.aliases)); people[person.id]=person
     for place in index.places:
-        require(type(place) is ReviewedPlace and place.library_id==library)
+        require(type(place) in (ReviewedPlace, NamedPlace) and place.library_id==library)
         identifier(place.id); require(place.id not in places);text(place.label,256);places[place.id]=place
+        if type(place) is NamedPlace:
+            require(type(place.aliases) is tuple and len(place.aliases)<=8)
+            for alias in place.aliases: text(alias,128)
+            require(len(set(place.aliases))==len(place.aliases))
     require(ids(index.pinned_ids,32)<=set(people))
+    if isinstance(index, ProjectedIndex):
+        require('people' in index.enabled or not (index.people or index.pinned_ids or index.assignments))
+        require('locations' in index.enabled or not (index.places or index.regions))
     require(type(index.assignments) is tuple and len(index.assignments)<=limit)
     seen=set()
     for face in index.assignments:
@@ -170,7 +213,49 @@ def validate(index, library, limit):
         require(type(pair) is tuple and len(pair)==2)
         for value in pair:identifier(value)
         require(pair not in pairs and pair[0] in selected and pair[1] in places);pairs.add(pair)
+    if type(index) is RefreshingPlaceIndex:
+        require(index.refresh_policy == 'current-library-regions-v1')
+        require(set(index.enabled) == {'date', 'locations', 'media'})
+        require(index.indexed_ids == index.scope_ids)
+        require(type(index.region_rules) is tuple and 1 <= len(index.region_rules) <= 128)
+        seen_rules = set()
+        for rule in index.region_rules:
+            validate_region_rule(rule)
+            require(rule.place_id in places and rule.place_id not in seen_rules)
+            seen_rules.add(rule.place_id)
+        require(seen_rules == set(places))
     return people,places
+
+
+def validate_region_rule(rule):
+    require(type(rule) is RegionRule)
+    identifier(rule.place_id)
+    for key in ('south', 'west', 'north', 'east'):
+        value = getattr(rule, key); limit = 90 if key in ('south', 'north') else 180
+        require(type(value) in (int, float) and math.isfinite(value) and -limit <= value <= limit)
+    require(rule.south < rule.north and rule.west != rule.east)
+    require(not (rule.west == 180 and rule.east == -180))
+
+
+def region_contains(rule, lat, lon):
+    longitude = (rule.west <= lon <= rule.east if rule.west < rule.east
+                 else lon >= rule.west or lon <= rule.east)
+    return rule.south <= lat <= rule.north and longitude
+
+
+def refreshed_index(index, source, check, maximum):
+    """No provider mutation, cache, write or cross-request state. Same transaction."""
+    scope = tuple(str(row[0]) for row in source['assets'])
+    pairs = []
+    for aid, lat, lon in source['coordinates']:
+        check()
+        if lat is None or lon is None: continue
+        for rule in index.region_rules:
+            if region_contains(rule, lat, lon):
+                if len(pairs) >= maximum: raise DiscoveryUnavailable()
+                pairs.append((str(aid), rule.place_id))
+    return replace(index, scope_ids=scope, indexed_ids=scope,
+                   source_digest=digest(source), regions=tuple(pairs))
 
 
 def taken_day(value):
@@ -211,7 +296,11 @@ class DiscoveryReads:
                     people,places=validate(index,library,self.budget.rows)
                     if len(packed(asdict(index)))>self.budget.index_bytes: raise DiscoveryUnavailable()
                 except (DiscoveryInvalid,TypeError,KeyError,RecursionError): raise DiscoveryUnavailable() from None
-                source=scoped_source(library,read);check()
+                source=index_source(index,read);check()
+                if type(index) is RefreshingPlaceIndex:
+                    index=refreshed_index(index,source,check,self.budget.rows)
+                    if len(packed(asdict(index)))>self.budget.index_bytes: raise DiscoveryUnavailable()
+                    check()
                 if tuple(str(r[0]) for r in source['assets'])!=index.scope_ids or digest(source)!=index.source_digest: raise DiscoveryChanged()
                 binding=digest({'policy':POLICY,'library':library,'session':session_digest(token),'account':member['account_id'],
                                 'membership':member['revision'],'originals':member['originals'],'index':asdict(index)})
@@ -273,11 +362,17 @@ class DiscoveryReads:
         for f in facets:facets[f]=sorted(facets[f],key=lambda p:int(p['id'])) if f in index.enabled else []
         return assets,rows,facets,coverage
 
-    def facets(self, token, library, *, facet='people', page=1, page_size=50, binding=None, cancelled=lambda:False):
+    def facets(self, token, library, *, facet='people', page=1, page_size=50, binding=None, q=None, cancelled=lambda:False):
         def action(index,facts,context,member,check):
             require(facet in ('people','tags','locations') and type(page) is int and 1<=page<=5000 and type(page_size) is int and 1<=page_size<=100)
             require(page==1 or binding is not None)
             assets,rows,facets,coverage=facts;items=facets[facet];offset=(page-1)*page_size
+            if q is not None:
+                require(facet=='locations');text(q,128,nonempty=False)
+                needle=place_fold(q)
+                names={p.id:(p.label,*getattr(p,'aliases',())) for p in index.places}
+                # Match locally, after membership and source checks. No geocoder calls.
+                items=[p for p in items if any(needle in place_fold(name) for name in names[p['id']])]
             people={p['id']:p for p in facets['people']};pins=index.pinned_ids if 'people' in index.enabled else ()
             days=[r['date'] for r in rows.values() if r['date'] is not None] if 'date' in index.enabled else []
             return {'library_id':library,'binding':context,'revision':index.revision,

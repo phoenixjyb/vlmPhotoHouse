@@ -33,6 +33,12 @@ class ReviewedPlace:
 
 
 @dataclass(frozen=True)
+class NamedPlace(ReviewedPlace):
+    """Opt-in local name aliases. Legacy ReviewedPlace bytes stay unchanged."""
+    aliases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ReviewedIndex:
     library_id: str
     revision: str
@@ -47,6 +53,28 @@ class ReviewedIndex:
     enabled: tuple[str, ...] = ('people', 'date', 'caption', 'tags', 'locations', 'media')
 
 
+@dataclass(frozen=True)
+class ProjectedIndex(ReviewedIndex):
+    """Opt-in dependency-specific projection; legacy artifact identity stays intact."""
+    projection: str = 'enabled-v2'
+
+
+@dataclass(frozen=True)
+class RegionRule:
+    place_id: str
+    south: float
+    west: float
+    north: float
+    east: float
+
+
+@dataclass(frozen=True)
+class RefreshingPlaceIndex(ProjectedIndex):
+    """Explicit policy: apply approved bounds to current authorized library scope."""
+    region_rules: tuple[RegionRule, ...] = ()
+    refresh_policy: str = 'current-library-regions-v1'
+
+
 class IndexProvider(Protocol):
     def get(self, library_id: str) -> ReviewedIndex | None: ...
 
@@ -54,7 +82,7 @@ class IndexProvider(Protocol):
 class MemoryIndexProvider:
     """Construction supplies already-reviewed internal inputs; no automatic discovery."""
     def __init__(self, indexes: tuple[ReviewedIndex, ...]):
-        if type(indexes) is not tuple or any(type(i) is not ReviewedIndex for i in indexes):
+        if type(indexes) is not tuple or any(type(i) not in (ReviewedIndex, ProjectedIndex, RefreshingPlaceIndex) for i in indexes):
             raise ValueError('Explicit reviewed indexes required')
         if len(indexes) > 32 or len({i.library_id for i in indexes}) != len(indexes):
             raise ValueError('Bounded unique library indexes required')

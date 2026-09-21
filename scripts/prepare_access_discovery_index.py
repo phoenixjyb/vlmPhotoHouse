@@ -16,6 +16,8 @@ The review file is bound to its library and the current source digest. It is not
 incremental: scope_ids is the full ordered visible asset set and the digest
 covers the whole library projection, so stale review input is refused.
 
+Legacy projection is the default. --projection enabled-v2 reads only enabled
+metadata dependencies and records that policy explicitly in the new artifact.
 One library per invocation. Output is written once and never overwritten.
 """
 import argparse
@@ -45,7 +47,7 @@ REVIEW_KEYS = frozenset(('library_id', 'source_digest', 'indexed_ids', 'enabled'
                          'source_fields'))
 SOURCE_FIELD_KEYS = frozenset(('caption', 'tags'))
 REVIEW_BYTES = 1024 * 1024
-ALLOWED_FUNCTIONS = frozenset({'length'})
+ALLOWED_FUNCTIONS = frozenset({'length', 'typeof'})
 
 
 class Refused(RuntimeError):
@@ -140,7 +142,7 @@ def open_read_only(path, start):
 
 
 def authorize(action, first, second, *rest):
-    """Read-only by construction, and only the one function the projection uses.
+    """Read-only by construction, and only the functions the reviewed projections use.
 
     A new function in `scoped_source` therefore refuses here instead of silently
     running unreviewed SQL: the operator must re-review this tool alongside it.
@@ -239,13 +241,18 @@ def reviewed_index(value, identifier, revision_value, scope, source_digest, sour
                          tuple(places), tuple(regions), tuple(enabled))
 
 
-def derive(db, identifier, revision_value, review=None):
+def derive(db, identifier, revision_value, review=None, projection=None):
     """Project and validate through the service's own code and read budget."""
     from app.access import discovery as d
-    from app.access.discovery_provider import ReviewedIndex
+    from app.access.discovery_provider import ReviewedIndex, ProjectedIndex
     budget = d.ReadBudget()
     with budget.attempt(db, lambda: False) as (check, read):
-        source = d.scoped_source(identifier, read)
+        if projection not in (None, 'enabled-v2'):
+            raise Refused('Unknown projection')
+        enabled = review.get('enabled', ()) if type(review) is dict else ENABLED
+        if type(enabled) not in (list, tuple) or any(type(v) is not str or v not in REVIEW_FIELDS for v in enabled):
+            raise Refused('Invalid enabled fields')
+        source = (d.projected_source(identifier, read, enabled) if projection else d.scoped_source(identifier, read))
         check()
         scope = tuple(str(row[0]) for row in source['assets'])
         if not scope:
@@ -255,6 +262,8 @@ def derive(db, identifier, revision_value, review=None):
              if review is not None else
              ReviewedIndex(library_id=identifier, revision=revision_value, scope_ids=scope,
                            indexed_ids=scope, source_digest=source_digest, enabled=ENABLED))
+    if projection:
+        index = ProjectedIndex(**{field: getattr(index, field) for field in index.__dataclass_fields__})
     # Refuse to emit an artifact the service would itself reject.
     d.validate(index, identifier, budget.rows)
     if len(d.packed(asdict(index))) > budget.index_bytes:
@@ -279,6 +288,7 @@ def main(argv=None):
     parser.add_argument('--revision', required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--review', type=Path)
+    parser.add_argument('--projection', choices=['enabled-v2'])
     completed = False
     try:
         args = parser.parse_args(argv)
@@ -286,7 +296,7 @@ def main(argv=None):
         review = review_json(args.review) if args.review is not None else None
         start = time.monotonic()
         with closing(open_read_only(args.database, start)) as db:
-            index, catalog_assets = derive(db, identifier, revision_value, review)
+            index, catalog_assets = derive(db, identifier, revision_value, review, args.projection)
         payload = json.dumps(asdict(index), sort_keys=True, ensure_ascii=True,
                              separators=(',', ':'), allow_nan=False).encode()
         digest = write_new(args.out, payload)

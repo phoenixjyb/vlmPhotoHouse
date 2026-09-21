@@ -79,3 +79,5 @@
 @media(max-width:600px){.pagination{flex-wrap:wrap;gap:12px}.upload-card-details{min-width:0}}
 
 @media(max-width:600px){.toolbar{flex-wrap:wrap}.toolbar .muted{flex-basis:100%;margin-left:0}}
+
+.discovery-places{margin:1rem 0 1.25rem;padding:1rem;background:#fffdf8;border:1px solid var(--line);border-radius:9px}.discovery-places h3{margin:0 0 .35rem;font:400 22px Georgia,"Songti SC",serif}.place-list{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:.8rem}.place-choice{display:flex;flex-direction:column;align-items:flex-start;min-width:9rem;text-align:left;background:#fff;border-color:var(--line)}.place-choice[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}.place-choice small{margin-top:.15rem;color:var(--muted)}.place-choice[aria-pressed=true] small{color:#fff6e9}

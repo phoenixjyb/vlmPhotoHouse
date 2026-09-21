@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '213195564850521706c50ed4309a97d1c757eeca'
+SOURCE = 'd2e5eaffdc18436123d697aaab2d49df1de19145'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text(encoding='utf-8'))
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.18':
+    if manifest['contract_version'] != '2.0.0-candidate.21':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,
@@ -49,7 +49,17 @@ def verify(root=ROOT):
         for path in (root / directory).rglob('*.py')
         if '__pycache__' not in path.parts
     }
-    expected_sources |= {'tests/security/test_library_reads.py',
+    expected_sources |= {'scripts/prepare_access_places.py',
+                         'scripts/prepare_access_discovery_index.py',
+                         'docs/security/PLACE_BROWSING_V24.md',
+                         'docs/security/PLACE_REFRESH_V25.md',
+                         'docs/security/PLACE_NAME_SEARCH_V26.md',
+                         'docs/security/place-catalogue-china-starter.json',
+                         'docs/security/PLACE_CATALOGUE_SOURCES.md',
+                         'tests/security/test_place_name_search.py',
+                         'tests/security/test_phone_discovery_http.py',
+                         'tests/security/phone_discovery_fixture.py',
+                         'tests/security/test_library_reads.py',
                          'tests/security/test_gallery_media_filter.py',
                          'tests/security/test_access_foundation.py',
                          'tests/security/test_orm_migrations.py',
