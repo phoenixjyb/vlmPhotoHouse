@@ -1362,19 +1362,16 @@
       discoveryState.fingerprint=result.fingerprint;discoveryState.total=result.total;
       $('discovery-status').textContent=result.total?'':t('discoveryNone');
       for(const asset of result.items){
-        const row=document.createElement('article');row.className='tag-asset-card';row.dataset.assetId=asset.id;
-        if(typeof asset.thumbnail_url==='string'&&asset.thumbnail_url.startsWith('/assets/')){
-          const image=document.createElement('img');image.className='tag-asset-crop';image.loading='lazy';
-          image.alt=`${t('discoveryResult')} · ${asset.id}`;
-          image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
-          image.src=asset.thumbnail_url;row.append(image);
-        }
-        row.append(storyButton('openPhoto',async()=>{
+        const card=document.createElement('button');card.type='button';card.className='asset';card.dataset.assetId=asset.id;
+        const image=document.createElement('img');image.loading='lazy';image.alt=assetLabel(asset);
+        image.src=safeMediaURL(asset.id,'thumbnail');
+        image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
+        const label=document.createElement('span');label.textContent=assetLabel(asset);card.append(image,label);
+        card.addEventListener('click',()=>{
           if(!current()||state.locked||state.busy||!abandonStory())return;
-          try{const detail=await request(libraryPath(`/assets/detail/${asset.id}`),{epoch});if(current())await openAsset(detail.asset);}
-          catch(error){await failure(error,epoch);}
-        }));
-        $('discovery-list').append(row);
+          void openAsset(asset,{sequence:result.items,origin:'page'});
+        });
+        $('discovery-list').append(card);
       }
       const pages=Math.max(1,Math.ceil(result.total/24));$('discovery-pages').hidden=result.total===0;
       $('discovery-previous').disabled=discoveryState.page===1;$('discovery-next').disabled=discoveryState.page>=pages;

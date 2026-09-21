@@ -862,8 +862,8 @@ let browser;
   await page.locator('#discovery-from').fill('2026-01-01');
   await page.locator('#discovery-to').fill('2026-01-01');
   await page.locator('#discovery-form button[type="submit"]').click();
-  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
+  await page.locator('#discovery-list .asset').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .asset').count(),1);
   await page.screenshot({path:path.join(artifacts,'member-place-filter.png'),fullPage:true});
   // Clearing filters cancels a pending result, even if its server response was
   // already computed. A late response must not repopulate the cleared panel.
@@ -874,7 +874,7 @@ let browser;
   oldDiscovery.release();await pause(180);
   // Nothing is listed until a filter is chosen: the panel narrows, it does not duplicate
   // the gallery below it.
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);
+  assert.equal(await page.locator('#discovery-list .asset').count(),0);
   assert((await page.locator('#discovery-status').textContent()).length>0);
   // Media narrowing. Every visible family-a photo is an image, so photos match and
   // videos do not; the video case is the load-bearing one, because it can only return
@@ -883,16 +883,32 @@ let browser;
   // checkpoint grew it, so the photo case also exercises bounded pagination.
   await page.locator('#discovery-media').selectOption('image');
   await page.locator('#discovery-form button[type="submit"]').click();
-  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),24);
+  await page.locator('#discovery-list .asset').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .asset').count(),24);
+  await page.locator('#discovery-list img').first().evaluate(img=>img.decode());
+  await page.locator('#discovery-list').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(artifacts,'discovery-grid-desktop.png')});
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#discovery-list').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(artifacts,'discovery-grid-phone.png')});
+  await page.setViewportSize({width:1200,height:900});
+  await page.locator('#discovery-list .asset').first().click();
+  await page.locator('#viewer-media img').evaluate(img=>img.decode());
+  assert.match(await page.locator('#view-position').textContent(),/1 \/ 24/);
+  await page.locator('#view-next').click();
+  await page.waitForFunction(()=>document.getElementById('view-position').textContent.includes('2 / 24'));
+  await page.locator('#viewer-media img').evaluate(img=>img.decode());
+  await page.locator('#close-viewer').click();
+
+
   assert.equal(await page.locator('#discovery-pages').isVisible(),true);
   // Editing the draft without Apply must not change the query/fingerprint
   // paginated by Next. This remains the second page of images.
   await page.locator('#discovery-media').selectOption('video');
   await page.locator('#discovery-next').click();
   await page.waitForFunction(()=>document.getElementById('discovery-page-label').textContent==='2 / 2');
-  assert(await page.locator('#discovery-list .tag-asset-card').count()>0);
-  await page.locator('#discovery-list .tag-asset-card img').first().evaluate(img=>img.decode());
+  assert(await page.locator('#discovery-list .asset').count()>0);
+  await page.locator('#discovery-list .asset img').first().evaluate(img=>img.decode());
   await page.locator('#discovery-media').selectOption('video');
   // Wait on the response itself, not on a DOM state: the list is cleared and the status
   // set to the loading text before the request goes out, so an empty list or a non-empty
@@ -901,24 +917,24 @@ let browser;
   await page.locator('#discovery-form button[type="submit"]').click();
   await videoSearch;
   await pause(120);
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),0);
+  assert.equal(await page.locator('#discovery-list .asset').count(),0);
   assert.equal(await page.locator('#discovery-pages').isVisible(),false);
   // Date narrowing, bounded by what the facets route reported as the captured range. Only
   // asset 102 was captured on or after this date, so this is a single-row answer.
   await page.locator('#discovery-media').selectOption('all');
   await page.locator('#discovery-from').fill('2026-01-02');
   await page.locator('#discovery-form button[type="submit"]').click();
-  await page.locator('#discovery-list .tag-asset-card').first().waitFor();
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').getAttribute('data-asset-id'),'102');
+  await page.locator('#discovery-list .asset').first().waitFor();
+  assert.equal(await page.locator('#discovery-list .asset').count(),1);
+  assert.equal(await page.locator('#discovery-list .asset').getAttribute('data-asset-id'),'102');
   // A date outside the reported captured range is refused before any request: the native
   // bounds carry the first refusal, and the previous result set is left untouched rather
   // than replaced by an empty or unfiltered one.
   await page.locator('#discovery-from').fill('2026-01-03');
   await page.locator('#discovery-form button[type="submit"]').click();
   await pause(150);
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').count(),1);
-  assert.equal(await page.locator('#discovery-list .tag-asset-card').getAttribute('data-asset-id'),'102');
+  assert.equal(await page.locator('#discovery-list .asset').count(),1);
+  assert.equal(await page.locator('#discovery-list .asset').getAttribute('data-asset-id'),'102');
   // Read-only by construction: one form, one select, and nothing that could write.
   assert.equal(await page.locator('#discovery-panel form').count(),1);
   assert.equal(await page.locator('#discovery-panel select').count(),1);
