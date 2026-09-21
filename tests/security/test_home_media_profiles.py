@@ -49,6 +49,23 @@ class MediaProfileTests(unittest.TestCase):
             with self.assertRaises(ValueError): library.profile(replace(b,**changes))
         self.assertIn('scripts/home_media_worker.py',library.code_pin())
 
+    def test_phone_quality_is_opt_in_and_pins_bounded_encoder_settings(self):
+        phone=prep.VIDEO_QUALITIES['phone-sdr-v1']
+        self.assertEqual(prep.video_encoder_args(), ['-c:v','libx264','-threads','1','-preset','fast','-crf','23','-profile:v','high','-level:v','4.1'])
+        args=prep.video_encoder_args(quality=phone)
+        self.assertIn('-b:v',args);self.assertEqual(args[args.index('-b:v')+1],'2M')
+        self.assertEqual(args[args.index('-maxrate')+1],'3M')
+        self.assertEqual(prep.VIDEO_QUALITIES['phone-sdr-v1'],prep.quality_config(asdict(phone)))
+
+    def test_phone_quality_real_tiny_encode_is_720p_max_and_validator_compatible(self):
+        source=self.sources/'phone-source.mp4';output=self.root/'phone-attempt';output.mkdir()
+        subprocess.run([str(self.ffmpeg),'-v','error','-nostdin','-f','lavfi','-i','testsrc=size=1920x1080:rate=12',
+                        '-t','1','-c:v','libx264','-threads','1','-pix_fmt','yuv420p',str(source)],check=True,timeout=30)
+        result=prep.prepare_one(source,'video',output,self.ffmpeg,self.ffprobe,self.profile,
+                                self.guard(output),quality=prep.VIDEO_QUALITIES['phone-sdr-v1'])
+        self.assertLessEqual(result['video']['width'],1280);self.assertLessEqual(result['video']['height'],720)
+        prep.verify_ready(output,result,self.profile,self.guard(output),prep.VIDEO_QUALITIES['phone-sdr-v1'])
+
     def test_hash_above_old_512_mib_cap_and_chunk_manifest_match_independent_oracle(self):
         large=self.sources/'sparse-synthetic.bin';size=512*1024**2+17
         with large.open('wb') as stream: stream.truncate(size)

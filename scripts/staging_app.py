@@ -21,7 +21,7 @@ FIELDS = {'format_version', 'database', 'web_origin', 'original_roots', 'derived
 # Optional on purpose. A configuration written before member upload existed must keep loading,
 # and an operator who has not created an incoming area must not be forced to invent one: absent
 # means the upload route answers 503 and no deployment gains a write surface by accident.
-OPTIONAL_FIELDS = {'incoming_root', 'discovery_indexes'}
+OPTIONAL_FIELDS = {'incoming_root', 'discovery_indexes', 'upload_review_enabled'}
 PRIVATE_NETWORKS = tuple(map(ipaddress.ip_network,
     ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10',
      '127.0.0.0/8', 'fc00::/7', '::1/128')))
@@ -55,6 +55,7 @@ class StagingConfiguration:
     tls_private_key: Path
     incoming_root: Path | None = None
     discovery_indexes: tuple[Path, ...] = ()
+    upload_review_enabled: bool = False
 
     def __post_init__(self):
         try:
@@ -105,6 +106,9 @@ class StagingConfiguration:
             if (type(self.discovery_indexes) is not tuple or len(self.discovery_indexes) > 8
                     or len(set(self.discovery_indexes)) != len(self.discovery_indexes)):
                 raise InvalidConfiguration()
+            if (type(self.upload_review_enabled) is not bool or
+                    (self.upload_review_enabled and (self.incoming_root is None or len(self.original_roots) != 1))):
+                raise InvalidConfiguration()
             protected = (*media, *files, *((self.incoming_root,) if self.incoming_root else ()))
             for index in self.discovery_indexes:
                 if not isinstance(index, Path) or _path(str(index)) != index:
@@ -121,7 +125,8 @@ class StagingConfiguration:
         from app.access.runtime import RuntimeConfiguration
         return RuntimeConfiguration(database=self.database, web_origin=self.web_origin,
             original_roots=self.original_roots, derived_root=self.derived_root,
-            incoming_root=self.incoming_root, discovery_indexes=self.discovery_indexes).build_app()
+            incoming_root=self.incoming_root, discovery_indexes=self.discovery_indexes,
+            upload_review_enabled=self.upload_review_enabled).build_app()
 
     def server_options(self):
         return dict(host=self.bind_host, port=self.port, ssl_certfile=str(self.tls_certificate),
@@ -148,7 +153,8 @@ def parse_configuration(value):
             derived_root=_path(value['derived_root']), bind_host=value['bind_host'], port=value['port'],
             tls_certificate=_path(value['tls_certificate']), tls_private_key=_path(value['tls_private_key']),
             incoming_root=None if incoming is None else _path(incoming),
-            discovery_indexes=tuple(_path(p) for p in indexes))
+            discovery_indexes=tuple(_path(p) for p in indexes),
+            upload_review_enabled=value.get('upload_review_enabled', False))
     except (TypeError, ValueError, KeyError):
         raise InvalidConfiguration() from None
 
@@ -207,7 +213,10 @@ def serve(config, *, server_run=None, photo_cache=None, prepared_index=None,
     if photo_cache is not None:
         from dataclasses import replace
         from app.photo_delivery import PhotoCache
-        app.state.media_runtime = replace(app.state.media_runtime, photo_cache=PhotoCache(photo_cache))
+        cache = PhotoCache(photo_cache)
+        app.state.media_runtime = replace(app.state.media_runtime, photo_cache=cache)
+        if app.state.upload_review_runtime is not None:
+            app.state.upload_review_runtime = replace(app.state.upload_review_runtime, photo_cache=cache)
     if prepared_index is not None:
         from dataclasses import replace
         from app.access.prepared_video import PreparedVideos

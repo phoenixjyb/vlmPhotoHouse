@@ -30,6 +30,16 @@ class StagingLauncherTests(unittest.TestCase):
             guard = patch(target, side_effect=AssertionError('External I/O forbidden'))
             guard.start(); self.addCleanup(guard.stop)
 
+    def test_upload_review_and_normal_media_share_one_bounded_preview_cache(self):
+        config = staging_app.parse_configuration(self.value | {
+            'incoming_root': str(self.root/'member-incoming'), 'upload_review_enabled': True})
+        captured = []
+        staging_app.serve(config, photo_cache=self.root/'photo-cache',
+                          server_run=lambda app, **options: captured.append(app))
+        app = captured[0]
+        self.assertIs(app.state.upload_review_runtime.photo_cache, app.state.media_runtime.photo_cache)
+        self.assertEqual(app.state.upload_review_runtime.upload.original_roots, config.original_roots)
+
     def write(self, value=None):
         self.path.write_text(json.dumps(self.value if value is None else value))
 

@@ -5,6 +5,7 @@ the protected discovery service computes for itself, so the producer reads
 through the service's own scoped_source, digest and read budget.
 """
 from contextlib import closing, redirect_stderr, redirect_stdout
+from dataclasses import asdict
 import hashlib
 import io
 import json
@@ -21,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'backend'), str(ROOT / 'scripts'), str(ROOT / 'tests' / 'security')]
 
 from app.access import discovery as d
-from app.access.discovery_provider import MemoryIndexProvider, ReviewedIndex
+from app.access.discovery_provider import MemoryIndexProvider, ReviewedFace, ReviewedIndex, ReviewedPerson, ReviewedPlace
 from app.access.service import AccessService, AccessDenied
 from phone_discovery_fixture import create, reviewed, TOKEN, OTHER, NOW
 import prepare_access_discovery_index as producer
@@ -64,12 +65,34 @@ class ProducerTests(unittest.TestCase):
         captured = io.StringIO()
         with redirect_stderr(io.StringIO()), redirect_stdout(captured):
             code = producer.main(['--database', str(database or self.database), '--library', library,
-                                  '--revision', revision, '--out', str(target)])
+                                  '--revision', revision, '--out', str(target)] +
+                                 (['--review', str(self.review_path)] if hasattr(self, 'review_path') else []))
         return code, target, json.loads(captured.getvalue() or '{}')
+
+    def write_review(self, *, enabled=None, source_fields=None, library='family-a', digest=None):
+        value = asdict(reviewed(self.access_service(), library=library))
+        value['library_id'] = library
+        value.pop('revision', None)
+        value.pop('scope_ids', None)
+        for item in value['people'] + value['places']:
+            item.pop('library_id', None)
+        value['source_digest'] = digest or value['source_digest']
+        value['enabled'] = enabled or ['people', 'date', 'caption', 'tags', 'locations', 'media']
+        value['source_fields'] = source_fields if source_fields is not None else {'caption': 'current_source', 'tags': 'current_source'}
+        self.review_path = self.tmp / 'review.json'
+        self.review_path.write_text(json.dumps(value, sort_keys=True), encoding='utf-8')
+        return self.review_path
 
     def artifact(self, out):
         raw = json.loads(out.read_bytes())
-        return raw, ReviewedIndex(**{k: (tuple(v) if isinstance(v, list) else v) for k, v in raw.items()})
+        value = dict(raw)
+        value['people'] = tuple(ReviewedPerson(item['library_id'], item['id'], item['label'], tuple(item['aliases']), item['allow_zero']) for item in value['people'])
+        value['assignments'] = tuple(ReviewedFace(**item) for item in value['assignments'])
+        value['places'] = tuple(ReviewedPlace(**item) for item in value['places'])
+        value['regions'] = tuple(tuple(item) for item in value['regions'])
+        for key in ('scope_ids', 'indexed_ids', 'pinned_ids', 'enabled'):
+            value[key] = tuple(value[key])
+        return raw, ReviewedIndex(**value)
 
     def access_service(self):
         connection = sqlite3.connect(str(self.database))
@@ -125,6 +148,49 @@ class ProducerTests(unittest.TestCase):
         self.assertEqual(self.ids(self.search(service, {'media': ['video']})), ['102'])
         self.assertEqual(self.ids(self.search(service, {'media': ['image', 'video']})), ['103', '102', '101'])
         self.assertEqual(self.ids(self.search(service, {'media': ['other']})), ['9223372036854775807'])
+
+    def test_explicit_review_enables_people_caption_tags_and_places(self):
+        self.write_review()
+        review = json.loads(self.review_path.read_text(encoding='utf-8'))
+        review['indexed_ids'] = ['101', '102', '103']
+        review['regions'] = [['101', '601'], ['103', '601']]
+        self.review_path.write_text(json.dumps(review), encoding='utf-8')
+        _, out, receipt = self.produce()
+        _, index = self.artifact(out)
+        self.assertEqual(index.enabled, ('people', 'date', 'caption', 'tags', 'locations', 'media'))
+        self.assertEqual(receipt['enabled'], ['people', 'date', 'caption', 'tags', 'locations', 'media'])
+        self.assertEqual(receipt['indexed_assets'], 3)
+        service = self.service(index)
+        self.assertEqual([item['id'] for item in service.facets(TOKEN, 'family-a', facet='people')['items']], ['301', '302'])
+        self.assertEqual([item['id'] for item in service.facets(TOKEN, 'family-a', facet='locations')['items']], ['601'])
+        result = self.search(service, {'people': {'ids': ['302'], 'match': 'any'},
+                                       'tags': {'ids': ['501'], 'match': 'any'},
+                                       'locations': ['601'], 'caption': 'family'})
+        self.assertEqual(self.ids(result), ['103'])
+
+    def test_review_rejects_assignment_not_matching_source_face(self):
+        self.write_review()
+        value = json.loads(self.review_path.read_text(encoding='utf-8'))
+        value['assignments'][0]['id'] = '999'
+        self.review_path.write_text(json.dumps(value), encoding='utf-8')
+        self.refuse()
+
+    def test_review_requires_explicit_native_caption_and_tag_declarations(self):
+        self.write_review(source_fields={})
+        self.refuse()
+        self.write_review(enabled=['date', 'caption', 'media'], source_fields={})
+        self.refuse()
+
+    def test_review_is_bound_to_current_library_projection(self):
+        self.write_review()
+        wrong_library = json.loads(self.review_path.read_text(encoding='utf-8'))
+        wrong_library['library_id'] = 'family-b'
+        self.review_path.write_text(json.dumps(wrong_library), encoding='utf-8')
+        self.refuse()
+        self.write_review()
+        self.update("INSERT INTO assets VALUES(104,'p','active','image/jpeg',8,8,NULL,'2026-06-06')")
+        self.update('INSERT INTO access_asset_libraries VALUES(104,?)', ('family-a',))
+        self.refuse(revision='2')
 
     def test_artifact_carries_no_review_content(self):
         _, out, _ = self.produce()

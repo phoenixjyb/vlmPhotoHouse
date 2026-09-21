@@ -21,7 +21,7 @@ class ProtectedNativeContractTests(unittest.TestCase):
         return self.cases[name]['response']['body']
 
     def test_entire_capture_matches_reviewed_wire_cases(self):
-        self.assertEqual(self.actual, json.loads((PACK / 'cases.json').read_text()))
+        self.assertEqual(self.actual, json.loads((PACK / 'cases.json').read_text(encoding='utf-8')))
 
     def test_manifest_pins_source_and_complete_payload(self):
         spec = importlib.util.spec_from_file_location('contract_verifier',
@@ -30,6 +30,14 @@ class ProtectedNativeContractTests(unittest.TestCase):
         spec.loader.exec_module(module)
         manifest = module.verify(ROOT)
         self.assertEqual(manifest['case_count'], len(self.actual['cases']))
+
+    def test_upload_retry_uses_canonical_receipt_without_library_access(self):
+        first = self.body('upload_accepted')
+        retry = self.body('upload_retry_other_batch')
+        self.assertEqual(retry, {**first, 'tasks_enqueued': 0})
+        self.assertEqual(first['tasks_enqueued'], 5)
+        self.assertIsNone(first['library_id'])
+        self.assertEqual(self.cases['upload_not_in_library']['response']['status'], 401)
 
     def test_invited_viewer_has_no_implicit_originals_or_other_library(self):
         memberships = self.body('invited_viewer_session')['memberships']
@@ -74,6 +82,16 @@ class ProtectedNativeContractTests(unittest.TestCase):
         self.assertEqual(self.cases['gallery_media_invalid']['response']['status'], 400)
         self.assertEqual(self.cases['gallery_media_duplicate']['response']['status'], 400)
         self.assertEqual(self.cases['gallery_media_revoked']['response']['status'], 401)
+
+    def test_prepared_gallery_is_opt_in_scoped_and_counted_before_paging(self):
+        one = self.body('prepared_gallery_page_one')
+        self.assertEqual(one['total'], 1)
+        self.assertEqual([a['id'] for a in one['items']], ['102'])
+        self.assertFalse(one['originals_allowed'])
+        self.assertEqual(self.body('prepared_gallery_page_two')['items'], [])
+        for name in ('prepared_gallery_foreign', 'prepared_gallery_anonymous', 'prepared_gallery_revoked'):
+            self.assertEqual(self.cases[name]['response']['status'], 401)
+        self.assertEqual(self.cases['prepared_gallery_without_provider']['response']['status'], 503)
 
     def test_read_only_story_pages_conflicts_and_retry_semantics(self):
         first, second = self.body('story_list_page_one'), self.body('story_list_page_two')

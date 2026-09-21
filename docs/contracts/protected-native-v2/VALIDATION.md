@@ -1,4 +1,62 @@
-# Validation receipt — 2026-09-20
+# Validation receipt — 2026-09-21
+
+## Candidate.18 — approved upload gallery visibility
+
+Source `213195564850521706c50ed4309a97d1c757eeca`. Gallery, media-filter, upload review, promotion,
+transfer and closed-application suites: 110 checks passed. The new regression
+covers more than one page of dated assets, missing-date receipt fallback, real
+capture-date precedence and hidden pending/foreign/deleted assets. The Chromium
+flow proves approval returns from a filtered gallery to page one automatically,
+shows the approved photo first and opens its decoded viewer image; lost-response
+retry and session revocation remain covered. Rendered phone layout inspected.
+All 11 native contract checks passed: 89 unchanged captured exchanges, 117 source
+hashes and 7 payload hashes verified under candidate.18.
+Synthetic source checks do not substitute for Windows or family acceptance.
+
+## Candidate.17 — admin upload review
+
+Source `2a684832148c667834213ad6e4915f1724f62a88`. Focused Python suite: 176 passes, with one additional
+shared-cache launcher test passing afterward (31 relevant checks rerun). Existing
+WebUI browser suite: 58 checkpoints. The new actual Chromium/ASGI workflow passes
+private serialized previews, target/audience confirmation, desktop/phone layouts,
+lost-response retry, gallery visibility and revocation cleanup. Synthetic resource
+admission is explicit in the browser harness. All 89 existing native wire cases
+remain byte-identical; only the candidate version/source closure changes.
+Windows activation and real family approval remain separate delivery gates.
+
+## Candidate.16 maintenance — existing task-table defaults
+
+Source `808abfe134273d4fa208c14199422dd81ea45d38`. A real phone attempt left
+complete incoming bytes but rolled back database registration: the live legacy
+`tasks` table has required `retry_count` and `cancel_requested` without SQL defaults.
+The new synthetic regression reproduces the NOT NULL failure before the fix and
+passes after both fields are explicitly initialized. Upload/promotion suites: 80
+passed. No user files were removed or production rows manually repaired. Wire
+replay remains 89 byte-identical cases. Runtime activation and phone acceptance
+are recorded separately from these source checks.
+
+## 2.0.0-candidate.16 — atomic upload retries
+
+Source `7321f3c3b4c9fd534d5555efa27636fcff3c132f`. Local upload/promotion suites: 79 tests pass,
+including concurrent same/different batches, canonical receipt after rename,
+missing/corrupt files, orphan adoption, revocation after staging, symlink refusal,
+and promotion commit/compensation locking. Related authorization, provisioning,
+launcher/package, discovery wiring and gallery suites: 135 tests pass.
+
+The native ASGI probe captures 89 cases; all 86 prior cases are byte-identical.
+No schema migration is needed. This source receipt is not live upload acceptance;
+Windows qualification and explicit activation are recorded separately.
+
+
+## 2.0.0-candidate.15 — prepared-video browsing
+
+Source `789bdf0ca9f69787fa3e5d13db3d666f4931e0a3`. Thirteen focused gallery tests pass, covering
+prepared pagination/counting, authorization before catalog access, missing and
+changed providers, hidden/foreign assets, and unchanged media filters. The native
+probe captures 86 ASGI exchanges; all 78 prior exchanges are byte-identical.
+Prepared browsing introduces no migration, encoding or original-media permission.
+Runtime activation, expanded index qualification and physical devices remain
+separate gates. Client prepared browsing is opt-in and defaults off.
 
 ## 2.0.0-candidate.14 — protected gallery media filter (2026-09-20)
 

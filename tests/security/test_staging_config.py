@@ -80,6 +80,28 @@ class StagingConfigurationTests(unittest.TestCase):
                 with self.assertRaises(s.InvalidConfiguration):
                     s.parse_configuration(dict(base(), **{extra: '/synthetic/x'}))
 
+    def test_upload_review_opt_in_requires_an_incoming_root_and_one_original_root(self):
+        invalid = (
+            'true', 1, None,
+        )
+        for value in invalid:
+            with self.subTest(upload_review_enabled=value), self.assertRaises(s.InvalidConfiguration):
+                s.parse_configuration(dict(base(), upload_review_enabled=value))
+        with self.assertRaises(s.InvalidConfiguration):
+            s.parse_configuration(dict(base(), upload_review_enabled=True,
+                                       incoming_root=None))
+        with self.assertRaises(s.InvalidConfiguration):
+            s.parse_configuration(dict(base(), upload_review_enabled=True,
+                                       incoming_root='/synthetic/00_MEMBER_UPLOADS',
+                                       original_roots=['/synthetic/01_INCOMING',
+                                                       '/synthetic/02_INCOMING']))
+
+    def test_upload_review_defaults_false_and_is_preserved_when_disabled(self):
+        self.assertFalse(s.parse_configuration(base()).upload_review_enabled)
+        configuration = s.parse_configuration(dict(
+            base(), incoming_root='/synthetic/00_MEMBER_UPLOADS', upload_review_enabled=False))
+        self.assertFalse(configuration.upload_review_enabled)
+
     def test_the_required_fields_are_still_required(self):
         for missing in sorted(s.FIELDS):
             with self.subTest(missing=missing):

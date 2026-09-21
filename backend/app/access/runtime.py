@@ -93,6 +93,7 @@ class RuntimeConfiguration:
     photo_cache: object = None
     discovery_indexes: tuple[Path, ...] = ()
     incoming_root: Path | None = None
+    upload_review_enabled: bool = False
 
     def build_app(self, *, clock=time.time):
         """Build only; storage is opened lazily in the request's worker thread.
@@ -123,6 +124,12 @@ class RuntimeConfiguration:
         if self.incoming_root is not None:
             from .upload import UploadRuntime
             upload = UploadRuntime(access, self.incoming_root, self.original_roots)
+        if type(self.upload_review_enabled) is not bool:
+            raise ValueError('Explicit review opt-in required')
+        review = None
+        if self.upload_review_enabled:
+            from .upload_review import UploadReviewRuntime
+            review = UploadReviewRuntime(upload, self.photo_cache)
         from ..main import create_app
         return create_app(access_runtime=access, media_runtime=media, discovery_runtime=discovery,
-                          upload_runtime=upload)
+                          upload_runtime=upload, upload_review_runtime=review)

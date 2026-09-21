@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.14'
+VERSION = '2.0.0-candidate.18'
 
 
 def capture():
@@ -42,10 +42,10 @@ def capture():
             if isinstance(value, list): return [normalize(v) for v in value]
             return identities.get(value, value) if isinstance(value, str) else value
 
-        def call(name, method, path, status, *, token=None, body=None, headers=None, record=True):
+        def call(name, method, path, status, *, token=None, body=None, headers=None, record=True, content=None):
             sent = dict(headers or {})
             if token: sent['Authorization'] = 'Bearer ' + token
-            response = env.client.request(method, path, json=body, headers=sent)
+            response = env.client.request(method, path, json=body, headers=sent, content=content)
             assert response.status_code == status, (name, response.status_code, response.text[:200])
             assert response.headers.get('cache-control') == 'no-store', name
             if path in ('/auth/register', '/auth/login') and status in (200, 201):
@@ -61,6 +61,8 @@ def capture():
             request = {'method': method, 'path': path, 'credential':
                        'none' if token is None else token, 'headers': dict(headers or {})}
             if body is not None: request['json'] = body
+            if content is not None:
+                request['content'] = {'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content)}
             cases.append({'id': name, 'request': request,
                           'response': {'status': status, 'headers': selected, 'body': output}})
             return response
@@ -157,6 +159,7 @@ def capture():
         movie = originals/'102.mov'; movie.write_bytes(b'synthetic-original-video')
         env.mutate('UPDATE assets SET path=? WHERE id=102',(str(movie),))
         call('playback_without_provider','HEAD','/assets/102/playback?library=family-a',503,token=native)
+        call('prepared_gallery_without_provider','GET','/assets?library=family-a&media=prepared_video',503,token=native)
         prepared = root/'prepared'; folder = prepared/'102-ready'; folder.mkdir(parents=True)
         video_bytes = (ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
         chunk_bytes = json.dumps([hashlib.sha256(video_bytes).hexdigest()]).encode()
@@ -169,6 +172,16 @@ def capture():
             directory=folder.name,video=descriptor)])).encode(); index.write_bytes(raw)
         provider = PreparedVideos(index,hashlib.sha256(raw).hexdigest(),prepared)
         env.client.app.state.media_runtime = replace(env.client.app.state.media_runtime,prepared_videos=provider)
+        with env.connection() as db:
+            previous_mime = db.execute('SELECT mime FROM assets WHERE id=102').fetchone()[0]
+        env.mutate("UPDATE assets SET mime='video/mp4' WHERE id=102")
+        call('prepared_gallery_page_one','GET','/assets?library=family-a&media=prepared_video&page_size=1',200,token=native)
+        call('prepared_gallery_page_two','GET','/assets?library=family-a&media=prepared_video&page_size=1&page=2',200,token=native)
+        call('prepared_gallery_foreign','GET','/assets?library=family-unavailable&media=prepared_video',401,token=native)
+        call('prepared_gallery_anonymous','GET','/assets?library=family-a&media=prepared_video',401)
+        call('prepared_gallery_duplicate','GET','/assets?library=family-a&media=prepared_video&media=all',400,token=native)
+        call('prepared_gallery_invalid','GET','/assets?library=family-a&media=prepared',400,token=native)
+        env.mutate('UPDATE assets SET mime=? WHERE id=102',(previous_mime,))
         call('playback_anonymous','GET','/assets/102/playback?library=family-a',401)
         call('playback_foreign','GET','/assets/201/playback?library=family-a',401,token=native)
         call('playback_head','HEAD','/assets/102/playback?library=family-a',200,token=native)
@@ -221,6 +234,22 @@ def capture():
         # surface by accident. It is not library-scoped: the accepted photo is in no library
         # until an operator promotes and assigns it.
         call('upload_requires_opt_in', 'POST', '/uploads', 503, token=native, body={})
+        # Opt-in uploads preserve canonical provenance across retries and never grant
+        # a library mapping. Real filesystem and DB; only the fixture JPEG is sent.
+        from app.access.upload import UploadRuntime
+        upload_access = env.client.app.state.access_runtime
+        env.client.app.state.upload_runtime = UploadRuntime(upload_access, root / 'incoming', (root / 'originals',))
+        with env.connection() as db:
+            _, label = AccessService(db, clock=lambda: env.now).uploader(native)
+        identities[label] = 'Synthetic-Member-00000000-0000-0000-0000-000000000004'
+        upload_bytes = (ROOT / 'tests/security/fixtures/home-8x8.jpg').read_bytes()
+        upload_headers = {'Content-Type': 'application/octet-stream',
+                          'X-Upload-Filename': 'synthetic.jpg', 'X-Upload-Batch': 'a' * 32}
+        accepted = call('upload_accepted', 'POST', '/uploads', 201, token=native,
+                        headers=upload_headers, content=upload_bytes).json()
+        call('upload_retry_other_batch', 'POST', '/uploads', 201, token=native,
+             headers={**upload_headers, 'X-Upload-Batch': 'b' * 32}, content=upload_bytes)
+        call('upload_not_in_library', 'GET', '/assets/detail/' + accepted['asset_id'] + '?library=family-a', 401, token=native)
         env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?", (new_id,))
         call('revoked_session_still_authenticated', 'GET', '/auth/session', 200, token=native)
         call('revoked_story_list', 'GET', '/assets/101/stories?library=family-a', 401, token=native)
@@ -236,6 +265,7 @@ def capture():
                    (fixture.LibraryReadTests.member_id,))
         call('gallery_media_revoked', 'GET', '/assets?library=family-a&media=video', 401,
              token=env.member_token)
+        call('prepared_gallery_revoked','GET','/assets?library=family-a&media=prepared_video',401,token=env.member_token)
         return {'contract_version': VERSION, 'synthetic_only': True,
                 'normalization': 'random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator',
                 'media_evidence': 'generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim',

@@ -1,0 +1,86 @@
+{
+  "source_commit": "b61a20896ea1f45dca34954e70af0cdf49dbaae9",
+  "live_source_commit": "4d1de0f06bae4f2e5342134db6a4b847657d2484",
+  "result": "activation_blocked",
+  "windows_synthetic_tests": {
+    "run": 103,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "discovery": {
+    "database_writes": false,
+    "published": false,
+    "completed_projections": [],
+    "failed_projection": {
+      "table": "assets",
+      "seconds": 2.016,
+      "kind": "OperationalError"
+    },
+    "success": false,
+    "failure_type": "DiscoveryUnavailable",
+    "seconds": 2.016,
+    "budget": {
+      "rows": 100000,
+      "source_bytes": 16777216,
+      "seconds": 2
+    }
+  },
+  "discovery_order_variant": {
+    "database_writes": false,
+    "published": false,
+    "qualification_only_variant": "ORDER BY m.asset_id",
+    "completed_projections": [
+      {
+        "table": "assets",
+        "rows": 27842,
+        "seconds": 1.907
+      }
+    ],
+    "failed_projection": {
+      "table": "captions",
+      "seconds": 0.14,
+      "kind": "OperationalError"
+    },
+    "success": false,
+    "failure_type": "DiscoveryUnavailable",
+    "seconds": 2.047,
+    "budget": {
+      "rows": 100000,
+      "source_bytes": 16777216,
+      "seconds": 2
+    }
+  },
+  "filesystem": {
+    "production_database_writes": false,
+    "source_commit": "b61a20896ea1f45dca34954e70af0cdf49dbaae9",
+    "principal": "SYSTEM",
+    "prior_probe_files_removed": 2,
+    "receipt_hash_bytes_valid": true,
+    "database_dedup_passed": true,
+    "unassigned_upload_invisible": true,
+    "duplicate_probe": {
+      "asset_rows": 1,
+      "files": 2,
+      "unreferenced_files": 1,
+      "receipt_batch_matches_provenance": false
+    },
+    "duplicate_storage_qualified": false,
+    "probe_files_removed": 2,
+    "actual_cross_volume_C_to_E": true,
+    "actual_cross_volume_E_to_C": true,
+    "incoming_empty_after_qualification": true,
+    "probes_completed": true,
+    "activation_qualified": false
+  },
+  "live_tls_verified": true,
+  "live_configuration_changed": false,
+  "production_database_writes": false,
+  "cleanup": {
+    "qualification_task_removed": true,
+    "short_temp_root_removed": true,
+    "incoming_empty": true,
+    "live_configuration_unchanged": true,
+    "available_ram_gib": 48.92
+  }
+}

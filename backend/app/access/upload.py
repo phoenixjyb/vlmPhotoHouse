@@ -18,6 +18,8 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import secrets
+import stat
 import struct
 
 from .service import AccessDenied
@@ -26,6 +28,62 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_PIXELS = 64 * 1024 * 1024
 MAX_ORIGINAL_NAME = 200
 BATCH_PATTERN = re.compile(r'[0-9a-f]{32}')
+
+
+def _identity(record):
+    return (record.st_dev, record.st_ino, record.st_size, record.st_mtime_ns)
+
+
+def _verify_candidate(path, data):
+    """A retry may reuse complete bytes, never a symlink or a partial old write."""
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_size != len(data):
+        raise OSError('Upload candidate is not reusable')
+    with path.open('rb') as stream:
+        if _identity(os.fstat(stream.fileno())) != _identity(before):
+            raise OSError('Upload candidate changed')
+        digest = hashlib.sha256()
+        remaining = len(data)
+        while remaining:
+            chunk = stream.read(min(65536, remaining))
+            if not chunk:
+                raise OSError('Upload candidate is incomplete')
+            digest.update(chunk)
+            remaining -= len(chunk)
+        if stream.read(1) or digest.digest() != hashlib.sha256(data).digest():
+            raise OSError('Upload candidate differs')
+    if _identity(path.lstat()) != _identity(before):
+        raise OSError('Upload candidate changed')
+
+
+def _stage_candidate(root, data):
+    """Complete the bounded bulk write before taking the SQLite writer lock."""
+    root.mkdir(parents=True, exist_ok=True)
+    temporary = root / ('.upload-' + secrets.token_hex(16) + '.pending')
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        temporary.unlink()
+        raise
+    return temporary
+
+
+def _publish_candidate(temporary, path, data):
+    """Called under the writer lock also held by promotion and unassignment."""
+    if path.parent.resolve() != path.parent:
+        raise OSError('Upload destination requires review')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.resolve() != path.parent:
+        raise OSError('Upload destination changed')
+    try:
+        os.link(temporary, path)  # Complete bytes become visible, with no overwrite.
+    except FileExistsError:
+        _verify_candidate(path, data)
+
 
 # Leading bytes decide the type. The declared filename is advisory and never selects it.
 SIGNATURES = ((b'\xff\xd8\xff', 'image/jpeg', '.jpg'),
@@ -107,11 +165,11 @@ class UploadRuntime:
     def store(self, token, data, filename, batch):
         """Accept one upload and return its public result.
 
-        The file is written **outside** the write transaction, so a 25 MiB write never holds
-        the SQLite write lock, and **before** the rows, so a database failure leaves an orphan
-        file in the incoming folder rather than a row pointing at a file that does not exist.
-        An orphan is reviewable; a dangling row is not. The capability is re-checked inside
-        the write transaction, so a revocation during the write is still honoured.
+        Bulk bytes are staged outside the write transaction. Under the SQLite writer
+        lock, select authoritative provenance and publish a complete file before recording
+        its row. Promotion uses the same lock, so neither its commit nor rollback can race
+        publication. A DB failure can still leave a reviewable final orphan, never a dangling
+        row. Capability is re-checked after staging and inside the recording transaction.
         """
         from .service import AccessService
 
@@ -132,21 +190,29 @@ class UploadRuntime:
             service = AccessService(connection, clock=access.clock)
             _account_id, label = service.uploader(token)
 
-        directory = self.incoming_root / label / batch
-        directory.mkdir(parents=True, exist_ok=True)
-        path = directory / (digest + suffix)
-        if not path.exists():
-            # O_EXCL so a racing writer cannot be silently overwritten, and 0600 so the bytes
-            # are not group or world readable while they await review.
-            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            try:
-                with os.fdopen(descriptor, 'wb') as handle:
-                    handle.write(data)
-            except BaseException:
-                path.unlink(missing_ok=True)
-                raise
-
-        with access.connection_factory() as connection:
-            service = AccessService(connection, clock=access.clock)
-            return service.record_upload(token, label, batch, path, filename,
-                                         digest, len(data), mime, size)
+        temporary = _stage_candidate(self.incoming_root, data)
+        try:
+            with access.connection_factory() as connection:
+                service = AccessService(connection, clock=access.clock)
+                with service._transaction(write=True):
+                    existing = service._incoming_upload(token, digest)
+                    if existing:
+                        # Use stored provenance even after a name/batch change. Never
+                        # create a second final file merely to discard it afterwards.
+                        path = Path(existing['path'])
+                        expected = self.incoming_root / existing['incoming_label'] / existing['batch'] / (digest + suffix)
+                        if (path != expected or not path.is_relative_to(self.incoming_root)
+                                or '..' in path.parts or existing['bytes'] != len(data)
+                                or existing['mime'] != mime
+                                or (existing['width'], existing['height']) != size):
+                            raise OSError('Stored upload path requires review')
+                    else:
+                        path = self.incoming_root / label / batch / (digest + suffix)
+                    _publish_candidate(temporary, path, data)
+                    result = service._record_upload_in_transaction(token, label, batch, path,
+                        filename, digest, len(data), mime, size)
+            return result
+        finally:
+            # Only this request's unique staging name is removed. A final file left
+            # after DB failure remains reviewable, and canonical files are never deleted.
+            temporary.unlink()
