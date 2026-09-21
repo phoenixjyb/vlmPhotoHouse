@@ -66,6 +66,16 @@ embedding or caption tasks have finished; it neither starts extra workers nor
 changes their state. The installed phone upload format is unchanged. Its existing
 accepted/pending receipt is not a live approval-status subscription.
 
+After successful approval, the WebUI refreshes the first, unfiltered gallery page
+and focuses the approved photo when it is on that page. This also clears a prior
+story search; the inbox still shows the approval result. For uploaded photos with
+no capture date, protected gallery ordering uses the upload receipt time as its
+fallback. A real capture date always takes precedence, and the response still
+returns the actual `taken_at` (including null); no capture metadata is invented or
+rewritten. Unregistered undated assets keep their prior relative ordering.
+This shared gallery behavior applies to protected WebUI and phone clients without
+a new APK. It does not change anonymous TV catalogs or make pending uploads visible.
+
 ## Verification and delivery
 
 Run the focused Python tests with the approved CPU test environment:

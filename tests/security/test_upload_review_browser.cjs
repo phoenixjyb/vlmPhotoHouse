@@ -32,6 +32,11 @@ let browser;
   await page.goto('https://photohouse.test/ui');
   await page.locator('#phone').fill('+12025550100');await page.locator('#password').fill('Synthetic family passphrase!');await page.locator('#auth-submit').click();
   await page.locator('#uploads-panel').waitFor({state:'visible'}).catch(async e=>{console.error(requests,await page.locator('#status').textContent());throw e;});
+  // Leave the owner on a filtered, potentially non-first gallery page before approval. A
+  // successful approval must return to normal page 1 so the newly assigned upload is visible.
+  await page.locator('#search-text').fill('no matching synthetic memory');
+  await page.locator('#story-search button.primary').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#grid .asset').length===0);
   await page.locator('#uploads-open').click();
   await page.locator('.upload-card').first().waitFor();assert.equal(await page.locator('.upload-card').count(),3);
   await page.waitForFunction(()=>[...document.querySelectorAll('.upload-card img')].filter(img=>img.naturalWidth>0).length===3);
@@ -50,8 +55,20 @@ let browser;
   await page.locator('#upload-review-dialog').waitFor({state:'hidden'});
   await page.waitForFunction(()=>document.querySelectorAll('.upload-card').length===2);
   assert.equal(posts,2);
-  await page.locator('#refresh').click();
   await page.locator(`.asset`).filter({hasText:String(seed.asset_id)}).waitFor();
+  assert.equal(await page.locator('#search-text').inputValue(),'');
+  assert.equal(await page.locator('#page-input').inputValue(),'1');
+  assert.match((await page.locator('.asset').first().textContent()).trim(),new RegExp(`\\b${String(seed.asset_id)}\\b`));
+  assert.match(await page.locator('#uploads-status').textContent(),/approved/i);
+  await page.waitForFunction(id=>{const card=[...document.querySelectorAll('.asset')].find(item=>item.textContent.includes(String(id)));return card?.querySelector('img')?.naturalWidth>0;},seed.asset_id);
+  await page.locator('.asset').filter({hasText:String(seed.asset_id)}).click();
+  await page.locator('#photo-viewer').waitFor({state:'visible'});
+  await page.locator('#view-fit').waitFor({state:'attached'});
+  await page.waitForFunction(()=>document.querySelector('#viewer-media .viewer-surface img')?.naturalWidth>0);
+  await page.screenshot({path:path.join(artifacts,'approved-gallery-phone.png')});
+  assert.equal(await page.evaluate(()=>{const image=document.querySelector('#viewer-media .viewer-surface img');return image&&image.naturalWidth>0&&image.naturalHeight>0;}),true);
+  await page.locator('#close-viewer').click();
+  await page.locator('#viewer').waitFor({state:'hidden'});
   await page.locator('#language').click();
   await page.waitForFunction(()=>document.querySelector('#uploads-open').textContent==='上传审核'&&document.querySelectorAll('.upload-card').length===2);
   // Revocation while a second confirmation is open must clear all private UI.

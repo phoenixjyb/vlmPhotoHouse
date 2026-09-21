@@ -539,7 +539,7 @@
       if(stale(epoch))return;
       state.total=result.total;
       for(const item of result.items) {
-        const card=document.createElement('button');card.type='button';card.className='asset';
+        const card=document.createElement('button');card.type='button';card.className='asset';card.dataset.assetId=item.id;
         const image=document.createElement('img');image.loading='lazy';image.alt=assetLabel(item);
         image.src=safeMediaURL(item.id,'thumbnail');
         image.addEventListener('error',()=>{image.alt=t('previewMissing');},{once:true});
@@ -723,12 +723,20 @@
     finally{state.busy=false;}
   }
   async function approveUpload(){
-    const item=uploadState.dialogItem,epoch=uploadState.dialogEpoch,plan=item&&uploadState.plans.get(item.id);
+    const item=uploadState.dialogItem,epoch=uploadState.dialogEpoch,library=state.library,plan=item&&uploadState.plans.get(item.id);
     if(state.busy||state.locked||!item||!plan||stale(epoch))return;
     state.busy=true;$('upload-review-approve').disabled=true;$('upload-review-cancel').disabled=true;$('upload-review-close').disabled=true;
     try{
       await request(libraryPath(`/admin/uploads/${encodeURIComponent(item.id)}/approve`),{method:'POST',body:{plan},epoch});
-      if(stale(epoch))return;closeUploadDialog();await loadUploads('uploadApproved');
+      if(stale(epoch))return;closeUploadDialog();
+      // The inbox disappearing alone leaves a stale gallery and makes approval
+      // look like data loss. Return to an unfiltered first page immediately.
+      storyState.search=null;$('search-text').value='';state.page=1;
+      if(await loadGallery()&&library===state.library&&!state.locked){
+        await loadUploads('uploadApproved');
+        const card=[...$('grid').children].find(node=>node.dataset.assetId===String(item.id));
+        if(card){card.scrollIntoView({block:'center'});card.focus({preventScroll:true});}
+      }
     }catch(error){
       if(stale(epoch))return;
       if(error.status===409){closeUploadDialog();await loadUploads('uploadConflict');}

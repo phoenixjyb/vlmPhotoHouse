@@ -23,6 +23,12 @@ router = APIRouter(route_class=LibraryRoute)
 SOURCE = ''' FROM assets a JOIN access_asset_libraries scope ON scope.asset_id=a.id
     WHERE scope.library_id=? AND (a.status IS NULL OR a.status='active')'''
 FIELDS = 'a.id,a.mime,a.width,a.height,a.duration_sec,a.taken_at'
+# An undated member upload belongs near the time it arrived, not after every
+# dated photo in a large library. Keep capture metadata unchanged and prefer it
+# whenever present. Unregistered undated assets retain their existing ordering.
+GALLERY_ORDER = ''' ORDER BY COALESCE(a.taken_at,
+    (SELECT datetime(u.created_at,'unixepoch') FROM access_uploads u
+     WHERE u.asset_id=a.id)) DESC,a.id DESC'''
 # Shared mobile response budget, measured with the actual JSON wire serializer.
 CAPTION_RESPONSE_BYTES = 512 * 1024
 
@@ -63,7 +69,7 @@ class LibraryReads:
             total = db.execute('SELECT count(*)' + SOURCE + media_sql,
                                (library_id,) + media_arg).fetchone()[0]
             rows = db.execute('SELECT ' + FIELDS + SOURCE +
-                media_sql + ' ORDER BY a.taken_at DESC,a.id DESC LIMIT ? OFFSET ?',
+                media_sql + GALLERY_ORDER + ' LIMIT ? OFFSET ?',
                 (library_id,) + media_arg + (page_size, (page - 1) * page_size)).fetchall()
             if media == 'prepared_video':
                 self.prepared.current()

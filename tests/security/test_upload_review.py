@@ -5,6 +5,7 @@ deliberately do not subclass it: importing this module must not discover and rer
 or operator-command suites.
 """
 from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 import unittest
@@ -103,6 +104,68 @@ class UploadReviewTests(unittest.TestCase):
             'SELECT count(*) FROM access_provisioning_receipts')[0][0], 1)
         self.assertEqual(self._rows(
             'SELECT state FROM access_uploads WHERE asset_id=?', (asset_id,))[0][0], 'assigned')
+
+    def test_gallery_orders_approved_null_date_upload_before_dated_assets_and_filters_scope(self):
+        # Keep every captured date strictly before the synthetic upload receipt time.  The
+        # approved upload has no captured date, so the gallery must use its received-at fallback.
+        dated = [(1000 + i, datetime.fromtimestamp(
+            promotion_base.NOW - (i + 1) * 86400, timezone.utc).isoformat())
+                 for i in range(26)]
+        deleted = 1100
+        foreign = 1101
+        with closing(self.fixture.connection()) as db:
+            db.executemany('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                VALUES (?,?,?,'active','image/jpeg',640,480,?)''',
+                [(asset_id, f'captured/{asset_id}.jpg', f'hash-{asset_id}', taken_at)
+                 for asset_id, taken_at in dated])
+            db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                VALUES (?,?,?,'deleted','image/jpeg',640,480,?)''',
+                       (deleted, 'deleted/1100.jpg', 'hash-1100', dated[0][1]))
+            db.execute('''INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at)
+                VALUES (?,?,?,'active','image/jpeg',640,480,?)''',
+                       (foreign, 'foreign/1101.jpg', 'hash-1101', dated[0][1]))
+            db.executemany('INSERT INTO access_asset_libraries(asset_id,library_id) VALUES (?,?)',
+                           [(asset_id, 'family-a') for asset_id, _ in dated] +
+                           [(deleted, 'family-a'), (foreign, 'family-b')])
+            db.commit()
+
+        pending = int(self._upload(data=promotion_base.png(641, 480), filename='pending.png')['asset_id'])
+        uploaded = self._upload(data=promotion_base.png(642, 480), filename='approved.png')
+        approved_id = int(uploaded['asset_id'])
+        plan = self._review(approved_id).json()['plan']
+        response = self._approve(approved_id, plan)
+        self.assertEqual(response.status_code, 200, response.text)
+
+        response = self.client.get('/assets?library=family-a&page=1&page_size=24',
+                                   headers=self._headers(self.fixture.owner_token))
+        self.assertEqual(response.status_code, 200, response.text)
+        items = response.json()['items']
+        ids = [int(item['id']) for item in items]
+        self.assertEqual(ids[0], approved_id)
+        self.assertIsNone(items[0]['taken_at'])
+        self.assertEqual(ids[1:], [asset_id for asset_id, _ in dated[:23]])
+
+        # A real captured date remains authoritative over the upload receipt fallback.  Make the
+        # approved upload's capture date older than the newest seeded asset and verify its place.
+        captured = self._upload(data=promotion_base.png(643, 480), filename='captured.png')
+        captured_id = int(captured['asset_id'])
+        with closing(self.fixture.connection()) as db:
+            db.execute('UPDATE assets SET taken_at=? WHERE id=?',
+                       (dated[10][1], captured_id))
+            db.commit()
+        captured_plan = self._review(captured_id).json()['plan']
+        self.assertEqual(self._approve(captured_id, captured_plan).status_code, 200)
+        all_items = self.client.get('/assets?library=family-a&page=1&page_size=100',
+                                    headers=self._headers(self.fixture.owner_token)).json()['items']
+        all_ids = [int(item['id']) for item in all_items]
+        self.assertEqual(all_ids.index(captured_id), 11)
+        self.assertEqual(all_items[all_ids.index(captured_id)]['taken_at'], dated[10][1])
+
+        # The full scope snapshot confirms that pending, deleted, and foreign rows stay hidden.
+        ids = all_ids
+        self.assertNotIn(pending, ids)
+        self.assertNotIn(deleted, ids)
+        self.assertNotIn(foreign, ids)
 
     def test_list_is_paginated_and_reveals_only_reviewable_member_uploads(self):
         uploaded = [self._upload(data=promotion_base.png(320 + i, 240), filename=f'{i}.png')
