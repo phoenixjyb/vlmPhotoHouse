@@ -11,7 +11,7 @@ SOURCE = '7321f3c3b4c9fd534d5555efa27636fcff3c132f'
 
 def verify(root=ROOT):
     root = Path(root).resolve()
-    manifest = json.loads((root / PACK / 'manifest.json').read_text())
+    manifest = json.loads((root / PACK / 'manifest.json').read_text(encoding='utf-8'))
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
     if manifest['contract_version'] != '2.0.0-candidate.16':
@@ -36,7 +36,7 @@ def verify(root=ROOT):
             if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
                 raise ValueError('Hash mismatch: ' + name)
     payloads = manifest['payload_sha256']
-    required = {str(PACK / name) for name in ('CONTRACT.md', 'UPLOAD_NEXT.md', 'VALIDATION.md', 'cases.json')}
+    required = {(PACK / name).as_posix() for name in ('CONTRACT.md', 'UPLOAD_NEXT.md', 'VALIDATION.md', 'cases.json')}
     required |= {'scripts/verify_protected_native_contract.py',
                  'tests/security/native_contract_v2_probe.py',
                  'tests/security/test_protected_native_contract.py'}
@@ -44,7 +44,7 @@ def verify(root=ROOT):
         raise ValueError('Incomplete or unexpected payload set')
     # Pin all application Python and migration code, including transitive imports.
     expected_sources = {
-        str(path.relative_to(root))
+        path.relative_to(root).as_posix()
         for directory in ('backend/app', 'backend/migrations')
         for path in (root / directory).rglob('*.py')
         if '__pycache__' not in path.parts
@@ -61,7 +61,7 @@ def verify(root=ROOT):
                          'backend/requirements-access-test.lock'}
     if set(manifest['source_sha256']) != expected_sources:
         raise ValueError('Source closure has changed; review and version the profile')
-    cases = json.loads((root / PACK / 'cases.json').read_text())
+    cases = json.loads((root / PACK / 'cases.json').read_text(encoding='utf-8'))
     if (cases['contract_version'] != manifest['contract_version']
             or cases['synthetic_only'] is not True
             or len(cases['cases']) != manifest['case_count']):

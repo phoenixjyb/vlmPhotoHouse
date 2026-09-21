@@ -21,7 +21,7 @@ class ProtectedNativeContractTests(unittest.TestCase):
         return self.cases[name]['response']['body']
 
     def test_entire_capture_matches_reviewed_wire_cases(self):
-        self.assertEqual(self.actual, json.loads((PACK / 'cases.json').read_text()))
+        self.assertEqual(self.actual, json.loads((PACK / 'cases.json').read_text(encoding='utf-8')))
 
     def test_manifest_pins_source_and_complete_payload(self):
         spec = importlib.util.spec_from_file_location('contract_verifier',

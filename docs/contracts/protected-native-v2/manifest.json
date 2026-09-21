@@ -14,9 +14,9 @@
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "2ea8ce05cd9c2336c725793812eac10f5b7a2315bdf72c155959adf7b9a9d1bd",
     "docs/contracts/protected-native-v2/VALIDATION.md": "915ec9fe9161a884ce13ebda41936fe7f432464123d0c706da33ac09d10cf5ae",
     "docs/contracts/protected-native-v2/cases.json": "13f4c6a9af089cfb461409bfb97333cdc8a760b71c5afa5c9509bbfec3af33cd",
-    "scripts/verify_protected_native_contract.py": "5ed38c613ed25626de944cdb299bc2aba7e366f6e56252acc078bee5bf17df94",
+    "scripts/verify_protected_native_contract.py": "a3b4a28dbad32e137d11618cc49a060618e894f540a99e79bc7a4d4797ce39ad",
     "tests/security/native_contract_v2_probe.py": "8862b3b6bea7201d230ef9946afb058876891755a5962438ff322f51b2942ffa",
-    "tests/security/test_protected_native_contract.py": "fc89cf2a9d02500e3f14c744031f161d6c34b5088319ba4887f216eb1bb33f75"
+    "tests/security/test_protected_native_contract.py": "a63f3ba338a9d3133b19f025de2a7925e686e344485629364fe8f5e0276076c8"
   },
   "source_sha256": {
     "backend/alembic.ini": "00797ba09e2df360339fd89185dcc8c08e5434c59e26e723f8804604a74e4768",
