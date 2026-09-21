@@ -99,12 +99,15 @@ def query(request):
     try:
         text = raw.decode('ascii')
         if re.search(r'%(?![0-9a-fA-F]{2})', text): raise ValueError()
-        pairs = parse_qsl(text, keep_blank_values=True, strict_parsing=True, errors='strict', max_num_fields=4)
+        pairs = parse_qsl(text, keep_blank_values=True, strict_parsing=True, errors='strict', max_num_fields=5)
         values = dict(pairs)
-        if len(values)!=len(pairs) or set(values)-{'facet','page','page_size','binding'}: raise ValueError()
+        if len(values)!=len(pairs) or set(values)-{'facet','page','page_size','binding','q'}: raise ValueError()
         result = {'facet':values.get('facet','people'), 'page':integer(values.get('page','1'),5000),
                   'page_size':integer(values.get('page_size','50'),100)}
         if 'binding' in values: result['binding']=values['binding']
+        if 'q' in values:
+            if result['facet'] != 'locations': raise ValueError()
+            d.text(values['q'],128,nonempty=False);result['q']=values['q']
         return result
     except (ValueError, UnicodeError): raise d.DiscoveryInvalid() from None
 

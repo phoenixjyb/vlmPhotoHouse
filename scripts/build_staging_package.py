@@ -40,6 +40,8 @@ FILES = tuple(sorted([
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/prepare_access_discovery_index.py', 'scripts/prepare_access_places.py',
     'docs/security/PLACE_BROWSING_V24.md', 'docs/security/PLACE_REFRESH_V25.md',
+    'docs/security/PLACE_NAME_SEARCH_V26.md', 'docs/security/place-catalogue-china-starter.json',
+    'docs/security/PLACE_CATALOGUE_SOURCES.md',
     'scripts/check_access_environment.py', 'scripts/rehearse_fullsize_database.py',
     'scripts/apply_access_schema.py', 'docs/security/SCHEMA_APPLICATION.md',
     'backend/app/photo_delivery.py', 'backend/app/home_feed.py',

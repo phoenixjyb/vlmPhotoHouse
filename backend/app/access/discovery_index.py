@@ -22,7 +22,7 @@ import stat
 
 from . import discovery as d
 from .discovery_provider import (MemoryIndexProvider, ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedFace, ReviewedIndex,
-                                 ReviewedPerson, ReviewedPlace)
+                                 ReviewedPerson, ReviewedPlace, NamedPlace)
 from .discovery_transport import DiscoveryRuntime
 
 INDEX_KEYS = frozenset({'library_id', 'revision', 'scope_ids', 'indexed_ids', 'source_digest',
@@ -142,9 +142,12 @@ def face(record):
 
 
 def place(record):
-    mapping(record, PLACE_KEYS)
-    return ReviewedPlace(library_id=text(record['library_id'], 128), id=identifier(record['id']),
-                         label=text(record['label'], 256))
+    if type(record) is not dict or set(record) not in (PLACE_KEYS, PLACE_KEYS | {'aliases'}):
+        raise DiscoveryIndexRefused()
+    constructor = NamedPlace if 'aliases' in record else ReviewedPlace
+    extra = {'aliases': tuple(text(v,128) for v in sequence(record['aliases'],8))} if 'aliases' in record else {}
+    return constructor(**extra, library_id=text(record['library_id'], 128), id=identifier(record['id']),
+                       label=text(record['label'], 256))
 
 
 def region(record):

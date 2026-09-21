@@ -17,7 +17,7 @@ from time import monotonic
 import unicodedata
 
 from .credentials import session_digest
-from .discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace
+from .discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedIndex, ReviewedPerson, ReviewedFace, ReviewedPlace, NamedPlace
 from .library import _asset
 from .service import AccessService, AccessDenied
 
@@ -48,6 +48,12 @@ def require(value):
 def packed(value):
     try: return json.dumps(value,sort_keys=True,ensure_ascii=True,separators=(',', ':'),allow_nan=False).encode()
     except (ValueError,TypeError,UnicodeError,RecursionError): raise DiscoveryInvalid() from None
+
+
+def place_fold(value):
+    # Ignore case, width and combining accents, preserving Chinese characters.
+    return ' '.join(''.join(c for c in unicodedata.normalize('NFKD',value).casefold()
+                           if not unicodedata.combining(c)).split())
 
 
 def digest(value): return hashlib.sha256(packed(value)).hexdigest()
@@ -184,8 +190,12 @@ def validate(index, library, limit):
         for alias in person.aliases: text(alias,128)
         require(len(set(person.aliases))==len(person.aliases)); people[person.id]=person
     for place in index.places:
-        require(type(place) is ReviewedPlace and place.library_id==library)
+        require(type(place) in (ReviewedPlace, NamedPlace) and place.library_id==library)
         identifier(place.id); require(place.id not in places);text(place.label,256);places[place.id]=place
+        if type(place) is NamedPlace:
+            require(type(place.aliases) is tuple and len(place.aliases)<=8)
+            for alias in place.aliases: text(alias,128)
+            require(len(set(place.aliases))==len(place.aliases))
     require(ids(index.pinned_ids,32)<=set(people))
     if isinstance(index, ProjectedIndex):
         require('people' in index.enabled or not (index.people or index.pinned_ids or index.assignments))
@@ -352,11 +362,17 @@ class DiscoveryReads:
         for f in facets:facets[f]=sorted(facets[f],key=lambda p:int(p['id'])) if f in index.enabled else []
         return assets,rows,facets,coverage
 
-    def facets(self, token, library, *, facet='people', page=1, page_size=50, binding=None, cancelled=lambda:False):
+    def facets(self, token, library, *, facet='people', page=1, page_size=50, binding=None, q=None, cancelled=lambda:False):
         def action(index,facts,context,member,check):
             require(facet in ('people','tags','locations') and type(page) is int and 1<=page<=5000 and type(page_size) is int and 1<=page_size<=100)
             require(page==1 or binding is not None)
             assets,rows,facets,coverage=facts;items=facets[facet];offset=(page-1)*page_size
+            if q is not None:
+                require(facet=='locations');text(q,128,nonempty=False)
+                needle=place_fold(q)
+                names={p.id:(p.label,*getattr(p,'aliases',())) for p in index.places}
+                # Match locally, after membership and source checks. No geocoder calls.
+                items=[p for p in items if any(needle in place_fold(name) for name in names[p['id']])]
             people={p['id']:p for p in facets['people']};pins=index.pinned_ids if 'people' in index.enabled else ()
             days=[r['date'] for r in rows.values() if r['date'] is not None] if 'date' in index.enabled else []
             return {'library_id':library,'binding':context,'revision':index.revision,

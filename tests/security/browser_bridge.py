@@ -46,8 +46,8 @@ def build_client():
     # UI exercises the real locations facet/search contract. The synthetic source
     # has no GPS semantics here: regions are reviewed IDs only.
     from dataclasses import replace
-    from app.access.discovery_provider import ReviewedPlace
-    index=replace(index, places=(ReviewedPlace('family-a','601','Example region / 示例地区'),),
+    from app.access.discovery_provider import NamedPlace
+    index=replace(index, places=(NamedPlace('family-a','601','Example region / 示例地区',('测试地区','Exampleland')),),
                  regions=(('101','601'),('102','601')),
                  enabled=tuple((*index.enabled,'locations')))
     producer.write_new(out, json.dumps(asdict(index), sort_keys=True, ensure_ascii=True,

@@ -19,7 +19,7 @@
   const duplicateState={page:1,total:0,load:0};
   // Date/media narrowing. `binding` is issued by the facets route and must be echoed to
   // the search route; `fingerprint` chains a later page to the exact filter it paginates.
-  const discoveryState={binding:null,page:1,total:0,facetLoad:0,searchLoad:0,fingerprint:null,applied:false,appliedFilters:null,placePage:1,placeTotal:0,places:[],selectedPlaces:new Set(),placesAvailable:false};
+  const discoveryState={binding:null,page:1,total:0,facetLoad:0,searchLoad:0,fingerprint:null,applied:false,appliedFilters:null,placePage:1,placeTotal:0,places:[],selectedPlaces:new Set(),selectedPlaceLabels:new Map(),placeQuery:'',placesAvailable:false};
   const unassignedState={page:1,total:0,load:0};
   const faceState={page:1,total:0,load:0};
   const albumState={page:1,total:0,load:0,draft:null,archivedLoad:0};
@@ -61,6 +61,8 @@
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
   Object.assign(words.en,{uploadReview:'Upload review',uploadReviewHelp:'Review private uploads before assigning them to this library. Only the library owner with admin authorization can approve an upload.',uploadLoading:'Loading upload inbox…',uploadEmpty:'No uploads are waiting for review.',uploadRestricted:'Upload review is unavailable for this account.',uploadReviewError:'Uploads could not load. Try again.',approveUpload:'Approve upload',uploadRetryApproval:'Retry approval',approveUploadHelp:'Approving will assign this photo to',approveVisibility:'It will become visible to this library’s members according to their existing access.',uploadReaders:'Current readers',uploadOriginalReaders:'Current original readers',uploadPreviewFailed:'Private preview unavailable. Retry the preview.',uploadApproved:'Upload approved.',uploadConflict:'This upload changed. Review it again before approving.',uploadUncertain:'Approval was not confirmed. The same approval can be retried.',uploadRetry:'Retry review',uploadBytes:'bytes',uploadDimensions:'dimensions',uploadBy:'Uploaded by'});
   Object.assign(words.zh,{uploadReview:'上传审核',uploadReviewHelp:'在将私密上传分配到本家庭库前先进行审核。只有拥有管理员授权的相册库主人可以批准上传。',uploadLoading:'正在加载上传审核…',uploadEmpty:'暂无等待审核的上传。',uploadRestricted:'此账号暂不能进行上传审核。',uploadReviewError:'暂时无法加载上传，请重试。',approveUpload:'批准上传',uploadRetryApproval:'重试批准',approveUploadHelp:'批准后，这张照片将分配到',approveVisibility:'按照现有权限，它将对本家庭库成员可见。',uploadReaders:'当前可读者',uploadOriginalReaders:'当前原文件可读者',uploadPreviewFailed:'私密预览暂不可用，请重试预览。',uploadApproved:'上传已批准。',uploadConflict:'上传内容已变化，请重新审核后再批准。',uploadUncertain:'尚未确认批准结果。可以使用同一确认再次重试。',uploadRetry:'重新审核',uploadBytes:'字节',uploadDimensions:'尺寸',uploadBy:'上传者'});
+  Object.assign(words.en,{placeSearchLabel:'Search places',placeSearch:'Search',placeSearchHelp:'Search the local place catalogue in Chinese or English. Choose a result, then apply your filters.',placeSearchNone:'No matching place in this library’s local catalogue. Try another name.',placeSearchTooLong:'Keep the place name within 128 UTF-8 bytes.',placeRemove:'Remove place'});
+  Object.assign(words.zh,{placeSearchLabel:'搜索地点',placeSearch:'搜索',placeSearchHelp:'支持中文、英文及常用别名。请先从本地地点目录选择结果，再应用筛选。',placeSearchNone:'本库的本地地点目录暂无匹配结果，请尝试其他名称。',placeSearchTooLong:'地点名称请勿超过 128 个 UTF-8 字节。',placeRemove:'移除地点'});
   const uploadState={page:1,total:0,load:0,items:[],plans:new Map(),dialogItem:null,dialogEpoch:0,previewQueue:{token:0,pending:[],active:false}};
   function storyStatus(key){$('story-status').textContent=key?t(key):'';}
   function abandonStory(){return !storyState.busy&&(!storyState.dirty||window.confirm(t('unsavedStory')));}
@@ -156,8 +158,8 @@
     $('directory-query').value='';$('directory-list').replaceChildren();$('directory-status').textContent='';$('directory-pages').hidden=true;
     tagState.page=1;tagState.query='';tagState.total=0;tagState.tag=null;tagState.tagPage=1;tagState.tagTotal=0;tagState.open=null;
     $('tag-query').value='';$('tag-list').replaceChildren();$('tag-status').textContent='';$('tag-pages').hidden=true;$('tag-assets').replaceChildren();
-    discoveryState.binding=null;discoveryState.page=1;discoveryState.total=0;discoveryState.facetLoad=0;discoveryState.searchLoad=0;discoveryState.fingerprint=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.placePage=1;discoveryState.placeTotal=0;discoveryState.places=[];discoveryState.selectedPlaces.clear();discoveryState.placesAvailable=false;
-    $('discovery-panel').hidden=true;$('discovery-panel').open=false;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';$('discovery-list').replaceChildren();$('discovery-status').textContent='';$('discovery-pages').hidden=true;$('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;$('discovery-places').hidden=true;$('discovery-places-status').textContent='';
+    discoveryState.binding=null;discoveryState.page=1;discoveryState.total=0;discoveryState.facetLoad=0;discoveryState.searchLoad=0;discoveryState.fingerprint=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.placePage=1;discoveryState.placeTotal=0;discoveryState.places=[];discoveryState.selectedPlaces.clear();discoveryState.selectedPlaceLabels.clear();discoveryState.placesAvailable=false;
+    $('discovery-panel').hidden=true;$('discovery-panel').open=false;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';$('discovery-list').replaceChildren();$('discovery-status').textContent='';$('discovery-pages').hidden=true;$('discovery-place-list').replaceChildren();$('discovery-place-selected').replaceChildren();$('discovery-place-query').value='';discoveryState.placeQuery='';$('discovery-place-pages').hidden=true;$('discovery-places').hidden=true;$('discovery-places-status').textContent='';
     $('library').hidden=true;$('auth').hidden=false;$('password').value='';$('code').value='';$('name').value='';
   }
   function errorStatus(error) {return error.status===409?'conflict':error.status===429?'limited':error.status===401||error.status===403?'denied':'unavailable';}
@@ -1281,6 +1283,7 @@
     if(state.locked||!state.library)return;
     const epoch=state.generation,library=state.library,load=++discoveryState.facetLoad;
     const previousBinding=discoveryState.binding;
+    discoveryState.placeQuery='';$('discovery-place-query').value='';
     discoveryState.searchLoad++;discoveryState.binding=null;
     $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
     $('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;
@@ -1292,7 +1295,7 @@
       if(!Array.isArray(result.enabled)||!result.enabled.includes('media')){$('discovery-panel').hidden=true;return;}
       discoveryState.binding=result.binding;
       if(previousBinding&&previousBinding!==result.binding){
-        discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.selectedPlaces.clear();
+        discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.selectedPlaces.clear();discoveryState.selectedPlaceLabels.clear();
       }
       discoveryState.page=1;discoveryState.fingerprint=null;
       const bounds=result.captured_date_bounds||{};
@@ -1315,20 +1318,30 @@
   function renderDiscoveryPlaces(){
     if(!discoveryState.placesAvailable)return;
     const list=$('discovery-place-list');list.replaceChildren();
-    if(!discoveryState.placeTotal){$('discovery-places').hidden=false;$('discovery-places-status').textContent=t('placesNone');$('discovery-place-pages').hidden=true;return;}
+    renderSelectedPlaces();
+    if(!discoveryState.placeTotal){$('discovery-places').hidden=false;$('discovery-places-status').textContent=t(discoveryState.placeQuery?'placeSearchNone':'placesNone');$('discovery-place-pages').hidden=true;return;}
     $('discovery-places').hidden=false;$('discovery-places-status').textContent='';
     for(const place of discoveryState.places){
       const button=document.createElement('button');button.type='button';button.className='place-choice';button.dataset.placeId=String(place.id);button.setAttribute('aria-pressed',String(discoveryState.selectedPlaces.has(String(place.id))));
       const label=document.createElement('span');label.textContent=String(place.label||place.id);const count=document.createElement('small');count.textContent=`${Number(place.asset_count)||0} ${t('placesCount')}`;button.append(label,count);
-      button.addEventListener('click',()=>{if(state.busy||state.locked)return;const id=String(place.id);if(discoveryState.selectedPlaces.has(id))discoveryState.selectedPlaces.delete(id);else if(discoveryState.selectedPlaces.size<20)discoveryState.selectedPlaces.add(id);else{$('discovery-status').textContent=t('placesLimit');return;}button.setAttribute('aria-pressed',String(discoveryState.selectedPlaces.has(id)));});list.append(button);
+      button.addEventListener('click',()=>{if(state.busy||state.locked)return;const id=String(place.id);if(discoveryState.selectedPlaces.has(id)){discoveryState.selectedPlaces.delete(id);discoveryState.selectedPlaceLabels.delete(id);}else if(discoveryState.selectedPlaces.size<20){discoveryState.selectedPlaces.add(id);discoveryState.selectedPlaceLabels.set(id,String(place.label||id));}else{$('discovery-status').textContent=t('placesLimit');return;}button.setAttribute('aria-pressed',String(discoveryState.selectedPlaces.has(id)));renderSelectedPlaces();});list.append(button);
     }
     const pages=Math.max(1,Math.ceil(discoveryState.placeTotal/24));$('discovery-place-pages').hidden=pages<=1;$('discovery-place-previous').disabled=discoveryState.placePage===1;$('discovery-place-next').disabled=discoveryState.placePage>=pages;$('discovery-place-page-label').textContent=`${t('page')} ${discoveryState.placePage} ${t('of')} ${pages}`;
+  }
+  function renderSelectedPlaces(){
+    const list=$('discovery-place-selected');list.replaceChildren();
+    for(const id of discoveryState.selectedPlaces){
+      const button=document.createElement('button');button.type='button';button.className='quiet';
+      const label=discoveryState.selectedPlaceLabels.get(id)||id;
+      button.textContent=`${label} ×`;button.setAttribute('aria-label',`${t('placeRemove')}: ${label}`);
+      button.addEventListener('click',()=>{if(state.busy||state.locked)return;discoveryState.selectedPlaces.delete(id);discoveryState.selectedPlaceLabels.delete(id);renderDiscoveryPlaces();});list.append(button);
+    }
   }
   async function loadDiscoveryPlaces(){
     if(state.locked||!state.library||!discoveryState.placesAvailable)return;
     const epoch=state.generation,library=state.library,load=++discoveryState.facetLoad;const current=()=>!stale(epoch)&&load===discoveryState.facetLoad&&library===state.library;
     $('discovery-place-list').replaceChildren();$('discovery-place-pages').hidden=true;$('discovery-places-status').textContent=t('placesLoading');
-    try{const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+new URLSearchParams({facet:'locations',page:String(discoveryState.placePage),page_size:'24',binding:discoveryState.binding}),{epoch});if(!current())return;discoveryState.placeTotal=Number(result.total)||0;discoveryState.places=Array.isArray(result.items)?result.items:[];renderDiscoveryPlaces();}
+    try{const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+new URLSearchParams({facet:'locations',page:String(discoveryState.placePage),page_size:'24',binding:discoveryState.binding,...(discoveryState.placeQuery?{q:discoveryState.placeQuery}:{})}),{epoch});if(!current())return;discoveryState.placeTotal=Number(result.total)||0;discoveryState.places=Array.isArray(result.items)?result.items:[];renderDiscoveryPlaces();}
     catch(error){if(current()){if(error&&error.status===409){discoveryState.binding=null;discoveryState.placePage=1;void openDiscovery();return;}$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void loadDiscoveryPlaces());$('discovery-places-status').append(' ',retry);}}
   }
   async function loadDiscovery(applyDraft=false){
@@ -1440,7 +1453,13 @@
     if(discoveryState.applied)void loadDiscovery();
   });
   $('discovery-form').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;void loadDiscovery(true);});
-  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.selectedPlaces.clear();document.querySelectorAll('.place-choice').forEach(button=>button.setAttribute('aria-pressed','false'));void loadDiscovery(true);});
+  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.selectedPlaces.clear();discoveryState.selectedPlaceLabels.clear();renderSelectedPlaces();document.querySelectorAll('.place-choice').forEach(button=>button.setAttribute('aria-pressed','false'));void loadDiscovery(true);});
+  $('discovery-place-search').addEventListener('submit',event=>{
+    event.preventDefault();if(state.busy||state.locked)return;
+    const query=$('discovery-place-query').value.trim();
+    if(new TextEncoder().encode(query).length>128){$('discovery-places-status').textContent=t('placeSearchTooLong');return;}
+    discoveryState.placeQuery=query;discoveryState.placePage=1;void loadDiscoveryPlaces();
+  });
   $('discovery-place-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage>1){discoveryState.placePage--;void loadDiscoveryPlaces();}});
   $('discovery-place-next').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage*24<discoveryState.placeTotal){discoveryState.placePage++;void loadDiscoveryPlaces();}});
   $('discovery-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.page>1){discoveryState.page--;void loadDiscovery();}});

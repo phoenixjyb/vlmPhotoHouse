@@ -17,7 +17,7 @@ import time
 
 import prepare_access_discovery_index as producer
 from app.access import discovery as d
-from app.access.discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedPlace
+from app.access.discovery_provider import ProjectedIndex, RefreshingPlaceIndex, RegionRule, ReviewedPlace, NamedPlace
 
 MAX_REGIONS = 128
 ENABLED = ('date', 'locations', 'media')
@@ -31,9 +31,14 @@ def regions(value):
         raise producer.Refused('Invalid region count')
     seen = set()
     for item in entries:
-        if type(item) is not dict or set(item) != {'id', 'label', 'south', 'west', 'north', 'east'}:
+        if type(item) is not dict or set(item) not in ({'id', 'label', 'south', 'west', 'north', 'east'}, {'id', 'label', 'aliases', 'south', 'west', 'north', 'east'}):
             raise producer.Refused('Invalid region')
         d.identifier(item['id']); d.text(item['label'], 256)
+        if 'aliases' in item:
+            aliases=item['aliases']
+            if type(aliases) is not list or len(aliases)>8: raise producer.Refused('Invalid aliases')
+            for alias in aliases: d.text(alias,128)
+            if len(set(aliases))!=len(aliases): raise producer.Refused('Duplicate aliases')
         if item['id'] in seen:
             raise producer.Refused('Duplicate region')
         seen.add(item['id'])
@@ -83,7 +88,7 @@ def derive(db, library, revision, definitions=(), *, audit=False, refresh=False)
         extra = {'region_rules': tuple(rule_for(r) for r in definitions)} if refresh else {}
         index = constructor(**extra, library_id=library, revision=revision, scope_ids=scope,
             indexed_ids=scope, source_digest=d.digest(source), enabled=ENABLED,
-            places=tuple(ReviewedPlace(library, r['id'], r['label']) for r in definitions),
+            places=tuple(NamedPlace(library, r['id'], r['label'], tuple(r['aliases'])) if 'aliases' in r else ReviewedPlace(library, r['id'], r['label']) for r in definitions),
             regions=tuple(pairs))
         receipt.update({'with_named_place': len(matched),
                         'gps_outside_named_places': located - len(matched)})

@@ -33,6 +33,12 @@ class ReviewedPlace:
 
 
 @dataclass(frozen=True)
+class NamedPlace(ReviewedPlace):
+    """Opt-in local name aliases. Legacy ReviewedPlace bytes stay unchanged."""
+    aliases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ReviewedIndex:
     library_id: str
     revision: str

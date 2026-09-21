@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "places": [
+    {
+      "id": "1",
+      "label": "北京 / Beijing（近似范围 / Approx.）",
+      "aliases": [
+        "北京",
+        "北京市",
+        "Beijing",
+        "Beijing City"
+      ],
+      "south": 39.46666666666667,
+      "west": 115.33333333333333,
+      "north": 41.083333333333336,
+      "east": 117.5
+    },
+    {
+      "id": "2",
+      "label": "天津 / Tianjin（近似范围 / Approx.）",
+      "aliases": [
+        "天津",
+        "天津市",
+        "Tianjin",
+        "Tianjin City"
+      ],
+      "south": 38.5666667,
+      "west": 116.7166667,
+      "north": 40.25,
+      "east": 118.0666667
+    },
+    {
+      "id": "3",
+      "label": "广州 / Guangzhou（近似范围 / Approx.）",
+      "aliases": [
+        "广州",
+        "广州市",
+        "Guangzhou",
+        "Guangzhou City",
+        "Canton"
+      ],
+      "south": 22.4333333,
+      "west": 112.95,
+      "north": 23.9333333,
+      "east": 114.05
+    },
+    {
+      "id": "4",
+      "label": "深圳 / Shenzhen（近似范围 / Approx.）",
+      "aliases": [
+        "深圳",
+        "深圳市",
+        "Shenzhen",
+        "Shenzhen City"
+      ],
+      "south": 22.4,
+      "west": 113.7166667,
+      "north": 22.8666667,
+      "east": 114.6333333
+    },
+    {
+      "id": "5",
+      "label": "成都 / Chengdu（近似范围 / Approx.）",
+      "aliases": [
+        "成都",
+        "成都市",
+        "Chengdu",
+        "Chengdu City"
+      ],
+      "south": 30.0833333,
+      "west": 102.9,
+      "north": 31.4333333,
+      "east": 104.8833333
+    },
+    {
+      "id": "6",
+      "label": "上海 / Shanghai（近似范围 / Approx.）",
+      "aliases": [
+        "上海",
+        "上海市",
+        "Shanghai"
+      ],
+      "south": 30.666666666666668,
+      "north": 31.883333333333333,
+      "west": 120.85,
+      "east": 122.2
+    },
+    {
+      "id": "101",
+      "label": "北京·海淀区 / Haidian, Beijing（近似范围 / Approx.）",
+      "aliases": [
+        "海淀",
+        "海淀区",
+        "北京海淀",
+        "Haidian",
+        "Haidian District",
+        "Beijing Haidian"
+      ],
+      "south": 39.885,
+      "west": 116.0419444,
+      "north": 40.1594444,
+      "east": 116.3880556
+    },
+    {
+      "id": "102",
+      "label": "北京·朝阳区 / Chaoyang, Beijing（近似范围 / Approx.）",
+      "aliases": [
+        "朝阳",
+        "朝阳区",
+        "北京朝阳",
+        "Chaoyang",
+        "Chaoyang District",
+        "Beijing Chaoyang"
+      ],
+      "south": 39.81666666666667,
+      "north": 40.083333333333336,
+      "west": 116.35,
+      "east": 116.63333333333334
+    },
+    {
+      "id": "201",
+      "label": "辽宁·朝阳市 / Chaoyang, Liaoning（近似范围 / Approx.）",
+      "aliases": [
+        "辽宁朝阳",
+        "朝阳市",
+        "辽宁省朝阳市",
+        "Chaoyang",
+        "Chaoyang City",
+        "Chaoyang, Liaoning"
+      ],
+      "south": 40.4166667,
+      "west": 118.8333333,
+      "north": 42.3666667,
+      "east": 121.2833333
+    }
+  ]
+}
