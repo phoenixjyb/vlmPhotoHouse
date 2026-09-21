@@ -13,6 +13,7 @@ Two operations, both sealed plans in the existing offline family and neither mou
 Neither operation can run from the planner: `ProvisioningPlanner` and its siblings require a
 read-only connection, and applying requires a write reservation.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass
 import errno
 import json
@@ -380,6 +381,33 @@ def _assert_unexpired(state, plan):
         raise PlanRejected('Plan expired during application')
 
 
+@contextmanager
+def _file_transaction(access, moves, operation):
+    """Keep the writer reservation until failed file moves are compensated.
+
+    Upload publication takes the same reservation. Restoring after a database rollback
+    would let a waiting upload repopulate a path before compensation could restore it.
+    Process death or a storage failure still requires operator reconciliation.
+    """
+    db = access.db
+    if db.in_transaction:
+        raise ValueError('Promotion must own its transaction')
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        yield
+        db.commit()
+    except BaseException as error:
+        try:
+            if moves:
+                _restore_moves(moves)
+        except BaseException as recovery_error:
+            raise PlanRejected(operation + ' failed; rollback failed after '
+                               + type(error).__name__) from recovery_error
+        finally:
+            db.rollback()
+        raise
+
+
 def promote_and_assign(envelope, *, review, clock=time.time):
     """Move each selected upload into the originals root and map it into the library.
 
@@ -395,65 +423,51 @@ def promote_and_assign(envelope, *, review, clock=time.time):
     if incoming.resolve().is_relative_to(originals.resolve()) or originals.resolve().is_relative_to(incoming.resolve()):
         raise PlanRejected('The incoming root must sit outside every original root')
     moved = []
-    committed = False
-    try:
-        with ExistingDatabase(review.database)() as db:
-            state = _PromotionState(db, clock=clock)
-            with state.access._transaction(write=True):
-                if _identity(review.database) != review.database_identity:
-                    raise PlanRejected('Promotion target changed')
-                plan = envelope['plan']
-                if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
-                              (plan['plan_id'], review.plan_digest)).fetchone():
-                    raise PlanRejected('Plan already applied')
-                state._validate_in_transaction(envelope)
-                target = plan['target']
-                library = target['library_id']
-                rows = db.execute('''SELECT a.id,a.path,u.incoming_label,u.batch,a.hash_sha256,u.bytes
-                    FROM assets a JOIN access_uploads u ON u.asset_id=a.id
-                    WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
-                    ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
-                transfers = []
-                for asset_id, path, label, batch, digest, size in rows:
-                    source = Path(path)
-                    # The recorded path must be inside the configured incoming root; otherwise the
-                    # operator is applying against the wrong roots and nothing should move.
-                    if not source.is_absolute() or not source.resolve().is_relative_to(incoming.resolve()):
-                        raise PlanRejected('Recorded upload path is outside the incoming root')
-                    info = source.lstat()
-                    if not stat.S_ISREG(info.st_mode) or info.st_size != size:
-                        raise PlanRejected('Uploaded file changed since planning')
-                    destination = originals / PROMOTED_FOLDER / label / batch / source.name
-                    if os.path.lexists(destination):
-                        raise PlanRejected('Destination already exists')
-                    transfers.append((asset_id, source, destination, label, batch, digest, size))
-                for asset_id, source, destination, label, batch, digest, size in transfers:
-                    _place(source, destination)
-                    moved.append((source, destination))
-                    db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
-                    db.execute("UPDATE access_uploads SET state='assigned' WHERE asset_id=?", (asset_id,))
-                    db.execute('INSERT INTO access_asset_libraries VALUES (?,?)', (asset_id, library))
-                receipt = _receipt(state, plan, review, {
-                    'library_id': library, 'asset_count': len(rows),
-                    'bytes_promoted': sum(row[5] for row in rows),
-                    'promoted_folder': PROMOTED_FOLDER, 'media_writes': True})
-                _record(state, plan, receipt)
-                _assert_unexpired(state, plan)
-                if db.execute('PRAGMA foreign_key_check').fetchone():
-                    raise PlanRejected('Promotion barrier failed')
-            committed = True
-            return receipt
-    except BaseException as error:
-        # The rows roll back for every exception. Put the bytes back so the incoming area still
-        # reflects the database; if that recovery fails, surface it instead of hiding a split
-        # filesystem/database state.
-        if moved and not committed:
-            try:
-                _restore_moves(moved)
-            except BaseException as recovery_error:
-                raise PlanRejected('Promotion failed; rollback failed after '
-                                   + type(error).__name__) from recovery_error
-        raise
+    with ExistingDatabase(review.database)() as db:
+        state = _PromotionState(db, clock=clock)
+        with _file_transaction(state.access, moved, 'Promotion'):
+            if _identity(review.database) != review.database_identity:
+                raise PlanRejected('Promotion target changed')
+            plan = envelope['plan']
+            if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
+                          (plan['plan_id'], review.plan_digest)).fetchone():
+                raise PlanRejected('Plan already applied')
+            state._validate_in_transaction(envelope)
+            target = plan['target']
+            library = target['library_id']
+            rows = db.execute('''SELECT a.id,a.path,u.incoming_label,u.batch,a.hash_sha256,u.bytes
+                FROM assets a JOIN access_uploads u ON u.asset_id=a.id
+                WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
+                ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
+            transfers = []
+            for asset_id, path, label, batch, digest, size in rows:
+                source = Path(path)
+                # The recorded path must be inside the configured incoming root; otherwise the
+                # operator is applying against the wrong roots and nothing should move.
+                if not source.is_absolute() or not source.resolve().is_relative_to(incoming.resolve()):
+                    raise PlanRejected('Recorded upload path is outside the incoming root')
+                info = source.lstat()
+                if not stat.S_ISREG(info.st_mode) or info.st_size != size:
+                    raise PlanRejected('Uploaded file changed since planning')
+                destination = originals / PROMOTED_FOLDER / label / batch / source.name
+                if os.path.lexists(destination):
+                    raise PlanRejected('Destination already exists')
+                transfers.append((asset_id, source, destination, label, batch, digest, size))
+            for asset_id, source, destination, label, batch, digest, size in transfers:
+                _place(source, destination)
+                moved.append((source, destination))
+                db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
+                db.execute("UPDATE access_uploads SET state='assigned' WHERE asset_id=?", (asset_id,))
+                db.execute('INSERT INTO access_asset_libraries VALUES (?,?)', (asset_id, library))
+            receipt = _receipt(state, plan, review, {
+                'library_id': library, 'asset_count': len(rows),
+                'bytes_promoted': sum(row[5] for row in rows),
+                'promoted_folder': PROMOTED_FOLDER, 'media_writes': True})
+            _record(state, plan, receipt)
+            _assert_unexpired(state, plan)
+            if db.execute('PRAGMA foreign_key_check').fetchone():
+                raise PlanRejected('Promotion barrier failed')
+        return receipt
 
 
 def unassign_assets(envelope, *, review, clock=time.time):
@@ -473,61 +487,50 @@ def unassign_assets(envelope, *, review, clock=time.time):
     if incoming.resolve().is_relative_to(originals.resolve()) or originals.resolve().is_relative_to(incoming.resolve()):
         raise PlanRejected('The incoming root must sit outside every original root')
     returned = []
-    committed = False
-    try:
-        with ExistingDatabase(review.database)() as db:
-            state = _PromotionState(db, clock=clock)
-            with state.access._transaction(write=True):
-                if _identity(review.database) != review.database_identity:
-                    raise PlanRejected('Unassignment target changed')
-                plan = envelope['plan']
-                if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
-                              (plan['plan_id'], review.plan_digest)).fetchone():
-                    raise PlanRejected('Plan already applied')
-                state._validate_in_transaction(envelope)
-                target = plan['target']
-                library = target['library_id']
-                rows = db.execute('''SELECT a.id,a.path,u.incoming_label,u.batch,u.bytes
-                    FROM assets a JOIN access_uploads u ON u.asset_id=a.id
-                    WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
-                    ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
-                transfers = []
-                for asset_id, path, label, batch, size in rows:
-                    source = Path(path)
-                    # The recorded path must be inside the originals root, or the operator is
-                    # applying against the wrong roots and nothing should move.
-                    if not source.is_absolute() or not source.resolve().is_relative_to(originals.resolve()):
-                        raise PlanRejected('Recorded path is outside the originals root')
-                    info = source.lstat()
-                    if not stat.S_ISREG(info.st_mode) or info.st_size != size:
-                        raise PlanRejected('Promoted file changed since planning')
-                    destination = incoming / label / batch / source.name
-                    if os.path.lexists(destination):
-                        raise PlanRejected('Destination already exists')
-                    transfers.append((asset_id, source, destination, label, batch, size))
-                for asset_id, source, destination, label, batch, size in transfers:
-                    _place(source, destination)
-                    returned.append((source, destination))
-                    db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
-                    db.execute("UPDATE access_uploads SET state='incoming' WHERE asset_id=?", (asset_id,))
-                    db.execute('DELETE FROM access_asset_libraries WHERE asset_id=?', (asset_id,))
-                receipt = _receipt(state, plan, review, {
-                    'library_id': library, 'asset_count': len(rows),
-                    'bytes_returned': sum(row[4] for row in rows), 'media_writes': True})
-                _record(state, plan, receipt)
-                _assert_unexpired(state, plan)
-                if db.execute('PRAGMA foreign_key_check').fetchone():
-                    raise PlanRejected('Unassignment barrier failed')
-            committed = True
-            return receipt
-    except BaseException as error:
-        if returned and not committed:
-            try:
-                _restore_moves(returned)
-            except BaseException as recovery_error:
-                raise PlanRejected('Unassignment failed; rollback failed after '
-                                   + type(error).__name__) from recovery_error
-        raise
+    with ExistingDatabase(review.database)() as db:
+        state = _PromotionState(db, clock=clock)
+        with _file_transaction(state.access, returned, 'Unassignment'):
+            if _identity(review.database) != review.database_identity:
+                raise PlanRejected('Unassignment target changed')
+            plan = envelope['plan']
+            if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
+                          (plan['plan_id'], review.plan_digest)).fetchone():
+                raise PlanRejected('Plan already applied')
+            state._validate_in_transaction(envelope)
+            target = plan['target']
+            library = target['library_id']
+            rows = db.execute('''SELECT a.id,a.path,u.incoming_label,u.batch,u.bytes
+                FROM assets a JOIN access_uploads u ON u.asset_id=a.id
+                WHERE a.id IN (''' + ','.join('?' for _ in target['asset_ids']) + ''')
+                ORDER BY a.id''', [int(v) for v in target['asset_ids']]).fetchall()
+            transfers = []
+            for asset_id, path, label, batch, size in rows:
+                source = Path(path)
+                # The recorded path must be inside the originals root, or the operator is
+                # applying against the wrong roots and nothing should move.
+                if not source.is_absolute() or not source.resolve().is_relative_to(originals.resolve()):
+                    raise PlanRejected('Recorded path is outside the originals root')
+                info = source.lstat()
+                if not stat.S_ISREG(info.st_mode) or info.st_size != size:
+                    raise PlanRejected('Promoted file changed since planning')
+                destination = incoming / label / batch / source.name
+                if os.path.lexists(destination):
+                    raise PlanRejected('Destination already exists')
+                transfers.append((asset_id, source, destination, label, batch, size))
+            for asset_id, source, destination, label, batch, size in transfers:
+                _place(source, destination)
+                returned.append((source, destination))
+                db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
+                db.execute("UPDATE access_uploads SET state='incoming' WHERE asset_id=?", (asset_id,))
+                db.execute('DELETE FROM access_asset_libraries WHERE asset_id=?', (asset_id,))
+            receipt = _receipt(state, plan, review, {
+                'library_id': library, 'asset_count': len(rows),
+                'bytes_returned': sum(row[4] for row in rows), 'media_writes': True})
+            _record(state, plan, receipt)
+            _assert_unexpired(state, plan)
+            if db.execute('PRAGMA foreign_key_check').fetchone():
+                raise PlanRejected('Unassignment barrier failed')
+        return receipt
 
 
 def reassign_assets(envelope, *, review, clock=time.time):

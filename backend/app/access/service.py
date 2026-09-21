@@ -274,40 +274,62 @@ class AccessService:
         the file exists elsewhere in the system.
         """
         with self._transaction(write=True):
-            session = self._session(token)
-            account_id = session['account_id']
-            # Re-checked inside the write transaction: a revocation between the file write and
-            # this row must still be honoured.
-            if not self._may_submit(account_id):
-                raise AccessDenied('Access denied')
-            existing = self._one("""SELECT asset_id FROM access_uploads
-                WHERE account_id=? AND sha256=? AND state='incoming'""", (account_id, digest))
-            if existing:
-                return self._upload_result(existing['asset_id'], label, batch, digest,
-                                           size_bytes, mime, size, 0)
-            self.db.execute('''INSERT INTO assets(path,hash_sha256,status,mime,width,height,file_size)
-                VALUES (?,?,'active',?,?,?,?)''',
-                (str(path), digest, mime, size[0], size[1], size_bytes))
-            asset_id = self.db.execute('SELECT last_insert_rowid()').fetchone()[0]
-            self.db.execute('''INSERT INTO access_uploads(asset_id,account_id,incoming_label,batch,
-                original_name,sha256,bytes,state,created_at) VALUES (?,?,?,?,?,?,?,'incoming',?)''',
-                (asset_id, account_id, label, batch, original_name, digest, size_bytes, self._now()))
-            self.db.execute('''INSERT INTO access_audit(actor_account,action,library_id,
-                target_account,occurred_at) VALUES (?,'upload.create',NULL,NULL,?)''',
-                (account_id, self._now()))
-            enqueued = 0
-            for kind, priority, extra in (('embed', 50, {'modality': 'image'}), ('phash', 60, None),
-                                          ('thumb', 80, None), ('caption', 110, None),
-                                          ('face', 120, None)):
-                payload = {'asset_id': asset_id}
-                if extra:
-                    payload.update(extra)
-                self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,
-                    scheduled_at,created_at) VALUES (?,?,'pending',?,datetime('now'),datetime('now'))''',
-                    (kind, json.dumps(payload, sort_keys=True), priority))
-                enqueued += 1
-            return self._upload_result(asset_id, label, batch, digest, size_bytes, mime, size,
-                                       enqueued)
+            return self._record_upload_in_transaction(token, label, batch, path, original_name,
+                                                       digest, size_bytes, mime, size)
+
+    def _incoming_upload(self, token, digest):
+        """Internal lookup: caller owns a transaction; path never enters the HTTP receipt."""
+        if not self.db.in_transaction:
+            raise ValueError('Upload lookup requires a transaction')
+        session = self._session(token)
+        if not self._may_submit(session['account_id']):
+            raise AccessDenied('Access denied')
+        return self._one("""SELECT u.asset_id,u.incoming_label,u.batch,u.sha256,
+            u.bytes,a.mime,a.width,a.height,a.path FROM access_uploads u
+            JOIN assets a ON a.id=u.asset_id
+            WHERE u.account_id=? AND u.sha256=? AND u.state='incoming'
+            AND NOT EXISTS (SELECT 1 FROM access_asset_libraries m WHERE m.asset_id=u.asset_id)
+            ORDER BY u.asset_id LIMIT 1""",
+            (session['account_id'], digest))
+
+    def _record_upload_in_transaction(self, token, label, batch, path, original_name,
+                                      digest, size_bytes, mime, size):
+        if not self.db.in_transaction:
+            raise ValueError('Upload recording requires a transaction')
+        session = self._session(token)
+        account_id = session['account_id']
+        # Re-checked inside the write transaction: a revocation between the file write and
+        # this row must still be honoured.
+        if not self._may_submit(account_id):
+            raise AccessDenied('Access denied')
+        existing = self._incoming_upload(token, digest)
+        if existing:
+            return self._upload_result(existing['asset_id'], existing['incoming_label'],
+                existing['batch'], existing['sha256'], existing['bytes'], existing['mime'],
+                (existing['width'], existing['height']), 0)
+        self.db.execute('''INSERT INTO assets(path,hash_sha256,status,mime,width,height,file_size)
+            VALUES (?,?,'active',?,?,?,?)''',
+            (str(path), digest, mime, size[0], size[1], size_bytes))
+        asset_id = self.db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        self.db.execute('''INSERT INTO access_uploads(asset_id,account_id,incoming_label,batch,
+            original_name,sha256,bytes,state,created_at) VALUES (?,?,?,?,?,?,?,'incoming',?)''',
+            (asset_id, account_id, label, batch, original_name, digest, size_bytes, self._now()))
+        self.db.execute('''INSERT INTO access_audit(actor_account,action,library_id,
+            target_account,occurred_at) VALUES (?,'upload.create',NULL,NULL,?)''',
+            (account_id, self._now()))
+        enqueued = 0
+        for kind, priority, extra in (('embed', 50, {'modality': 'image'}), ('phash', 60, None),
+                                      ('thumb', 80, None), ('caption', 110, None),
+                                      ('face', 120, None)):
+            payload = {'asset_id': asset_id}
+            if extra:
+                payload.update(extra)
+            self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,
+                scheduled_at,created_at) VALUES (?,?,'pending',?,datetime('now'),datetime('now'))''',
+                (kind, json.dumps(payload, sort_keys=True), priority))
+            enqueued += 1
+        return self._upload_result(asset_id, label, batch, digest, size_bytes, mime, size,
+                                   enqueued)
 
     @staticmethod
     def _upload_result(asset_id, label, batch, digest, size_bytes, mime, size, enqueued):
