@@ -25,6 +25,9 @@ class PreparedGalleryTests(unittest.TestCase):
                            ('duration_sec', 'REAL'), ('taken_at', 'TEXT')]:
             self.e.mutate(f'ALTER TABLE assets ADD COLUMN {name} {kind}')
         self.e.mutate("UPDATE assets SET mime='video/mp4'")
+        # This intentionally small video fixture predates member uploads. Real
+        # runtimes require that table; gallery ordering now reads receipt times.
+        self.e.mutate('CREATE TABLE access_uploads(asset_id INTEGER UNIQUE, created_at INTEGER)')
 
     def get(self, query='library=family-a&media=prepared_video', headers=None):
         return self.e.client.get('/assets?' + query, headers=headers or self.e.headers())
