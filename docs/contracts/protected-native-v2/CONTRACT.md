@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.22
+# Protected native profile 2.0.0-candidate.23
 
-Backend source: `d6192b91bc0983ab7b67aa14458eb052ed3c0ee6`.
+Backend source: `85da95266926f4ef002066084bf1a18ce52bffc9`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -9,7 +9,7 @@ this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
 
-## Reissue — 2.0.0-candidate.22 (September 21)
+## Reissue — 2.0.0-candidate.23 (September 21)
 
 Adds separate protected library catalogue and reviewed operator/owner asset-transfer
 routes, with atomic story transfer. Existing 89 native wire cases and profile

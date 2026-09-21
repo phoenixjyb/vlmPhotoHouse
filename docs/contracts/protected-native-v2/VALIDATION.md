@@ -1,5 +1,14 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.23 — bounded face editing and move failure feedback
+
+Source `85da95266926f4ef002066084bf1a18ce52bffc9`. 128 affected backend tests and 59
+Chromium/ASGI checkpoints passed, including unrelated queued face jobs, conflicting
+jobs, bounded malformed payloads, lost unassign replies and post-move refresh failure.
+The live library confirmation failure still requires an authenticated replay;
+privacy-safe operation diagnostics were added. Source tests do not establish that
+live move acceptance. Native captures and source/payload checksums are reissued together.
+
 ## Candidate.22 — library organization
 
 Source `d6192b91bc0983ab7b67aa14458eb052ed3c0ee6`. Eight new library-organization HTTP tests,
