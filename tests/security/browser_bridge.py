@@ -42,6 +42,14 @@ def build_client():
     start = time.monotonic()
     with closing(producer.open_read_only(fixture.path.resolve(), start)) as db:
         index, _catalog = producer.derive(db, producer.library('family-a'), producer.revision('1'))
+    # This browser fixture opts into one explicit reviewed place so the protected
+    # UI exercises the real locations facet/search contract. The synthetic source
+    # has no GPS semantics here: regions are reviewed IDs only.
+    from dataclasses import replace
+    from app.access.discovery_provider import ReviewedPlace
+    index=replace(index, places=(ReviewedPlace('family-a','601','Example region / 示例地区'),),
+                 regions=(('101','601'),('102','601')),
+                 enabled=tuple((*index.enabled,'locations')))
     producer.write_new(out, json.dumps(asdict(index), sort_keys=True, ensure_ascii=True,
                                        separators=(',', ':'), allow_nan=False).encode())
     return TestClient(RuntimeConfiguration(fixture.path.resolve(), 'https://photohouse.test',

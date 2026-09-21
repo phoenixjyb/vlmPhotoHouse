@@ -1290,6 +1290,7 @@
       if(!Array.isArray(result.enabled)||!result.enabled.includes('media')){$('discovery-panel').hidden=true;return;}
       discoveryState.binding=result.binding;
       discoveryState.page=1;discoveryState.fingerprint=null;
+      discoveryState.searchLoad++;
       const bounds=result.captured_date_bounds||{};
       // Both inputs carry the same captured range as native bounds; the server
       // independently refuses an inverted or malformed range, so neither side is
@@ -1326,22 +1327,25 @@
     try{const result=await request(`/libraries/${encodeURIComponent(library)}/discovery/v1/facets?`+new URLSearchParams({facet:'locations',page:String(discoveryState.placePage),page_size:'24',binding:discoveryState.binding}),{epoch});if(!current())return;discoveryState.placeTotal=Number(result.total)||0;discoveryState.places=Array.isArray(result.items)?result.items:[];renderDiscoveryPlaces();}
     catch(error){if(current()){if(error&&error.status===409){discoveryState.binding=null;discoveryState.placePage=1;void openDiscovery();return;}$('discovery-places-status').textContent=t('placesUnavailable');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('placesRetry');retry.addEventListener('click',()=>void loadDiscoveryPlaces());$('discovery-places-status').append(' ',retry);}}
   }
-  async function loadDiscovery(){
+  async function loadDiscovery(applyDraft=false){
     if(state.locked||!discoveryState.binding)return;
-    const from=$('discovery-from').value,to=$('discovery-to').value;
-    if(from&&to&&from>to){$('discovery-status').textContent=t('discoveryRange');return;}
-    const filters={};
-    if($('discovery-media').value!=='all')filters.media=[$('discovery-media').value];
-    if(discoveryState.selectedPlaces.size>20){$('discovery-status').textContent=t('placesLimit');return;}
-    if(discoveryState.selectedPlaces.size)filters.locations=[...discoveryState.selectedPlaces];
-    if(from||to)filters.date={from:from||null,to:to||null};
-    if(!Object.keys(filters).length){
-      discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.fingerprint=null;
-      $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
-      $('discovery-status').textContent=t('discoveryHint');return;
+    if(applyDraft){
+      const from=$('discovery-from').value,to=$('discovery-to').value;
+      if(from&&to&&from>to){$('discovery-status').textContent=t('discoveryRange');return;}
+      const filters={};
+      if($('discovery-media').value!=='all')filters.media=[$('discovery-media').value];
+      if(discoveryState.selectedPlaces.size>20){$('discovery-status').textContent=t('placesLimit');return;}
+      if(discoveryState.selectedPlaces.size)filters.locations=[...discoveryState.selectedPlaces];
+      if(from||to)filters.date={from:from||null,to:to||null};
+      if(!Object.keys(filters).length){
+        discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.fingerprint=null;
+        $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
+        $('discovery-status').textContent=t('discoveryHint');return;
+      }
+      discoveryState.appliedFilters=JSON.parse(JSON.stringify(filters));
+      discoveryState.applied=true;discoveryState.page=1;discoveryState.fingerprint=null;
     }
-    discoveryState.appliedFilters=JSON.parse(JSON.stringify(filters));
-    discoveryState.applied=true;discoveryState.page=1;discoveryState.fingerprint=null;
+    if(!discoveryState.appliedFilters)return;
     const epoch=state.generation,library=state.library,load=++discoveryState.searchLoad;
     const current=()=>!stale(epoch)&&load===discoveryState.searchLoad&&library===state.library;
     $('discovery-list').replaceChildren();$('discovery-pages').hidden=true;$('discovery-status').textContent=t('loading');
@@ -1433,8 +1437,8 @@
     await openDiscovery();
     if(discoveryState.applied)void loadDiscovery();
   });
-  $('discovery-form').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;discoveryState.page=1;void loadDiscovery();});
-  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.selectedPlaces.clear();document.querySelectorAll('.place-choice').forEach(button=>button.setAttribute('aria-pressed','false'));discoveryState.page=1;void loadDiscovery();});
+  $('discovery-form').addEventListener('submit',event=>{event.preventDefault();if(state.busy||state.locked)return;void loadDiscovery(true);});
+  $('discovery-clear').addEventListener('click',()=>{if(state.busy||state.locked)return;$('discovery-media').value='all';$('discovery-from').value='';$('discovery-to').value='';discoveryState.selectedPlaces.clear();document.querySelectorAll('.place-choice').forEach(button=>button.setAttribute('aria-pressed','false'));void loadDiscovery(true);});
   $('discovery-place-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage>1){discoveryState.placePage--;void loadDiscoveryPlaces();}});
   $('discovery-place-next').addEventListener('click',()=>{if(!state.busy&&discoveryState.placePage*24<discoveryState.placeTotal){discoveryState.placePage++;void loadDiscoveryPlaces();}});
   $('discovery-previous').addEventListener('click',()=>{if(!state.busy&&discoveryState.page>1){discoveryState.page--;void loadDiscovery();}});
