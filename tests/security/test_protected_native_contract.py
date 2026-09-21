@@ -31,6 +31,14 @@ class ProtectedNativeContractTests(unittest.TestCase):
         manifest = module.verify(ROOT)
         self.assertEqual(manifest['case_count'], len(self.actual['cases']))
 
+    def test_upload_retry_uses_canonical_receipt_without_library_access(self):
+        first = self.body('upload_accepted')
+        retry = self.body('upload_retry_other_batch')
+        self.assertEqual(retry, {**first, 'tasks_enqueued': 0})
+        self.assertEqual(first['tasks_enqueued'], 5)
+        self.assertIsNone(first['library_id'])
+        self.assertEqual(self.cases['upload_not_in_library']['response']['status'], 401)
+
     def test_invited_viewer_has_no_implicit_originals_or_other_library(self):
         memberships = self.body('invited_viewer_session')['memberships']
         self.assertEqual(len(memberships), 1)

@@ -1,5 +1,5 @@
 {
-  "contract_version": "2.0.0-candidate.15",
+  "contract_version": "2.0.0-candidate.16",
   "synthetic_only": true,
   "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
   "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim",
@@ -2121,6 +2121,97 @@
         },
         "body": {
           "detail": "Access unavailable"
+        }
+      }
+    },
+    {
+      "id": "upload_accepted",
+      "request": {
+        "method": "POST",
+        "path": "/uploads",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "X-Upload-Filename": "synthetic.jpg",
+          "X-Upload-Batch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "content": {
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "asset_id": "1000",
+          "library_id": null,
+          "incoming": "Synthetic-Member-00000000-0000-0000-0000-000000000004",
+          "batch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "image",
+          "width": 8,
+          "height": 8,
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632,
+          "tasks_enqueued": 5
+        }
+      }
+    },
+    {
+      "id": "upload_retry_other_batch",
+      "request": {
+        "method": "POST",
+        "path": "/uploads",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "X-Upload-Filename": "synthetic.jpg",
+          "X-Upload-Batch": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "content": {
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "asset_id": "1000",
+          "library_id": null,
+          "incoming": "Synthetic-Member-00000000-0000-0000-0000-000000000004",
+          "batch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "image",
+          "width": 8,
+          "height": 8,
+          "sha256": "c311363ddcc33e304b4f657d7fb3353c839bcdbdb9bdbd09bea62b1152fac42d",
+          "bytes": 632,
+          "tasks_enqueued": 0
+        }
+      }
+    },
+    {
+      "id": "upload_not_in_library",
+      "request": {
+        "method": "GET",
+        "path": "/assets/detail/1000?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
         }
       }
     },

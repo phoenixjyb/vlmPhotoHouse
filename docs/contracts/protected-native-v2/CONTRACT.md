@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.15
+# Protected native profile 2.0.0-candidate.16
 
-Backend source: `789bdf0ca9f69787fa3e5d13db3d666f4931e0a3`.
+Backend source: `7321f3c3b4c9fd534d5555efa27636fcff3c132f`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,18 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.16 (September 21)
+
+Incoming upload retries now reuse the original account-scoped file and provenance,
+including its stored label and batch. Files are staged completely before a SQLite
+writer reservation serializes publication with promotion and its compensation.
+An existing corrupt or redirected destination is refused without overwriting it.
+Failed DB writes may leave a reviewable final orphan; process/storage failure still
+requires operator reconciliation. Uploads remain JPEG/PNG whole-file requests,
+25 MiB maximum, invisible to libraries until reviewed promotion. No migration or
+implicit runtime opt-in. The 86 previous captures are unchanged; three new cases
+cover an accepted upload, a different-batch retry and denial of library access.
 
 ## Reissue — 2.0.0-candidate.15 (September 20)
 

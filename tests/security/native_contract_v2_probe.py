@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.15'
+VERSION = '2.0.0-candidate.16'
 
 
 def capture():
@@ -42,10 +42,10 @@ def capture():
             if isinstance(value, list): return [normalize(v) for v in value]
             return identities.get(value, value) if isinstance(value, str) else value
 
-        def call(name, method, path, status, *, token=None, body=None, headers=None, record=True):
+        def call(name, method, path, status, *, token=None, body=None, headers=None, record=True, content=None):
             sent = dict(headers or {})
             if token: sent['Authorization'] = 'Bearer ' + token
-            response = env.client.request(method, path, json=body, headers=sent)
+            response = env.client.request(method, path, json=body, headers=sent, content=content)
             assert response.status_code == status, (name, response.status_code, response.text[:200])
             assert response.headers.get('cache-control') == 'no-store', name
             if path in ('/auth/register', '/auth/login') and status in (200, 201):
@@ -61,6 +61,8 @@ def capture():
             request = {'method': method, 'path': path, 'credential':
                        'none' if token is None else token, 'headers': dict(headers or {})}
             if body is not None: request['json'] = body
+            if content is not None:
+                request['content'] = {'sha256': hashlib.sha256(content).hexdigest(), 'bytes': len(content)}
             cases.append({'id': name, 'request': request,
                           'response': {'status': status, 'headers': selected, 'body': output}})
             return response
@@ -232,6 +234,22 @@ def capture():
         # surface by accident. It is not library-scoped: the accepted photo is in no library
         # until an operator promotes and assigns it.
         call('upload_requires_opt_in', 'POST', '/uploads', 503, token=native, body={})
+        # Opt-in uploads preserve canonical provenance across retries and never grant
+        # a library mapping. Real filesystem and DB; only the fixture JPEG is sent.
+        from app.access.upload import UploadRuntime
+        upload_access = env.client.app.state.access_runtime
+        env.client.app.state.upload_runtime = UploadRuntime(upload_access, root / 'incoming', (root / 'originals',))
+        with env.connection() as db:
+            _, label = AccessService(db, clock=lambda: env.now).uploader(native)
+        identities[label] = 'Synthetic-Member-00000000-0000-0000-0000-000000000004'
+        upload_bytes = (ROOT / 'tests/security/fixtures/home-8x8.jpg').read_bytes()
+        upload_headers = {'Content-Type': 'application/octet-stream',
+                          'X-Upload-Filename': 'synthetic.jpg', 'X-Upload-Batch': 'a' * 32}
+        accepted = call('upload_accepted', 'POST', '/uploads', 201, token=native,
+                        headers=upload_headers, content=upload_bytes).json()
+        call('upload_retry_other_batch', 'POST', '/uploads', 201, token=native,
+             headers={**upload_headers, 'X-Upload-Batch': 'b' * 32}, content=upload_bytes)
+        call('upload_not_in_library', 'GET', '/assets/detail/' + accepted['asset_id'] + '?library=family-a', 401, token=native)
         env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?", (new_id,))
         call('revoked_session_still_authenticated', 'GET', '/auth/session', 200, token=native)
         call('revoked_story_list', 'GET', '/assets/101/stories?library=family-a', 401, token=native)

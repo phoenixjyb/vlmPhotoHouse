@@ -1,4 +1,17 @@
-# Validation receipt — 2026-09-20
+# Validation receipt — 2026-09-21
+
+## 2.0.0-candidate.16 — atomic upload retries
+
+Source `7321f3c3b4c9fd534d5555efa27636fcff3c132f`. Local upload/promotion suites: 79 tests pass,
+including concurrent same/different batches, canonical receipt after rename,
+missing/corrupt files, orphan adoption, revocation after staging, symlink refusal,
+and promotion commit/compensation locking. Related authorization, provisioning,
+launcher/package, discovery wiring and gallery suites: 135 tests pass.
+
+The native ASGI probe captures 89 cases; all 86 prior cases are byte-identical.
+No schema migration is needed. This source receipt is not live upload acceptance;
+Windows qualification and explicit activation are recorded separately.
+
 
 ## 2.0.0-candidate.15 — prepared-video browsing
 

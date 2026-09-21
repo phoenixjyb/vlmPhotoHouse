@@ -34,6 +34,15 @@ an incomplete item, quotas, incomplete-item expiry, batch-to-many-assets Stories
 audio/transcription. The owner has explicitly declined caps and quotas for now, so the per-file
 byte cap and the audit row are the only controls.
 
+## Retry repair in candidate.16
+
+Same-account incoming retries return the original stored batch and label, even
+when the caller selected the file again in a new batch or renamed their account.
+They preserve one canonical file and enqueue no duplicate work. Publication and
+promotion compensation share a writer reservation. Partial/changed files and
+redirected paths are refused; a matching complete orphan can be adopted. Automatic
+historical orphan cleanup and crash reconciliation are not included.
+
 ## What the rest of this proposal still asks for
 
 The remaining work is the resumable core. Before adding routes, review a distinct upload grant
