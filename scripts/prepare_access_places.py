@@ -82,7 +82,7 @@ def derive(db, library, revision, definitions=(), *, audit=False, refresh=False)
                    'without_valid_gps': len(scope) - located}
         if audit:
             return None, receipt
-        if not scope:
+        if not scope and not refresh:
             raise producer.Refused('No visible assets')
         constructor = RefreshingPlaceIndex if refresh else ProjectedIndex
         extra = {'region_rules': tuple(rule_for(r) for r in definitions)} if refresh else {}

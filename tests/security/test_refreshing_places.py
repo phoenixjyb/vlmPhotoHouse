@@ -57,6 +57,19 @@ class RefreshingPlaceTests(unittest.TestCase):
         self.assertEqual(fresh['catalog_assets'], 5)
         self.assertEqual(next(item for item in fresh['items'] if item['id'] == '601')['asset_count'], 2)
 
+    def test_empty_refreshing_library_accepts_future_asset_moves(self):
+        self.db.execute("DELETE FROM access_asset_libraries WHERE library_id='family-a'")
+        self.db.commit()
+        index = self.index()
+        self.assertEqual(index.scope_ids, ())
+        service = self.service(index)
+        self.assertEqual(service.facets(TOKEN, 'family-a', facet='locations')['catalog_assets'], 0)
+        self.db.execute("INSERT INTO access_asset_libraries VALUES(101,'family-a')")
+        self.db.commit()
+        fresh = service.facets(TOKEN, 'family-a', facet='locations')
+        self.assertEqual(fresh['catalog_assets'], 1)
+        self.assertEqual(next(item for item in fresh['items'] if item['id'] == '601')['asset_count'], 1)
+
     def test_pending_foreign_and_hidden_assets_are_excluded(self):
         self.add_asset(104, status='pending')
         self.add_asset(105, library='family-b')

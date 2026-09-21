@@ -16,6 +16,8 @@ read-only connection, and applying requires a write reservation.
 from contextlib import contextmanager
 from dataclasses import dataclass
 import errno
+import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -103,6 +105,53 @@ def _ids(target):
 
 
 class _PromotionState(_PlanState):
+    STORY_REVIEW_ROWS = 10000
+    STORY_REVIEW_BYTES = 8 * 1024 * 1024
+
+    def _story_review_state(self, source_by_asset):
+        """Hash story rows/history incrementally, with an explicit review budget."""
+        key = self.access.db.execute('SELECT secret FROM access_admission_key WHERE id=1').fetchone()
+        if not key or not isinstance(key[0], bytes) or len(key[0]) != 32:
+            raise PlanRejected('Planning unavailable')
+        mac = hmac.new(key[0], b'PhotoHouse offline plan v1\0library-reassignment-stories\0', hashlib.sha256)
+        rows_seen = 0
+        bytes_seen = 0
+        story_ids = []
+
+        def add(marker, row):
+            nonlocal rows_seen, bytes_seen
+            encoded = _json([marker, *list(row)])
+            rows_seen += 1
+            bytes_seen += len(encoded)
+            if rows_seen > self.STORY_REVIEW_ROWS or bytes_seen > self.STORY_REVIEW_BYTES:
+                raise PlanRejected('Story metadata exceeds review budget')
+            mac.update(encoded)
+
+        db = self.access.db
+        for asset_id, source in sorted(source_by_asset.items()):
+            cursor = db.execute('''SELECT id,asset_id,library_id,author_id,revision,title,text,
+                    language,byline,created_at,updated_at,deleted
+                FROM access_stories WHERE asset_id=? AND library_id=? ORDER BY id''',
+                (asset_id, source))
+            while True:
+                batch = cursor.fetchmany(128)
+                if not batch:
+                    break
+                for row in batch:
+                    add(['story', asset_id, source], row)
+                    story_ids.append(row[0])
+        for story_id in story_ids:
+            cursor = db.execute('''SELECT story_id,revision,editor_id,mutation_id,request_digest,
+                    title,text,language,byline,occurred_at,deleted
+                FROM access_story_revisions WHERE story_id=? ORDER BY revision''', (story_id,))
+            while True:
+                batch = cursor.fetchmany(128)
+                if not batch:
+                    break
+                for row in batch:
+                    add(['revision', story_id], row)
+        return mac.hexdigest(), len(story_ids)
+
     def _state(self, operation, target):
         if type(target) is not dict:
             raise PlanRejected('Invalid plan')
@@ -159,6 +208,7 @@ class _PromotionState(_PlanState):
         values = _ids(target)
         fingerprints = []
         sources = set()
+        source_by_asset = {}
         for start in range(0, len(values), 500):
             chunk = values[start:start + 500]
             rows = db.execute('''SELECT a.id,a.path,a.hash_sha256,a.status,m.library_id
@@ -170,16 +220,59 @@ class _PromotionState(_PlanState):
                 if row[3] not in (None, 'active') or row[4] == library:
                     raise PlanRejected('Select assets that currently belong to another library')
                 sources.add(row[4])
+                source_by_asset[row[0]] = row[4]
                 fingerprints.append(list(row))
         # The actor must own every library the change takes something away from, not only the
         # one it gives to: a reassignment is a removal from the source audience's point of view.
         for source in sorted(sources):
             _operator(db, actor, source, now)
+        # Reassignment also moves stories that belong to the selected asset and its
+        # current source library. Bind both the story rows and their complete revision
+        # history into the review so a concurrent edit cannot be silently carried across.
+        album_links = []
+        face_count = 0
+        for asset_id, source in sorted(source_by_asset.items()):
+            links = db.execute('''SELECT aa.album_id,aa.asset_id,aa.position,a.cover_asset_id,
+                    substr(a.title,1,160),substr(a.title_zh,1,160),substr(a.description,1,1000),
+                    a.theme,a.status,a.updated_at,o.library_id,o.revision
+                FROM album_assets aa JOIN albums a ON a.id=aa.album_id
+                JOIN access_album_libraries o ON o.album_id=aa.album_id
+                WHERE aa.asset_id=? AND o.library_id=? ORDER BY aa.album_id,aa.position,aa.id''',
+                (asset_id, source)).fetchall()
+            album_links.extend([list(row) for row in links])
+            # A malformed/legacy album may retain a cover reference without an
+            # album_assets edge. Bind that reference too; the move must never
+            # silently change which cover is exposed after owner review.
+            covers = db.execute('''SELECT a.id,NULL,-1,a.cover_asset_id,
+                    substr(a.title,1,160),substr(a.title_zh,1,160),substr(a.description,1,1000),
+                    a.theme,a.status,a.updated_at,o.library_id,o.revision
+                FROM albums a JOIN access_album_libraries o ON o.album_id=a.id
+                WHERE a.cover_asset_id=? AND o.library_id=?
+                AND NOT EXISTS (SELECT 1 FROM album_assets aa
+                                WHERE aa.album_id=a.id AND aa.asset_id=?)
+                ORDER BY a.id''', (asset_id, source, asset_id)).fetchall()
+            album_links.extend([list(row) for row in covers])
+            face_count += db.execute('SELECT count(*) FROM face_detections WHERE asset_id=?',
+                                     (asset_id,)).fetchone()[0]
+        story_state, story_count = self._story_review_state(source_by_asset)
+        album_state = self._mac('library-reassignment-albums', album_links)
+        source_audiences = {}
+        source_current_audiences = {}
+        source_owner_revisions = {}
+        for source in sorted(sources):
+            audience, current = _audience(db, source, now)
+            source_audiences[source] = self._mac('library-audience', audience)
+            source_current_audiences[source] = self._mac('library-current-audience', current)
+            source_owner_revisions[source] = {row[0]: row[3] for row in audience if row[2] == 'owner'}
         audience, current = _audience(db, library, now)
         return {'operator_revision': str(revision), 'asset_state': self._mac('library-reassignment', fingerprints),
                 'count': len(values), 'source_libraries': sorted(sources),
                 'audience_state': self._mac('library-audience', audience), 'current_readers': len(current),
                 'current_original_readers': sum(bool(member[5]) for member in current),
+                'source_audiences': source_audiences, 'source_current_audiences': source_current_audiences,
+                'source_owner_revisions': source_owner_revisions, 'story_state': story_state,
+                'album_state': album_state, 'story_count': story_count,
+                'source_album_count': len({row[0] for row in album_links}), 'face_count': face_count,
                 'originals_granted': False, 'media_writes': False, 'moves_between_libraries': True}
 
 
@@ -552,7 +645,7 @@ def unassign_assets(envelope, *, review, clock=time.time):
         return receipt
 
 
-def reassign_assets(envelope, *, review, clock=time.time):
+def reassign_assets(envelope, *, review, clock=time.time, authorize=None, allow_replay=False):
     """Move selected assets from their current library into another one.
 
     Database-only: after promotion the bytes are already in the originals root. Because
@@ -566,24 +659,47 @@ def reassign_assets(envelope, *, review, clock=time.time):
             if _identity(review.database) != review.database_identity:
                 raise PlanRejected('Reassignment target changed')
             plan = envelope['plan']
+            if authorize is not None:
+                authorize(state.access, plan)
             if db.execute('SELECT 1 FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
                           (plan['plan_id'], review.plan_digest)).fetchone():
+                prior = db.execute('SELECT plan_digest,receipt FROM access_provisioning_receipts WHERE plan_id=? OR plan_digest=?',
+                                   (plan['plan_id'], review.plan_digest)).fetchone()
+                if allow_replay and authorize is not None and prior[0] == review.plan_digest:
+                    for asset in plan['target']['asset_ids']:
+                        current = db.execute('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
+                                             (int(asset),)).fetchone()
+                        if current != (plan['target']['library_id'],):
+                            raise PlanRejected('Reassigned asset changed; review again')
+                    return json.loads(prior[1])
                 raise PlanRejected('Plan already applied')
             state._validate_in_transaction(envelope)
             target = plan['target']
             library = target['library_id']
             sources = set()
+            source_by_asset = {}
             for value in target['asset_ids']:
                 row = db.execute('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
                                  (int(value),)).fetchone()
                 if row is None:
                     raise PlanRejected('Every selected asset must currently belong to a library')
                 sources.add(row[0])
+                source_by_asset[int(value)] = row[0]
                 db.execute('UPDATE access_asset_libraries SET library_id=? WHERE asset_id=?',
                            (library, int(value)))
+            story_count = 0
+            for asset_id, source in source_by_asset.items():
+                cursor = db.execute('''UPDATE access_stories SET library_id=?
+                    WHERE asset_id=? AND library_id=?''', (library, asset_id, source))
+                story_count += cursor.rowcount
             receipt = _receipt(state, plan, review, {
                 'library_id': library, 'asset_count': len(target['asset_ids']),
-                'source_libraries': sorted(sources), 'media_writes': False})
+                'source_libraries': sorted(sources), 'stories_moved': story_count,
+                'stories_preserved_history': True, 'source_album_count': plan['expected'].get('source_album_count', 0),
+                'face_count': plan['expected'].get('face_count', 0), 'media_writes': False})
+            if authorize is not None:
+                authorize(state.access, plan)
+                receipt['channel'] = 'web'
             _record(state, plan, receipt)
             _assert_unexpired(state, plan)
             if db.execute('PRAGMA foreign_key_check').fetchone():

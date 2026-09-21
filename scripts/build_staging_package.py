@@ -26,7 +26,7 @@ FILES = tuple(sorted([
         'discovery','discovery_provider','discovery_transport','discovery_index')),
     *('backend/app/access/'+name+'.py' for name in (
         'upload','upload_schema','upload_transport','duplicates','captions',
-        'promotion','task_recovery','upload_review')),
+        'promotion','task_recovery','upload_review','library_organization')),
     *('backend/app/ui/access/'+name for name in ('index.html','app.js','styles.css')),
     'backend/migrations/env.py', 'backend/alembic.ini',
     *('backend/migrations/versions/'+name+'.py' for name in (
@@ -39,6 +39,8 @@ FILES = tuple(sorted([
         'd2b7e4f6a901_album_drafts','e3a9b1c7d402_access_foundation','f4c1a8d2e703_access_admission')),
     'scripts/staging_app.py', 'scripts/provision_access.py', 'scripts/prepare_access_database.py',
     'scripts/prepare_access_discovery_index.py', 'scripts/prepare_access_places.py',
+    'scripts/create_library_presets.py',
+    'docs/security/LIBRARY_ORGANIZATION_V27.md',
     'docs/security/PLACE_BROWSING_V24.md', 'docs/security/PLACE_REFRESH_V25.md',
     'docs/security/PLACE_NAME_SEARCH_V26.md', 'docs/security/place-catalogue-china-starter.json',
     'docs/security/PLACE_CATALOGUE_SOURCES.md',

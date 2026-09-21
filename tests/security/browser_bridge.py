@@ -103,7 +103,20 @@ try:
         if message.get('command')=='mutate':
             # Strict synthetic scenarios; no caller-supplied SQL or file paths.
             scenario=message['scenario']
-            if scenario=='person-name-html':
+            if scenario=='library-organization':
+                from app.access.library_organization import create_presets
+                from app.access.service import AccessService
+                with fixture.connection() as db:
+                    access=AccessService(db,clock=lambda:fixture.now)
+                    with access._transaction(write=True):
+                        actor=db.execute("SELECT bootstrap_operator FROM access_libraries WHERE id='family-a'").fetchone()[0]
+                        create_presets(access,actor)
+                        for asset_id,mime in ((9501,'image/jpeg'),(9502,'video/mp4')):
+                            db.execute("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height,taken_at) VALUES (?,?,?,'active',?,400,300,'2050-01-01')",(asset_id,str(originals/f'{asset_id}.jpg'),str(asset_id),mime))
+                            db.execute("INSERT INTO access_asset_libraries VALUES (?,'family-a')",(asset_id,))
+                            shutil.copyfile(originals/'101.jpg',originals/f'{asset_id}.jpg')
+                            shutil.copyfile(derived/'thumbnails/256/101.jpg',derived/f'thumbnails/256/{asset_id}.jpg')
+            elif scenario=='person-name-html':
                 fixture.mutate("UPDATE persons SET display_name=?,updated_at='changed-by-test' WHERE id=1",('<img src=x onerror="window.syntheticXSS=true">',))
             elif scenario=='face-assignment-changed':
                 fixture.mutate("UPDATE face_detections SET label_source='dnn',label_score=0.2 WHERE id=200")

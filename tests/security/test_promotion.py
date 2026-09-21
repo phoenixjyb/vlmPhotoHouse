@@ -28,6 +28,8 @@ from app.access.promotion import (PROMOTE_OPERATION, REASSIGN_OPERATION, UNASSIG
 from app.access.provisioning import PlanRejected
 from app.access.runtime import ExistingDatabase
 from app.access.service import AccessService
+from app.access.service import AccessDenied
+from app.access.stories import Stories
 from app.access.transport import AccessRuntime
 from app.access.upload import UploadRuntime
 from app.access.provisioning_apply import plan_digest
@@ -102,6 +104,11 @@ class PromotionTests(unittest.TestCase):
     def rows(self, sql, args=()):
         with closing(self.connection()) as db:
             return db.execute(sql, args).fetchall()
+
+    def mutate(self, sql, args=()):
+        with closing(self.connection()) as db:
+            db.execute(sql, args)
+            db.commit()
 
     def gallery(self, token):
         """Read the gallery and close the connection; a leak shows up as a ResourceWarning."""
@@ -278,6 +285,105 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(len(self.rows('SELECT 1 FROM access_asset_libraries WHERE asset_id=900')), 1)
         # The bytes never moved: reassignment is database-only.
         self.assertEqual(self.rows('SELECT path FROM assets WHERE id=900')[0][0], 'private-synthetic/900.jpg')
+
+    def test_reassign_moves_source_story_preserves_history_and_reports_metadata(self):
+        self.make_owner_of_both()
+        story = 'story-reassign-900'
+        mutation = 'mutation-reassign-900'
+        self.mutate("INSERT INTO access_stories "
+                    "(id,asset_id,library_id,author_id,revision,title,text,language,byline,created_at,updated_at,deleted) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,0)",
+                    (story, 900, 'family-a', self.owner_id, 1, 'Moment', 'A memory', 'en', 'Owner', NOW, NOW))
+        self.mutate("INSERT INTO access_story_revisions "
+                    "(story_id,revision,editor_id,mutation_id,request_digest,title,text,language,byline,occurred_at,deleted) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,0)",
+                    (story, 1, self.owner_id, mutation, 'digest-reassign-900', 'Moment', 'A memory', 'en', 'Owner', NOW))
+        envelope = self.planned('reassign', library_id='family-b',
+                                operator_account_id=self.owner_id, asset_ids=[900])
+        expected = envelope['plan']['expected']
+        self.assertEqual(expected['story_count'], 1)
+        self.assertEqual(expected['source_album_count'], 0)
+        self.assertEqual(expected['face_count'], 0)
+        receipt = reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW)
+        self.assertEqual(receipt['stories_moved'], 1)
+        moved_story = self.rows('SELECT library_id,revision FROM access_stories WHERE id=?', (story,))[0]
+        self.assertEqual((moved_story['library_id'], moved_story['revision']), ('family-b', 1))
+        self.assertEqual(len(self.rows('SELECT * FROM access_story_revisions WHERE story_id=?', (story,))), 1)
+
+        with closing(self.connection()) as db:
+            reads = Stories(AccessService(db, clock=lambda: NOW))
+            with self.assertRaises(AccessDenied):
+                reads.list(self.owner_token, 'family-a', 900, 1)
+            visible = reads.list(self.other_token, 'family-b', 900, 1)
+            self.assertEqual([item['id'] for item in visible['items']], [story])
+
+    def test_reassign_review_refuses_story_album_and_audience_drift(self):
+        self.make_owner_of_both()
+        story = 'story-reassign-drift'
+        self.mutate("INSERT INTO access_stories "
+                    "(id,asset_id,library_id,author_id,revision,title,text,language,byline,created_at,updated_at,deleted) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,0)",
+                    (story, 900, 'family-a', self.owner_id, 1, 'Moment', 'A memory', 'en', 'Owner', NOW, NOW))
+        self.mutate("INSERT INTO access_story_revisions "
+                    "(story_id,revision,editor_id,mutation_id,request_digest,title,text,language,byline,occurred_at,deleted) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,0)",
+                    (story, 1, self.owner_id, 'mutation-drift', 'digest-drift', 'Moment', 'A memory', 'en', 'Owner', NOW))
+        self.mutate("INSERT INTO albums(id,title,theme,status,cover_asset_id) VALUES (31,'Trip','custom','draft',900)")
+        self.mutate("INSERT INTO access_album_libraries(album_id,library_id,creator_id,revision) VALUES (31,'family-a',?,1)",
+                    (self.owner_id,))
+        self.mutate("INSERT INTO album_assets(album_id,asset_id,position) VALUES (31,900,0)")
+
+        for mutation in (
+            lambda: self.mutate("UPDATE access_stories SET text='Changed',revision=2 WHERE id=?", (story,)),
+            lambda: self.mutate("UPDATE albums SET title='Changed' WHERE id=31"),
+            lambda: self.mutate("UPDATE access_memberships SET revision=revision+1 WHERE account_id=? AND library_id='family-a'",
+                                (self.owner_id,)),
+        ):
+            envelope = self.planned('reassign', library_id='family-b',
+                                    operator_account_id=self.owner_id, asset_ids=[900])
+            mutation()
+            with self.assertRaises(PlanRejected):
+                reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW)
+
+    def test_reassign_post_change_authorization_rolls_back_mapping_and_story(self):
+        self.make_owner_of_both()
+        story = 'story-reassign-rollback'
+        self.mutate("INSERT INTO access_stories "
+                    "(id,asset_id,library_id,author_id,revision,title,text,language,byline,created_at,updated_at,deleted) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,0)",
+                    (story, 900, 'family-a', self.owner_id, 1, 'Moment', 'A memory', 'en', 'Owner', NOW, NOW))
+        envelope = self.planned('reassign', library_id='family-b',
+                                operator_account_id=self.owner_id, asset_ids=[900])
+        calls = 0
+        def authorize(access, checked):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise PlanRejected('authorization changed')
+        with self.assertRaises(PlanRejected):
+            reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW,
+                            authorize=authorize)
+        self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=900')[0][0], 'family-a')
+        self.assertEqual(self.rows('SELECT library_id FROM access_stories WHERE id=?', (story,))[0][0], 'family-a')
+
+    def test_reassign_authorize_is_inside_writer_and_exact_replay_checks_mapping(self):
+        self.make_owner_of_both()
+        envelope = self.planned('reassign', library_id='family-b',
+                                operator_account_id=self.owner_id, asset_ids=[900])
+        calls = []
+        def authorize(access, checked):
+            calls.append(checked['operation'])
+            self.assertTrue(access.db.in_transaction)
+        first = reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW,
+                                authorize=authorize, allow_replay=True)
+        replay = reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW,
+                                 authorize=authorize, allow_replay=True)
+        self.assertEqual(replay, first)
+        self.assertEqual(calls, [REASSIGN_OPERATION, REASSIGN_OPERATION, REASSIGN_OPERATION])
+        self.mutate("UPDATE access_asset_libraries SET library_id='family-a' WHERE asset_id=900")
+        with self.assertRaises(PlanRejected):
+            reassign_assets(envelope, review=self.review(envelope), clock=lambda: NOW,
+                            authorize=authorize, allow_replay=True)
 
     def test_reassign_refuses_an_asset_already_in_the_target_library(self):
         with self.assertRaises(PlanRejected):

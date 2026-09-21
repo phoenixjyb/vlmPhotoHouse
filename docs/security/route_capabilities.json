@@ -32,7 +32,8 @@
   "home.discovery.delivery.read": "Anonymous reviewed discovery for the exact Home catalog and source index, preserving v3 media capabilities; no identity inference, account grant or live database access.",
   "upload.submit": "Verified principal holding at least one approved, unexpired membership in an active library. Account-scoped, not library-scoped: the upload selects no library, and the photo is invisible to every member until an operator promotes and assigns it.",
   "caption.write": "Any approved membership in the selected library. Deliberately not contributor-or-owner: an invitation creates a viewer and no route changes a role, so a contributor-gated write could never be reached. Matches the upload decision. Only where the asset has no current caption, so this cannot take a description away.",
-  "upload.review": "Explicit enabled runtime AND current operator and approved owner of selected active library. Pending upload must belong to a current approved member of this library. Sealed single-photo approval moves bytes and maps the asset atomically; no TV publication or job control."
+  "upload.review": "Explicit enabled runtime AND current operator and approved owner of selected active library. Pending upload must belong to a current approved member of this library. Sealed single-photo approval moves bytes and maps the asset atomically; no TV publication or job control.",
+  "library.transfer": "Active system operator and approved owner of both source and destination. Sealed bounded review of assets, audiences, stories and albums; atomic mapping and story move, replay validation; no media bytes, person ownership or Home publication changes."
  },
  "topology": [
   {
@@ -3340,6 +3341,62 @@
    "scope": "Single selected library and currently approved uploader; pending incoming photos only.",
    "current_control": "Operator plus owner, same-origin cookie CSRF or explicit bearer, no-store. Explicit runtime opt-in; sealed audience and actor-bound single-photo review; fresh authorization inside writer lock; idempotent exact receipt; bounded private JPEG preview with post-render authorization.",
    "gap": "Source and synthetic tests; live activation and family acceptance remain separate."
+  },
+  {
+   "source": "backend/app/access/library_organization.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/library-catalogue",
+   "handler": "catalogue",
+   "surface": "photohouse",
+   "capabilities": [
+    "account.self"
+   ],
+   "scope": "Current session and explicitly approved memberships only.",
+   "current_control": "Bounded library catalogue and owner/operator-only cross-library move. Cookie CSRF or explicit bearer. Stories follow the asset; source album selections remain hidden. New libraries are provisioned explicitly with owner-only audience.",
+   "gap": "Live activation and signed-in family/device acceptance recorded separately. No automatic Home publication update."
+  },
+  {
+   "source": "backend/app/access/library_organization.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/admin/library-transfers",
+   "handler": "destinations",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.transfer"
+   ],
+   "scope": "Current session and explicitly approved memberships only.",
+   "current_control": "Bounded library catalogue and owner/operator-only cross-library move. Cookie CSRF or explicit bearer. Stories follow the asset; source album selections remain hidden. New libraries are provisioned explicitly with owner-only audience.",
+   "gap": "Live activation and signed-in family/device acceptance recorded separately. No automatic Home publication update."
+  },
+  {
+   "source": "backend/app/access/library_organization.py",
+   "owner": "router",
+   "method": "POST",
+   "path": "/admin/library-transfers/review",
+   "handler": "review",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.transfer"
+   ],
+   "scope": "Current session and explicitly approved memberships only.",
+   "current_control": "Bounded library catalogue and owner/operator-only cross-library move. Cookie CSRF or explicit bearer. Stories follow the asset; source album selections remain hidden. New libraries are provisioned explicitly with owner-only audience.",
+   "gap": "Live activation and signed-in family/device acceptance recorded separately. No automatic Home publication update."
+  },
+  {
+   "source": "backend/app/access/library_organization.py",
+   "owner": "router",
+   "method": "POST",
+   "path": "/admin/library-transfers/confirm",
+   "handler": "confirm",
+   "surface": "photohouse",
+   "capabilities": [
+    "library.transfer"
+   ],
+   "scope": "Current session and explicitly approved memberships only.",
+   "current_control": "Bounded library catalogue and owner/operator-only cross-library move. Cookie CSRF or explicit bearer. Stories follow the asset; source album selections remain hidden. New libraries are provisioned explicitly with owner-only audience.",
+   "gap": "Live activation and signed-in family/device acceptance recorded separately. No automatic Home publication update."
   }
  ]
 }
