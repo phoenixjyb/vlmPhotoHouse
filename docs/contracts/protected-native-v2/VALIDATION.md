@@ -1,5 +1,18 @@
 # Validation receipt — 2026-09-21
 
+## Candidate.18 — approved upload gallery visibility
+
+Source `213195564850521706c50ed4309a97d1c757eeca`. Gallery, media-filter, upload review, promotion,
+transfer and closed-application suites: 110 checks passed. The new regression
+covers more than one page of dated assets, missing-date receipt fallback, real
+capture-date precedence and hidden pending/foreign/deleted assets. The Chromium
+flow proves approval returns from a filtered gallery to page one automatically,
+shows the approved photo first and opens its decoded viewer image; lost-response
+retry and session revocation remain covered. Rendered phone layout inspected.
+All 11 native contract checks passed: 89 unchanged captured exchanges, 117 source
+hashes and 7 payload hashes verified under candidate.18.
+Synthetic source checks do not substitute for Windows or family acceptance.
+
 ## Candidate.17 — admin upload review
 
 Source `2a684832148c667834213ad6e4915f1724f62a88`. Focused Python suite: 176 passes, with one additional

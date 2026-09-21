@@ -1,21 +1,21 @@
 {
-  "backend_source_commit": "2a684832148c667834213ad6e4915f1724f62a88",
+  "backend_source_commit": "213195564850521706c50ed4309a97d1c757eeca",
   "case_count": 89,
   "client_profile_defaults": {
     "protected_native_v2": false,
     "protected_photo_display": false,
     "protected_story_read": false
   },
-  "contract_version": "2.0.0-candidate.17",
+  "contract_version": "2.0.0-candidate.18",
   "database_migration_head": "f2a6d8b4c915",
   "frozen_mobile_v1_backend": "87a60b475b37b1d6873cd977bcb6e7254472da7e",
   "payload_sha256": {
-    "docs/contracts/protected-native-v2/CONTRACT.md": "188d7882c0f969ef12d04d239695c4c476c608436e856d3f2edebbbcd677a0cd",
+    "docs/contracts/protected-native-v2/CONTRACT.md": "9156657e5746fe780f9114a6d4f9739c2f9185a474fcc9f8f44cb82b5e421365",
     "docs/contracts/protected-native-v2/UPLOAD_NEXT.md": "9c52e0d9338ba49c2e8c74c5e4622294307bd67a024fe769a77b2a5fe1c82b12",
-    "docs/contracts/protected-native-v2/VALIDATION.md": "310f497b2a1ef11c0b9d04dba1312ca7317cb59938cc9b7cd5f727257cefe27e",
-    "docs/contracts/protected-native-v2/cases.json": "ecafcef29a361f56f1687d431f974f05fc7d41f7d3fd0e489af544243fd928b4",
-    "scripts/verify_protected_native_contract.py": "2eff7a0d7457276167692897cade86ce52ac337102665c5ef6ccf895be97d7a9",
-    "tests/security/native_contract_v2_probe.py": "ef1f3635353e585a6998b7e75bab205eb94d4335f7e65dbd48b0664ea6a7f893",
+    "docs/contracts/protected-native-v2/VALIDATION.md": "1041b8fdc40bd1763748594c080c9ce36437eac1950765df55a21df81266b53b",
+    "docs/contracts/protected-native-v2/cases.json": "11c0bf147a48199f03dcdc43a697387203b6f4c5bf74b439c20cb1937e6bba21",
+    "scripts/verify_protected_native_contract.py": "59f2c16ab97c4f70aba1379f9d41f3fd92f1da698de2fa93f4a06fa7ccc53884",
+    "tests/security/native_contract_v2_probe.py": "0fbe14c46ddf04fee653544e1cd859f37660dd4a5d0d30a5c9c92fc15dbb2209",
     "tests/security/test_protected_native_contract.py": "a63f3ba338a9d3133b19f025de2a7925e686e344485629364fe8f5e0276076c8"
   },
   "source_sha256": {
@@ -34,7 +34,7 @@
     "backend/app/access/discovery_transport.py": "ea0ed43d6cb79138de3f2ec1c940b4cc615bb2a6ffe0792299b590c51faf9c89",
     "backend/app/access/duplicates.py": "685296fe257e5c3e3c112474ccb831666c7580f5d986a862c40727467a305656",
     "backend/app/access/face_jobs.py": "8a9c8c13dc5280935b39e510462e5518df006e464cb2b006a3d4c1067390db63",
-    "backend/app/access/library.py": "984eb2df49bab0fcd46659bacd6a54be404cb187ca8054a979a48e6d05162243",
+    "backend/app/access/library.py": "7bab23a28f7894d08d306a836bbba7a13d087d407c66b3ed1388eed0deb4bed0",
     "backend/app/access/management_import.py": "0327e9251b1bda088491ed918eae156ec8fc0cb46cd9fc12c4e7acf1dbcdf0e9",
     "backend/app/access/management_schema.py": "8ad058d760f569e6ecebb4351792109fc1ba52711593afca66910edd95da36ba",
     "backend/app/access/media.py": "cd82fc1896970eccbbff338b2e65e7a6189148a9fb6a1aa0f233dd2324d3042a",
