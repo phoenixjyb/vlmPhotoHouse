@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '85da95266926f4ef002066084bf1a18ce52bffc9'
+SOURCE = 'a33eb936a87660271cc4fe2663ffa1f9a36bfa31'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text(encoding='utf-8'))
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.23':
+    if manifest['contract_version'] != '2.0.0-candidate.24':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,
@@ -49,7 +49,10 @@ def verify(root=ROOT):
         for path in (root / directory).rglob('*.py')
         if '__pycache__' not in path.parts
     }
-    expected_sources |= {'scripts/prepare_access_places.py',
+    expected_sources |= {'tests/security/test_upload.py',
+                         'tests/security/test_upload_history.py',
+                         'docs/security/MEMBER_UPLOAD_HISTORY_V35.md',
+                         'scripts/prepare_access_places.py',
                          'scripts/create_library_presets.py',
                          'docs/security/LIBRARY_ORGANIZATION_V27.md',
                          'scripts/prepare_access_discovery_index.py',

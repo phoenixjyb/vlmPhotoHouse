@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.23'
+VERSION = '2.0.0-candidate.24'
 
 
 def capture():
@@ -233,6 +233,7 @@ def capture():
         # deployment opts in with an incoming root, so no existing deployment gains a write
         # surface by accident. It is not library-scoped: the accepted photo is in no library
         # until an operator promotes and assigns it.
+        call('upload_history_requires_opt_in', 'GET', '/uploads?page=1', 503, token=native)
         call('upload_requires_opt_in', 'POST', '/uploads', 503, token=native, body={})
         # Opt-in uploads preserve canonical provenance across retries and never grant
         # a library mapping. Real filesystem and DB; only the fixture JPEG is sent.
@@ -250,7 +251,18 @@ def capture():
         call('upload_retry_other_batch', 'POST', '/uploads', 201, token=native,
              headers={**upload_headers, 'X-Upload-Batch': 'b' * 32}, content=upload_bytes)
         call('upload_not_in_library', 'GET', '/assets/detail/' + accepted['asset_id'] + '?library=family-a', 401, token=native)
+        call('upload_history_pending','GET','/uploads?page=1',200,token=native)
+        call('upload_history_other_account_empty','GET','/uploads?page=1',200,token=env.owner_token)
+        call('upload_history_unknown_query','GET','/uploads?account_id=other',400,token=native)
+        call('upload_history_duplicate_page','GET','/uploads?page=1&page=2',400,token=native)
+        call('upload_history_anonymous','GET','/uploads?page=1',401)
+        env.mutate("UPDATE access_uploads SET state='assigned' WHERE asset_id=?",(accepted['asset_id'],))
+        env.mutate("INSERT INTO access_asset_libraries VALUES (?,'family-a')",(accepted['asset_id'],))
+        call('upload_history_available','GET','/uploads?page=1',200,token=native)
+        env.mutate("UPDATE assets SET status='suppressed' WHERE id=?",(accepted['asset_id'],))
+        call('upload_history_unavailable','GET','/uploads?page=1',200,token=native)
         env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?", (new_id,))
+        call('upload_history_revoked','GET','/uploads?page=1',401,token=native)
         call('revoked_session_still_authenticated', 'GET', '/auth/session', 200, token=native)
         call('revoked_story_list', 'GET', '/assets/101/stories?library=family-a', 401, token=native)
         call('native_logout', 'POST', '/auth/logout', 200, token=native)

@@ -1,6 +1,6 @@
-# Protected native profile 2.0.0-candidate.23
+# Protected native profile 2.0.0-candidate.24
 
-Backend source: `85da95266926f4ef002066084bf1a18ce52bffc9`.
+Backend source: `a33eb936a87660271cc4fe2663ffa1f9a36bfa31`.
 Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
@@ -8,6 +8,37 @@ The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predate
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.24 (September 22)
+
+Adds account-only upload receipt history: `GET /uploads?page=1` (fixed page size 10).
+Only `page` is accepted, once, in 1..100000. Requires the configured upload runtime,
+a current session and at least one approved unexpired active-library membership.
+Returns exactly `page`, `page_size`, `total`, `items`. Each item contains exactly:
+
+- `asset_id`: positive decimal string, signed 64-bit range.
+- `created_at`: integer Unix seconds, 0..253402300799.
+- `bytes`: integer 1..26214400; `kind`: `image` (JPEG/PNG uploads only).
+- `state`: `awaiting_review`, `available`, or `unavailable`.
+- `library_id`: null except when available under current library.read authorization.
+
+Total is 0..2147483647; items contain exactly the current page slice in descending
+receipt ID order (at most 10, unique asset IDs). Receipt history is account-scoped,
+not scoped to the library currently being browsed. It returns no paths, filenames,
+hashes, other uploaders or inaccessible destination IDs. Available means assigned
+and authorized, not that a preview/caption is prepared. Opening still uses ordinary
+protected asset/detail/media routes. No retries, processing work or filesystem reads
+are triggered. Missing upload runtime returns 503; identity/membership denial 401;
+invalid or repeated query fields 400. Cookie origin and bearer rules are unchanged.
+All responses are no-store. Existing POST semantics and frozen mobile v1 stay unchanged.
+
+Clients manually refresh and clear private rows on close/background/logout/access or
+library changes. Late results cannot restore a previous account's history. Older
+servers may return 403/404/503; clients keep regular upload submission usable.
+
+Adds operator-created bilingual presets `home-renovation` (装修 / Home Renovation)
+and `expense-receipts` (报销单 / Expense Receipts). Creation is explicit and empty,
+with owner-only membership and no original grant. Family remains the default.
 
 ## Reissue — 2.0.0-candidate.23 (September 21)
 

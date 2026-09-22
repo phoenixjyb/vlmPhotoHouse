@@ -39,6 +39,17 @@ class ProtectedNativeContractTests(unittest.TestCase):
         self.assertIsNone(first['library_id'])
         self.assertEqual(self.cases['upload_not_in_library']['response']['status'], 401)
 
+    def test_own_upload_history_does_not_grant_access(self):
+        pending = self.body('upload_history_pending')['items'][0]
+        self.assertEqual(pending['state'], 'awaiting_review')
+        self.assertIsNone(pending['library_id'])
+        self.assertEqual(self.body('upload_history_other_account_empty')['items'], [])
+        self.assertEqual(self.body('upload_history_available')['items'][0]['library_id'], 'family-a')
+        hidden = self.body('upload_history_unavailable')['items'][0]
+        self.assertEqual(hidden['state'], 'unavailable')
+        self.assertIsNone(hidden['library_id'])
+        self.assertEqual(self.cases['upload_history_revoked']['response']['status'], 401)
+
     def test_invited_viewer_has_no_implicit_originals_or_other_library(self):
         memberships = self.body('invited_viewer_session')['memberships']
         self.assertEqual(len(memberships), 1)

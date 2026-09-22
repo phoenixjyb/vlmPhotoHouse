@@ -1,4 +1,15 @@
-# Validation receipt — 2026-09-21
+# Validation receipt — 2026-09-22
+
+## Candidate.24 — private upload history and two new presets
+
+Source `a33eb936a87660271cc4fe2663ffa1f9a36bfa31`. 115 affected backend tests passed, including
+ten own-upload history checks. Ten focused Chromium/real-ASGI history scenarios
+and all 63 existing WebUI checkpoints passed. Desktop and narrow Chinese renders
+were inspected. Nine new wire captures cover disabled runtime, own pending and
+available receipts, foreign-account isolation, hidden unavailable destination,
+strict queries, anonymous denial and membership revocation. All prior 89 exchanges
+are unchanged. Candidate.24 contains 98 captures. No production service, database,
+job, phone or TV was changed by this validation.
 
 ## Candidate.23 — bounded face editing and move failure feedback
 

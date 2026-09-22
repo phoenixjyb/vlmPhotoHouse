@@ -101,3 +101,9 @@ The secured WebUI now offers an explicitly enabled operator/owner upload inbox.
 The same phone upload is still accepted privately; only a confirmed admin review
 moves it into the selected family library. See `docs/security/ADMIN_UPLOAD_REVIEW.md`
 for activation, authorization and the still-separate native admin/status UI scope.
+
+## Candidate.24: my uploads
+
+The implemented account-only `GET /uploads?page=N` read exposes honest receipt states
+for manual refresh. It does not add resumable transfer, video upload, transcription,
+job retry or inferred processing progress. See CONTRACT.md for the exact wire shape.
