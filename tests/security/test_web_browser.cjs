@@ -31,6 +31,7 @@ let hold=null,abortLogout=false,loseStorySave=false,loseStoryDelete=false;
 let loseFaceSave=false;
 let loseAlbumSave=false;
 let failNextPath=null;
+let failNextMoveRefreshPath=null;
 let failNextPlaybackGet=false;
 const playbackOverrides=[];
 let assignmentPosts=0;
@@ -59,14 +60,15 @@ async function context(browser){
       syntheticFetchMetadata++;
     }
     delete headers['content-length']; // TestClient recalculates bytes forwarded on the pipe.
-    const response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
+    let response=await rpc({method:request.method(),path:url.pathname+url.search,headers,body:(request.postDataBuffer()||Buffer.alloc(0)).toString('base64')});
+    if(failNextMoveRefreshPath&&request.method()==='GET'&&url.pathname===failNextMoveRefreshPath){failNextMoveRefreshPath=null;response={...response,status:503,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify({detail:'synthetic refresh failure'})).toString('base64')};}
     if(request.method()==='HEAD'&&url.pathname==='/assets/105/playback'&&playbackOverrides.length){const override=playbackOverrides.shift();response.status=override.status;response.headers={...response.headers,...override.headers};response.body='';}
     if(failNextPath&&url.pathname===failNextPath){failNextPath=null;await route.abort();return;}
     if(failNextPlaybackGet&&request.method()==='GET'&&url.pathname==='/assets/105/playback'){failNextPlaybackGet=false;await route.abort();return;}
     if(loseStorySave&&request.method()==='POST'&&url.pathname.endsWith('/stories')){loseStorySave=false;await route.abort();return;}
     if(loseStoryDelete&&request.method()==='DELETE'&&url.pathname.startsWith('/stories/')){loseStoryDelete=false;await route.abort();return;}
     if(request.method()==='POST'&&url.pathname.endsWith('/assignment'))assignmentPosts++;
-    if(loseFaceSave&&request.method()==='POST'&&url.pathname.endsWith('/assignment')){loseFaceSave=false;await route.abort();return;}
+    if(loseFaceSave&&request.method()==='POST'&&(/\/(assignment|unassign|new-person)$/.test(url.pathname))){loseFaceSave=false;await route.abort();return;}
     if(loseAlbumSave&&request.method()==='POST'&&url.pathname==='/admin/albums'){loseAlbumSave=false;await route.abort();return;}
     if(hold&&hold.predicate(url,request)) {const delayed=hold;hold=null;delayed.arrived();await delayed.gate;}
     const outputHeaders={...response.headers};if(request.method()!=='HEAD')delete outputHeaders['content-length'];delete outputHeaders['content-encoding'];
@@ -340,7 +342,10 @@ let browser;
   await owner.locator('.new-person-form input').fill('家人新名字');owner.once('dialog',dialog=>dialog.accept());
   await owner.getByRole('button',{name:'Create and assign',exact:true}).click();
   await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='家人新名字');
-  owner.once('dialog',dialog=>dialog.accept());await face.getByRole('button',{name:'Remove this assignment',exact:true}).click();
+  owner.once('dialog',dialog=>dialog.accept());loseFaceSave=true;await face.getByRole('button',{name:'Remove this assignment',exact:true}).click();
+  await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] .face-action-status')?.textContent.includes('Save not confirmed'));
+  assert.equal(await face.getByRole('button',{name:'Remove this assignment',exact:true}).isDisabled(),false);
+  await owner.locator('#face-refresh').click();await face.waitFor();
   await owner.waitForFunction(()=>document.querySelector('[data-face-id="200"] h4')?.textContent==='Unassigned');
   await face.getByRole('button',{name:'Choose a person',exact:true}).click();
   await owner.locator('.face-picker input').fill('家人新名字');await owner.locator('.face-picker form button').click();
@@ -437,10 +442,31 @@ let browser;
   const cancelled=await owner.locator('#created-code').inputValue();await owner.locator('#cancel-invite').click();
   await owner.locator('#invitation-result').waitFor({state:'hidden'});
   await joined.locator('#logout').click();await joined.locator('#auth').waitFor({state:'visible'});
+  await joined.setViewportSize({width:390,height:844});
   await joined.locator('#register-tab').click();await joined.locator('#phone').fill('+12025550104');await joined.locator('#password').fill(PASSWORD);await joined.locator('#name').fill('Cancelled invite member');await joined.locator('#code').fill(cancelled);await joined.locator('#auth-submit').click();
   await joined.waitForFunction(()=>document.getElementById('status').textContent.includes('could not be confirmed'));
+  assert.equal(await joined.locator('#auth-feedback').isVisible(),true);
+  assert.match(await joined.locator('#auth-feedback').textContent(),/could not be confirmed/);
+  const authButtonBox=await joined.locator('#auth-submit').boundingBox();
+  const authFeedbackBox=await joined.locator('#auth-feedback').boundingBox();
+  assert(authButtonBox&&authFeedbackBox&&authFeedbackBox.y>=authButtonBox.y&&authFeedbackBox.y<844);
+  await joined.screenshot({path:path.join(artifacts,'registration-error-mobile.png'),fullPage:true});
   assert.equal(await joined.locator('.asset').count(),0);
   checkpoint('Cancelled invitation cannot register or disclose photos');
+  await joined.locator('#language').click();
+  assert.match(await joined.locator('#auth-feedback').textContent(),/无法确认/);
+  await joined.locator('#login-tab').click();
+  assert.equal(await joined.locator('#auth-feedback').textContent(),'');
+  await joined.locator('#register-tab').click();
+  await joined.locator('#password').fill(PASSWORD);await joined.locator('#code').fill(cancelled);await joined.locator('#name').fill('');
+  await joined.locator('#auth-submit').click();
+  assert.match(await joined.locator('#auth-feedback').textContent(),/名字/);
+  await joined.locator('#name').fill('Synthetic member');await joined.locator('#code').fill('');
+  await joined.locator('#auth-submit').click();
+  assert.match(await joined.locator('#auth-feedback').textContent(),/邀请码/);
+  await joined.locator('#auth-feedback').scrollIntoViewIfNeeded();
+  await joined.screenshot({path:path.join(artifacts,'registration-validation-mobile-zh.png'),fullPage:true});
+  checkpoint('Authentication feedback translates, clears on mode switch and includes native field validation');
   await owner.locator('.asset').filter({hasText:'101'}).click();
   await owner.locator('#story-add').waitFor();await owner.locator('#story-add').click();
   const longStory='Her first visit to Grandma’s garden. 奶奶的花园，第一次浇花。\n'.repeat(90)+'<img src=x onerror="window.storyXSS=true">';
@@ -1105,8 +1131,11 @@ let browser;
   oldReview.release();await pause(50);
   assert((await owner.locator('#transfer-review-summary').textContent()).includes('Documents'));
   await owner.screenshot({path:path.join(artifacts,'library-move-review.png'),fullPage:true});
+  failNextMoveRefreshPath='/assets';
   await owner.locator('#transfer-review-confirm').click();await owner.locator('#transfer-review').waitFor({state:'hidden'});
-  await owner.waitForFunction(()=>document.getElementById('transfer-status').textContent.includes('moved'));
+  await owner.waitForFunction(()=>document.getElementById('transfer-status').textContent.includes('completed'));
+  assert(!((await owner.locator('#transfer-status').textContent()).includes('could not be completed')));
+  await owner.locator('#refresh').click();await owner.locator('.asset').first().waitFor();
   assert.equal(await owner.locator('#grid [data-asset-id="9501"]').count(),0);
   await owner.locator('#library-select').selectOption('documents');await owner.locator('#grid [data-asset-id="9501"]').waitFor();
   assert.equal(await owner.locator('#grid [data-asset-id="9502"]').count(),1);
@@ -1114,6 +1143,38 @@ let browser;
   await owner.setViewportSize({width:390,height:844});await owner.screenshot({path:path.join(artifacts,'library-move-phone-zh.png'),fullPage:true});
   assert(await owner.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   checkpoint('Admin moves selected photo/video to the reviewed destination; late reviews cannot replace a newer choice; bilingual catalogue fits phone');
+  await mutate('family-default');
+  await owner.locator('#refresh').click();
+  await owner.waitForFunction(()=>document.querySelector('#library-select option')?.value==='family');
+  assert.equal(await owner.locator('#library-select').inputValue(),'documents');
+  checkpoint('Family is first in the picker; refreshing keeps a manually selected library');
+  await owner.reload();await owner.locator('#grid [data-asset-id="9601"]').waitFor();
+  assert.equal(await owner.locator('#library-select').inputValue(),'family');
+  await owner.locator('#language').click();
+  await owner.screenshot({path:path.join(artifacts,'family-default-phone-zh.png'),fullPage:true});
+  await owner.locator('#language').click();
+  assert.equal(await owner.locator('#library-select').inputValue(),'family');
+  await owner.setViewportSize({width:1200,height:900});
+  await owner.screenshot({path:path.join(artifacts,'family-default-desktop-en.png'),fullPage:true});
+  await owner.locator('#library-select').selectOption('documents');await owner.locator('#grid [data-asset-id="9501"]').waitFor();
+  await owner.locator('#refresh').click();await owner.locator('#grid [data-asset-id="9501"]').waitFor();
+  assert.equal(await owner.locator('#library-select').inputValue(),'documents');
+  await owner.locator('#logout').click();await owner.locator('#auth').waitFor({state:'visible'});
+  await auth(owner,'+12025550100');
+  assert.equal(await owner.locator('#library-select').inputValue(),'family');
+  checkpoint('Cold restore and new login load Family despite alphabetically earlier libraries; bilingual manual switching remains available');
+  await mutate('family-default-unavailable');
+  const fallbackStart=browserRequests.length;
+  await owner.locator('#refresh').click();await owner.waitForFunction(()=>document.getElementById('library-select').value==='chuan-work');
+  await owner.locator('#empty').waitFor({state:'visible'});
+  assert(!browserRequests.slice(fallbackStart).some(item=>item.path.startsWith('/assets?')&&new URL(item.path,'https://photohouse.test').searchParams.get('library')==='family'));
+  assert.equal(await owner.locator('#library-select option[value="family"]').count(),0);
+  await mutate('family-default-no-access');
+  const noAccessStart=browserRequests.length;
+  await owner.locator('#refresh').click();await owner.waitForFunction(()=>document.getElementById('library-select').options.length===0);
+  assert.equal(await owner.locator('#grid .asset').count(),0);
+  assert(!browserRequests.slice(noAccessStart).some(item=>item.path.startsWith('/assets?')));
+  checkpoint('Unavailable Family falls back to an accessible library; no memberships means no media requests');
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify({checks,externalRequests:external,pageErrors:errors,browser:browser.version(),syntheticFetchMetadataRequests:syntheticFetchMetadata,transportLimitation:'DevTools interception omits Fetch Metadata here; same-origin signals are explicitly modeled from the requesting frame. Real network header emission and CORP enforcement remain unverified.',evidence:'Chromium rendered; all HTTP fulfilled via stdin/stdout ASGI bridge and explicit ExistingDatabase adapter; synthetic migrated SQLite/JPEG/MP4 only'},null,2));
   console.log(`Browser checks: ${checks.length} passed. Artifacts: ${artifacts}`);

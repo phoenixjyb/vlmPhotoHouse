@@ -264,6 +264,70 @@ class PeopleTests(unittest.TestCase):
         with self.f.connection() as db:
             self.assertEqual(db.execute('SELECT type,state FROM tasks').fetchall(),[('caption','running')])
 
+    def test_unassignment_allows_face_work_for_another_asset(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        self.f.mutate("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES('face','pending',1,0,?)",
+                      ('{"asset_id":201}',))
+        response=self.client.post('/admin/faces/11/unassign?library=family-a',
+                                  headers={'Authorization':'Bearer '+self.owner},json={'revision':revision})
+        self.assertEqual(response.status_code,200)
+
+    def test_unassignment_allows_face_embedding_work_for_another_asset(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        self.f.mutate("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES('face_embed','pending',1,0,?)",
+                      ('{"face_id":21}',))
+        response=self.client.post('/admin/faces/11/unassign?library=family-a',
+                                  headers={'Authorization':'Bearer '+self.owner},json={'revision':revision})
+        self.assertEqual(response.status_code,200)
+
+    def test_unassignment_face_work_for_same_asset_is_refused_pending_or_running(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        with self.f.connection() as db:
+            db.execute("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES('face','pending',1,0,'{\"asset_id\":101}')")
+            db.commit()
+        path='/admin/faces/11/unassign?library=family-a';headers={'Authorization':'Bearer '+self.owner}
+        self.assertEqual(self.client.post(path,headers=headers,json={'revision':revision}).status_code,409)
+        self.f.mutate("UPDATE tasks SET state='running'")
+        self.assertEqual(self.client.post(path,headers=headers,json={'revision':revision}).status_code,409)
+        self.f.mutate("UPDATE tasks SET type='face_embed',payload_json='{\"face_id\":11}'")
+        self.assertEqual(self.client.post(path,headers=headers,json={'revision':revision}).status_code,409)
+
+    def test_unassignment_face_job_metadata_fails_closed(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        for kind,payload in (('face','{}'),('face_embed','{}'),('face_embed','{"face_id":99999}'),
+                             ('face','{"asset_id":99999}'),('face','{"asset_id":true}'),
+                             ('face','{"asset_id":9223372036854775808}')):
+            with self.f.connection() as db:
+                db.execute('DELETE FROM tasks')
+                db.execute("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES(?,?,1,0,?)",
+                           (kind,'pending',payload));db.commit()
+            response=self.client.post('/admin/faces/11/unassign?library=family-a',
+                                      headers={'Authorization':'Bearer '+self.owner},json={'revision':revision})
+            self.assertEqual(response.status_code,409,(kind,payload))
+
+    def test_unassignment_face_job_oversized_and_deep_metadata_fails_closed(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        payloads = [('{"asset_id":201,"padding":"' + ('x' * 9000) + '"}'),
+                    '[' * 1100 + '0' + ']' * 1100]
+        with self.f.connection() as db:
+            for payload in payloads:
+                db.execute('DELETE FROM tasks')
+                db.execute("INSERT INTO tasks(type,state,priority,retry_count,payload_json) VALUES('face','pending',1,0,?)",
+                           (payload,));db.commit()
+                response=self.client.post('/admin/faces/11/unassign?library=family-a',
+                                          headers={'Authorization':'Bearer '+self.owner},json={'revision':revision})
+                self.assertEqual(response.status_code,409)
+
+    def test_unassignment_face_job_metadata_budget_fails_closed(self):
+        self.assignment_fixture();revision=self.assignment_body()['revision']
+        with self.f.connection() as db:
+            db.executemany("""INSERT INTO tasks(type,state,priority,retry_count,payload_json)
+                VALUES('face','pending',1,0,?)""", [('{"asset_id":201}',)] * 1001)
+            db.commit()
+        response=self.client.post('/admin/faces/11/unassign?library=family-a',
+                                  headers={'Authorization':'Bearer '+self.owner},json={'revision':revision})
+        self.assertEqual(response.status_code,409)
+
     def test_assignment_audit_or_history_failure_rolls_back_every_change(self):
         self.assignment_fixture();body=self.assignment_body()
         for table in ('access_audit','face_assignment_events','person_embedding_artifacts'):

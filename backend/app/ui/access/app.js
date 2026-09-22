@@ -36,8 +36,8 @@
   Object.assign(words.zh,{preparedPlayback:'已准备的视频',videoChecking:'正在检查受保护的视频…',videoUnavailable:'此准备好的视频暂不可用。',videoNotPrepared:'此视频尚未准备好。',videoChanged:'此视频已发生变化。请关闭后刷新相册库。',videoBusy:'准备好的视频当前繁忙，请稍后再试。',videoRetry:'重试视频',videoRetryLater:'稍后重试',videoUnauthorized:'访问权限已变化，视频已关闭。',videoInterrupted:'播放已中断，请重试视频。'});
   Object.assign(words.en,{newPerson:'Create a new person',createAssign:'Create and assign',unassignFace:'Remove this assignment',confirmUnassign:'Remove this face assignment? The saved person and photo will be kept.',albums:'Family albums',albumPrivacy:'Saved in this library, not automatically published to TV.',newAlbum:'Create album',editAlbum:'Edit album',albumTitle:'Album title',albumTitleZh:'Chinese title (optional)',albumDescription:'Description',albumTheme:'Theme',saveAlbum:'Save album',albumSaved:'Album saved.',noAlbums:'No library-owned albums yet. Earlier unowned albums need a reviewed import.',selectPhotos:'Choose photos/videos (up to 60)',selectedPhotos:'Selected order',moveUp:'Move earlier',moveDown:'Move later',remove:'Remove',setCover:'Use as cover',cover:'Cover',albumEmpty:'Empty album',albumChanged:'Album changed. Close this editor and reopen the current version before editing.',albumUncertain:'Save not confirmed. Retry this same save or close and review the saved albums.',discardAlbum:'Discard this unsaved album edit?',albumNeedsReview:'Some earlier selections are no longer available. Saving will remove unavailable entries.',newPersonHelp:'Use an existing saved person when possible. Creating a name does not merge duplicates.'});
   Object.assign(words.zh,{newPerson:'创建新人物',createAssign:'创建并分配',unassignFace:'取消此人脸归属',confirmUnassign:'取消此人脸归属？已保存的人物和照片将保留。',albums:'家庭主题相册',albumPrivacy:'保存在本家庭库，不会自动发布到电视。',newAlbum:'创建相册',editAlbum:'编辑相册',albumTitle:'相册标题',albumTitleZh:'中文标题（可选）',albumDescription:'描述',albumTheme:'主题',saveAlbum:'保存相册',albumSaved:'相册已保存。',noAlbums:'暂无属于本库的相册。旧的未归属相册需经确认后导入。',selectPhotos:'选择照片或视频（最多 60 项）',selectedPhotos:'已选顺序',moveUp:'向前移动',moveDown:'向后移动',remove:'移除',setCover:'设为封面',cover:'封面',albumEmpty:'空相册',albumChanged:'相册已更改，请关闭编辑器并打开最新版本后再编辑。',albumUncertain:'尚未确认保存成功。请重试同一次保存，或关闭并核对已保存相册。',discardAlbum:'放弃尚未保存的相册修改？',albumNeedsReview:'部分原选项已不可访问，保存将移除这些选项。',newPersonHelp:'请优先选择已有的人物。创建姓名不会自动合并重名人物。'});
-  Object.assign(words.en,{moveMemories:'Move memories',moveMemoriesHelp:'Move up to 50 photos or videos to another family library. Stories move with them.',moveSelected:'Move selected',clearSelection:'Clear selection',moveThisMemory:'Move this memory',reviewMove:'Review move',confirmMove:'Confirm move',chooseDestination:'Choose a destination',sourceLibrary:'From',destinationLibrary:'To',moveSummary:'Move summary',moveStories:'Stories move with these memories.',moveAlbums:'Album links stay hidden in the source library.',moveFaces:'People names from the source library are not shared with the destination.',moveReaders:'Only members of the destination library can access the moved items. Existing TV publications are managed separately.',readersCount:'destination members',originalReadersCount:'with original downloads',moveSuccess:'Memories moved. This library has been refreshed.',moveLimit:'Choose up to 50 memories.',moveNone:'Choose at least one memory.',moveUnavailable:'Moving is not available for this library.',moveFailed:'The move could not be completed. Refresh and try again.',assetsCount:'memories',storiesCount:'stories',albumsCount:'album links',facesCount:'saved faces'});
-  Object.assign(words.zh,{moveMemories:'移动回忆',moveMemoriesHelp:'最多将 50 张照片或视频移动到另一个家庭相册库，故事也会一起移动。',moveSelected:'移动所选内容',clearSelection:'清除选择',moveThisMemory:'移动这段回忆',reviewMove:'确认移动',confirmMove:'确认移动',chooseDestination:'选择目标相册库',sourceLibrary:'来源',destinationLibrary:'目标',moveSummary:'移动内容',moveStories:'这些回忆里的故事会一起移动。',moveAlbums:'来源相册库中的相册关联会保留为隐藏状态。',moveFaces:'来源库中的人物姓名不会共享到目标库。',moveReaders:'移动后，仅目标库成员可访问这些内容。已发布到电视的内容需单独管理。',readersCount:'位目标库成员',originalReadersCount:'位可下载原文件',moveSuccess:'回忆已移动，当前相册库已刷新。',moveLimit:'最多选择 50 段回忆。',moveNone:'请至少选择一段回忆。',moveUnavailable:'此相册库暂时不能移动回忆。',moveFailed:'移动未完成，请刷新后重试。',assetsCount:'段回忆',storiesCount:'个故事',albumsCount:'个相册关联',facesCount:'张已保存人脸'});
+  Object.assign(words.en,{moveMemories:'Move memories',moveMemoriesHelp:'Move up to 50 photos or videos to another family library. Stories move with them.',moveSelected:'Move selected',clearSelection:'Clear selection',moveThisMemory:'Move this memory',reviewMove:'Review move',confirmMove:'Confirm move',chooseDestination:'Choose a destination',sourceLibrary:'From',destinationLibrary:'To',moveSummary:'Move summary',moveStories:'Stories move with these memories.',moveAlbums:'Album links stay hidden in the source library.',moveFaces:'People names from the source library are not shared with the destination.',moveReaders:'Only members of the destination library can access the moved items. Existing TV publications are managed separately.',readersCount:'destination members',originalReadersCount:'with original downloads',moveSuccess:'Memories moved. This library has been refreshed.',moveRefreshFailed:'The move was completed. Refresh to see the latest library.',moveUncertain:'Move not confirmed. Retry this confirmation to check its result.',moveLimit:'Choose up to 50 memories.',moveNone:'Choose at least one memory.',moveUnavailable:'Moving is not available for this library.',moveFailed:'The move could not be completed. Refresh and try again.',assetsCount:'memories',storiesCount:'stories',albumsCount:'album links',facesCount:'saved faces'});
+  Object.assign(words.zh,{moveMemories:'移动回忆',moveMemoriesHelp:'最多将 50 张照片或视频移动到另一个家庭相册库，故事也会一起移动。',moveSelected:'移动所选内容',clearSelection:'清除选择',moveThisMemory:'移动这段回忆',reviewMove:'确认移动',confirmMove:'确认移动',chooseDestination:'选择目标相册库',sourceLibrary:'来源',destinationLibrary:'目标',moveSummary:'移动内容',moveStories:'这些回忆里的故事会一起移动。',moveAlbums:'来源相册库中的相册关联会保留为隐藏状态。',moveFaces:'来源库中的人物姓名不会共享到目标库。',moveReaders:'移动后，仅目标库成员可访问这些内容。已发布到电视的内容需单独管理。',readersCount:'位目标库成员',originalReadersCount:'位可下载原文件',moveSuccess:'回忆已移动，当前相册库已刷新。',moveRefreshFailed:'移动已完成，请刷新以查看最新相册库。',moveUncertain:'尚未确认移动结果。请重试此次确认以核对结果。',moveLimit:'最多选择 50 段回忆。',moveNone:'请至少选择一段回忆。',moveUnavailable:'此相册库暂时不能移动回忆。',moveFailed:'移动未完成，请刷新后重试。',assetsCount:'段回忆',storiesCount:'个故事',albumsCount:'个相册关联',facesCount:'张已保存人脸'});
   Object.assign(words.en,{closeSelection:'Close selection'});
   Object.assign(words.zh,{closeSelection:'关闭选择面板'});
   Object.assign(words.en,{assignFaces:'Review face assignments · Owner',assignHelp:'Choose an existing person for one face. No automatic propagation or new person is created.',unassigned:'Unassigned',choosePerson:'Choose a person',confirmAssignment:'Confirm assignment',assignmentReview:'Assign this face to',assignmentSaved:'Assignment saved. Other faces were not changed.',assignmentConflict:'The face or person changed, or face processing is active. Refresh and review before trying again.',assignmentFailed:'Save not confirmed. Refresh and review this face before trying again.',assignmentUnavailable:'This assignment needs a separate ownership review.',noFaces:'No detected faces on this asset.',selectPerson:'Select this person'});
@@ -90,7 +90,10 @@
     }
   }
   let statusKey = '';
-  function status(key) { statusKey = key; $('status').textContent = key ? t(key) : ''; }
+  function status(key) {
+    statusKey = key;
+    for (const id of ['status','auth-feedback']) $(id).textContent = key ? t(key) : '';
+  }
   function translate() {
     document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
     document.querySelectorAll('[data-i18n]').forEach(node => {node.textContent=t(node.dataset.i18n);});
@@ -541,6 +544,12 @@
     finally{storyState.busy=false;}
   }
   function catalogueItem(id){return state.catalogue?.items?.find(item=>String(item.id)===String(id));}
+  function availableLibraries(profile){
+    // Stable ID, not translated title or alphabetical response order. This only
+    // prioritizes memberships the server has already marked accessible.
+    return profile.memberships.filter(m=>m.available===true)
+      .sort((a,b)=>Number(b.library_id==='family')-Number(a.library_id==='family'));
+  }
   function libraryTitle(id){const item=catalogueItem(id);return state.language==='zh'&&item?.title_zh?item.title_zh:(item?.title||String(id));}
   function transferCanManage(){return Boolean(catalogueItem(state.library)?.can_manage);}
   function updateTransferUI(){
@@ -566,7 +575,7 @@
       const result=await request('/library-catalogue',{epoch});if(stale(epoch))return null;
       state.catalogue=result;
       $('library-select').replaceChildren();
-      for(const member of state.profile.memberships.filter(m=>m.available===true)){
+      for(const member of availableLibraries(state.profile)){
         const option=document.createElement('option');option.value=member.library_id;option.textContent=libraryTitle(member.library_id);$('library-select').append(option);
       }
       $('library-select').value=state.library||'';updateTransferUI();return result;
@@ -605,7 +614,7 @@
         const notes=document.createElement('div');notes.className='transfer-notes';
         for(const key of ['moveStories','moveAlbums','moveFaces','moveReaders']){const p=document.createElement('p');p.textContent=t(key);notes.append(p);}
         $('transfer-review-summary').append(facts,audience,notes);$('transfer-review-status').textContent='';$('transfer-review-confirm').disabled=false;
-      }catch(error){if(current()){$('transfer-review-status').textContent=t(error.status===401||error.status===403?'moveUnavailable':'moveFailed');}}
+      }catch(error){if(current()){$('transfer-review-status').textContent=t(error.status===401||error.status===403?'moveUnavailable':error.status===409?'conflict':(!error.status||error.status>=500)?'moveUncertain':'moveFailed')+(Number.isInteger(error.status)?` (HTTP ${error.status})`:'');}}
     }
     choice.addEventListener('change',()=>void reviewDestination());
     await reviewDestination();
@@ -619,10 +628,19 @@
       await request(`/admin/library-transfers/confirm?library=${encodeURIComponent(source)}`,{method:'POST',body:{plan:review.plan},epoch});
       if(stale(epoch)||source!==state.library)return;
       transferState.selected.clear();transferState.review=null;$('transfer-review').close();closeViewer();state.page=1;
-      discoveryState.binding=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.selectedPlaces.clear();discoveryState.selectedPlaceLabels.clear();discoveryState.searchLoad++;discoveryState.facetLoad++;$('discovery-list').replaceChildren();$('discovery-pages').hidden=true;await loadLibraryCatalogue(epoch);await loadGallery();$('transfer-status').textContent=t('moveSuccess');
+      // The confirm response is the commit boundary. A later catalogue/gallery refresh may
+      // fail because the session or a concurrent navigation changed, but must not turn a
+      // completed move into a failure message.
+      $('transfer-status').textContent=t('moveSuccess');
+      discoveryState.binding=null;discoveryState.applied=false;discoveryState.appliedFilters=null;discoveryState.selectedPlaces.clear();discoveryState.selectedPlaceLabels.clear();discoveryState.searchLoad++;discoveryState.facetLoad++;$('discovery-list').replaceChildren();$('discovery-pages').hidden=true;
+      let refreshed=true;
+      try{await loadLibraryCatalogue(epoch);if(state.library===source&&!state.locked)refreshed=await loadGallery()!==false;}catch(error){refreshed=false;}
+      // loadGallery intentionally invalidates the request generation and clearPhotos clears
+      // transient transfer text, so write the final post-commit status after the refresh.
+      if(state.library===source&&!state.locked)$('transfer-status').textContent=t(refreshed?'moveSuccess':'moveRefreshFailed');
     }catch(error){
       if(!stale(epoch)){
-        $('transfer-review-status').textContent=t(error.status===409?'conflict':'moveFailed');
+        $('transfer-review-status').textContent=t(error.status===409?'conflict':error.status===401||error.status===403?'moveUnavailable':(!error.status||error.status>=500)?'moveUncertain':'moveFailed')+(Number.isInteger(error.status)?` (HTTP ${error.status})`:'');
         if(error.status===409||error.status===401||error.status===403)transferState.review=null;
         else $('transfer-review-confirm').disabled=false;
       }
@@ -671,14 +689,15 @@
     try {
       const profile=await request('/auth/session',{epoch});
       if(stale(epoch))return;
+      if(state.profile?.account_id!==profile.account_id)state.library=null;
       if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';directoryState.page=1;directoryState.query='';$('directory-query').value='';tagState.page=1;tagState.query='';tagState.tag=null;tagState.open=null;$('tag-query').value='';$('tag-assets').replaceChildren();uploadState.page=1;}
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
-      const available=profile.memberships.filter(m=>m.available===true);
+      const available=availableLibraries(profile);
       if(!available.some(m=>m.library_id===state.library)){state.library=available[0]?.library_id||null;state.page=1;state.memberPage=1;}
       $('library-select').replaceChildren();for(const member of available){const option=document.createElement('option');option.value=member.library_id;option.textContent=member.library_id;$('library-select').append(option);}
       await loadLibraryCatalogue(epoch);
-      if(state.catalogue?.items?.length&&!state.catalogue.items.some(item=>String(item.id)===String(state.library))){state.library=state.catalogue.items[0].id;state.page=1;}
+      if(state.catalogue?.items?.length&&!state.catalogue.items.some(item=>String(item.id)===String(state.library))){state.library=available.find(member=>state.catalogue.items.some(item=>String(item.id)===member.library_id))?.library_id||null;state.page=1;}
       $('library-select').value=state.library||'';
       const isOwner=available.some(m=>m.library_id===state.library&&m.role==='owner');
       $('owner-panel').hidden=!isOwner;$('uploads-panel').hidden=!isOwner;$('uploads-open').hidden=!isOwner;
@@ -699,7 +718,7 @@
     $('register-tab').setAttribute('aria-pressed',String(mode==='register'));
     $('registration-fields').hidden=mode!=='register';$('code').required=mode==='register';$('name').required=mode==='register';
     $('password').autocomplete=mode==='register'?'new-password':'current-password';
-    $('password').minLength=mode==='register'?8:1;$('password').value='';$('code').value='';translate();
+    $('password').minLength=mode==='register'?8:1;$('password').value='';$('code').value='';status('');translate();
   }
   // UI convenience only: transport and stored identities remain explicit E.164.
   function phoneForRequest(value) {
@@ -710,8 +729,11 @@
   }
   Object.assign(words.en, {phoneHelp:'China (+86) is the default. For another country, enter + and its country code.',invalidPhone:'Enter an 11-digit number, or a full international number starting with +.'});
   Object.assign(words.zh, {phoneHelp:'默认中国区号 +86，无需输入。其他国家请填写以 + 和国家区号开头的完整号码。',invalidPhone:'请输入 11 位号码，或以 + 和国家区号开头的完整号码。'});
+  Object.assign(words.en, {invalidCode:'Enter the invitation code sent by your library owner.',enterPassword:'Enter your password.'});
+  Object.assign(words.zh, {invalidCode:'请输入相册主人发给你的邀请码。',enterPassword:'请输入密码。'});
   async function signIn(event) {
     event.preventDefault();if(state.busy)return;
+    status('');
     const phone=phoneForRequest($('phone').value),password=$('password').value;
     if(!phone) {status('invalidPhone');return;}
     if(state.mode==='register'&&(Array.from(password).length<8||Array.from(password).length>128)){status('invalidPassword');return;}
@@ -1106,9 +1128,20 @@
           row.append(personPicker({face,image,current,epoch,onSaved:loadAssetFaces,status:$('face-status'),container:$('face-list')}));
         }));
         if(face.can_assign){
-          async function changeFace(action,body){if(!current()||state.busy)return;state.busy=true;try{await request(libraryPath(`/admin/faces/${face.id}/${action}`),{method:'POST',body:{revision:face.revision,...body},epoch});if(current()){await loadAssetFaces();if(!stale(epoch))$('face-status').textContent=t('assignmentSaved');}}catch(error){if(current()){$('face-status').textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');if(error.status===401||error.status===403)await failure(error,epoch);}}finally{state.busy=false;}}
-          row.append(storyButton('newPerson',()=>{if(!current()||state.busy)return;row.querySelector('.new-person-form')?.remove();const form=document.createElement('form');form.className='new-person-form';const label=document.createElement('label');label.htmlFor=`new-person-${face.id}`;label.textContent=t('personName');const input=document.createElement('input');input.id=label.htmlFor;input.required=true;input.maxLength=128;const help=document.createElement('p');help.textContent=t('newPersonHelp');const save=document.createElement('button');save.type='submit';save.textContent=t('createAssign');form.append(label,input,help,save);form.addEventListener('submit',event=>{event.preventDefault();if(input.value.trim()&&window.confirm(`${t('createAssign')}: ${input.value.trim()}?`))void changeFace('new-person',{display_name:input.value.trim()});});row.append(form);input.focus();}));
-          if(face.person_id)row.append(storyButton('unassignFace',()=>{if(window.confirm(t('confirmUnassign')))void changeFace('unassign',{});}));
+          const actionStatus=document.createElement('p');actionStatus.className='face-action-status';actionStatus.setAttribute('role','status');actionStatus.setAttribute('aria-live','polite');
+          async function changeFace(action,body,button){
+            if(!current()||state.busy)return;
+            const actionEpoch=epoch;state.busy=true;state.faceActionEpoch=actionEpoch;if(button)button.disabled=true;actionStatus.textContent=t('working');
+            try{
+              await request(libraryPath(`/admin/faces/${face.id}/${action}`),{method:'POST',body:{revision:face.revision,...body},epoch});
+              if(current()){await loadAssetFaces();if(!stale(actionEpoch)){$('face-status').textContent=t('assignmentSaved');actionStatus.textContent=t('assignmentSaved');}}
+            }catch(error){
+              if(current()){actionStatus.textContent=t(error.status===409?'assignmentConflict':'assignmentFailed');$('face-status').textContent=actionStatus.textContent;if(error.status===401||error.status===403)await failure(error,epoch);}
+            }finally{if(state.faceActionEpoch===actionEpoch){state.faceActionEpoch=null;state.busy=false;if(button&&button.isConnected)button.disabled=false;}}
+          }
+          row.append(storyButton('newPerson',()=>{if(!current()||state.busy)return;row.querySelector('.new-person-form')?.remove();const form=document.createElement('form');form.className='new-person-form';const label=document.createElement('label');label.htmlFor=`new-person-${face.id}`;label.textContent=t('personName');const input=document.createElement('input');input.id=label.htmlFor;input.required=true;input.maxLength=128;const help=document.createElement('p');help.textContent=t('newPersonHelp');const save=document.createElement('button');save.type='submit';save.textContent=t('createAssign');form.append(label,input,help,save);form.addEventListener('submit',event=>{event.preventDefault();if(input.value.trim()&&window.confirm(`${t('createAssign')}: ${input.value.trim()}?`))void changeFace('new-person',{display_name:input.value.trim()},save);});row.append(form);input.focus();}));
+          if(face.person_id){const unassign=storyButton('unassignFace',()=>{if(window.confirm(t('confirmUnassign')))void changeFace('unassign',{},unassign);});row.append(unassign);}
+          row.append(actionStatus);
         }
         $('face-list').append(row);
       }
@@ -1576,6 +1609,12 @@
   $('auth-form').addEventListener('submit',event=>{void signIn(event);});
   $('login-tab').addEventListener('click',()=>setMode('login'));
   $('register-tab').addEventListener('click',()=>setMode('register'));
+  // Native validation can block submit entirely; mirror its first error near the button.
+  $('auth-form').addEventListener('invalid',event=>{
+    if(event.target!==$('auth-form').querySelector(':invalid'))return;
+    const key={phone:'invalidPhone',password:state.mode==='register'?'invalidPassword':'enterPassword',name:'invalidName',code:'invalidCode'}[event.target.id];
+    if(key)status(key);
+  },true);
   $('logout').addEventListener('click',()=>{void signOut();});
   $('refresh').addEventListener('click',()=>{if(!state.locked&&abandonStory()){state.page=1;void restore();}});
   $('library-select').addEventListener('change',()=>{if(state.locked||!abandonStory()){$('library-select').value=state.library||'';return;}storyState.search=null;storyState.suspended=null;$('search-text').value='';peopleState.page=1;peopleState.query='';$('people-query').value='';state.library=$('library-select').value;state.page=1;state.memberPage=1;uploadState.page=1;void restore();});

@@ -116,6 +116,20 @@ try:
                             db.execute("INSERT INTO access_asset_libraries VALUES (?,'family-a')",(asset_id,))
                             shutil.copyfile(originals/'101.jpg',originals/f'{asset_id}.jpg')
                             shutil.copyfile(derived/'thumbnails/256/101.jpg',derived/f'thumbnails/256/{asset_id}.jpg')
+            elif scenario=='family-default':
+                with fixture.connection() as db:
+                    actor=db.execute("SELECT bootstrap_operator FROM access_libraries WHERE id='family-a'").fetchone()[0]
+                    db.execute("INSERT INTO access_libraries(id,bootstrap_operator) VALUES ('family',?)",(actor,))
+                    db.execute("INSERT INTO access_memberships(account_id,library_id,status,role,revision,approved_by) VALUES (?,'family','approved','owner',1,?)",(actor,actor))
+                    db.execute("INSERT INTO assets(id,path,hash_sha256,status,mime,width,height) VALUES (9601,?,'synthetic-family-default','active','image/jpeg',400,300)",(str(originals/'9601.jpg'),))
+                    db.execute("INSERT INTO access_asset_libraries VALUES (9601,'family')")
+                    db.commit()
+                shutil.copyfile(originals/'101.jpg',originals/'9601.jpg')
+                shutil.copyfile(derived/'thumbnails/256/101.jpg',derived/'thumbnails/256/9601.jpg')
+            elif scenario=='family-default-unavailable':
+                fixture.mutate("UPDATE access_libraries SET state='closed' WHERE id='family'")
+            elif scenario=='family-default-no-access':
+                fixture.mutate("UPDATE access_memberships SET status='revoked',revision=revision+1 WHERE account_id=(SELECT bootstrap_operator FROM access_libraries WHERE id='family-a')")
             elif scenario=='person-name-html':
                 fixture.mutate("UPDATE persons SET display_name=?,updated_at='changed-by-test' WHERE id=1",('<img src=x onerror="window.syntheticXSS=true">',))
             elif scenario=='face-assignment-changed':

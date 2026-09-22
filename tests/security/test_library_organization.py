@@ -9,6 +9,7 @@ import sys
 import uuid
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import test_promotion as _promotion_fixture
 
@@ -66,6 +67,16 @@ class LibraryOrganizationTests(unittest.TestCase):
         body = {'asset_ids': ','.join(str(value) for value in asset_ids), 'destination': destination}
         return self.client.post('/admin/library-transfers/review?library=' + library,
                                 headers=self.headers(token), json=body)
+
+    def test_failed_move_diagnostics_do_not_log_request_or_exception_contents(self):
+        from app.access.library_organization import _call, LibraryOrganization
+        with patch.object(LibraryOrganization, 'confirm', side_effect=RuntimeError('private-token-and-path')):
+            with self.assertLogs('app.access.library_organization', level='WARNING') as logs:
+                with self.assertRaises(RuntimeError):
+                    _call(None, 'confirm', 'private-token', 'private-library', 'private-plan')
+        output=' '.join(logs.output)
+        self.assertIn('action=confirm kind=RuntimeError', output)
+        self.assertNotIn('private', output)
 
     def test_create_presets_is_explicit_transaction_operator_only_and_idempotent(self):
         self.mutate("UPDATE access_libraries SET bootstrap_operator=? WHERE id='family-b'", (self.owner_id,))
