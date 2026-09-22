@@ -9,15 +9,16 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from .transport import (AccessRoute, TransportError, _runtime, _single,
+from .transport import (TransportError, _runtime, _single,
                         credentials_from_request)
 from .upload import MAX_UPLOAD_BYTES, UploadRuntime
+from .library import LibraryRoute, _integer
 
-router = APIRouter(route_class=AccessRoute)
+router = APIRouter(route_class=LibraryRoute)
 
 
-def runtime(request):
-    access = _runtime(request)
+def runtime(request, *, allow_query=False):
+    access = _runtime(request, allow_query=allow_query)
     result = getattr(request.app.state, 'upload_runtime', None)
     if not isinstance(result, UploadRuntime) or result.access is not access:
         raise TransportError(503, 'Access unavailable')
@@ -66,3 +67,14 @@ async def create_upload(request: Request):
     data = await payload(request)
     result = await run_in_threadpool(upload.store, token, data, filename, batch)
     return JSONResponse(result, status_code=201)
+
+
+@router.get('/uploads')
+async def own_uploads(request: Request):
+    upload = runtime(request, allow_query=True)
+    token, _mode = credentials_from_request(request, allow_query=True)
+    pairs = list(request.query_params.multi_items())
+    if len(pairs) != len(dict(pairs)) or set(dict(pairs)) - {'page'}:
+        raise TransportError(400, 'Invalid request')
+    page = _integer(dict(pairs).get('page', '1'), 100000)
+    return JSONResponse(await run_in_threadpool(upload.history, token, page=page))

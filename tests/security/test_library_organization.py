@@ -88,12 +88,14 @@ class LibraryOrganizationTests(unittest.TestCase):
                 first = type(self).create_presets(access, self.owner_id)
             with access._transaction(write=True):
                 second = type(self).create_presets(access, self.owner_id)
-            self.assertEqual(len(first['created']), 5)
+            self.assertEqual(len(first['created']), 7)
+            self.assertIn({'id':'home-renovation','title':'Home Renovation','title_zh':'装修'},first['items'])
+            self.assertIn({'id':'expense-receipts','title':'Expense Receipts','title_zh':'报销单'},first['items'])
             self.assertEqual(second['created'], [])
             self.assertEqual(first['items'], second['items'])
             self.assertEqual(first['items'][0]['title'], 'Yanbo’s Work')
             self.assertEqual(db.execute(
-                'SELECT count(*) FROM access_memberships WHERE account_id=?', (self.owner_id,)).fetchone()[0], 7)
+                'SELECT count(*) FROM access_memberships WHERE account_id=?', (self.owner_id,)).fetchone()[0], 9)
             with self.assertRaises(AccessDenied):
                 with access._transaction(write=True):
                     type(self).create_presets(access, self.member_id)

@@ -216,3 +216,52 @@ class UploadRuntime:
             # Only this request's unique staging name is removed. A final file left
             # after DB failure remains reviewable, and canonical files are never deleted.
             temporary.unlink()
+
+    def history(self, token, *, page=1):
+        """Own receipts only, with current library access checked in one snapshot.
+
+        This read never stats incoming files, prepares media or retries jobs. Receipt
+        acceptance and library visibility are separate facts; no processing state is
+        inferred from a missing thumbnail or caption.
+        """
+        from .service import AccessService, AccessDenied
+        from .transport import TransportError
+
+        if type(page) is not int or not 1 <= page <= 100000:
+            raise ValueError('Invalid page')
+        with self.access.connection_factory() as connection:
+            service = AccessService(connection, clock=self.access.clock)
+            with service._transaction():
+                account = service._session(token)['account_id']
+                if not service._may_submit(account):
+                    raise AccessDenied('Access denied')
+                total = connection.execute('SELECT count(*) FROM access_uploads WHERE account_id=?',
+                                           (account,)).fetchone()[0]
+                if not 0 <= total <= 2147483647:
+                    raise TransportError(503, 'Upload history unavailable')
+                rows = connection.execute('''SELECT u.asset_id,u.created_at,u.bytes,u.state,
+                    a.status,a.mime,scope.library_id FROM access_uploads u
+                    JOIN assets a ON a.id=u.asset_id
+                    LEFT JOIN access_asset_libraries scope ON scope.asset_id=a.id
+                    WHERE u.account_id=? ORDER BY u.id DESC LIMIT 10 OFFSET ?''',
+                    (account, (page-1)*10)).fetchall()
+                items = []
+                for asset, created, size, receipt, status, mime, mapped in rows:
+                    if (type(asset) is not int or not 1 <= asset <= 2**63-1
+                            or type(created) is not int or not 0 <= created <= 253402300799
+                            or type(size) is not int or not 1 <= size <= MAX_UPLOAD_BYTES
+                            or mime not in {'image/jpeg', 'image/png'}):
+                        raise TransportError(503, 'Upload history unavailable')
+                    state, library = 'unavailable', None
+                    if status in (None, 'active'):
+                        if receipt == 'incoming' and mapped is None:
+                            state = 'awaiting_review'
+                        elif receipt == 'assigned' and mapped is not None:
+                            try:
+                                service._require(token, mapped, 'library.read')
+                                state, library = 'available', mapped
+                            except AccessDenied:
+                                pass
+                    items.append(dict(asset_id=str(asset), created_at=created, bytes=size,
+                                      kind='image', state=state, library_id=library))
+                return dict(page=page, page_size=10, total=total, items=items)

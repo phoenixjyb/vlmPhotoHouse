@@ -33,7 +33,8 @@
   "upload.submit": "Verified principal holding at least one approved, unexpired membership in an active library. Account-scoped, not library-scoped: the upload selects no library, and the photo is invisible to every member until an operator promotes and assigns it.",
   "caption.write": "Any approved membership in the selected library. Deliberately not contributor-or-owner: an invitation creates a viewer and no route changes a role, so a contributor-gated write could never be reached. Matches the upload decision. Only where the asset has no current caption, so this cannot take a description away.",
   "upload.review": "Explicit enabled runtime AND current operator and approved owner of selected active library. Pending upload must belong to a current approved member of this library. Sealed single-photo approval moves bytes and maps the asset atomically; no TV publication or job control.",
-  "library.transfer": "Active system operator and approved owner of both source and destination. Sealed bounded review of assets, audiences, stories and albums; atomic mapping and story move, replay validation; no media bytes, person ownership or Home publication changes."
+  "library.transfer": "Active system operator and approved owner of both source and destination. Sealed bounded review of assets, audiences, stories and albums; atomic mapping and story move, replay validation; no media bytes, person ownership or Home publication changes.",
+  "upload.history.read": "Active account with at least one approved unexpired membership. Own receipts only; current destination read access required to disclose a library or open a photo."
  },
  "topology": [
   {
@@ -54,6 +55,10 @@
   },
   {
    "source": "backend/app/access/library.py",
+   "expression": "router = APIRouter(route_class=LibraryRoute)"
+  },
+  {
+   "source": "backend/app/access/library_organization.py",
    "expression": "router = APIRouter(route_class=LibraryRoute)"
   },
   {
@@ -86,7 +91,7 @@
   },
   {
    "source": "backend/app/access/upload_transport.py",
-   "expression": "router = APIRouter(route_class=AccessRoute)"
+   "expression": "router = APIRouter(route_class=LibraryRoute)"
   },
   {
    "source": "backend/app/home_calendar.py",
@@ -235,6 +240,10 @@
   {
    "source": "backend/app/main.py",
    "expression": "app.include_router(member_router)"
+  },
+  {
+   "source": "backend/app/main.py",
+   "expression": "app.include_router(organization_router)"
   },
   {
    "source": "backend/app/main.py",
@@ -3397,6 +3406,20 @@
    "scope": "Current session and explicitly approved memberships only.",
    "current_control": "Bounded library catalogue and owner/operator-only cross-library move. Cookie CSRF or explicit bearer. Stories follow the asset; source album selections remain hidden. New libraries are provisioned explicitly with owner-only audience.",
    "gap": "Live activation and signed-in family/device acceptance recorded separately. No automatic Home publication update."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/uploads",
+   "handler": "own_uploads",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.history.read"
+   ],
+   "scope": "Current account receipts, never another account or an inaccessible destination.",
+   "current_control": "Opt-in upload runtime, same-origin cookie or bearer policy, strict page-only query, ten rows per page, one read transaction, active membership and per-destination read authorization, no-store, no filesystem or job side effects.",
+   "gap": "Manual refresh; no resumable uploads, inferred processing states or TV publication. Deployment and device acceptance are separate."
   }
  ]
 }

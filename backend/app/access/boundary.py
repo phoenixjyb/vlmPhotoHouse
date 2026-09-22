@@ -55,7 +55,7 @@ class ClosedBoundary:
         if method == 'POST' and path in ('/admin/library-transfers/review', '/admin/library-transfers/confirm'): return True
         if method == 'GET' and (path == '/admin/uploads' or re.fullmatch(r'/admin/uploads/[0-9]+/preview', path)): return True
         if method == 'POST' and re.fullmatch(r'/admin/uploads/[0-9]+/(review|approve)', path): return True
-        if method == 'POST' and path == '/uploads':
+        if method in {'GET', 'POST'} and path == '/uploads':
             # No library in the path: the upload is a pre-library action, so there is nothing
             # library-scoped for this pattern to bind. The capability is checked in the service.
             return True

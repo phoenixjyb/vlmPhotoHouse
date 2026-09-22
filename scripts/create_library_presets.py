@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit creation of the five bilingual libraries for an existing operator.
+"""Explicit creation of the bilingual library presets for an existing operator.
 
 Default is read-only preview. --apply creates empty libraries owned only by the
 named active operator; no account, original download grant or asset is created.
