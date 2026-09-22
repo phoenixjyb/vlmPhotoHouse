@@ -544,6 +544,12 @@
     finally{storyState.busy=false;}
   }
   function catalogueItem(id){return state.catalogue?.items?.find(item=>String(item.id)===String(id));}
+  function availableLibraries(profile){
+    // Stable ID, not translated title or alphabetical response order. This only
+    // prioritizes memberships the server has already marked accessible.
+    return profile.memberships.filter(m=>m.available===true)
+      .sort((a,b)=>Number(b.library_id==='family')-Number(a.library_id==='family'));
+  }
   function libraryTitle(id){const item=catalogueItem(id);return state.language==='zh'&&item?.title_zh?item.title_zh:(item?.title||String(id));}
   function transferCanManage(){return Boolean(catalogueItem(state.library)?.can_manage);}
   function updateTransferUI(){
@@ -569,7 +575,7 @@
       const result=await request('/library-catalogue',{epoch});if(stale(epoch))return null;
       state.catalogue=result;
       $('library-select').replaceChildren();
-      for(const member of state.profile.memberships.filter(m=>m.available===true)){
+      for(const member of availableLibraries(state.profile)){
         const option=document.createElement('option');option.value=member.library_id;option.textContent=libraryTitle(member.library_id);$('library-select').append(option);
       }
       $('library-select').value=state.library||'';updateTransferUI();return result;
@@ -683,14 +689,15 @@
     try {
       const profile=await request('/auth/session',{epoch});
       if(stale(epoch))return;
+      if(state.profile?.account_id!==profile.account_id)state.library=null;
       if(state.profile?.account_id!==profile.account_id){peopleState.page=1;peopleState.query='';$('people-query').value='';directoryState.page=1;directoryState.query='';$('directory-query').value='';tagState.page=1;tagState.query='';tagState.tag=null;tagState.open=null;$('tag-query').value='';$('tag-assets').replaceChildren();uploadState.page=1;}
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
-      const available=profile.memberships.filter(m=>m.available===true);
+      const available=availableLibraries(profile);
       if(!available.some(m=>m.library_id===state.library)){state.library=available[0]?.library_id||null;state.page=1;state.memberPage=1;}
       $('library-select').replaceChildren();for(const member of available){const option=document.createElement('option');option.value=member.library_id;option.textContent=member.library_id;$('library-select').append(option);}
       await loadLibraryCatalogue(epoch);
-      if(state.catalogue?.items?.length&&!state.catalogue.items.some(item=>String(item.id)===String(state.library))){state.library=state.catalogue.items[0].id;state.page=1;}
+      if(state.catalogue?.items?.length&&!state.catalogue.items.some(item=>String(item.id)===String(state.library))){state.library=available.find(member=>state.catalogue.items.some(item=>String(item.id)===member.library_id))?.library_id||null;state.page=1;}
       $('library-select').value=state.library||'';
       const isOwner=available.some(m=>m.library_id===state.library&&m.role==='owner');
       $('owner-panel').hidden=!isOwner;$('uploads-panel').hidden=!isOwner;$('uploads-open').hidden=!isOwner;
