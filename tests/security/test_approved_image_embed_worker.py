@@ -254,6 +254,6 @@ class ApprovedImageEmbedWorkerTests(unittest.TestCase):
              patch.object(worker.subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0, create=True):
             worker.run_supervised(['synthetic-child'], env={}, derived=self.derived,
                                   deadline=float('inf'))
-        module.WindowsJob.assert_called_once_with(worker.MAX_CHILD_RSS // 1024**2)
+        module.WindowsJob.assert_called_once_with(4096)
         job.close.assert_called_once()
         self.assertEqual(popen.call_args.kwargs['creationflags'], 0)
