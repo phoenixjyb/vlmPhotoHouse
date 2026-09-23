@@ -169,3 +169,17 @@ CUDA mapping. Three approved face tasks remained pending at the GPU activation
 read. Confident named-person assignment additionally needs a reviewed,
 same-library reference cohort and threshold calibration; uncertain faces will
 be left for manual review. Historical failed/dead records were not retried.
+
+The next face-lane candidate must parse exact task payloads without letting
+malformed legacy JSON stop polling; claim only an approved, uniquely assigned
+asset; and pin the detector pack and LVFace model by local checksum. The parent
+must supervise one inference child under a Windows Job Object and deadline.
+That child may decode and infer into private staging but must not open the
+production database. For the physical RTX 3090 selected as `cuda:1`, the child
+must see logical CUDA device zero and pass the provider's effective-device
+check. After inference, the parent must recheck source, approval, cancellation,
+and task ownership in a short transaction before publishing crops or vectors
+and follow-up tasks. It also needs a single-owner crash-recovery rule for
+`running` tasks and orphaned files. Native synthetic detection-to-embedding,
+timeout, memory-cap, and rollback tests are required before activation. The
+older mixed executor must remain off so it cannot race this lane.
