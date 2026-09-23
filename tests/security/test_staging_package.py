@@ -47,6 +47,11 @@ class StagingPackageTests(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(archive.read(name)).hexdigest(),manifest['files'][name])
             self.assertIn('backend/app/ui/photohouse-icon.png',archive.namelist())
             self.assertEqual(manifest['migration_revision'], 'a8d4c2e6f901')
+            for name in ('backend/app/tasks.py', 'backend/app/gps_utils.py',
+                         'backend/app/ingest.py', 'scripts/run_caption_worker.py',
+                         'scripts/run_face_worker.py',
+                         'docs/security/RESUMABLE_MEDIA_UPLOAD_V36.md'):
+                self.assertIn(name, archive.namelist())
             for name in ('backend/app/access/stories.py', 'backend/app/access/story_schema.py',
                          'backend/migrations/versions/c7f4a9e2b610_family_stories.py'):
                 self.assertIn(name, archive.namelist())
