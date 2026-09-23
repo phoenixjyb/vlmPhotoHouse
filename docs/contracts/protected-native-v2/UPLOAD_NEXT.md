@@ -1,3 +1,25 @@
+# Candidate.25: resumable photo and video contribution
+
+The proposal below is retained as historical planning context. Candidate.25
+implements the resumable core with the exact wire shape in CONTRACT.md and
+14 frozen synthetic cases. The phone accepts multi-file and SAF-folder JPEG,
+PNG, MP4 and MOV selection; it reviews count, bytes and skipped files before
+sending, warns on metered networks, and has a private persistent queue with
+explicit resume, pause, retry and confirmed cancellation. The app hashes and
+transfers files in bounded streams. The server writes at most 4 MiB chunks to a
+persisted account-bound ledger; the old 25 MiB one-shot photo route stays for
+older clients. The backend migration head is `a8d4c2e6f901`.
+
+Arrival means a private incoming receipt, not library admission. A current
+owner/operator must approve and assign the asset. Video probe/keyframe/caption
+work is queued after intake, while prepared H.264 playback and TV publication
+remain separate operational pipelines. Offline reviewed backup and migration,
+Windows package installation, worker qualification, HTTPS endpoint rollout and
+a real-phone journey are still delivery gates; none is implied by the source
+or emulator checks. Abandoned partial transfers need a reviewed cleanup policy.
+
+## Historical proposal through candidate.24
+
 # Next proposed slice: authenticated resumable contribution core
 
 Proposal only for the **resumable** core. It is no longer true that no upload route exists: a

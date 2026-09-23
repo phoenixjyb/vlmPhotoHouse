@@ -1,13 +1,52 @@
-# Protected native profile 2.0.0-candidate.24
+# Protected native profile 2.0.0-candidate.25
 
-Backend source: `a33eb936a87660271cc4fe2663ffa1f9a36bfa31`.
-Database migration head: `f2a6d8b4c915`. This is a backend-owned candidate
+Backend source: `eaf46ecb38c6a1c0622603c1c1949488472dd812`.
+Database migration head: `a8d4c2e6f901`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
 The later merged backend `a42147c63cf6a9628899735aa64b18cff1ec619d` also predates
 this source. The manifest pins source bytes and all pack payloads independently
 of later documentation/test commits. Hashes detect drift; they are not signatures.
 
+
+## Reissue — 2.0.0-candidate.25 (September 23)
+
+Adds account-bound resumable JPEG/PNG and MP4/MOV contribution via
+`POST /upload-sessions`, `GET/PUT/DELETE /upload-sessions/{upload_id}` and
+`POST /upload-sessions/{upload_id}/complete`. Every transfer is an idempotent,
+persisted private intake; it grants no library or TV access. Create sends exactly
+`request_id` and `batch` (32 lowercase hexadecimal characters), `filename`
+(basename, 1..200 characters), `bytes` (positive integer), `sha256` (64 lowercase
+hexadecimal characters), and `kind` (`image` or `video`). Images have a 256 MiB
+per-file cap and videos a 16 GiB cap. The phone limits each reviewed batch to
+100 accepted files and 64 GiB.
+
+The session response contains exactly `upload_id` (32 lowercase hex), `bytes`,
+`offset`, `chunk_bytes` (4194304), `state` (`uploading`, `complete`, `cancelled`),
+and `asset_id` (null until complete, then a positive decimal string). Creation
+returns 201; status, append, completion and cancellation return 200. A `PUT`
+sends `Content-Type: application/octet-stream`, decimal `Upload-Offset`,
+`X-Chunk-SHA256` and 1..4194304 body bytes. A mismatched offset returns 409;
+clients query status and resume from the committed offset. Completion sends
+JSON `{}` and remains idempotent even after approval. 401 denies identity or
+current membership, 404 hides another account's transfer; 413 is oversize,
+415 invalid media, 422 a checksum mismatch, 429 busy and 503 unavailable.
+The capability requires a configured upload runtime and current approved
+membership. Cookie writes retain same-origin CSRF; native bearer requests
+never send credentials in URLs. Responses are no-store.
+
+Whole-file SHA is checked by streaming at completion. A bounded header/container
+check accepts the original into the private incoming area, then only `video_probe`
+is initially queued for video. A successful strict video probe schedules bounded
+keyframes, embedding and caption work. Owner/operator assignment remains a
+separate reviewed step. Video acceptance does not promise that an H.264 streaming
+copy is prepared; prepared playback is a separate pipeline. Anonymous TV
+publication is unchanged. The prior `POST /uploads` remains the 25 MiB JPEG/PNG
+compatibility path. `GET /uploads` can now report `kind=video` and a video byte
+count up to 16 GiB; candidate.24's image-only bound remains historical.
+The 14 new wire cases preserve all 98 candidate.24 exchanges byte-for-byte.
+See [UPLOAD_NEXT.md](UPLOAD_NEXT.md) for the transfer lifecycle and activation
+boundaries.
 
 ## Reissue — 2.0.0-candidate.24 (September 22)
 
@@ -667,7 +706,7 @@ authorization, deploy code or certify all routes. Important remaining gaps:
    Native clients need explicit profile selection, 8–128 creation / 1–128 login,
    128-character library IDs and dedicated bounded Stories parsing. Android's
    current feature branch is addressing these; this pack does not certify it.
-2. No refresh/password reset/account deletion/upload/STT/voice native API in this
+2. No refresh/password reset/account deletion/STT/voice native API in this
    profile. Legacy upload and voice stay closed. Owner management routes in this
    source are outside this bounded mobile adoption.
 3. Invited viewers do not receive originals or write rights. No normal client
@@ -681,4 +720,4 @@ authorization, deploy code or certify all routes. Important remaining gaps:
 Next: coordinator adopts exact pack; Android tests its fixture/parser against
 cases, builds the opt-in profile, then performs a separately authorized user-led
 configured-origin journey. Keep private endpoint/account entry outside tracked
-fixtures. See [UPLOAD_NEXT.md](UPLOAD_NEXT.md) for the proposed next backend slice.
+fixtures. See [UPLOAD_NEXT.md](UPLOAD_NEXT.md) for the implemented transfer lifecycle and remaining rollout steps.

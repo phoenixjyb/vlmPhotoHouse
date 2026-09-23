@@ -1,5 +1,18 @@
 # Validation receipt — 2026-09-22
 
+## Candidate.25 — bounded resumable photos and videos
+
+Source `eaf46ecb38c6a1c0622603c1c1949488472dd812`. The affected backend
+suite passed 233 tests in the disposable dependency-complete Mac test environment.
+An actual synthetic MP4 passed bounded `ffprobe` and one 24,871-byte keyframe
+was extracted by the bounded `ffmpeg` command. Real ASGI/Chromium review flows
+passed for photo approval and video placeholder/approval; the rendered video
+review screen was inspected. The frozen pack adds 14 transfer cases: private
+creation, duplicate request, chunk/status, duplicate-chunk conflict, completion
+retry, video history, cancellation and membership revocation. All prior 98 case
+responses remain byte-for-byte unchanged. These are source and synthetic media
+checks, not Windows service, prepared playback or physical-phone acceptance.
+
 ## Candidate.24 — private upload history and two new presets
 
 Source `a33eb936a87660271cc4fe2663ffa1f9a36bfa31`. 115 affected backend tests passed, including
