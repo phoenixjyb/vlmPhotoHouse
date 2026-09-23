@@ -27,7 +27,7 @@ FILES = tuple(sorted([
         'home_media_worker', 'home_preparation_resources', 'home_memory_envelope',
         'run_approved_cpu_worker', 'run_approved_video_worker',
         'run_approved_image_embed_worker', 'run_approved_video_embed_worker',
-        'run_approved_face_worker')),
+        'run_approved_face_worker', 'qualify_approved_workers_windows')),
     'docs/security/APPROVED_UPLOAD_PROCESSING_V37.md',
 ]))
 
