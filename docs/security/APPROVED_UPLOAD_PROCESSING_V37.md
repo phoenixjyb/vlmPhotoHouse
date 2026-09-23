@@ -216,3 +216,41 @@ claimed on the live database. Scheduled-task activation also requires exact
 package verification and a queue-ownership inspection. Automatic name matching
 remains disabled until same-library, manually labeled, active references and
 a conservative threshold are qualified separately.
+
+## September 23 face-lane activation record
+
+The tested face-worker source is commit
+`04e595a6ca2b4296811333b479b1191d94f65eb9`. Its 21-file source-only ZIP
+has SHA-256
+`164403bc9fe04c96289976c7c5b72e40ce85026d1564bcba051383409df95ff4`;
+all manifest members were hash-verified after extraction on Windows. The
+original model files stayed in their installed locations. The native
+synthetic task canary completed SCRFD detection and a 512-dimensional LVFace
+embedding in a disposable database under the four-GiB child Job Object; the
+generated drawing produced no detected face, so the embedding canary used a
+separately generated crop. No family media or production database was opened
+by that test. Thirty face queue, child, and publication tests passed under the
+Windows interpreter. Separate native checks killed a child at its deadline
+and refused an over-budget allocation under a 512-MiB test Job Object.
+
+The read-only live preflight found three approved `face` tasks, no running face
+task, and no mixed executor. A one-task live canary detected one face for
+asset 28208; the remaining two approved detection tasks also finished. Three
+`face_embed` follow-ups were created. A one-task embedding canary produced a
+checksum-verified shadow vector; the persistent task drained the other two.
+At the post-activation read, no approved `face` or `face_embed` task remained
+pending/running, three shadow vectors matched their on-disk checksums, and no
+name assignment had been made by this lane. Eight older failed face tasks were
+preserved, not retried.
+
+`PhotoHouse Approved Face v38 SYSTEM` is a separate startup task running the
+pinned worker through
+`C:\Users\yanbo\AppData\Local\PhotoHouseAccess\photohouse-approved-face-v38.ps1`.
+It has a five-minute restart interval, its own
+`approved-face-v38.stop` flag and `approved-face-v38.log`, and the shared GPU
+lock with the approved image/video embedding lanes. It was `Running` after
+registration. A resource read showed about 46.4 GiB host RAM free and 17.2
+GiB free on the RTX 3090. This establishes detection and shadow embedding for
+approved uploads, not confident automatic identity assignment. The next lane
+needs reviewed same-library, manually named active reference vectors and
+calibrated thresholds before `person_auto_match` can be enabled.
