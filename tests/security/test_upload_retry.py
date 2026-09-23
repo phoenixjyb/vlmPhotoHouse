@@ -68,7 +68,8 @@ class UploadRetryTests(unittest.TestCase):
         self.assertEqual(retry, {**first, 'tasks_enqueued': 0})
         jobs = self.rows('SELECT type,state,retry_count,cancel_requested FROM tasks ORDER BY type')
         self.assertEqual([tuple(row) for row in jobs],
-                         [(kind, 'pending', 0, 0) for kind in ('caption', 'embed', 'face', 'phash', 'thumb')])
+                         [(kind, 'awaiting_review', 0, 0)
+                          for kind in ('caption', 'embed', 'face', 'phash', 'thumb')])
         self.assertEqual(self.rows('SELECT count(*) FROM access_uploads')[0][0], 1)
         self.assertEqual(len([p for p in self.fixture.incoming.rglob('*') if p.is_file()]), 1)
 

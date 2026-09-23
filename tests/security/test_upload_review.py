@@ -339,6 +339,8 @@ class UploadReviewTests(unittest.TestCase):
         self.assertEqual(retry.status_code, 200, retry.text)
         self.assertEqual(retry.json()['state'], 'assigned')
         self.assertEqual(self._rows('SELECT count(*) FROM access_provisioning_receipts')[0][0], 1)
+        self.assertEqual(self._rows("SELECT count(*) FROM tasks WHERE state='pending'")[0][0], 5)
+        self.assertEqual(self._rows("SELECT count(*) FROM tasks WHERE state='awaiting_review'")[0][0], 0)
         self.assertEqual([p for p in self.fixture.incoming.rglob('*') if p.is_file()], [])
 
     def test_replay_after_offline_unassignment_is_rejected(self):

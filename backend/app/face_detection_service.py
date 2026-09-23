@@ -81,7 +81,7 @@ class MTCNNDetectionProvider:
         return out
 
 class InsightFaceDetectionProvider:
-    def __init__(self, device: str):
+    def __init__(self, device: str, *, strict: bool = False):
         try:
             from insightface.app import FaceAnalysis  # type: ignore
             import onnxruntime as ort  # type: ignore
@@ -93,6 +93,10 @@ class InsightFaceDetectionProvider:
         model_root = os.path.abspath(os.path.expandvars(os.path.expanduser(
             os.getenv('INSIGHTFACE_ROOT', '~/.insightface')
         )))
+        if strict:
+            model_dir = os.path.join(model_root, 'models', det_pack)
+            if not os.path.isfile(os.path.join(model_dir, 'det_10g.onnx')):
+                raise RuntimeError('Strict InsightFace detection requires a preinstalled local SCRFD model')
         self.runtime_name = 'onnxruntime'
         self.runtime_version = str(ort.__version__)
         self.requested_device = device
@@ -200,35 +204,70 @@ def describe_detection_runtime(provider: FaceDetectionProvider) -> dict:
         'accelerated': getattr(provider, 'accelerated', None),
         'model_root': getattr(provider, 'model_root', None),
         'model_pack': getattr(provider, 'model_pack', None),
+        'provider': type(provider).__name__,
     }
 
+def _strict_inference_enabled() -> bool:
+    return os.getenv('PHOTOHOUSE_STRICT_INFERENCE', '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 @lru_cache()
-def get_face_detection_provider() -> FaceDetectionProvider:
+def get_face_detection_provider(*, strict: bool | None = None) -> FaceDetectionProvider:
     s = get_settings()
+    strict_mode = _strict_inference_enabled() if strict is None else bool(strict)
     # Force stub in test mode unless overridden to keep CI fast
-    if s.run_mode == 'tests' and os.getenv('FORCE_REAL_FACE_PROVIDER','0') not in ('1','true','yes'):
+    if (not strict_mode and s.run_mode == 'tests'
+            and os.getenv('FORCE_REAL_FACE_PROVIDER','0') not in ('1','true','yes')):
         return StubDetectionProvider()
     provider = s.face_detect_provider.lower() if hasattr(s,'face_detect_provider') else os.getenv('FACE_DETECT_PROVIDER','mtcnn').lower()
     device = s.embed_device
+    if strict_mode and provider in ('stub', 'builtin'):
+        raise RuntimeError('Strict inference refuses stub face detection')
     if provider in ('insight', 'scrfd'):
         try:
-            return InsightFaceDetectionProvider(device)
+            result = InsightFaceDetectionProvider(device, strict=strict_mode)
+            if strict_mode and result.effective_device not in ('cpu', 'cuda:0'):
+                raise RuntimeError('Strict face detection provider did not report its effective device')
+            if strict_mode and device.startswith('cuda') and not result.accelerated:
+                raise RuntimeError('Requested CUDA face detection provider is not effective')
+            return result
         except Exception as e:
+            if strict_mode:
+                raise RuntimeError('Strict InsightFace detection provider unavailable') from e
             logging.getLogger('app').warning('InsightFace detection unavailable; falling back to stub detection provider', exc_info=True)
             return StubDetectionProvider()
     if provider in ('mtcnn','facenet'):
+        if strict_mode:
+            raise RuntimeError('Strict inference does not enable MTCNN because its pretrained weights may download at startup')
         try:
-            return MTCNNDetectionProvider(device)
+            result = MTCNNDetectionProvider(device)
+            if strict_mode and device.startswith('cuda') and not result.accelerated:
+                raise RuntimeError('Requested CUDA face detection provider is not effective')
+            return result
         except Exception as e:
+            if strict_mode:
+                raise RuntimeError('Strict MTCNN face detection provider unavailable') from e
             logging.getLogger('app').warning('MTCNN detection unavailable; falling back to stub detection provider', exc_info=True)
             return StubDetectionProvider()
     if provider == 'auto':
-        for builder in (InsightFaceDetectionProvider, MTCNNDetectionProvider):
+        errors = []
+        builders = (InsightFaceDetectionProvider,) if strict_mode else (InsightFaceDetectionProvider, MTCNNDetectionProvider)
+        for builder in builders:
             try:
-                return builder(device)  # type: ignore[misc]
-            except Exception:
+                result = builder(device, strict=strict_mode) if strict_mode else builder(device)  # type: ignore[misc]
+                if strict_mode and result.effective_device not in ('cpu', 'cuda:0'):
+                    raise RuntimeError('Strict face detection provider did not report its effective device')
+                if strict_mode and device.startswith('cuda') and not result.accelerated:
+                    raise RuntimeError('Requested CUDA face detection provider is not effective')
+                return result
+            except Exception as exc:
+                errors.append(exc)
                 continue
+        if strict_mode:
+            raise RuntimeError('Strict face detection found no usable real provider') from errors[-1]
         logging.getLogger('app').warning('No real face detection provider available in auto mode; using stub')
         return StubDetectionProvider()
+    if strict_mode:
+        raise RuntimeError(f"Strict inference refuses unknown face detection provider {provider!r}")
     logging.getLogger('app').warning(f"Unknown FACE_DETECT_PROVIDER '{provider}', using stub")
     return StubDetectionProvider()

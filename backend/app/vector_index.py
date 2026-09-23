@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from typing import List, Tuple, Dict, Optional, Any
 from pathlib import Path
 import threading
@@ -160,16 +161,29 @@ class EmbeddingService:
     - clip-* : try to load OpenAI CLIP via "open_clip" or "clip" libraries, fallback to stub
     - any other string for text: attempt sentence-transformers
     """
-    def __init__(self, image_model: str, text_model: str, dim: int, device: str = 'cpu'):
+    def __init__(self, image_model: str, text_model: str, dim: int, device: str = 'cpu', *, strict: bool | None = None):
         self.image_model = image_model
         self.text_model = text_model
         self.dim = dim
         self.device = device
+        self.strict = _strict_inference_enabled() if strict is None else bool(strict)
+        self.effective_image_provider: str | None = None
+        self.effective_image_device: str | None = None
         self._text_model_impl: Optional[Any] = None
         self._clip_model: Optional[Any] = None
         self._clip_preprocess: Optional[Any] = None
+        strict_checkpoint = None
+        if self.strict:
+            if image_model.startswith('stub'):
+                raise RuntimeError('Strict inference refuses a stub image embedding model')
+            if not image_model.startswith('clip'):
+                raise RuntimeError(f"Strict image inference does not support configured model {image_model!r}")
+            strict_checkpoint = os.getenv('PHOTOHOUSE_IMAGE_EMBEDDING_CHECKPOINT', '').strip()
+            if (not strict_checkpoint or not Path(strict_checkpoint).is_absolute()
+                    or not Path(strict_checkpoint).is_file()):
+                raise RuntimeError('Strict image inference requires an existing local PHOTOHOUSE_IMAGE_EMBEDDING_CHECKPOINT')
         # Load text model if real
-        if not text_model.startswith("stub") and not text_model.startswith("clip"):
+        if not self.strict and not text_model.startswith("stub") and not text_model.startswith("clip"):
             try:
                 from sentence_transformers import SentenceTransformer  # type: ignore
                 self._text_model_impl = SentenceTransformer(text_model, device=self.device)
@@ -193,7 +207,8 @@ class EmbeddingService:
                     parts = image_model.split('-',1)[1]
                     if parts:
                         model_name = parts
-                self._clip_model, _, self._clip_preprocess = open_clip.create_model_and_transforms(model_name, pretrained=pretrained, device=self.device)
+                self._clip_model, _, self._clip_preprocess = open_clip.create_model_and_transforms(
+                    model_name, pretrained=strict_checkpoint or pretrained, device=self.device)
                 self._clip_tokenizer = open_clip.get_tokenizer(model_name)
                 # set dimension from model (text projection dimension)
                 try:
@@ -201,10 +216,12 @@ class EmbeddingService:
                 except Exception:
                     pass
                 loaded = True
+                self.effective_image_provider = 'open_clip'
+                self.effective_image_device = _model_device(self._clip_model, self.device)
                 logger.info(f"Loaded open_clip model {model_name} (dim={self.dim}) on {self.device}")
             except Exception as e:
                 logger.warning(f"open_clip load failed ({e}); trying fallback clip lib")
-            if not loaded:
+            if not loaded and not self.strict:
                 try:
                     import clip  # type: ignore
                     model_name = 'ViT-B/32'
@@ -220,6 +237,28 @@ class EmbeddingService:
                     logger.info(f"Loaded clip model {model_name} (dim={self.dim}) on {self.device}")
                 except Exception as e:
                     logger.warning(f"Falling back to stub embeddings: clip load failed ({e})")
+
+            if loaded and self.effective_image_provider is None:
+                self.effective_image_provider = 'openai_clip'
+                self.effective_image_device = _model_device(self._clip_model, self.device)
+
+            if self.strict and image_model.startswith('clip') and not loaded:
+                raise RuntimeError(f"Strict image inference could not load configured model {image_model!r}")
+            if (self.strict and self.device.startswith('cuda')
+                    and not str(self.effective_image_device or '').startswith('cuda')):
+                raise RuntimeError('Strict image embedding did not activate the requested CUDA device')
+
+        if self.strict and self.effective_image_provider is None:
+            raise RuntimeError(f"Strict image inference has no real provider for {image_model!r}")
+
+    def describe_runtime(self) -> dict:
+        return {
+            'image_model': self.image_model,
+            'requested_device': self.device,
+            'effective_provider': self.effective_image_provider,
+            'effective_device': self.effective_image_device,
+            'strict': self.strict,
+        }
 
     # ---- Internal deterministic stubs ----
     def _stub_from_key(self, key: str, dim: Optional[int] = None) -> np.ndarray:
@@ -240,15 +279,25 @@ class EmbeddingService:
                 with torch.no_grad():
                     feats = self._clip_model.encode_image(image_in.to(self.device))  # type: ignore
                     feats = feats / feats.norm(dim=-1, keepdim=True)
-                return feats.cpu().numpy()[0].astype('float32')
+                vec = feats.cpu().numpy()[0].astype('float32')
+                if self.strict:
+                    if not np.isfinite(vec).all() or float(np.linalg.norm(vec)) == 0.0:
+                        raise ValueError('Strict image model returned an invalid or zero vector')
+                return vec
             except Exception as e:
+                if self.strict:
+                    raise RuntimeError('Strict image embedding inference failed') from e
                 logger.warning(f"clip image embed failed, falling back to stub: {e}")
+        if self.strict:
+            raise RuntimeError('Strict image inference has no loaded model')
         if self.image_model.startswith('stub'):
             return self._stub_from_key(path)
         # fallback stub for any other unhandled model names
         return self._stub_from_key(path)
 
     def embed_text(self, text: str) -> np.ndarray:
+        if self.strict:
+            raise RuntimeError('Strict image worker does not provide text embeddings')
         if self._clip_model is not None:
             try:
                 import torch  # type: ignore
@@ -273,3 +322,14 @@ class EmbeddingService:
         return self.embed_image(path)
     def embed_text_stub(self, text: str) -> np.ndarray:  # deprecated
         return self.embed_text(text)
+
+
+def _strict_inference_enabled() -> bool:
+    return os.getenv('PHOTOHOUSE_STRICT_INFERENCE', '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _model_device(model: Any, requested: str) -> str:
+    try:
+        return str(next(model.parameters()).device)
+    except Exception:
+        return requested

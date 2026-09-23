@@ -117,7 +117,8 @@ class UploadTests(unittest.TestCase):
                                    (asset_id,)), [])
         self.assertEqual(len(self.rows('SELECT 1 FROM access_uploads WHERE asset_id=?', (asset_id,))), 1)
         self.assertEqual(len(self.rows("SELECT 1 FROM access_audit WHERE action='upload.create'")), 1)
-        self.assertEqual(len(self.rows('SELECT 1 FROM tasks WHERE state=?', ('pending',))), 5)
+        self.assertEqual(len(self.rows('SELECT 1 FROM tasks WHERE state=?', ('awaiting_review',))), 5)
+        self.assertEqual(self.rows('SELECT 1 FROM tasks WHERE state=?', ('pending',)), [])
 
     def test_uploaded_asset_is_invisible_to_the_library_read(self):
         """The gallery read is the real path a member would use, so assert against it."""

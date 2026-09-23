@@ -204,6 +204,35 @@ class ScopedFaceWorkerTests(unittest.TestCase):
         self.assertEqual(self.rows("SELECT person_id,label_source FROM face_detections WHERE id=15"), [(1, "dnn")])
         self.assertEqual(self.rows("SELECT count(*) FROM face_assignment_events WHERE new_person_id=1")[0][0], 1)
 
+    def test_auto_match_assigns_only_confident_faces_from_approved_asset(self):
+        with Session(self.engine) as db:
+            db.execute(text('''INSERT INTO access_uploads
+                (asset_id,account_id,incoming_label,batch,original_name,sha256,bytes,state,created_at)
+                VALUES (5,:actor,'synthetic','synthetic','synthetic.jpg','h5',1,'assigned',1)'''),
+                {'actor': ACTOR})
+            db.add(FaceDetection(id=17, asset_id=5, person_id=None, label_source=None,
+                                 bbox_x=0, bbox_y=0, bbox_w=1, bbox_h=1))
+            db.flush()
+            path = self.root / '17.npy'
+            checksum = npy(path, [0., 1.])
+            db.add(FaceEmbeddingArtifact(face_id=17, model=MODEL, model_version=VERSION,
+                dim=2, alignment=ALIGNMENT, storage_path=str(path), vector_checksum=checksum,
+                status='active'))
+            db.commit()
+        before_manual = self.rows('SELECT id,person_id,label_source,label_score FROM face_detections WHERE id IN (11,12,13) ORDER BY id')
+        result = self.invoke_worker('person_auto_match', asset_id=5, min_ref_faces=1)
+        self.assertEqual(result['assigned'], 1)
+        self.assertEqual(result['new_persons'], 0)
+        self.assertEqual(self.rows('SELECT person_id,label_source FROM face_detections WHERE id=15'), [(1, 'dnn')])
+        self.assertEqual(self.rows('SELECT person_id,label_source FROM face_detections WHERE id=17'), [(None, None)])
+        self.assertEqual(before_manual, self.rows('SELECT id,person_id,label_source,label_score FROM face_detections WHERE id IN (11,12,13) ORDER BY id'))
+
+    def test_auto_match_refuses_unapproved_or_unversioned_scope(self):
+        for payload in ({'asset_id': 5}, {'asset_id': 3}, {'asset_id': 5, 'embedding_status': 'legacy'}):
+            with self.assertRaises(AssignmentRefused):
+                self.invoke_worker('person_auto_match', min_ref_faces=1, **payload)
+        self.assertEqual(self.rows('SELECT count(*) FROM face_assignment_events'), [(0,)])
+
     def test_shared_person_is_not_an_explicitly_owned_propagation_target(self):
         with Session(self.engine) as db:
             db.add(FaceDetection(id=17, asset_id=3, person_id=1, label_source="manual",

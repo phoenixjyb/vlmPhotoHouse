@@ -263,7 +263,7 @@ class AccessService:
 
     def record_upload(self, token, label, batch, path, original_name, digest, size_bytes,
                       mime, size):
-        """Write the asset, its provenance and its audit row, then enqueue the derived work.
+        """Write the asset, its provenance and its audit row, then stage derived work.
 
         Deliberately writes **no** `access_asset_libraries` row. An incoming photo is in no
         library, so it is invisible to every member until an operator assigns it — that is what
@@ -325,8 +325,11 @@ class AccessService:
             payload = {'asset_id': asset_id}
             if extra:
                 payload.update(extra)
+            # A member upload has no library until an operator approves it. Keep
+            # even caption work unclaimable until promotion moves the source and
+            # commits the library mapping in the same transaction.
             self.db.execute('''INSERT INTO tasks(type,payload_json,state,priority,retry_count,cancel_requested,
-                scheduled_at,created_at) VALUES (?,?,'pending',?,0,0,datetime('now'),datetime('now'))''',
+                scheduled_at,created_at) VALUES (?,?,'awaiting_review',?,0,0,datetime('now'),datetime('now'))''',
                 (kind, json.dumps(payload, sort_keys=True), priority))
             enqueued += 1
         return self._upload_result(asset_id, label, batch, digest, size_bytes, mime, size,

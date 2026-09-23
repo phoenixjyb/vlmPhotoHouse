@@ -568,6 +568,17 @@ def promote_and_assign(envelope, *, review, clock=time.time, authorize=None, all
                 db.execute('UPDATE assets SET path=? WHERE id=?', (str(destination.resolve()), asset_id))
                 db.execute("UPDATE access_uploads SET state='assigned' WHERE asset_id=?", (asset_id,))
                 db.execute('INSERT INTO access_asset_libraries VALUES (?,?)', (asset_id, library))
+                # Upload creation staged these exact per-asset starters. Release
+                # them only after the source and library mapping are established;
+                # the enclosing transaction rolls the release back with approval.
+                # Older uploads may already have pending/finished tasks, so never
+                # create another task or reset an existing task's result here.
+                payloads = (json.dumps({'asset_id': asset_id}, sort_keys=True),
+                            json.dumps({'asset_id': asset_id, 'modality': 'image'}, sort_keys=True))
+                db.execute('''UPDATE tasks SET state='pending', scheduled_at=datetime('now')
+                    WHERE state='awaiting_review'
+                    AND type IN ('embed','phash','thumb','caption','face','video_probe')
+                    AND payload_json IN (?,?)''', payloads)
             receipt = _receipt(state, plan, review, {
                 'library_id': library, 'asset_count': len(rows),
                 'bytes_promoted': sum(row[5] for row in rows),

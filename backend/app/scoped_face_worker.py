@@ -21,9 +21,10 @@ class AssignmentRefused(ValueError):
 
 
 KINDS = {'person_cluster', 'person_recluster', 'person_label_propagate'}
+AUTO_KIND = 'person_auto_match'
 REQUIRED = {'library_id', 'operator_account_id', 'embedding_model', 'embedding_version',
             'embedding_dim', 'embedding_alignment', 'embedding_status'}
-OPTIONAL = {'max_faces', 'score_threshold', 'margin', 'min_ref_faces', 'person_ids'}
+OPTIONAL = {'max_faces', 'score_threshold', 'margin', 'min_ref_faces', 'person_ids', 'asset_id'}
 TABLES = {'face_assignment_events', 'face_embedding_artifacts', 'person_embedding_artifacts',
           'access_person_libraries', 'access_asset_libraries', 'access_accounts',
           'access_libraries', 'access_memberships', 'access_operators', 'access_audit',
@@ -35,6 +36,11 @@ def _payload(value, kind):
     if not isinstance(value, dict) or not REQUIRED <= value.keys() or value.keys() - REQUIRED - OPTIONAL:
         raise AssignmentRefused('Explicit scoped assignment payload required')
     p = dict(value)
+    if kind == 'person_auto_match':
+        if type(p.get('asset_id')) is not int or not 0 < p['asset_id'] < 2**63:
+            raise AssignmentRefused('Explicit asset scope required for automatic matching')
+    elif 'asset_id' in p:
+        raise AssignmentRefused('Asset scope is reserved for automatic matching')
     if not isinstance(p['library_id'], str) or not re.fullmatch('[a-z0-9][a-z0-9_-]{2,63}', p['library_id']):
         raise AssignmentRefused('Invalid library scope')
     try:
@@ -52,6 +58,8 @@ def _payload(value, kind):
         raise AssignmentRefused('Invalid embedding alignment')
     if p['embedding_status'] not in ('active', 'legacy'):
         raise AssignmentRefused('Shadow artifacts cannot assign people')
+    if kind == AUTO_KIND and p['embedding_status'] != 'active':
+        raise AssignmentRefused('Automatic matching requires active versioned artifacts')
     for key, default, maximum in (('embedding_dim', None, 4096), ('max_faces', 100, 500), ('min_ref_faces', 2, 50)):
         p.setdefault(key, default)
         if type(p[key]) is not int or not 1 <= p[key] <= maximum:
@@ -109,7 +117,7 @@ def _vector(root, path, checksum, dimension):
 
 
 def run_scoped_assignment(session, task, *, embedding_root, clock=time.time, commit=True):
-    if task.type not in KINDS:
+    if task.type not in KINDS | {AUTO_KIND}:
         raise AssignmentRefused('Unsupported assignment job')
     p = _payload(task.payload_json, task.type)
     if session.new or session.dirty or session.deleted:
@@ -169,9 +177,14 @@ def assignment_selection(rows, p, kind):
     refs = rows(base + " AND f.label_source='manual' AND f.person_id IS NOT NULL ORDER BY f.id LIMIT 2001", **params)
     if len(refs) > 2000:
         raise AssignmentRefused('Reference budget exceeded')
-    candidates = rows(base + " AND (f.label_source IS NULL OR f.label_source<>'manual') "
-        + (" AND (f.person_id IS NULL OR f.label_source='dnn') " if kind == 'person_recluster' else ' AND f.person_id IS NULL ')
-        + ' ORDER BY f.id LIMIT :limit', limit=p['max_faces'], **params)
+    candidate_filter = " AND (f.label_source IS NULL OR f.label_source<>'manual') "
+    candidate_filter += (" AND (f.person_id IS NULL OR f.label_source='dnn') "
+                         if kind == 'person_recluster' else ' AND f.person_id IS NULL ')
+    if kind == 'person_auto_match':
+        candidate_filter += ' AND f.asset_id=:asset_id '
+        params['asset_id'] = p['asset_id']
+    candidates = rows(base + candidate_filter + ' ORDER BY f.id LIMIT :limit',
+                      limit=p['max_faces'], **params)
     return owned_rows, refs, candidates
 
 
@@ -209,6 +222,15 @@ def _run(session, task, p, root, clock, deadline):
             actor=p['operator_account_id'], library=p['library_id'], now=int(clock())).first():
             raise AssignmentRefused('Current library owner and operator required')
     authority()
+    if task.type == 'person_auto_match':
+        asset_scope = execute('''SELECT 1 FROM assets a
+            JOIN access_asset_libraries m ON m.asset_id=a.id
+            JOIN access_uploads u ON u.asset_id=a.id
+            WHERE a.id=:asset AND a.status='active' AND m.library_id=:library
+            AND u.state='assigned' AND u.sha256=a.hash_sha256 LIMIT 1''',
+            asset=p['asset_id'], library=p['library_id']).first()
+        if not asset_scope:
+            raise AssignmentRefused('Automatic match requires an approved upload in its library')
     owned_rows, refs, candidates = assignment_selection(lambda sql, **params: execute(sql, **params).all(), p, task.type)
     owned = {row[0] for row in owned_rows}
     sums, counts = {}, {}
@@ -237,6 +259,9 @@ def _run(session, task, p, root, clock, deadline):
         second = scores[1][0] if len(scores) > 1 else -1.
         matched = best and best[0] >= p['score_threshold'] and best[0] - second >= p['margin']
         if task.type == 'person_label_propagate' and (not matched or best[1] not in p['person_ids']):
+            continue
+        if task.type == 'person_auto_match' and not matched:
+            # An uncertain identity remains unassigned for family review.
             continue
         if matched:
             score, pid = best
