@@ -87,9 +87,42 @@ ownership, stop flags, and a synthetic Windows canary. Only then should the
 continuously polling CPU and video-preparation workers be registered as
 separate startup/recovery tasks. The existing caption task stays separate.
 
-Current qualification state: source tests cover the approval release and
-scoped CPU, video, image-embedding, and video-embedding workers. There is no
-Windows native canary or active new media Scheduled Task in this source
-candidate. Face detection/embedding, CLIP image/video embeddings, and
-confident-person matching must remain disabled until their specific gates
-above pass. A `pending` queue row alone does not prove a derivative was made.
+Source tests cover the approval release and scoped CPU, video,
+image-embedding, and video-embedding workers. Face detection/embedding, CLIP
+image/video embeddings, and confident-person matching remain disabled until
+their specific gates above pass. A `pending` queue row alone does not prove a
+derivative was made.
+
+## September 23 Windows activation record
+
+The final source revision is `ff6d2de1a1419aa8ad5792ceafbbb3bf75309e22`.
+The approved-worker source ZIP has SHA-256
+`1a5d3f9f36dd16133ead4408031cdb71cf42c3347518483c199d6204c25a1cf5`;
+the protected API source ZIP has SHA-256
+`7762bad3876513820ff6d42e872313ee9ce4890880d13964632c9a6f75d1d794`.
+Every extracted manifest member was checked on Windows before use. The API
+candidate passed its configuration syntax check, then the existing protected
+API task switched to the pinned release. Its old task XML was saved beside the
+candidate for rollback. The unauthenticated protected endpoint continued to
+return 403 after the switch; this does not establish authenticated family
+acceptance. The caption task remained on its existing release and running.
+
+The synthetic Windows canary generated its own image, two-second video and
+SQLite database. Under the installed interpreter and real ffmpeg it finished
+`thumb`, `phash`, `video_probe`, and `video_keyframes`, and enqueued `caption`
+and `video_embed`; it opened no family media or production database. A separate
+`--once` CPU live canary finished one approved `phash` task. The persistent
+`PhotoHouse Approved CPU v37 SYSTEM` and
+`PhotoHouse Approved Video Prep v37 SYSTEM` tasks now run at startup, poll for
+new approved work, and have five-minute failure restart settings. At the
+post-activation read, both tasks and the API/caption tasks were running; no
+`thumb`, `phash`, `video_probe`, or `video_keyframes` task remained pending or
+running. Old failed/dead task records were preserved.
+
+This activation covers CPU image derivatives and video preparation only.
+Image/video vector embedding is still held for a local checkpoint and exact
+GPU/provider canary. Face detection/embedding is still blocked by its hard
+child budget and provenance review, and confident person matching by the
+active reference cohort and threshold calibration. At the same read, four
+`embed` and three `face` tasks remained pending. No claim of full media
+processing or automatic identity assignment is made by this activation.
