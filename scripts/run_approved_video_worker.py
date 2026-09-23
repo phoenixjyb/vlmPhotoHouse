@@ -21,9 +21,13 @@ import signal
 import sqlite3
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
 
 
 TASK_TYPES = ("video_probe", "video_keyframes")
