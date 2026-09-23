@@ -125,13 +125,10 @@ def ingest_paths(session: Session, roots: List[str], *, enqueue_embeddings: bool
                         Task(type='image_tag', priority=115, payload_json={'asset_id': asset.id})
                     )
             else:
-                # Minimal video pipeline: probe + keyframes + embed (all optional/no-op stubs for now)
+                # Probe is the validation barrier; successful handlers enqueue their children.
                 if settings.video_enabled:
-                    tasks_to_create.extend([
-                        Task(type='video_probe', priority=40, payload_json={'asset_id': asset.id}),
-                        Task(type='video_keyframes', priority=70, payload_json={'asset_id': asset.id}),
-                        Task(type='video_embed', priority=90, payload_json={'asset_id': asset.id}),
-                    ])
+                    tasks_to_create.append(
+                        Task(type='video_probe', priority=40, payload_json={'asset_id': asset.id}))
                     # Optional scene detection
                     if getattr(settings, 'video_scene_detect', False):
                         tasks_to_create.append(Task(type='video_scene_detect', priority=80, payload_json={'asset_id': asset.id}))

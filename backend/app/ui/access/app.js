@@ -12,6 +12,54 @@
   Object.assign(words.zh, {familyStories:'家人的故事',storyEyebrow:'照片背后的故事',storyPrivacy:'与此相册库的成员共享，不会自动发布到电视。',addStory:'写下这段回忆',storyTitle:'标题（可选）',storyByline:'署名（显示名称）',storyLanguage:'故事的语言',otherLanguage:'其他 / 未指定',storyText:'这一刻，有什么值得记住？',storyLimit:'不限制字数。文本最多 64 KiB，超出时明确提示，不会截断。',saveStory:'保存故事',savedStory:'故事已保存。',storyEmpty:'每个瞬间都有故事，准备好时，写下你的回忆。',storyLoading:'正在加载家人的故事…',storyError:'暂时无法加载故事，请重新打开此照片重试。',editStory:'编辑',history:'历史版本',familyMember:'家人',you:'你',revision:'版本',moreStories:'更多故事',unsavedStory:'放弃尚未保存的故事？',storyConflict:'故事已被其他人修改。你的草稿仍在，请先对比最新版本。',compareLatest:'对比最新版本',keepDraft:'将我的草稿作为下一版本',confirmDraft:'确认用你的草稿更新此最新版本？两个版本都会保存在历史记录中。',storySaveError:'尚未确认保存成功。草稿仍在，请先重试同一次保存，再修改内容。',storyInvalid:'未保存。请检查语言、标题和署名长度，以及 64 KiB 文本限制。',deleteStory:'移除故事',confirmDelete:'从相册和搜索中移除此故事？作者和主人仍可查看历史记录，此操作并非永久删除。',removedStory:'故事已移除。',historyTitle:'故事的历史版本',restoreDraft:'将此版本用作草稿',searchMemories:'寻找一段回忆',searchIn:'搜索范围',allDescriptions:'故事与 AI 描述',aiDescriptions:'AI 描述',aiAndLegacy:'AI 描述与早期编辑的描述',search:'搜索',clearSearch:'显示全部',matchedFamily:'来自家人的故事',matchedAI:'来自 AI 描述',matchedLegacy:'来自早期编辑的描述',noMatches:'没有找到匹配的回忆，请换个词试试。',draftRecovered:'已在此标签页恢复未保存的草稿。',writtenBy:'作者',unverifiedByline:'作者自行填写的显示名称'});
   Object.assign(words.en,{storyDeleteError:'Removal not confirmed. Retry Remove story to confirm the same request.',storyCurrent:'Your earlier save was confirmed. A newer version is now shown.'});
   Object.assign(words.zh,{storyDeleteError:'尚未确认移除成功。请再次点击“移除故事”，确认同一次请求。',storyCurrent:'已确认此前的保存。当前显示的是更新的版本。'});
+  Object.assign(words.en,{myUploads:'My uploads',myUploadsHelp:'Photos and videos you sent from your phone. Only you can see this history. Refresh to check for an update.',myUploadsEmpty:'No uploads yet. Send photos or videos from the PhotoHouse phone app.',myUploadsUnavailable:'Upload history is unavailable. Please refresh later.',receiptAwaiting:'Received · awaiting owner review',receiptAvailable:'Added to a library',receiptUnavailable:'Currently unavailable',receiptOpen:'Open',receiptHelp:'Approval makes the upload available in its library. Previews and descriptions may take longer.'});
+  Object.assign(words.zh,{myUploads:'我的上传',myUploadsHelp:'从手机上传的照片和视频。只有你能查看此记录，点击刷新查看最新状态。',myUploadsEmpty:'暂无上传记录。可以从 PhotoHouse 手机应用上传照片或视频。',myUploadsUnavailable:'暂时无法查看上传记录，请稍后刷新。',receiptAwaiting:'已收到 · 等待主人审核',receiptAvailable:'已加入相册库',receiptUnavailable:'当前不可用',receiptOpen:'打开',receiptHelp:'审核通过后可在相册库查看，预览和描述可能需要更长时间。'});
+  const myUploadsState={page:1,total:0,load:0,busy:false};
+  function clearMyUploads(){
+    myUploadsState.load++;myUploadsState.page=1;myUploadsState.total=0;myUploadsState.busy=false;
+    $('my-uploads-panel').open=false;$('my-uploads-list').replaceChildren();$('my-uploads-status').textContent='';$('my-uploads-pages').hidden=true;$('my-uploads-refresh').disabled=false;
+  }
+  function receiptPageValid(data,page){
+    const keys=(value,names)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===names.split(',').sort().join(',');
+    if(!keys(data,'page,page_size,total,items')||data.page!==page||data.page_size!==10||!Number.isInteger(data.total)||data.total<0||data.total>2147483647||!Array.isArray(data.items)||data.items.length!==Math.min(10,Math.max(0,data.total-(page-1)*10)))return false;
+    const ids=new Set();return data.items.every(item=>{
+      if(!keys(item,'asset_id,created_at,bytes,kind,state,library_id')||typeof item.asset_id!=='string'||!/^[1-9][0-9]{0,18}$/.test(item.asset_id)||BigInt(item.asset_id)>9223372036854775807n||ids.has(item.asset_id)||!['image','video'].includes(item.kind)||!Number.isInteger(item.created_at)||item.created_at<0||item.created_at>253402300799||!Number.isInteger(item.bytes)||item.bytes<1||item.bytes>(item.kind==='video'?17179869184:268435456))return false;
+      ids.add(item.asset_id);return item.state==='available'?typeof item.library_id==='string'&&item.library_id.trim().length>0&&[...item.library_id].length<=128&&!/[\x00-\x1f\x7f]/.test(item.library_id)&&!['.','..'].includes(item.library_id):['awaiting_review','unavailable'].includes(item.state)&&item.library_id===null;
+    });
+  }
+  async function loadMyUploads(){
+    if(state.locked||!state.profile||!$('my-uploads-panel').open)return;
+    const epoch=state.generation,account=state.profile.account_id,load=++myUploadsState.load,page=myUploadsState.page;
+    const current=()=>!stale(epoch)&&account===state.profile?.account_id&&load===myUploadsState.load&&$('my-uploads-panel').open;
+    myUploadsState.busy=true;$('my-uploads-refresh').disabled=true;$('my-uploads-list').replaceChildren();$('my-uploads-pages').hidden=true;$('my-uploads-status').textContent=t('loading');
+    try{
+      const data=await request(`/uploads?page=${page}`,{epoch});if(!current())return;
+      if(!receiptPageValid(data,page))throw new Error('Invalid upload history');
+      myUploadsState.total=data.total;
+      for(const item of data.items){
+        const card=document.createElement('article');card.className='receipt-card';card.dataset.asset=item.asset_id;
+        const title=document.createElement('h3');title.textContent=`${t(item.kind==='image'?'photo':'video')} ${item.asset_id}`;
+        const meta=document.createElement('p');meta.className='fine';meta.textContent=`${new Date(item.created_at*1000).toLocaleString(state.language==='zh'?'zh-CN':'en')} · ${(item.bytes/1024).toFixed(1)} KiB`;
+        const label=document.createElement('p');label.className='receipt-state';label.textContent=t(item.state==='available'?'receiptAvailable':item.state==='awaiting_review'?'receiptAwaiting':'receiptUnavailable');card.append(title,meta,label);
+        if(item.state==='available'&&availableLibraries(state.profile).some(m=>m.library_id===item.library_id)){
+          const button=document.createElement('button');button.type='button';button.className='quiet';button.textContent=t('receiptOpen');button.addEventListener('click',async()=>{
+            if(!current()||state.busy||!abandonStory())return;
+            button.disabled=true;state.library=item.library_id;state.page=1;
+            const openingEpoch=state.generation+1;await restore(false);
+            if(stale(openingEpoch)||state.locked||state.profile?.account_id!==account||state.library!==item.library_id)return;
+            const gallery=loadGallery(),galleryEpoch=state.generation;await gallery;
+            if(stale(galleryEpoch)||state.locked||state.profile?.account_id!==account||state.library!==item.library_id)return;
+            await openAsset({id:item.asset_id,kind:item.kind});
+          });card.append(button);
+        }
+        $('my-uploads-list').append(card);
+      }
+      $('my-uploads-status').textContent=t(data.total?'receiptHelp':'myUploadsEmpty');$('my-uploads-pages').hidden=data.total===0;
+      $('my-uploads-page-label').textContent=`${t('page')} ${page} ${t('of')} ${Math.max(1,Math.ceil(data.total/10))}`;
+      $('my-uploads-previous').disabled=page<=1;$('my-uploads-next').disabled=page*10>=data.total;
+    }catch(error){if(!current()||error.name==='AbortError')return;$('my-uploads-list').replaceChildren();$('my-uploads-status').textContent=t('myUploadsUnavailable');if(error.status===401)await failure(error,epoch);}
+    finally{if(current()){myUploadsState.busy=false;$('my-uploads-refresh').disabled=false;}}
+  }
   const storyState={asset:null,editing:null,dirty:false,busy:false,page:1,load:0,loading:false,history:0,deletes:new Map(),pending:null,search:null,suspended:null};
   const peopleState={page:1,total:0,load:0,query:'',named:'all'};
   const directoryState={page:1,total:0,load:0,query:'',person:null,assetLoad:0,assetPage:1,assetTotal:0};
@@ -62,7 +110,7 @@
   Object.assign(words.zh,{describePhoto:'为这张照片写一句描述',saveCaption:'保存描述',captionSaved:'已保存，谢谢。',captionConflict:'这张照片已经有描述了。'});
   Object.assign(words.zh,{duplicatesInLibrary:'保存了两次的照片',duplicatesHelp:'本家庭库中保存了不止一次的相同照片，通常是因为同一批照片被导入过两次。只读：这里不会删除、隐藏或合并任何一份。',savedTimes:'保存份数',noDuplicatesInLibrary:'本家庭库中没有重复保存的照片。'});
   Object.assign(words.zh,{tagsInLibrary:'本家庭库的标签',tagsHelp:'本家庭库中照片已附带的标签，仅供查看：此页面不能添加或删除标签。',findTag:'查找标签',noTagsInLibrary:'本家庭库还没有标签。',assetsCount:'张照片',tagAssets:'带此标签的照片',noTaggedAssets:'本家庭库没有照片带此标签。',clearTag:'关闭'});
-  Object.assign(words.en,{uploadReview:'Upload review',uploadReviewHelp:'Review private uploads before assigning them to this library. Only the library owner with admin authorization can approve an upload.',uploadLoading:'Loading upload inbox…',uploadEmpty:'No uploads are waiting for review.',uploadRestricted:'Upload review is unavailable for this account.',uploadReviewError:'Uploads could not load. Try again.',approveUpload:'Approve upload',uploadRetryApproval:'Retry approval',approveUploadHelp:'Approving will assign this photo to',approveVisibility:'It will become visible to this library’s members according to their existing access.',uploadReaders:'Current readers',uploadOriginalReaders:'Current original readers',uploadPreviewFailed:'Private preview unavailable. Retry the preview.',uploadApproved:'Upload approved.',uploadConflict:'This upload changed. Review it again before approving.',uploadUncertain:'Approval was not confirmed. The same approval can be retried.',uploadRetry:'Retry review',uploadBytes:'bytes',uploadDimensions:'dimensions',uploadBy:'Uploaded by'});
+  Object.assign(words.en,{uploadReview:'Upload review',uploadReviewHelp:'Review private uploads before assigning them to this library. Only the library owner with admin authorization can approve an upload.',uploadLoading:'Loading upload inbox…',uploadEmpty:'No uploads are waiting for review.',uploadRestricted:'Upload review is unavailable for this account.',uploadReviewError:'Uploads could not load. Try again.',approveUpload:'Approve upload',uploadRetryApproval:'Retry approval',approveUploadHelp:'Approving will assign this upload to',approveVisibility:'It will become visible to this library’s members according to their existing access.',uploadReaders:'Current readers',uploadOriginalReaders:'Current original readers',uploadPreviewFailed:'Private preview unavailable. Retry the preview.',uploadApproved:'Upload approved.',uploadConflict:'This upload changed. Review it again before approving.',uploadUncertain:'Approval was not confirmed. The same approval can be retried.',uploadRetry:'Retry review',uploadBytes:'bytes',uploadDimensions:'dimensions',uploadBy:'Uploaded by'});
   Object.assign(words.zh,{uploadReview:'上传审核',uploadReviewHelp:'在将私密上传分配到本家庭库前先进行审核。只有拥有管理员授权的相册库主人可以批准上传。',uploadLoading:'正在加载上传审核…',uploadEmpty:'暂无等待审核的上传。',uploadRestricted:'此账号暂不能进行上传审核。',uploadReviewError:'暂时无法加载上传，请重试。',approveUpload:'批准上传',uploadRetryApproval:'重试批准',approveUploadHelp:'批准后，这张照片将分配到',approveVisibility:'按照现有权限，它将对本家庭库成员可见。',uploadReaders:'当前可读者',uploadOriginalReaders:'当前原文件可读者',uploadPreviewFailed:'私密预览暂不可用，请重试预览。',uploadApproved:'上传已批准。',uploadConflict:'上传内容已变化，请重新审核后再批准。',uploadUncertain:'尚未确认批准结果。可以使用同一确认再次重试。',uploadRetry:'重新审核',uploadBytes:'字节',uploadDimensions:'尺寸',uploadBy:'上传者'});
   Object.assign(words.en,{placeSearchLabel:'Search places',placeSearch:'Search',placeSearchHelp:'Search the local place catalogue in Chinese or English. Choose a result, then apply your filters.',placeSearchNone:'No matching place in this library’s local catalogue. Try another name.',placeSearchTooLong:'Keep the place name within 128 UTF-8 bytes.',placeRemove:'Remove place'});
   Object.assign(words.zh,{placeSearchLabel:'搜索地点',placeSearch:'搜索',placeSearchHelp:'支持中文、英文及常用别名。请先从本地地点目录选择结果，再应用筛选。',placeSearchNone:'本库的本地地点目录暂无匹配结果，请尝试其他名称。',placeSearchTooLong:'地点名称请勿超过 128 个 UTF-8 字节。',placeRemove:'移除地点'});
@@ -127,7 +175,7 @@
     $('accept-code').value=''; $('invite-phone').value='';
     state.memberGeneration++;$('member-list').replaceChildren();$('member-pages').hidden=true;
     peopleState.load++;$('people-list').replaceChildren();$('people-pages').hidden=true;$('people-status').textContent='';
-    clearUploadReview();
+    clearUploadReview();clearMyUploads();
   }
   function clearUploadReview(){
     uploadState.load++;uploadState.page=1;uploadState.items=[];uploadState.total=0;uploadState.plans.clear();uploadState.dialogItem=null;uploadState.dialogEpoch=0;uploadState.previewQueue.token++;uploadState.previewQueue.pending=[];uploadState.previewQueue.cancel?.();
@@ -159,6 +207,7 @@
   function showAuth() {
     albumState.draft=null;albumState.page=1;$('album-archived-panel').hidden=true;$('album-archived-panel').open=false;$('album-archived-list').replaceChildren();
     storyState.search=null;storyState.suspended=null;$('search-text').value='';$('search-source').value='all';
+    clearMyUploads();$('my-uploads-open').hidden=true;$('my-uploads-panel').hidden=true;
     state.profile=null;state.csrf=null;state.library=null;state.catalogue=null;state.locked=false;clearUploadReview();$('uploads-panel').hidden=true;$('uploads-open').hidden=true;$('uploads-panel').open=false;updateTransferUI();
     $('account-label').textContent='';$('library-select').replaceChildren();$('owner-panel').hidden=true;$('members-panel').hidden=true;$('people-panel').hidden=true;
     peopleState.page=1;peopleState.query='';peopleState.named='all';$('people-query').value='';$('people-named').value='all';
@@ -694,6 +743,7 @@
       state.profile=profile;state.csrf=profile.csrf_token;state.locked=false;
       $('auth').hidden=true;$('library').hidden=false;$('account-label').textContent=profile.phone_login;
       const available=availableLibraries(profile);
+      $('my-uploads-open').hidden=$('my-uploads-panel').hidden=!available.length;
       if(!available.some(m=>m.library_id===state.library)){state.library=available[0]?.library_id||null;state.page=1;state.memberPage=1;}
       $('library-select').replaceChildren();for(const member of available){const option=document.createElement('option');option.value=member.library_id;option.textContent=member.library_id;$('library-select').append(option);}
       await loadLibraryCatalogue(epoch);
@@ -817,6 +867,7 @@
   }
   function renderUploadPreview(container,item){
     container.replaceChildren();
+    if(item.kind==='video'){container.replaceChildren();const note=document.createElement('div');note.className='upload-video-placeholder';const compact=container.classList.contains('upload-card-preview');note.textContent=compact?(state.language==='zh'?'▶ 视频':'▶ Video'):(state.language==='zh'?'视频预览暂不可用':'Video preview is not available yet');container.append(note);return;}
     const url=safeUploadPreviewURL(item.preview_url,item.id);
     const failed=()=>{container.replaceChildren();const note=document.createElement('p');note.className='upload-preview-error';note.textContent=t('uploadPreviewFailed');const retry=document.createElement('button');retry.type='button';retry.className='quiet';retry.textContent=t('uploadRetry');retry.addEventListener('click',()=>renderUploadPreview(container,item));container.append(note,retry);};
     if(!url){failed();return;}
@@ -888,7 +939,7 @@
         const preview=document.createElement('div');preview.className='upload-card-preview';renderUploadPreview(preview,item);
         const details=document.createElement('div');details.className='upload-card-details';
         const title=document.createElement('h3');title.textContent=`${t('uploadBy')}: ${item.uploader}`;
-        const meta=document.createElement('p');meta.className='fine';meta.textContent=`${String(item.created_at||'')} · ${item.width}×${item.height} · ${item.bytes} ${t('uploadBytes')}`;
+        const meta=document.createElement('p');meta.className='fine';meta.textContent=`${String(item.created_at||'')} · ${item.kind==='video'?t('video'):`${item.width}×${item.height}`} · ${item.bytes} ${t('uploadBytes')}`;
         const button=document.createElement('button');button.type='button';button.className='primary';button.textContent=t('uploadReview');button.addEventListener('click',()=>void reviewUpload(item));
         details.append(title,meta,button);card.append(preview,details);$('uploads-list').append(card);
       }
@@ -1631,6 +1682,11 @@
   $('members-panel').addEventListener('toggle',()=>{if($('members-panel').open)void loadMembers();});
   $('member-previous').addEventListener('click',()=>{if(state.memberPage>1){state.memberPage--;void loadMembers();}});
   $('member-next').addEventListener('click',()=>{if(state.memberPage*25<state.memberTotal){state.memberPage++;void loadMembers();}});
+  $('my-uploads-open').addEventListener('click',()=>{if(state.locked||state.busy)return;$('my-uploads-panel').open=true;$('my-uploads-panel').scrollIntoView({block:'start'});});
+  $('my-uploads-panel').addEventListener('toggle',()=>{if($('my-uploads-panel').open)void loadMyUploads();else clearMyUploads();});
+  $('my-uploads-refresh').addEventListener('click',()=>{if(!myUploadsState.busy){myUploadsState.page=1;void loadMyUploads();}});
+  $('my-uploads-previous').addEventListener('click',()=>{if(!myUploadsState.busy&&myUploadsState.page>1){myUploadsState.page--;void loadMyUploads();}});
+  $('my-uploads-next').addEventListener('click',()=>{if(!myUploadsState.busy&&myUploadsState.page*10<myUploadsState.total){myUploadsState.page++;void loadMyUploads();}});
   $('uploads-open').addEventListener('click',()=>{if(state.locked||state.busy)return;$('uploads-panel').open=true;$('uploads-panel').scrollIntoView({block:'start'});$('uploads-panel').querySelector('summary').focus();});
   $('uploads-panel').addEventListener('toggle',()=>{if($('uploads-panel').open)void loadUploads();});
   $('uploads-refresh').addEventListener('click',()=>{if(!state.busy&&!state.locked){uploadState.page=1;void loadUploads();}});

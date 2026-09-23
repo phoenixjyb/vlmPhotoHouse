@@ -105,6 +105,27 @@ class UploadReviewTests(unittest.TestCase):
         self.assertEqual(self._rows(
             'SELECT state FROM access_uploads WHERE asset_id=?', (asset_id,))[0][0], 'assigned')
 
+    def test_video_review_approval_preserves_original_without_photo_preview(self):
+        import hashlib
+        from app.access.resumable import Transfers
+        data=(ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
+        transfers=Transfers(self.fixture.uploads)
+        row=transfers.create(self.fixture.member_token,dict(request_id='1'*32,batch='2'*32,
+            filename='synthetic.mp4',bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),kind='video'))
+        transfers.append(self.fixture.member_token,row['upload_id'],0,data,hashlib.sha256(data).hexdigest())
+        receipt=transfers.complete(self.fixture.member_token,row['upload_id']);asset_id=receipt['asset_id']
+        listing=self.client.get('/admin/uploads?library=family-a&page=1',headers=self._headers(self.fixture.owner_token))
+        self.assertEqual(200,listing.status_code,listing.text)
+        self.assertEqual('video',listing.json()['items'][0]['kind'])
+        preview=self.client.get(f'/admin/uploads/{asset_id}/preview?library=family-a',headers=self._headers(self.fixture.owner_token))
+        self.assertEqual(404,preview.status_code)
+        reviewed=self._review(asset_id);self.assertEqual(200,reviewed.status_code,reviewed.text)
+        approved=self._approve(asset_id,reviewed.json()['plan']);self.assertEqual(200,approved.status_code,approved.text)
+        self.assertIn(asset_id,self.fixture.gallery(self.fixture.owner_token))
+        stored=self._rows('SELECT path,mime FROM assets WHERE id=?',(asset_id,))[0]
+        self.assertEqual('video/mp4',stored[1]);self.assertEqual(data,Path(stored[0]).read_bytes())
+        self.assertEqual(receipt,transfers.complete(self.fixture.member_token,row['upload_id']))
+
     def test_gallery_orders_approved_null_date_upload_before_dated_assets_and_filters_scope(self):
         # Keep every captured date strictly before the synthetic upload receipt time.  The
         # approved upload has no captured date, so the gallery must use its received-at fallback.
@@ -181,7 +202,7 @@ class UploadReviewTests(unittest.TestCase):
         self.assertTrue(body['can_review'])
         self.assertEqual(len(body['items']), 10)
         self.assertEqual(set(body['items'][0]),
-                         {'id', 'uploader', 'created_at', 'bytes', 'width', 'height', 'preview_url'})
+                         {'id', 'uploader', 'created_at', 'bytes', 'width', 'height', 'preview_url', 'kind'})
         self.assertNotIn(str(self.fixture.incoming), response.text)
         second_page = self.client.get('/admin/uploads?library=family-a&page=2',
                                       headers=self._headers(self.fixture.owner_token))

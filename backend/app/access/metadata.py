@@ -90,4 +90,6 @@ def migration_metadata(legacy_metadata):
     add_management_tables(metadata)
     from .upload_schema import add_upload_tables
     add_upload_tables(metadata)
+    from .resumable_schema import add_resumable_table
+    add_resumable_table(metadata)
     return metadata

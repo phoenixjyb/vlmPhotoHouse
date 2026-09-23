@@ -1,8 +1,8 @@
 # Offline access-schema application
 
-`scripts/apply_access_schema.py` applies only the reviewed additive transition from
-`d2b7e4f6a901` to `f2a6d8b4c915`, or the explicitly selected existing-account
-transition from `d8e5b2f7a904` to `f2a6d8b4c915`. It is an operator tool, not an API/startup hook.
+`scripts/apply_access_schema.py` applies reviewed additive transitions from
+`d2b7e4f6a901`, explicitly selected `d8e5b2f7a904`, or explicitly selected
+`f2a6d8b4c915` to `a8d4c2e6f901`. It is an operator tool, not an API/startup hook.
 It creates no account, password, session, library, media mapping or HTTP listener.
 The default operation reviews the selected target and separate backup read-only.
 
@@ -26,8 +26,8 @@ python -I scripts/apply_access_schema.py
   --max-bytes 2147483648 --timeout-seconds 900
 ```
 
-Review verifies integrity, foreign keys, the pre-access revision, no access tables,
-no running tasks and identical streamed logical fingerprints. Execution repeats
+Review verifies integrity, foreign keys, the selected source revision and its
+expected prior tables, no running tasks and identical streamed logical fingerprints. Execution repeats
 the comparison under a DELETE-mode exclusive SQLite transaction, uses that same
 explicit SQLAlchemy connection for transactional Alembic DDL, verifies the required
 schema and every pre-existing table/column value except the revision ledger, then
@@ -51,14 +51,20 @@ Protected serving, legacy route isolation and media mapping remain distinct gate
 
 ## Upgrading an existing protected installation
 
-Use `--from-revision d8e5b2f7a904` for an installation that already has accounts.
+Use `--from-revision d8e5b2f7a904` for an installation with accounts but no upload
+provenance. Use `--from-revision f2a6d8b4c915` when existing upload receipts must
+be preserved. Review the actual schema and backup before choosing either.
 The default remains the original pre-access transition and refuses such a database.
-The explicit upgrade preserves every pre-existing table and column value, including
-password hashes, sessions, invitations, memberships, admission keys and media mappings.
-It adds nullable `display_name` and empty upload provenance; it creates no grants and
-does not enable uploads. Synthetic tests cover the actual old shape without the name
+The explicit upgrades preserve every pre-existing table and column value, including
+password hashes, sessions, invitations, memberships, admission keys, upload receipts
+and media mappings. From `d8e5b2f7a904`, the transition adds nullable
+`display_name` and empty upload provenance; it creates no grants and does not
+enable uploads. Synthetic tests cover the actual old shape without the name
 column, full logical preservation, repeated/stale/running-task refusal and rollback
 of both DDL and an injected account mutation.
+The `f2a6d8b4c915` path adds only the empty resumable-transfer ledger. Synthetic
+upgrade coverage includes a pre-existing assigned receipt and membership, both
+preserved byte-for-byte at the logical row level.
 
 The same stopped-writer, fresh matching backup, exclusive transaction and preservation
 checks apply. Do not use `migrate-candidate` or the recovery rehearsal as the production

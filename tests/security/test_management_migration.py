@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / 'backend'))
 PRE_MANAGEMENT = 'c7f4a9e2b610'
 # The upgrade test below targets head, so this tracks the current head rather than the revision
 # that any single migration produced.
-CURRENT_HEAD = 'f2a6d8b4c915'
+CURRENT_HEAD = 'a8d4c2e6f901'
 OWNERSHIP_TABLES = {'access_person_libraries', 'access_album_libraries'}
 
 

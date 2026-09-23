@@ -28,6 +28,7 @@ TABLES = {'face_assignment_events', 'face_embedding_artifacts', 'person_embeddin
           'access_person_libraries', 'access_asset_libraries', 'access_accounts',
           'access_libraries', 'access_memberships', 'access_operators', 'access_audit',
           'persons', 'face_detections', 'assets', 'tasks'}
+REVISIONS = ('f2a6d8b4c915', 'a8d4c2e6f901')
 
 
 def _payload(value, kind):
@@ -184,7 +185,7 @@ def _run(session, task, p, root, clock, deadline):
         return session.execute(text(sql), params)
 
     tables = set(execute("SELECT name FROM sqlite_master WHERE type='table'").scalars())
-    if not TABLES <= tables or execute('SELECT version_num FROM alembic_version').all() != [('f2a6d8b4c915',)]:
+    if not TABLES <= tables or execute('SELECT version_num FROM alembic_version').scalar() not in REVISIONS:
         raise AssignmentRefused('Migrated assignment schema required')
     if execute('PRAGMA foreign_keys').scalar() != 1:
         raise AssignmentRefused('Foreign keys must be enabled')

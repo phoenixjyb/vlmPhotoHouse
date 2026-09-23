@@ -1,5 +1,5 @@
 {
-  "contract_version": "2.0.0-candidate.23",
+  "contract_version": "2.0.0-candidate.25",
   "synthetic_only": true,
   "normalization": "random account IDs/session tokens/invitation code replaced with fixed synthetic values; story IDs fixed in generator",
   "media_evidence": "generated fixture JPEG; on-demand renderer stubbed; authorization/file/range behavior real; gallery all/image/video filtering and denial captured; no decoder/device claim",
@@ -2105,6 +2105,25 @@
       }
     },
     {
+      "id": "upload_history_requires_opt_in",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access unavailable"
+        }
+      }
+    },
+    {
       "id": "upload_requires_opt_in",
       "request": {
         "method": "POST",
@@ -2201,6 +2220,571 @@
       "request": {
         "method": "GET",
         "path": "/assets/detail/1000?library=family-a",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "upload_history_pending",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "page": 1,
+          "page_size": 10,
+          "total": 1,
+          "items": [
+            {
+              "asset_id": "1000",
+              "created_at": 2000000000,
+              "bytes": 632,
+              "kind": "image",
+              "state": "awaiting_review",
+              "library_id": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "upload_history_other_account_empty",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "page": 1,
+          "page_size": 10,
+          "total": 0,
+          "items": []
+        }
+      }
+    },
+    {
+      "id": "upload_history_unknown_query",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?account_id=other",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid request"
+        }
+      }
+    },
+    {
+      "id": "upload_history_duplicate_page",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1&page=2",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Invalid request"
+        }
+      }
+    },
+    {
+      "id": "upload_history_anonymous",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "none",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "upload_history_available",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "page": 1,
+          "page_size": 10,
+          "total": 1,
+          "items": [
+            {
+              "asset_id": "1000",
+              "created_at": 2000000000,
+              "bytes": 632,
+              "kind": "image",
+              "state": "available",
+              "library_id": "family-a"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "upload_history_unavailable",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "page": 1,
+          "page_size": 10,
+          "total": 1,
+          "items": [
+            {
+              "asset_id": "1000",
+              "created_at": 2000000000,
+              "bytes": 632,
+              "kind": "image",
+              "state": "unavailable",
+              "library_id": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "transfer_create",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "request_id": "cccccccccccccccccccccccccccccccc",
+          "batch": "dddddddddddddddddddddddddddddddd",
+          "filename": "synthetic.mp4",
+          "bytes": 24336,
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "kind": "video"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 0,
+          "chunk_bytes": 4194304,
+          "state": "uploading",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_create_retry",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "request_id": "cccccccccccccccccccccccccccccccc",
+          "batch": "dddddddddddddddddddddddddddddddd",
+          "filename": "synthetic.mp4",
+          "bytes": 24336,
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "kind": "video"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 0,
+          "chunk_bytes": 4194304,
+          "state": "uploading",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_foreign",
+      "request": {
+        "method": "GET",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "credential": "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "headers": {}
+      },
+      "response": {
+        "status": 404,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Upload unavailable"
+        }
+      }
+    },
+    {
+      "id": "transfer_chunk",
+      "request": {
+        "method": "PUT",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "Upload-Offset": "0",
+          "X-Chunk-SHA256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+        },
+        "content": {
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "bytes": 24336
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 24336,
+          "chunk_bytes": 4194304,
+          "state": "uploading",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_duplicate_chunk",
+      "request": {
+        "method": "PUT",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {
+          "Content-Type": "application/octet-stream",
+          "Upload-Offset": "0",
+          "X-Chunk-SHA256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8"
+        },
+        "content": {
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "bytes": 24336
+        }
+      },
+      "response": {
+        "status": 409,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Refresh upload offset"
+        }
+      }
+    },
+    {
+      "id": "transfer_status",
+      "request": {
+        "method": "GET",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 24336,
+          "chunk_bytes": 4194304,
+          "state": "uploading",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_complete",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/complete",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 24336,
+          "chunk_bytes": 4194304,
+          "state": "complete",
+          "asset_id": "1001"
+        }
+      }
+    },
+    {
+      "id": "transfer_complete_retry",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/complete",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 24336,
+          "offset": 24336,
+          "chunk_bytes": 4194304,
+          "state": "complete",
+          "asset_id": "1001"
+        }
+      }
+    },
+    {
+      "id": "transfer_video_history",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "page": 1,
+          "page_size": 10,
+          "total": 2,
+          "items": [
+            {
+              "asset_id": "1001",
+              "created_at": 2000000000,
+              "bytes": 24336,
+              "kind": "video",
+              "state": "awaiting_review",
+              "library_id": null
+            },
+            {
+              "asset_id": "1000",
+              "created_at": 2000000000,
+              "bytes": 632,
+              "kind": "image",
+              "state": "unavailable",
+              "library_id": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "transfer_cancel_create",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {
+          "request_id": "99999999999999999999999999999999",
+          "batch": "dddddddddddddddddddddddddddddddd",
+          "filename": "synthetic.mp4",
+          "bytes": 24336,
+          "sha256": "5ab7d5d27cc6b3f557068ce21cc07e332939ae92f8240233b5eb087c1012afe8",
+          "kind": "video"
+        }
+      },
+      "response": {
+        "status": 201,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "ffffffffffffffffffffffffffffffff",
+          "bytes": 24336,
+          "offset": 0,
+          "chunk_bytes": 4194304,
+          "state": "uploading",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_cancel",
+      "request": {
+        "method": "DELETE",
+        "path": "/upload-sessions/ffffffffffffffffffffffffffffffff",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "ffffffffffffffffffffffffffffffff",
+          "bytes": 24336,
+          "offset": 0,
+          "chunk_bytes": 4194304,
+          "state": "cancelled",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_cancel_retry",
+      "request": {
+        "method": "DELETE",
+        "path": "/upload-sessions/ffffffffffffffffffffffffffffffff",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "upload_id": "ffffffffffffffffffffffffffffffff",
+          "bytes": 24336,
+          "offset": 0,
+          "chunk_bytes": 4194304,
+          "state": "cancelled",
+          "asset_id": null
+        }
+      }
+    },
+    {
+      "id": "transfer_cancel_complete_denied",
+      "request": {
+        "method": "POST",
+        "path": "/upload-sessions/ffffffffffffffffffffffffffffffff/complete",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {},
+        "json": {}
+      },
+      "response": {
+        "status": 409,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Upload incomplete"
+        }
+      }
+    },
+    {
+      "id": "transfer_revoked",
+      "request": {
+        "method": "GET",
+        "path": "/upload-sessions/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+        "headers": {}
+      },
+      "response": {
+        "status": 401,
+        "headers": {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        },
+        "body": {
+          "detail": "Access denied"
+        }
+      }
+    },
+    {
+      "id": "upload_history_revoked",
+      "request": {
+        "method": "GET",
+        "path": "/uploads?page=1",
         "credential": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
         "headers": {}
       },

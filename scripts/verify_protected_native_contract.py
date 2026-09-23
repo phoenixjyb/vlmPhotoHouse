@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = '85da95266926f4ef002066084bf1a18ce52bffc9'
+SOURCE = 'b18f4bb59e3802e846ef401bbe108cf12bbe008f'
 
 
 def verify(root=ROOT):
@@ -14,7 +14,7 @@ def verify(root=ROOT):
     manifest = json.loads((root / PACK / 'manifest.json').read_text(encoding='utf-8'))
     if manifest['backend_source_commit'] != SOURCE:
         raise ValueError('Unexpected backend source pin')
-    if manifest['contract_version'] != '2.0.0-candidate.23':
+    if manifest['contract_version'] != '2.0.0-candidate.25':
         raise ValueError('Unexpected contract version')
     if manifest['client_profile_defaults'] != {
         'protected_native_v2': False, 'protected_photo_display': False,
@@ -49,7 +49,10 @@ def verify(root=ROOT):
         for path in (root / directory).rglob('*.py')
         if '__pycache__' not in path.parts
     }
-    expected_sources |= {'scripts/prepare_access_places.py',
+    expected_sources |= {'tests/security/test_upload.py',
+                         'tests/security/test_upload_history.py',
+                         'docs/security/MEMBER_UPLOAD_HISTORY_V35.md',
+                         'scripts/prepare_access_places.py',
                          'scripts/create_library_presets.py',
                          'docs/security/LIBRARY_ORGANIZATION_V27.md',
                          'scripts/prepare_access_discovery_index.py',
@@ -74,6 +77,25 @@ def verify(root=ROOT):
                          'backend/alembic.ini',
                          'scripts/home_media_worker.py', 'backend/requirements-access.lock',
                          'backend/requirements-access-test.lock'}
+    expected_sources |= {
+        'docs/security/RESUMABLE_MEDIA_UPLOAD_V36.md',
+        'docs/security/SCHEMA_APPLICATION.md',
+        'scripts/apply_access_schema.py', 'scripts/run_caption_worker.py',
+        'scripts/run_face_worker.py', 'tests/security/test_resumable_upload.py',
+        'tests/security/test_uploaded_video_tasks.py',
+        'tests/security/test_upload_review.py',
+        'tests/security/test_video_upload_review_browser.cjs',
+        'tests/security/test_upload_review_browser.cjs',
+        'tests/security/upload_review_browser_bridge.py',
+        'tests/security/test_closed_application.py',
+        'tests/security/test_staging_package.py',
+        'tests/security/test_existing_access_upgrade.py',
+        'tests/security/test_management_migration.py',
+        'tests/security/test_upload_migration.py',
+        'tests/security/test_fullsize_preparation.py',
+        'tests/security/test_caption_worker.py',
+        'tests/security/caption_worker_fixture.py',
+    }
     if set(manifest['source_sha256']) != expected_sources:
         raise ValueError('Source closure has changed; review and version the profile')
     cases = json.loads((root / PACK / 'cases.json').read_text(encoding='utf-8'))

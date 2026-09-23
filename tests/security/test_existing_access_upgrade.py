@@ -68,6 +68,7 @@ class ExistingAccessUpgradeTests(unittest.TestCase):
                              (migration.TO_REVISION,))
             self.assertEqual(db.execute('SELECT display_name FROM access_accounts').fetchall(), [(None,)])
             self.assertEqual(db.execute('SELECT count(*) FROM access_uploads').fetchone(), (0,))
+            self.assertEqual(db.execute('SELECT count(*) FROM access_upload_transfers').fetchone(), (0,))
             self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
         self.assertEqual(self.backup.read_bytes(), backup_bytes)
 
@@ -100,6 +101,37 @@ class ExistingAccessUpgradeTests(unittest.TestCase):
         self.apply(execute=True, all_writers_stopped=True)
         with self.assertRaises(migration.full.small.Refused):
             self.apply(execute=True, all_writers_stopped=True)
+
+    def test_current_upload_revision_preserves_existing_receipts_and_memberships(self):
+        from sqlalchemy import create_engine
+        from alembic import command
+        engine = create_engine('sqlite:///' + str(self.db))
+        try:
+            with engine.begin() as connection:
+                config = migration.full.small.migration_config()
+                config.attributes['connection'] = connection
+                command.upgrade(config, migration.EXISTING_UPLOAD_REVISION)
+        finally:
+            engine.dispose()
+        with closing(sqlite3.connect(self.db)) as db:
+            db.execute('''INSERT INTO access_uploads(asset_id,account_id,incoming_label,batch,
+                original_name,sha256,bytes,state,created_at) VALUES(?,?,?,?,?,?,?,?,?)''',
+                (1, 'owner', 'synthetic-owner', '1' * 32, 'synthetic.jpg', '2' * 64,
+                 1234, 'assigned', 1770000000))
+            db.commit()
+            previous = db.execute('SELECT * FROM access_uploads').fetchall()
+            membership = db.execute('SELECT * FROM access_memberships').fetchall()
+        self.backup = self.root / 'upload-backup.sqlite'
+        self.digest = migration.full.snapshot(self.db, self.backup, self.budget())['snapshot_digest']
+        result = migration.apply(self.db, self.backup, self.digest, self.budget(),
+            from_revision=migration.EXISTING_UPLOAD_REVISION, execute=True, all_writers_stopped=True)
+        self.assertTrue(result['applied'])
+        with closing(sqlite3.connect(self.db)) as db:
+            self.assertEqual(db.execute('SELECT * FROM access_uploads').fetchall(), previous)
+            self.assertEqual(db.execute('SELECT * FROM access_memberships').fetchall(), membership)
+            self.assertEqual(db.execute('SELECT count(*) FROM access_upload_transfers').fetchone(), (0,))
+            self.assertEqual(db.execute('SELECT version_num FROM alembic_version').fetchone(),
+                             (migration.TO_REVISION,))
 
     def test_cli_selects_existing_account_upgrade_explicitly(self):
         from contextlib import redirect_stdout

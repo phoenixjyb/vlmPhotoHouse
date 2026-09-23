@@ -51,11 +51,14 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method == 'POST' and path == '/upload-sessions': return True
+        if method in {'GET','PUT','DELETE'} and re.fullmatch(r'/upload-sessions/[0-9a-f]{32}',path): return True
+        if method == 'POST' and re.fullmatch(r'/upload-sessions/[0-9a-f]{32}/complete',path): return True
         if method == 'GET' and path in ('/library-catalogue', '/admin/library-transfers'): return True
         if method == 'POST' and path in ('/admin/library-transfers/review', '/admin/library-transfers/confirm'): return True
         if method == 'GET' and (path == '/admin/uploads' or re.fullmatch(r'/admin/uploads/[0-9]+/preview', path)): return True
         if method == 'POST' and re.fullmatch(r'/admin/uploads/[0-9]+/(review|approve)', path): return True
-        if method == 'POST' and path == '/uploads':
+        if method in {'GET', 'POST'} and path == '/uploads':
             # No library in the path: the upload is a pre-library action, so there is nothing
             # library-scoped for this pattern to bind. The capability is checked in the service.
             return True

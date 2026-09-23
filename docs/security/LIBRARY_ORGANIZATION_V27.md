@@ -14,6 +14,8 @@ Public product presets, with stable IDs and presentation labels:
 | chuan-work | 曹川的工作 | Chuan’s Work |
 | scenery | 风景 | Scenery |
 | concerts | 音乐会 | Concerts |
+| home-renovation | 装修 | Home Renovation |
+| expense-receipts | 报销单 | Expense Receipts |
 
 `scripts/create_library_presets.py --database ABSOLUTE_PATH --operator-account UUID`
 previews the exact preset list. Explicit `--apply` creates empty libraries and

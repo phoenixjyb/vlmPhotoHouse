@@ -28,6 +28,8 @@ PRESETS = {
     'chuan-work': ("Chuan’s Work", '曹川的工作'),
     'scenery': ('Scenery', '风景'),
     'concerts': ('Concerts', '音乐会'),
+    'home-renovation': ('Home Renovation', '装修'),
+    'expense-receipts': ('Expense Receipts', '报销单'),
 }
 
 

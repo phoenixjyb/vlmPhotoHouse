@@ -1,4 +1,28 @@
-# Validation receipt — 2026-09-21
+# Validation receipt — 2026-09-22
+
+## Candidate.25 — bounded resumable photos and videos
+
+Source `b18f4bb59e3802e846ef401bbe108cf12bbe008f`. The affected backend
+suite passed 233 tests in the disposable dependency-complete Mac test environment.
+An actual synthetic MP4 passed bounded `ffprobe` and one 24,871-byte keyframe
+was extracted by the bounded `ffmpeg` command. Real ASGI/Chromium review flows
+passed for photo approval and video placeholder/approval; the rendered video
+review screen was inspected. The frozen pack adds 14 transfer cases: private
+creation, duplicate request, chunk/status, duplicate-chunk conflict, completion
+retry, video history, cancellation and membership revocation. All prior 98 case
+responses remain byte-for-byte unchanged. These are source and synthetic media
+checks, not Windows service, prepared playback or physical-phone acceptance.
+
+## Candidate.24 — private upload history and two new presets
+
+Source `a33eb936a87660271cc4fe2663ffa1f9a36bfa31`. 115 affected backend tests passed, including
+ten own-upload history checks. Ten focused Chromium/real-ASGI history scenarios
+and all 63 existing WebUI checkpoints passed. Desktop and narrow Chinese renders
+were inspected. Nine new wire captures cover disabled runtime, own pending and
+available receipts, foreign-account isolation, hidden unavailable destination,
+strict queries, anonymous denial and membership revocation. All prior 89 exchanges
+are unchanged. Candidate.24 contains 98 captures. No production service, database,
+job, phone or TV was changed by this validation.
 
 ## Candidate.23 — bounded face editing and move failure feedback
 

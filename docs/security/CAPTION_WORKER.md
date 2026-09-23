@@ -235,7 +235,16 @@ queue preflight. It creates no lock, receipt or task, contacts no service and im
 no application/model modules. It only compiles the hash-verified stdlib launcher.
 It refuses a retained stop file even in preflight; it never removes one.
 
-The private JSON has exactly these fields:
+For an explicitly reviewed receiving-only interval, the private supervisor JSON
+may additionally set `"defer_non_caption_pending": true`. This permits pending
+non-caption tasks to remain untouched while the caption-only worker runs; any
+running non-caption task still refuses startup. The preflight result and start
+receipt record the count of deferred tasks. The option does not assign an owner,
+process images or videos, or make uploaded videos ready for playback. Leave it
+unset for the normal independent-owner gate, and qualify a separate media worker
+before claiming processing parity.
+
+The private JSON has these required fields and the optional deferred-mode field:
 
 | Field | Required value |
 | --- | --- |
@@ -249,8 +258,9 @@ The private JSON has exactly these fields:
 | `caption_url` | Explicit HTTP loopback model endpoint accepted by the worker |
 | `environment_json`, `environment_sha256` | Existing reviewed policy file and its hash |
 | `receipt_directory` | Existing private directory separate from source/media/temp |
+| `defer_non_caption_pending` | Optional boolean; `true` permits only pending, not running, other task families |
 
-All non-version values are strings; all paths are explicit canonical local paths.
+All required non-version values are strings; all paths are explicit canonical local paths.
 The supervisor refuses duplicate/unknown fields, aliases, mismatched hashes and
 unmanifested files including `.env` and bytecode. Configuration and manifest hashes
 must come from independent review, not from untrusted content in the same directory.
@@ -258,8 +268,9 @@ Private policy values are never printed or stored in the receipts.
 
 Execution additionally requires `--execute --writers-fenced`. This flag is an
 operator assertion after independently fencing legacy/other writers, **not a
-mechanism that stops or detects them**. It refuses running captions and any pending
-or running non-caption tasks at startup. That query is a startup check, not a
+mechanism that stops or detects them**. It refuses running captions and running
+non-caption tasks. It also refuses pending non-caption tasks unless the optional
+deferred-mode pin is explicitly true. That query is a startup check, not a
 continuous monitor or a guarantee against another writer enqueueing later.
 
 The supervisor verifies inputs twice before execution, then calls the verified
