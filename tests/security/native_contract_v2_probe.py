@@ -17,7 +17,7 @@ from app.access.media import MediaRuntime
 from app.photo_delivery import PhotoCache
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = '2.0.0-candidate.24'
+VERSION = '2.0.0-candidate.25'
 
 
 def capture():
@@ -261,7 +261,31 @@ def capture():
         call('upload_history_available','GET','/uploads?page=1',200,token=native)
         env.mutate("UPDATE assets SET status='suppressed' WHERE id=?",(accepted['asset_id'],))
         call('upload_history_unavailable','GET','/uploads?page=1',200,token=native)
+        video_bytes=(ROOT/'tests/security/fixtures/home-video.mp4').read_bytes()
+        transfer_body=dict(request_id='c'*32,batch='d'*32,filename='synthetic.mp4',
+                           bytes=len(video_bytes),sha256=hashlib.sha256(video_bytes).hexdigest(),kind='video')
+        with patch('app.access.resumable.secrets.token_hex',return_value='e'*32):
+            transfer=call('transfer_create','POST','/upload-sessions',201,token=native,body=transfer_body).json()
+        transfer_path='/upload-sessions/'+transfer['upload_id']
+        call('transfer_create_retry','POST','/upload-sessions',201,token=native,body=transfer_body)
+        call('transfer_foreign','GET',transfer_path,404,token=env.owner_token)
+        chunk_headers={'Content-Type':'application/octet-stream','Upload-Offset':'0',
+                       'X-Chunk-SHA256':hashlib.sha256(video_bytes).hexdigest()}
+        call('transfer_chunk','PUT',transfer_path,200,token=native,headers=chunk_headers,content=video_bytes)
+        call('transfer_duplicate_chunk','PUT',transfer_path,409,token=native,headers=chunk_headers,content=video_bytes)
+        call('transfer_status','GET',transfer_path,200,token=native)
+        call('transfer_complete','POST',transfer_path+'/complete',200,token=native,body={})
+        call('transfer_complete_retry','POST',transfer_path+'/complete',200,token=native,body={})
+        call('transfer_video_history','GET','/uploads?page=1',200,token=native)
+        with patch('app.access.resumable.secrets.token_hex',return_value='f'*32):
+            cancelled=call('transfer_cancel_create','POST','/upload-sessions',201,token=native,
+                           body={**transfer_body,'request_id':'9'*32}).json()
+        cancelled_path='/upload-sessions/'+cancelled['upload_id']
+        call('transfer_cancel','DELETE',cancelled_path,200,token=native)
+        call('transfer_cancel_retry','DELETE',cancelled_path,200,token=native)
+        call('transfer_cancel_complete_denied','POST',cancelled_path+'/complete',409,token=native,body={})
         env.mutate("UPDATE access_memberships SET status='revoked', revision=revision+1 WHERE account_id=?", (new_id,))
+        call('transfer_revoked','GET',transfer_path,401,token=native)
         call('upload_history_revoked','GET','/uploads?page=1',401,token=native)
         call('revoked_session_still_authenticated', 'GET', '/auth/session', 200, token=native)
         call('revoked_story_list', 'GET', '/assets/101/stories?library=family-a', 401, token=native)

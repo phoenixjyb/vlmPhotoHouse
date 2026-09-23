@@ -18,7 +18,7 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-REVISION = 'f2a6d8b4c915'
+REVISIONS = ('f2a6d8b4c915', 'a8d4c2e6f901')
 KINDS = ('person_cluster', 'person_recluster', 'person_label_propagate')
 
 
@@ -90,7 +90,8 @@ def preflight(database, root, task_id, plan_id, digest, stop_file):
         db.execute("PRAGMA query_only=ON")
         db.execute('PRAGMA trusted_schema=OFF')
         db.execute('BEGIN')
-        if db.execute('SELECT version_num FROM alembic_version').fetchall() != [(REVISION,)]:
+        revision = db.execute('SELECT version_num FROM alembic_version').fetchone()
+        if not revision or revision[0] not in REVISIONS:
             raise Refused('Migrated database required')
         task = db.execute('SELECT type,state,cancel_requested,scheduled_at FROM tasks WHERE id=?', (int(task_id),)).fetchone()
         if not task or task[0] not in KINDS or task[1:] != ('pending', 0, None):
@@ -145,7 +146,8 @@ def run(args, *, clock=time.time):
                 if (identity(database) != before or identity(root) != root_before
                         or os.path.lexists(stop_file)):
                     raise Refused('Worker target or stop request changed')
-                if raw.execute('SELECT version_num FROM alembic_version').fetchall() != [(REVISION,)]:
+                revision = raw.execute('SELECT version_num FROM alembic_version').fetchone()
+                if not revision or revision[0] not in REVISIONS:
                     raise Refused('Migrated database required')
                 envelope = verify_queued(state, plan_id=args.plan_id, digest=args.reviewed_plan_digest,
                               task_id=int(args.task_id), database_identity=before)

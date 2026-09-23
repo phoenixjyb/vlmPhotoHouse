@@ -54,7 +54,7 @@ class UploadMigrationTests(unittest.TestCase):
 
     def test_chain_has_exactly_one_head_and_it_is_this_revision(self):
         heads = ScriptDirectory.from_config(migration_config()).get_heads()
-        self.assertEqual(heads, [UPLOAD_HEAD])
+        self.assertEqual(heads, ['a8d4c2e6f901'])
 
     def test_existing_account_survives_with_a_null_display_name(self):
         self.upgrade(PRE_UPLOAD)

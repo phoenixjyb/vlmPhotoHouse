@@ -1,4 +1,4 @@
-import os, json, time, random, re, numpy as np
+import os, json, time, random, re, shutil, numpy as np
 import subprocess
 import tempfile
 import threading
@@ -44,8 +44,42 @@ DERIVED_DIR = Path(os.getenv('DERIVED_PATH', os.path.join(os.getenv('VLM_DATA_RO
 ( DERIVED_DIR / 'face_embeddings').mkdir(parents=True, exist_ok=True)
 ( DERIVED_DIR / 'person_embeddings').mkdir(parents=True, exist_ok=True)
 THUMB_SIZES = [256, 1024]
+VIDEO_KEYFRAME_LIMIT = 32
+VIDEO_KEYFRAME_BYTES = 128 * 1024 * 1024
+VIDEO_PROCESS_LOG_BYTES = 64 * 1024
 FACE_CLUSTER_DIST_THRESHOLD = 0.35  # default; overridden by settings
 FACE_ASSIGNMENT_TASK_TYPES = ('person_cluster', 'person_recluster', 'person_label_propagate')
+
+
+def _run_bounded_media_process(args, *, timeout, output_dir):
+    """Run one owned media child with bounded logs and deterministic cleanup."""
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        process = subprocess.Popen([str(arg) for arg in args], stdin=subprocess.DEVNULL,
+                                   stdout=stdout, stderr=stderr, creationflags=flags,
+                                   start_new_session=(os.name != 'nt'))
+        started = time.monotonic()
+        try:
+            while process.poll() is None:
+                if time.monotonic() - started > timeout:
+                    raise ValueError('video processing timeout')
+                if stdout.tell() > VIDEO_PROCESS_LOG_BYTES or stderr.tell() > VIDEO_PROCESS_LOG_BYTES:
+                    raise ValueError('video processing log budget exceeded')
+                output = [p for p in Path(output_dir).glob('frame_*.jpg') if p.is_file() and not p.is_symlink()]
+                if len(output) > VIDEO_KEYFRAME_LIMIT or sum(p.stat().st_size for p in output) > VIDEO_KEYFRAME_BYTES:
+                    raise ValueError('video processing disk budget exceeded')
+                time.sleep(0.02)
+            if process.returncode or stdout.tell() > VIDEO_PROCESS_LOG_BYTES or stderr.tell() > VIDEO_PROCESS_LOG_BYTES:
+                raise ValueError('video processing failed')
+        finally:
+            if process.poll() is None:
+                process.kill()
+                if os.name != 'nt':
+                    try:
+                        os.killpg(process.pid, 9)
+                    except OSError:
+                        pass
+            process.wait()
 
 INDEX_SINGLETON: InMemoryVectorIndex | None = None
 VIDEO_INDEX_SINGLETON: InMemoryVectorIndex | None = None
@@ -995,69 +1029,92 @@ class TaskExecutor:
 
     # ---- Minimal Video Handlers (MVP stubs) ----
     def _handle_video_probe(self, session: Session, task: Task):
-        # Ensure derived folders; probe duration/fps/GPS when available.
+        # Probe is the validation barrier; failures must remain visible in task state.
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         if not asset_id:
-            return
+            raise ValueError('video asset_id missing')
         asset = session.get(Asset, asset_id)
         if not asset:
-            return
-        # create derived dirs
+            raise ValueError('video asset missing')
+        if not str(asset.mime or '').lower().startswith('video/'):
+            raise ValueError('video probe received non-video asset')
         (DERIVED_DIR / 'video_frames' / str(asset_id)).mkdir(parents=True, exist_ok=True)
         (DERIVED_DIR / 'video_embeddings').mkdir(parents=True, exist_ok=True)
-        try:
-            meta = probe_video_metadata(asset.path, timeout_sec=10)
-            if meta.get('duration_sec') is not None:
-                asset.duration_sec = float(meta['duration_sec'])
-            if meta.get('fps') is not None:
-                asset.fps = float(meta['fps'])
-            if meta.get('gps_lat') is not None and meta.get('gps_lon') is not None:
-                asset.gps_lat = float(meta['gps_lat'])
-                asset.gps_lon = float(meta['gps_lon'])
-        except Exception:
-            pass
+        meta = probe_video_metadata(asset.path, timeout_sec=10, strict=True)
+        asset.duration_sec = float(meta['duration_sec'])
+        asset.fps = float(meta['fps'])
+        asset.width, asset.height = int(meta['width']), int(meta['height'])
+        if meta.get('gps_lat') is not None and meta.get('gps_lon') is not None:
+            asset.gps_lat, asset.gps_lon = float(meta['gps_lat']), float(meta['gps_lon'])
+        session.add(Task(type='video_keyframes', priority=70,
+                         payload_json={'asset_id': asset_id}))
         session.commit()
 
     def _handle_video_keyframes(self, session: Session, task: Task):
-        # Attempt to extract spaced frames with ffmpeg when available; else stub
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         if not asset_id:
-            return
+            raise ValueError('video asset_id missing')
         src = None
         with self.session_factory() as s2:
             a = s2.get(Asset, asset_id)
-            if a:
+            if a and str(a.mime or '').lower().startswith('video/'):
                 src = a.path
-        out_dir = DERIVED_DIR / 'video_frames' / str(asset_id)
-        out_dir.mkdir(parents=True, exist_ok=True)
+            elif a:
+                raise ValueError('video keyframes received non-video asset')
         if not src or not os.path.exists(src):
-            return
+            raise ValueError('video source missing')
+        probe = probe_video_metadata(src, timeout_sec=10, strict=True)
         interval = max(0.5, float(getattr(self.settings, 'video_keyframe_interval_sec', 2.0)))
-        # Use ffmpeg -vf fps=1/interval to sample roughly one frame per interval
+        duration = float(probe.get('duration_sec') or 0.0)
+        sample_rate = max(1.0 / interval, 1.0 / max(duration, 1.0))
+        parent_dir = DERIVED_DIR / 'video_frames'
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        out_dir = Path(tempfile.mkdtemp(prefix=f'.{asset_id}-', dir=parent_dir))
+        cmd = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+               '-threads', '1', '-protocol_whitelist', 'file', '-i', src,
+               '-map', '0:v:0', '-an', '-sn', '-dn', '-vf',
+               f'fps={sample_rate:.6f},scale=1024:1024:force_original_aspect_ratio=decrease',
+               '-pix_fmt', 'yuvj420p',
+               '-frames:v', str(VIDEO_KEYFRAME_LIMIT), str(out_dir / 'frame_%05d.jpg')]
         try:
-            import subprocess
-            cmd = [
-                'ffmpeg','-hide_banner','-loglevel','error','-y',
-                '-i', src,
-                '-vf', f"fps=1/{interval}",
-                str(out_dir / 'frame_%05d.jpg')
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+            _run_bounded_media_process(cmd, timeout=120, output_dir=out_dir)
+            frames = sorted(out_dir.glob('frame_*.jpg'))
+            if not frames or len(frames) > VIDEO_KEYFRAME_LIMIT:
+                raise ValueError('video keyframe output missing or unbounded')
+            total = 0
+            for frame in frames:
+                if not frame.is_file() or frame.is_symlink():
+                    raise ValueError('video keyframe output invalid')
+                total += frame.stat().st_size
+            if total <= 0 or total > VIDEO_KEYFRAME_BYTES:
+                raise ValueError('video keyframe output exceeds budget')
+            published = parent_dir / str(asset_id)
+            old = published.with_name(published.name + '.old')
+            if old.exists():
+                shutil.rmtree(old)
+            if published.exists():
+                os.replace(published, old)
+            os.replace(out_dir, published)
+            if old.exists():
+                shutil.rmtree(old)
         except Exception:
-            # fallback: marker file
-            try:
-                (out_dir / '_keyframes_stub.txt').write_text('keyframes not implemented (ffmpeg missing)')
-            except Exception:
-                pass
+            shutil.rmtree(out_dir, ignore_errors=True)
+            raise
+        session.add(Task(type='video_embed', priority=90,
+                         payload_json={'asset_id': asset_id}))
+        # Captioning already extracts one bounded representative frame. Face detection is
+        # image-only, so no face task is fabricated for a video asset.
+        session.add(Task(type='caption', priority=110,
+                         payload_json={'asset_id': asset_id}))
+        session.commit()
 
     def _handle_video_embed(self, session: Session, task: Task):
-        # Compute pooled embedding over extracted frames if present; else zero-vector stub
         payload = task.payload_json or {}
         asset_id = payload.get('asset_id')
         if not asset_id:
-            return
+            raise ValueError('video asset_id missing')
         frames_dir = DERIVED_DIR / 'video_frames' / str(asset_id)
         vecs = []
         if frames_dir.exists():
@@ -1076,11 +1133,10 @@ class TaskExecutor:
                         continue
             except Exception:
                 pass
-        if vecs:
-            import numpy as _np
-            vec = _np.mean(_np.stack(vecs, axis=0), axis=0).astype('float32')
-        else:
-            vec = np.zeros((EMBED_DIM,), dtype='float32')
+        if not vecs:
+            raise ValueError('video embedding has no usable keyframe vectors')
+        import numpy as _np
+        vec = _np.mean(_np.stack(vecs, axis=0), axis=0).astype('float32')
         emb_path = DERIVED_DIR / 'video_embeddings' / f'{asset_id}.npy'
         emb_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(emb_path, vec)

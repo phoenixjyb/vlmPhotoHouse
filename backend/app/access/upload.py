@@ -226,6 +226,7 @@ class UploadRuntime:
         """
         from .service import AccessService, AccessDenied
         from .transport import TransportError
+        from .resumable import MAX_IMAGE_BYTES, MAX_VIDEO_BYTES
 
         if type(page) is not int or not 1 <= page <= 100000:
             raise ValueError('Invalid page')
@@ -249,8 +250,8 @@ class UploadRuntime:
                 for asset, created, size, receipt, status, mime, mapped in rows:
                     if (type(asset) is not int or not 1 <= asset <= 2**63-1
                             or type(created) is not int or not 0 <= created <= 253402300799
-                            or type(size) is not int or not 1 <= size <= MAX_UPLOAD_BYTES
-                            or mime not in {'image/jpeg', 'image/png'}):
+                            or type(size) is not int or not 1 <= size <= (MAX_VIDEO_BYTES if mime and mime.startswith('video/') else MAX_IMAGE_BYTES)
+                            or mime not in {'image/jpeg', 'image/png','video/mp4','video/quicktime'}):
                         raise TransportError(503, 'Upload history unavailable')
                     state, library = 'unavailable', None
                     if status in (None, 'active'):
@@ -263,5 +264,5 @@ class UploadRuntime:
                             except AccessDenied:
                                 pass
                     items.append(dict(asset_id=str(asset), created_at=created, bytes=size,
-                                      kind='image', state=state, library_id=library))
+                                      kind='video' if mime.startswith('video/') else 'image', state=state, library_id=library))
                 return dict(page=page, page_size=10, total=total, items=items)

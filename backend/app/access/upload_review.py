@@ -24,7 +24,8 @@ from .provisioning_apply import _identity, plan_digest
 from .runtime import ExistingDatabase
 from .service import AccessDenied, AccessService
 from .transport import TransportError, _body, _runtime, credentials_from_request
-from .upload import MAX_UPLOAD_BYTES, UploadRuntime
+from .upload import UploadRuntime
+from .resumable import MAX_IMAGE_BYTES, MAX_VIDEO_BYTES
 from ..home_feed import Refused
 from ..photo_delivery import PhotoCache, source_pin
 
@@ -74,13 +75,13 @@ class UploadReviewRuntime:
         if row is None or not (row[8:] == ('incoming', None) or
                 (allow_assigned and row[8:] == ('assigned', library))):
             raise AccessDenied('Access denied')
-        if (row[3] != row[6] or row[4] != row[7] or not 0 < row[4] <= MAX_UPLOAD_BYTES
-                or row[5] not in {'image/jpeg', 'image/png'}):
+        if (row[3] != row[6] or row[4] != row[7] or not 0 < row[4] <= (MAX_VIDEO_BYTES if row[5] and row[5].startswith('video/') else MAX_IMAGE_BYTES)
+                or row[5] not in {'image/jpeg', 'image/png','video/mp4','video/quicktime'}):
             raise TransportError(409, 'Upload changed; review again')
         return row
 
     def _pending_path(self, row):
-        suffix = '.jpg' if row[5] == 'image/jpeg' else '.png'
+        suffix = {'image/jpeg':'.jpg','image/png':'.png','video/mp4':'.mp4','video/quicktime':'.mov'}[row[5]]
         root = self.upload.incoming_root
         path = Path(row[0])
         if (not row[1] or Path(row[1]).name != row[1] or row[1] in {'.', '..'}
@@ -107,11 +108,11 @@ class UploadReviewRuntime:
                 args = (library, access._now())
                 result['total'] = db.execute('SELECT count(*)' + SOURCE + PENDING, args).fetchone()[0]
                 rows = db.execute('''SELECT a.id,substr(p.display_name,1,160),u.created_at,
-                    u.bytes,a.width,a.height''' + SOURCE + PENDING +
+                    u.bytes,a.width,a.height,a.mime''' + SOURCE + PENDING +
                     ' ORDER BY u.id DESC LIMIT 10 OFFSET ?', (*args, (page-1)*10)).fetchall()
                 result['items'] = [dict(id=str(r[0]), uploader=r[1] or '',
                     created_at=datetime.fromtimestamp(r[2], timezone.utc).isoformat(),
-                    bytes=r[3], width=r[4], height=r[5],
+                    bytes=r[3], width=r[4], height=r[5],kind='video' if r[6].startswith('video/') else 'image',
                     preview_url=f'/admin/uploads/{r[0]}/preview?' + urlencode({'library': library})) for r in rows]
                 return result
 
@@ -166,6 +167,8 @@ class UploadReviewRuntime:
                 self._owner(access, token, library)
                 row = self._item(access, library, asset)
                 path = self._pending_path(row)
+        if row[5].startswith('video/'):
+            raise TransportError(404, 'Video preview pending preparation')
         if not isinstance(self.photo_cache, PhotoCache):
             raise TransportError(503, 'Preview unavailable')
         try:

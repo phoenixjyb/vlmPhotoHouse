@@ -15,20 +15,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import rehearse_fullsize_database as full
 
 FROM_REVISION = 'd2b7e4f6a901'
-TO_REVISION = 'f2a6d8b4c915'
+TO_REVISION = 'a8d4c2e6f901'
 EXISTING_ACCESS_REVISION = 'd8e5b2f7a904'
+EXISTING_UPLOAD_REVISION = 'f2a6d8b4c915'
 
 
 def _source(db, budget, from_revision=FROM_REVISION):
-    if (from_revision not in (FROM_REVISION, EXISTING_ACCESS_REVISION)
+    if (from_revision not in (FROM_REVISION, EXISTING_ACCESS_REVISION, EXISTING_UPLOAD_REVISION)
             or full.validate(db, budget) != from_revision):
         raise full.small.Refused('Reviewed source revision required')
     tables = full.schema(db)
     if from_revision == FROM_REVISION and any(name.startswith('access_') for name in tables):
         raise full.small.Refused('Existing authentication state requires separate review')
-    if from_revision == EXISTING_ACCESS_REVISION:
+    if from_revision in (EXISTING_ACCESS_REVISION, EXISTING_UPLOAD_REVISION):
         from app.access.runtime import REQUIRED_TABLES
-        if not (REQUIRED_TABLES - {'access_uploads'}) <= set(tables) or 'access_uploads' in tables:
+        missing = REQUIRED_TABLES - ({'access_uploads', 'access_upload_transfers'}
+                                     if from_revision == EXISTING_ACCESS_REVISION else {'access_upload_transfers'})
+        if (not missing <= set(tables)
+                or (from_revision == EXISTING_ACCESS_REVISION and 'access_uploads' in tables)
+                or 'access_upload_transfers' in tables
+                or (from_revision == EXISTING_UPLOAD_REVISION and 'access_uploads' not in tables)):
             raise full.small.Refused('Reviewed existing-access schema required')
     if 'tasks' not in tables or db.execute("SELECT 1 FROM tasks WHERE state='running' LIMIT 1").fetchone():
         raise full.small.Refused('All running tasks must be drained')
@@ -104,8 +110,13 @@ def apply(database, backup, digest, budget, *, execute=False, all_writers_stoppe
                     raise full.small.Refused('Incomplete transactional migration')
                 if full.fingerprint(driver, preserved, budget)[0] != expected:
                     raise full.small.Refused('Existing data changed')
-                empty_tables = ('access_accounts', 'access_libraries', 'access_sessions', 'access_asset_libraries') \
-                    if from_revision == FROM_REVISION else ('access_uploads',)
+                if from_revision == FROM_REVISION:
+                    empty_tables = ('access_accounts', 'access_libraries', 'access_sessions',
+                                    'access_asset_libraries', 'access_uploads', 'access_upload_transfers')
+                elif from_revision == EXISTING_ACCESS_REVISION:
+                    empty_tables = ('access_uploads', 'access_upload_transfers')
+                else:
+                    empty_tables = ('access_upload_transfers',)
                 for table in empty_tables:
                     if driver.execute('SELECT count(*) FROM ' + table).fetchone()[0]:
                         raise full.small.Refused('Unexpected access grant')
@@ -136,7 +147,7 @@ def main(argv=None):
     parser.add_argument('--timeout-seconds', type=int, required=True)
     parser.add_argument('--execute', action='store_true')
     parser.add_argument('--all-writers-stopped', action='store_true')
-    parser.add_argument('--from-revision', choices=(FROM_REVISION, EXISTING_ACCESS_REVISION),
+    parser.add_argument('--from-revision', choices=(FROM_REVISION, EXISTING_ACCESS_REVISION, EXISTING_UPLOAD_REVISION),
                         default=FROM_REVISION)
     try:
         args = parser.parse_args(argv)

@@ -318,9 +318,10 @@ class AccessService:
             target_account,occurred_at) VALUES (?,'upload.create',NULL,NULL,?)''',
             (account_id, self._now()))
         enqueued = 0
-        for kind, priority, extra in (('embed', 50, {'modality': 'image'}), ('phash', 60, None),
-                                      ('thumb', 80, None), ('caption', 110, None),
-                                      ('face', 120, None)):
+        jobs = (('video_probe', 40, None),) if mime.startswith('video/') else (
+            ('embed', 50, {'modality': 'image'}), ('phash', 60, None),
+            ('thumb', 80, None), ('caption', 110, None), ('face', 120, None))
+        for kind, priority, extra in jobs:
             payload = {'asset_id': asset_id}
             if extra:
                 payload.update(extra)
@@ -334,7 +335,7 @@ class AccessService:
     @staticmethod
     def _upload_result(asset_id, label, batch, digest, size_bytes, mime, size, enqueued):
         return {'asset_id': str(asset_id), 'library_id': None, 'incoming': label, 'batch': batch,
-                'kind': 'image', 'width': size[0], 'height': size[1], 'sha256': digest,
+                'kind': 'video' if mime.startswith('video/') else 'image', 'width': size[0], 'height': size[1], 'sha256': digest,
                 'bytes': size_bytes, 'tasks_enqueued': enqueued}
 
     def set_display_name(self, operator_account_id: str, target_account_id: str, name: str):

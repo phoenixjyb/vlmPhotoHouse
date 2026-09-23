@@ -53,7 +53,7 @@ worker = importlib.util.module_from_spec(spec); spec.loader.exec_module(worker)
 stopfile = work/'stop'
 args = worker.argparse.Namespace(database=str(database), derived=str(work), temporary=str(work),
     stop_file=str(stopfile), caption_url='http://127.0.0.1:1', environment_json=str(environment),
-    expected_revision='f2a6d8b4c915', execute=True, legacy_worker_stopped=mode!='unconfirmed', once=mode!='drain')
+    expected_revision='a8d4c2e6f901', execute=True, legacy_worker_stopped=mode!='unconfirmed', once=mode!='drain')
 generated = 'EN: A red cup rests on a wooden table.\n\nZH-CN: 一个红色杯子放在木桌上。'
 calls = []
 class Provider:
@@ -131,7 +131,7 @@ with closing(sqlite3.connect(database)) as db:
     assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[3],)).fetchone()==('finished' if supervisor_path else 'pending',)
     assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[4],)).fetchone()==('pending',)
     assert db.execute('SELECT count(*) FROM tasks').fetchone()[0]==(2 if mode=='idle' else 3)
-    assert db.execute('SELECT version_num FROM alembic_version').fetchone()==('f2a6d8b4c915',)
+    assert db.execute('SELECT version_num FROM alembic_version').fetchone()==('a8d4c2e6f901',)
     if mode=='drain':
         assert db.execute('SELECT state FROM tasks WHERE id=?',(ids[2],)).fetchone()==('finished',)
         assert db.execute('SELECT superseded FROM captions WHERE id=?',(ids[1],)).fetchone()==(1,)

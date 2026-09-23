@@ -39,6 +39,16 @@ class ProtectedNativeContractTests(unittest.TestCase):
         self.assertIsNone(first['library_id'])
         self.assertEqual(self.cases['upload_not_in_library']['response']['status'], 401)
 
+    def test_resumable_video_retry_and_cancel_are_durable_and_private(self):
+        self.assertEqual(self.body('transfer_create'),self.body('transfer_create_retry'))
+        self.assertEqual(self.body('transfer_complete'),self.body('transfer_complete_retry'))
+        self.assertEqual(self.body('transfer_cancel'),self.body('transfer_cancel_retry'))
+        self.assertEqual(self.cases['transfer_foreign']['response']['status'],404)
+        self.assertEqual(self.cases['transfer_duplicate_chunk']['response']['status'],409)
+        self.assertEqual(self.cases['transfer_revoked']['response']['status'],401)
+        video=next(i for i in self.body('transfer_video_history')['items'] if i['kind']=='video')
+        self.assertEqual(video['state'],'awaiting_review');self.assertIsNone(video['library_id'])
+
     def test_own_upload_history_does_not_grant_access(self):
         pending = self.body('upload_history_pending')['items'][0]
         self.assertEqual(pending['state'], 'awaiting_review')

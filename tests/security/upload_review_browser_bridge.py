@@ -56,6 +56,17 @@ try:
     for line in sys.stdin:
         message = json.loads(line)
         if message.get('command') == 'quit': break
+        if message.get('command') == 'seed_video':
+            import hashlib
+            from pathlib import Path
+            from app.access.resumable import Transfers
+            data=(Path(__file__).parent/'fixtures/home-video.mp4').read_bytes()
+            transfers=Transfers(fixture.uploads)
+            row=transfers.create(fixture.member_token,dict(request_id='1'*32,batch='2'*32,
+                filename='synthetic.mp4',bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),kind='video'))
+            transfers.append(fixture.member_token,row['upload_id'],0,data,hashlib.sha256(data).hexdigest())
+            receipt=transfers.complete(fixture.member_token,row['upload_id'])
+            print(json.dumps(dict(id=message['id'],asset_id=receipt['asset_id'])),flush=True);continue
         if message.get('command') == 'revoke':
             with closing(fixture.connection()) as db:
                 db.execute('UPDATE access_sessions SET revoked=1'); db.commit()

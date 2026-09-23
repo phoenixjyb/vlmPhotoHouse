@@ -60,7 +60,7 @@ class CaptionWorkerTests(unittest.TestCase):
             worker.preflight(self.db, 'd2b7e4f6a901')
 
     def test_each_supported_revision_requires_exact_read_only_selection(self):
-        revisions = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904', 'f2a6d8b4c915')
+        revisions = ('d2b7e4f6a901', 'c7f4a9e2b610', 'd8e5b2f7a904', 'f2a6d8b4c915', 'a8d4c2e6f901')
         self.assertEqual(worker.REVISIONS, revisions)
         for actual in revisions:
             with closing(sqlite3.connect(self.db)) as db:

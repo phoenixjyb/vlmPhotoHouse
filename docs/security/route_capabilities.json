@@ -3419,7 +3419,77 @@
    ],
    "scope": "Current account receipts, never another account or an inaccessible destination.",
    "current_control": "Opt-in upload runtime, same-origin cookie or bearer policy, strict page-only query, ten rows per page, one read transaction, active membership and per-destination read authorization, no-store, no filesystem or job side effects.",
-   "gap": "Manual refresh; no resumable uploads, inferred processing states or TV publication. Deployment and device acceptance are separate."
+   "gap": "Manual refresh; inferred processing states or TV publication. Deployment and device acceptance are separate."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "POST",
+   "path": "/upload-sessions",
+   "handler": "create_transfer",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.submit"
+   ],
+   "scope": "Current approved member, own account transfer only. No library access grant; completed media waits for separate owner/operator review.",
+   "current_control": "Persistent idempotent transfer ledger; 4 MiB chunks with hashes and committed offsets; exclusive per-transfer OS lock; bounded transport admission; streamed full checksum; media container/pixel checks; account and current membership rechecked; cookie CSRF; server-owned incoming paths.",
+   "gap": "Source/synthetic acceptance only. New explicit offline migration and server activation required. Original MP4/MOV acceptance does not imply playback preparation. No background worker or runtime activation."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "GET",
+   "path": "/upload-sessions/{upload_id}",
+   "handler": "get_transfer",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.submit"
+   ],
+   "scope": "Current approved member, own account transfer only. No library access grant; completed media waits for separate owner/operator review.",
+   "current_control": "Persistent idempotent transfer ledger; 4 MiB chunks with hashes and committed offsets; exclusive per-transfer OS lock; bounded transport admission; streamed full checksum; media container/pixel checks; account and current membership rechecked; cookie CSRF; server-owned incoming paths.",
+   "gap": "Source/synthetic acceptance only. New explicit offline migration and server activation required. Original MP4/MOV acceptance does not imply playback preparation. No background worker or runtime activation."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "PUT",
+   "path": "/upload-sessions/{upload_id}",
+   "handler": "append_transfer",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.submit"
+   ],
+   "scope": "Current approved member, own account transfer only. No library access grant; completed media waits for separate owner/operator review.",
+   "current_control": "Persistent idempotent transfer ledger; 4 MiB chunks with hashes and committed offsets; exclusive per-transfer OS lock; bounded transport admission; streamed full checksum; media container/pixel checks; account and current membership rechecked; cookie CSRF; server-owned incoming paths.",
+   "gap": "Source/synthetic acceptance only. New explicit offline migration and server activation required. Original MP4/MOV acceptance does not imply playback preparation. No background worker or runtime activation."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "DELETE",
+   "path": "/upload-sessions/{upload_id}",
+   "handler": "cancel_transfer",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.submit"
+   ],
+   "scope": "Current approved member, own account transfer only. No library access grant; completed media waits for separate owner/operator review.",
+   "current_control": "Persistent idempotent transfer ledger; 4 MiB chunks with hashes and committed offsets; exclusive per-transfer OS lock; bounded transport admission; streamed full checksum; media container/pixel checks; account and current membership rechecked; cookie CSRF; server-owned incoming paths.",
+   "gap": "Source/synthetic acceptance only. New explicit offline migration and server activation required. Original MP4/MOV acceptance does not imply playback preparation. No background worker or runtime activation."
+  },
+  {
+   "source": "backend/app/access/upload_transport.py",
+   "owner": "router",
+   "method": "POST",
+   "path": "/upload-sessions/{upload_id}/complete",
+   "handler": "complete_transfer",
+   "surface": "photohouse",
+   "capabilities": [
+    "upload.submit"
+   ],
+   "scope": "Current approved member, own account transfer only. No library access grant; completed media waits for separate owner/operator review.",
+   "current_control": "Persistent idempotent transfer ledger; 4 MiB chunks with hashes and committed offsets; exclusive per-transfer OS lock; bounded transport admission; streamed full checksum; media container/pixel checks; account and current membership rechecked; cookie CSRF; server-owned incoming paths.",
+   "gap": "Source/synthetic acceptance only. New explicit offline migration and server activation required. Original MP4/MOV acceptance does not imply playback preparation. No background worker or runtime activation."
   }
  ]
 }

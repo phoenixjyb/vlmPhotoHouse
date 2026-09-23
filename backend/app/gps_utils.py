@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import signal
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -139,7 +143,18 @@ def parse_ffprobe_gps(info: dict[str, Any]) -> tuple[float, float] | None:
     return None
 
 
-def probe_video_metadata(path: str | Path, timeout_sec: int = 10) -> dict[str, float | None]:
+class VideoProbeError(ValueError):
+    """A video failed the bounded metadata probe."""
+
+
+MAX_VIDEO_BYTES = 16 * 1024 ** 3
+MAX_VIDEO_DURATION_SEC = 24 * 60 * 60
+MAX_VIDEO_PIXELS = 64 * 1024 * 1024
+MAX_VIDEO_FPS = 120.0
+MAX_PROBE_OUTPUT = 2 * 1024 * 1024
+
+
+def probe_video_metadata(path: str | Path, timeout_sec: int = 10, *, strict: bool = False) -> dict:
     out: dict[str, float | None] = {
         "duration_sec": None,
         "fps": None,
@@ -147,29 +162,11 @@ def probe_video_metadata(path: str | Path, timeout_sec: int = 10) -> dict[str, f
         "gps_lon": None,
     }
     try:
-        cmd = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-print_format",
-            "json",
-            "-show_streams",
-            "-show_format",
-            str(path),
-        ]
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="ignore",
-            timeout=max(1, int(timeout_sec)),
-        )
-        if result.returncode != 0 or not result.stdout:
-            return out
-        info = json.loads(result.stdout)
-    except Exception:
+        source = Path(path)
+        info = _bounded_ffprobe(source, timeout_sec)
+    except Exception as error:
+        if strict:
+            raise error if isinstance(error, VideoProbeError) else VideoProbeError('video probe failed') from error
         return out
 
     # Duration / FPS from first video stream (fallback to format duration)
@@ -214,8 +211,89 @@ def probe_video_metadata(path: str | Path, timeout_sec: int = 10) -> dict[str, f
                     dur = None
     out["duration_sec"] = dur
 
+    if isinstance(vs, dict):
+        out['width'] = vs.get('width')
+        out['height'] = vs.get('height')
+        out['video_codec'] = vs.get('codec_name')
+    out['video_streams'] = len(vstreams)
+    out['audio_streams'] = sum(1 for s in (info.get('streams') or [])
+                               if isinstance(s, dict) and s.get('codec_type') == 'audio')
+    out['format_name'] = str((info.get('format') or {}).get('format_name') or '')
+
     gps = parse_ffprobe_gps(info)
     if gps is not None:
         out["gps_lat"] = gps[0]
         out["gps_lon"] = gps[1]
+    if strict:
+        _validate_video_probe(source, out, info)
     return out
+
+
+def _bounded_ffprobe(source: Path, timeout_sec: int) -> dict:
+    try:
+        stat_result = source.stat()
+    except OSError as error:
+        raise VideoProbeError('video source unavailable') from error
+    if not source.is_file() or stat_result.st_size <= 0 or stat_result.st_size > MAX_VIDEO_BYTES:
+        raise VideoProbeError('video size outside policy')
+    cmd = ['ffprobe', '-v', 'error', '-protocol_whitelist', 'file',
+           '-enable_drefs', '0', '-use_absolute_path', '0', '-show_streams',
+           '-show_format', '-of', 'json', str(source)]
+    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        flags = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0) if os.name == 'nt' else 0
+        process = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
+                                   creationflags=flags, start_new_session=(os.name != 'nt'))
+        started = time.monotonic()
+        try:
+            while process.poll() is None:
+                if time.monotonic() - started > max(1, int(timeout_sec)):
+                    raise VideoProbeError('video probe timed out')
+                if stdout.tell() > MAX_PROBE_OUTPUT or stderr.tell() > 65536:
+                    raise VideoProbeError('video probe output exceeded budget')
+                time.sleep(0.01)
+            if process.returncode or stdout.tell() > MAX_PROBE_OUTPUT or stderr.tell() > 65536:
+                raise VideoProbeError('video probe failed')
+            stdout.seek(0)
+            raw = stdout.read(MAX_PROBE_OUTPUT + 1)
+        finally:
+            if process.poll() is None:
+                try:
+                    if os.name != 'nt':
+                        os.killpg(process.pid, signal.SIGKILL)
+                    else:
+                        process.kill()
+                except OSError:
+                    pass
+            process.wait()
+    try:
+        value = json.loads(raw.decode('utf-8'))
+    except (UnicodeError, ValueError) as error:
+        raise VideoProbeError('video probe metadata is invalid') from error
+    if not isinstance(value, dict):
+        raise VideoProbeError('video probe metadata shape invalid')
+    return value
+
+
+def _validate_video_probe(source: Path, meta: dict, info: dict) -> None:
+    streams = info.get('streams') or []
+    videos = [s for s in streams if isinstance(s, dict) and s.get('codec_type') == 'video'
+              and not s.get('disposition', {}).get('attached_pic')]
+    audios = [s for s in streams if isinstance(s, dict) and s.get('codec_type') == 'audio']
+    duration, width, height, fps = (meta.get(k) for k in ('duration_sec', 'width', 'height', 'fps'))
+    formats = set(meta.get('format_name', '').split(','))
+    metadata = [s for s in streams if isinstance(s, dict) and (
+        s.get('codec_type') in {'data', 'subtitle', 'attachment'}
+        or (s.get('codec_type') == 'video' and s.get('disposition', {}).get('attached_pic')))]
+    if (len(videos) != 1 or len(audios) > 1
+            or len(videos) + len(audios) + len(metadata) != len(streams)):
+        raise VideoProbeError('unsupported video stream layout')
+    if not isinstance(duration, (int, float)) or not 0 < duration <= MAX_VIDEO_DURATION_SEC:
+        raise VideoProbeError('video duration outside policy')
+    if not isinstance(width, int) or not isinstance(height, int) or width < 1 or height < 1:
+        raise VideoProbeError('video dimensions unavailable')
+    if width * height > MAX_VIDEO_PIXELS:
+        raise VideoProbeError('video pixel budget exceeded')
+    if not isinstance(fps, (int, float)) or not 0 < fps <= MAX_VIDEO_FPS:
+        raise VideoProbeError('video frame-rate outside policy')
+    if not formats.intersection({'mov', 'mp4', 'm4a', '3gp', '3g2', 'mj2'}):
+        raise VideoProbeError('unsupported video container')

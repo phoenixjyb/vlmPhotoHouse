@@ -43,7 +43,7 @@ let browser;
   await page.locator('#uploads-panel').scrollIntoViewIfNeeded();
   await page.screenshot({path:path.join(artifacts,'upload-inbox-desktop.png'),fullPage:true});
   await page.locator('.upload-card button.primary').first().click();await page.locator('#upload-review-dialog').waitFor({state:'visible'});
-  assert.match(await page.locator('#upload-review-copy').textContent(),/family-a/);
+  assert.match(await page.locator('#upload-review-copy').textContent(),/Family/);
   await page.screenshot({path:path.join(artifacts,'upload-confirm-desktop.png')});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(artifacts,'upload-confirm-phone.png')});
   assert.equal(await page.evaluate(()=>{const r=document.querySelector('#upload-review-dialog').getBoundingClientRect();return r.left>=0&&r.right<=window.innerWidth;}),true);

@@ -51,6 +51,9 @@ class ClosedBoundary:
 
     @classmethod
     def allowed(cls, method, path):
+        if method == 'POST' and path == '/upload-sessions': return True
+        if method in {'GET','PUT','DELETE'} and re.fullmatch(r'/upload-sessions/[0-9a-f]{32}',path): return True
+        if method == 'POST' and re.fullmatch(r'/upload-sessions/[0-9a-f]{32}/complete',path): return True
         if method == 'GET' and path in ('/library-catalogue', '/admin/library-transfers'): return True
         if method == 'POST' and path in ('/admin/library-transfers/review', '/admin/library-transfers/confirm'): return True
         if method == 'GET' and (path == '/admin/uploads' or re.fullmatch(r'/admin/uploads/[0-9]+/preview', path)): return True
