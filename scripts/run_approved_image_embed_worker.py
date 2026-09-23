@@ -442,7 +442,8 @@ def _probe_provider(args, checkpoint, *, deadline):
     try:
         argv = [sys.executable, '-I', str(Path(__file__).resolve()), '_probe',
                 '--checkpoint', str(checkpoint), '--image-model', args.image_model,
-                '--device', args.device, '--receipt', str(receipt)]
+                '--device', 'cpu' if args.device == 'cpu' else 'cuda:0',
+                '--receipt', str(receipt)]
         run_supervised(argv, env=_child_environment(args.device, checkpoint),
                        derived=args.derived_root, deadline=deadline)
         raw = receipt.read_bytes()
@@ -513,7 +514,8 @@ def _run_embed_child(image, stage, args, checkpoint, deadline):
     receipt = stage / 'result.json'
     argv = [sys.executable, '-I', str(Path(__file__).resolve()), '_embed',
             '--image', str(image), '--stage', str(stage), '--checkpoint', str(checkpoint),
-            '--image-model', args.image_model, '--device', args.device,
+            '--image-model', args.image_model,
+            '--device', 'cpu' if args.device == 'cpu' else 'cuda:0',
             '--model-version', args.model_version, '--receipt', str(receipt)]
     run_supervised(argv, env=_child_environment(args.device, checkpoint),
                    derived=args.derived_root, deadline=deadline)

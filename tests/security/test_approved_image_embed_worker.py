@@ -205,6 +205,41 @@ class ApprovedImageEmbedWorkerTests(unittest.TestCase):
                 self.checksum, args.image_model, args.model_version, args.device,
                 args.expected_gpu_uuid)
 
+    def test_physical_second_gpu_is_logical_zero_inside_isolated_child(self):
+        args = self.args(); args.device = 'cuda:1'
+        args.expected_gpu_uuid = 'GPU-11111111-1111-1111-1111-111111111111'
+        receipt = {'provider': 'open_clip', 'effective_provider': 'open_clip',
+                   'effective_device': 'cuda:0', 'dimension': 512}
+
+        def child(argv, *, env, **_kwargs):
+            self.assertEqual(argv[argv.index('--device') + 1], 'cuda:0')
+            self.assertEqual(env['CUDA_VISIBLE_DEVICES'], '1')
+            Path(argv[argv.index('--receipt') + 1]).write_text(json.dumps(receipt))
+
+        with patch.object(worker, 'gpu_free_memory', return_value=4 * 1024**3), \
+             patch.object(worker, 'run_supervised', side_effect=child):
+            observed = worker._probe_provider(args, self.checkpoint, deadline=float('inf'))
+        self.assertEqual(observed['selected_physical_device'], 'cuda:1')
+        self.assertEqual(observed['effective_device'], 'cuda:0')
+
+        image = self.derived / 'sample.jpg'
+        Image.new('RGB', (8, 8)).save(image)
+        stage = self.derived / 'stage'; stage.mkdir()
+        def embed_child(argv, *, env, **_kwargs):
+            self.assertEqual(argv[argv.index('--device') + 1], 'cuda:0')
+            self.assertEqual(env['CUDA_VISIBLE_DEVICES'], '1')
+            with (stage / 'vector.npy').open('wb') as stream:
+                np.save(stream, np.ones(512, dtype=np.float32), allow_pickle=False)
+            (stage / 'result.json').write_text(json.dumps({
+                **receipt, 'model_version': args.model_version}))
+
+        with patch.object(worker, 'gpu_free_memory', return_value=4 * 1024**3), \
+             patch.object(worker, 'run_supervised', side_effect=embed_child):
+            vector, metadata, _ = worker._run_embed_child(
+                image, stage, args, self.checkpoint, float('inf'))
+        self.assertEqual(vector.shape, (512,))
+        self.assertEqual(metadata['effective_device'], 'cuda:0')
+
     def test_windows_supervised_child_gets_hard_job_memory_cap_and_cleanup(self):
         job = Mock()
         module = SimpleNamespace(WindowsJob=Mock(return_value=job))
