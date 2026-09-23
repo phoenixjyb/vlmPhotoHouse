@@ -126,3 +126,46 @@ child budget and provenance review, and confident person matching by the
 active reference cohort and threshold calibration. At the same read, four
 `embed` and three `face` tasks remained pending. No claim of full media
 processing or automatic identity assignment is made by this activation.
+
+## September 23 GPU embedding activation follow-up
+
+The approved GPU worker source is now pinned to
+`65976f6f05076ae14b104972a11a86de754fbcda`. Its 18-file source package has
+SHA-256 `4a252fcebbc27bc3704a4c8a1c3b4fa72f1e52f96bf36e0fb1eb8df9afda1a95`;
+all extracted member hashes were verified on Windows. The CPU and video-preparation
+tasks, protected API, and caption task remain on their earlier installed releases.
+
+The local CLIP checkpoint is bound by SHA-256
+`f807d82432eb6c926694b401cb55d5e40fad5a7df507e6a12cf9a83e7ac81ab0`.
+It was derived locally from the SHA-verified OpenAI ViT-B-32 TorchScript archive
+by extracting its tensor state dictionary and removing three TorchScript-only
+metadata entries. The original archive and intermediate conversion were retained
+separately. No model weights are in the source ZIP. Strict Windows preflight
+verified the OpenCLIP provider and physical RTX 3090 UUID
+`GPU-0095f55f-02a4-be5c-dfd0-01da4c727729`; the isolated child sees logical
+`cuda:0`. The GPU child has a hard 4 GiB Windows Job Object memory ceiling, a
+task deadline, a host free-RAM floor, and a shared lock across image and video
+embedding lanes.
+
+One live `--once` image embedding canary finished, then the persistent image
+task drained the remaining three approved items. All four new 512-dimensional
+files matched their database checksums. A synthetic native video embedding
+canary finished a 512-dimensional normalized vector using generated frames and
+a disposable database; it opened no family media or production database. The
+video lane had no approved pending item at activation. Both persistent tasks,
+`PhotoHouse Approved Image Embed v37 SYSTEM` and
+`PhotoHouse Approved Video Embed v37 SYSTEM`, are registered for startup with
+five-minute failure restart and were running after their shared-lock update.
+The previous actions were saved as task XML for rollback. An image-worker exit
+code 2 observed during initial concurrent startup led to an explicit bounded
+Windows lock wait; the updated tasks require a later stability read and a new
+approved-video live test for full runtime acceptance.
+
+Face detection and face embedding remain **off**. Their preflight now requires
+the approved upload receipt and exactly one active library, but `--execute`
+still refuses because inference lacks an isolated child with a hard time and
+memory boundary, atomic publication/recovery, and verified physical-to-logical
+CUDA mapping. Three approved face tasks remained pending at the GPU activation
+read. Confident named-person assignment additionally needs a reviewed,
+same-library reference cohort and threshold calibration; uncertain faces will
+be left for manual review. Historical failed/dead records were not retried.
