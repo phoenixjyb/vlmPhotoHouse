@@ -155,3 +155,24 @@ def test_probe_uses_only_synthetic_image_and_loads_both_providers(tmp_path):
     assert result['embedding_device'] == 'cuda'
     assert result['outputs'] == []
     assert sorted(path.name for path in stage.iterdir()) == ['receipt.json']
+
+
+def test_runtime_cpu_fallback_after_session_creation_is_refused(tmp_path):
+    source, stage, receipt = setup(tmp_path)
+    model = tmp_path / 'model.onnx'; model.write_bytes(b'fake checkpoint')
+    class Session:
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        def get_providers(self):
+            return self.providers
+        def disable_fallback(self):
+            pass
+    class FallingEmbedder(FakeEmbedder):
+        def __init__(self):
+            super().__init__()
+            self.session = Session()
+        def embed_face(self, image):
+            self.session.providers = ['CPUExecutionProvider']
+            return self.vector
+    with pytest.raises(child.Refused, match='cuda_execution_provider_not_effective'):
+        child.run('embed', source, stage, receipt, embedder=FallingEmbedder(), model_path=model)
+    assert not receipt.exists()

@@ -200,14 +200,18 @@ after a crash while preserving any referenced artifact. It never writes a
 person assignment. The older `run_approved_face_worker.py` still refuses
 `--execute` and must not be substituted for this candidate.
 
-The installed Windows interpreter passed a synthetic-only strict CUDA probe:
-SCRFD and LVFace both reported `CUDAExecutionProvider` on physical GPU index 1
-(logical CUDA zero) under the four-GiB Job Object. The exact detector SHA-256 is
+An initial synthetic-only Windows probe reported `CUDAExecutionProvider` for
+SCRFD and LVFace on physical GPU index 1 (logical CUDA zero), but the full
+synthetic embedding run exposed ONNX Runtime's CPU fallback: `cudnn64_9.dll`
+was present in the installed PyTorch `torch/lib` directory but had not been
+preloaded for the standalone LVFace child. The child now explicitly preloads
+the installed CUDA/cuDNN DLLs, disables session fallback, and checks the live
+provider again after inference. The exact detector SHA-256 is
 `5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91`;
 LVFace SHA-256 is
 `9d834ed8e927fd35b9123b2bf97c40aad05785b1f9ecfb1c4c1f6242d38d1382`.
-The probe opened no family media or production database. Source tests and a
-native synthetic end-to-end task canary must pass before any face task is
+The probes opened no family media or production database. Source tests and a
+new native synthetic end-to-end task canary must pass before any face task is
 claimed on the live database. Scheduled-task activation also requires exact
 package verification and a queue-ownership inspection. Automatic name matching
 remains disabled until same-library, manually labeled, active references and

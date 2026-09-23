@@ -96,7 +96,15 @@ def _read_image(path: Path) -> tuple[Image.Image, str]:
 
 
 def _cuda_provider(provider: Any) -> None:
-    effective = getattr(provider, 'effective_execution_provider', None)
+    session = getattr(provider, 'session', None)
+    if session is not None and callable(getattr(session, 'get_providers', None)):
+        effective = session.get_providers()
+    else:
+        sessions = [getattr(model, 'session', None)
+                    for model in getattr(getattr(provider, 'app', None), 'models', {}).values()]
+        live = [s.get_providers() for s in sessions
+                if s is not None and callable(getattr(s, 'get_providers', None))]
+        effective = live[0] if live else getattr(provider, 'effective_execution_provider', None)
     if effective is None:
         # LVFace exposes the complete ONNX Runtime provider list as a string.
         effective = getattr(provider, 'effective_provider', None)
@@ -107,6 +115,29 @@ def _cuda_provider(provider: Any) -> None:
     requested = getattr(provider, 'requested_device', 'cuda')
     if requested != 'cuda':
         raise Refused('logical_cuda_device_required')
+
+
+def _prepare_cuda_runtime(provider: Any | None = None) -> None:
+    """Preload installed local CUDA/cuDNN and disable ORT's CPU run fallback."""
+    if provider is None:
+        import onnxruntime as ort
+        preload = getattr(ort, 'preload_dlls', None)
+        if not callable(preload):
+            raise Refused('onnxruntime_cuda_preload_unavailable')
+        preload()
+        return
+    sessions = []
+    session = getattr(provider, 'session', None)
+    if session is not None:
+        sessions.append(session)
+    sessions.extend(getattr(model, 'session', None)
+                    for model in getattr(getattr(provider, 'app', None), 'models', {}).values())
+    for session in sessions:
+        if session is not None:
+            disable = getattr(session, 'disable_fallback', None)
+            if not callable(disable):
+                raise Refused('onnxruntime_fallback_guard_unavailable')
+            disable()
 
 
 def _finite_number(value: Any) -> float:
@@ -122,7 +153,9 @@ def _finite_number(value: Any) -> float:
 def _detect(image: Image.Image, digest: str, stage: Path, receipt: Path,
             *, provider: Any, model_root: Path) -> dict[str, Any]:
     _cuda_provider(provider)
+    _prepare_cuda_runtime(provider)
     detected = provider.detect(image)
+    _cuda_provider(provider)
     if len(detected) > MAX_FACES:
         raise Refused('face_count_out_of_bounds')
     faces = []
@@ -162,9 +195,11 @@ def _detect(image: Image.Image, digest: str, stage: Path, receipt: Path,
 def _embed(image: Image.Image, digest: str, stage: Path,
            *, provider: Any, model_path: Path) -> dict[str, Any]:
     _cuda_provider(provider)
+    _prepare_cuda_runtime(provider)
     import numpy as np
 
     vector = np.asarray(provider.embed_face(image), dtype=np.float32)
+    _cuda_provider(provider)
     if vector.shape != (VECTOR_DIM,) or not np.isfinite(vector).all():
         raise Refused('embedding_shape_or_values_invalid')
     norm = float(np.linalg.norm(vector))
@@ -211,17 +246,23 @@ def run(operation: str, image_path: str | Path | None, stage_path: str | Path,
         checkpoint = _path(model_path)
         os.environ['INSIGHTFACE_ROOT'] = str(root)
         if detector is None:
+            _prepare_cuda_runtime()
             from app.face_detection_service import InsightFaceDetectionProvider
             detector = InsightFaceDetectionProvider('cuda', strict=True)
         if embedder is None:
+            _prepare_cuda_runtime()
             from app.face_embedding_service import LVFaceEmbeddingProvider
             embedder = LVFaceEmbeddingProvider(str(checkpoint), 'cuda', VECTOR_DIM, strict=True)
         _cuda_provider(detector)
         _cuda_provider(embedder)
+        _prepare_cuda_runtime(detector)
+        _prepare_cuda_runtime(embedder)
         import numpy as np
         synthetic = Image.new('RGB', (CROP_SIZE, CROP_SIZE), color=(96, 128, 160))
         detector.detect(synthetic)
+        _cuda_provider(detector)
         probe_vector = np.asarray(embedder.embed_face(synthetic), dtype=np.float32)
+        _cuda_provider(embedder)
         if probe_vector.shape != (VECTOR_DIM,) or not np.isfinite(probe_vector).all():
             raise Refused('probe_embedding_invalid')
         manifest = {
@@ -239,6 +280,7 @@ def run(operation: str, image_path: str | Path | None, stage_path: str | Path,
                 raise Refused('insightface_root_required_for_detect')
             root = _path(insightface_root, directory=True) if insightface_root is not None else stage
             if detector is None:
+                _prepare_cuda_runtime()
                 os.environ['INSIGHTFACE_ROOT'] = str(root)
                 from app.face_detection_service import InsightFaceDetectionProvider
                 detector = InsightFaceDetectionProvider('cuda', strict=True)
@@ -248,6 +290,7 @@ def run(operation: str, image_path: str | Path | None, stage_path: str | Path,
                 raise Refused('model_path_required_for_embed')
             checkpoint = _path(model_path) if model_path is not None else stage
             if embedder is None:
+                _prepare_cuda_runtime()
                 from app.face_embedding_service import LVFaceEmbeddingProvider
                 embedder = LVFaceEmbeddingProvider(str(checkpoint), 'cuda', VECTOR_DIM, strict=True)
             manifest = _embed(image, digest, stage, provider=embedder, model_path=checkpoint)
