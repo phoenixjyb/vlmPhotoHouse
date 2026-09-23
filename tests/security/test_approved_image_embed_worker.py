@@ -240,6 +240,17 @@ class ApprovedImageEmbedWorkerTests(unittest.TestCase):
         self.assertEqual(vector.shape, (512,))
         self.assertEqual(metadata['effective_device'], 'cuda:0')
 
+    def test_verified_child_receipt_includes_parent_required_provider_and_dimension(self):
+        model = SimpleNamespace(parameters=lambda: iter([SimpleNamespace(device='cuda:0')]))
+        service = SimpleNamespace(_clip_model=model, dim=512,
+            describe_runtime=lambda: {'effective_provider': 'open_clip',
+                                      'effective_device': 'cuda:0'})
+        receipt = worker._verified_runtime(service, 'cuda:0')
+        self.assertEqual(receipt['provider'], 'open_clip')
+        self.assertEqual(receipt['dimension'], 512)
+        with self.assertRaisesRegex(RuntimeError, 'device preflight mismatch'):
+            worker._verified_runtime(service, 'cpu')
+
     def test_windows_supervised_child_gets_hard_job_memory_cap_and_cleanup(self):
         job = Mock()
         module = SimpleNamespace(WindowsJob=Mock(return_value=job))

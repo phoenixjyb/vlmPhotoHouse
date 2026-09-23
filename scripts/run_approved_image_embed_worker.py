@@ -654,6 +654,22 @@ def record_failure(database, task_id, retry_count, error):
         db.commit()
 
 
+def _verified_runtime(service, device):
+    runtime = service.describe_runtime()
+    try:
+        actual_device = str(next(service._clip_model.parameters()).device)
+    except Exception as error:
+        raise RuntimeError('Effective model device could not be verified') from error
+    if runtime.get('effective_provider') != 'open_clip' or actual_device != device:
+        raise RuntimeError('Strict provider or device preflight mismatch')
+    dimension = int(service.dim)
+    if dimension not in (512, 768, 1024, 1280, 2560):
+        raise RuntimeError('Unsupported strict image embedding dimension')
+    runtime.update({'provider': 'open_clip', 'effective_device': actual_device,
+                    'dimension': dimension})
+    return runtime
+
+
 def _probe_or_embed_child(args):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('operation', choices=('_probe', '_embed'))
@@ -679,15 +695,7 @@ def _probe_or_embed_child(args):
     from app.vector_index import EmbeddingService
     service = EmbeddingService(values.image_model, 'stub-clip', 512,
                                values.device, strict=True)
-    runtime = service.describe_runtime()
-    try:
-        actual_device = str(next(service._clip_model.parameters()).device)
-    except Exception as error:
-        raise RuntimeError('Effective model device could not be verified') from error
-    expected_device = values.device
-    if runtime.get('effective_provider') != 'open_clip' or actual_device != expected_device:
-        raise RuntimeError('Strict provider or device preflight mismatch')
-    runtime['effective_device'] = actual_device
+    runtime = _verified_runtime(service, values.device)
     if values.operation == '_probe':
         _write_json_receipt(Path(values.receipt), runtime)
         return 0
