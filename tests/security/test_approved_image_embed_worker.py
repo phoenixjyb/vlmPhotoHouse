@@ -160,6 +160,17 @@ class ApprovedImageEmbedWorkerTests(unittest.TestCase):
                 with worker.kernel_lock(self.dbpath):
                     pass
 
+    def test_windows_gpu_lock_waits_beyond_native_retry_window(self):
+        stream = Mock()
+        locker = SimpleNamespace(LK_NBLCK=1, locking=Mock(
+            side_effect=[OSError('busy')] * 11 + [None]))
+        with patch.object(worker.time, 'sleep'):
+            worker._lock_windows(stream, locker, blocking=True)
+        self.assertEqual(locker.locking.call_count, 12)
+        with self.assertRaises(OSError):
+            worker._lock_windows(stream, SimpleNamespace(
+                LK_NBLCK=1, locking=Mock(side_effect=OSError('busy'))), blocking=False)
+
     def test_worker_polls_until_operator_stop_without_claiming_other_jobs(self):
         self.task('thumb')
         args = self.args(); args.once = False

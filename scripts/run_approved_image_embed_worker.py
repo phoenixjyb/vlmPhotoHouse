@@ -275,7 +275,7 @@ def kernel_lock(database, *, blocking=False):
         if os.name == 'nt':
             import msvcrt
             try:
-                msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK, 1)
+                _lock_windows(stream, msvcrt, blocking=blocking)
             except OSError:
                 raise Refused('Another approved image embedding worker owns this database') from None
             try:
@@ -292,6 +292,21 @@ def kernel_lock(database, *, blocking=False):
                 yield
             finally:
                 fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+def _lock_windows(stream, locker, *, blocking):
+    # msvcrt.LK_LOCK itself retries only ten times, shorter than a bounded GPU
+    # inference task. Keep waiting explicitly so two healthy lanes can coexist.
+    deadline = time.monotonic() + MAX_TASK_SECONDS + 60 if blocking else 0
+    while True:
+        stream.seek(0)
+        try:
+            locker.locking(stream.fileno(), locker.LK_NBLCK, 1)
+            return
+        except OSError:
+            if not blocking or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.2)
 
 
 def _child_environment(device, checkpoint):
