@@ -21,6 +21,11 @@ import sys
 import tempfile
 import time
 
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / 'scripts'
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
 from approved_face_queue import (QueueRefused, claim, record_failure,
                                  recover_owned, select_candidate, validate_schema,
                                  verify_claim)
@@ -28,7 +33,6 @@ from run_approved_image_embed_worker import (direct_path, gpu_free_memory, ident
                                              kernel_lock, run_supervised, sha256_file,
                                              _safe_output_dir, _sqlite)
 
-ROOT = Path(__file__).resolve().parents[1]
 CHILD = ROOT / 'scripts' / 'approved_face_inference_child.py'
 DEVICE = 'cuda:1'
 MODEL = 'LVFace-B_Glint360K.onnx'
