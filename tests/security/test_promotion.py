@@ -139,6 +139,7 @@ class PromotionTests(unittest.TestCase):
         asset_id = int(uploaded['asset_id'])
         # Invisible before: it is in no library.
         self.assertNotIn(str(asset_id), self.gallery(self.owner_token))
+        self.assertEqual(len(self.rows("SELECT 1 FROM tasks WHERE state='awaiting_review'")), 5)
         envelope = self.planned('promote', library_id='family-a',
                                 operator_account_id=self.owner_id, asset_ids=[asset_id])
         self.assertEqual(envelope['plan']['operation'], PROMOTE_OPERATION)
@@ -155,6 +156,8 @@ class PromotionTests(unittest.TestCase):
                          'assigned')
         self.assertEqual(self.rows('SELECT library_id FROM access_asset_libraries WHERE asset_id=?',
                                    (asset_id,))[0][0], 'family-a')
+        self.assertEqual(len(self.rows("SELECT 1 FROM tasks WHERE state='pending'")), 5)
+        self.assertEqual(self.rows("SELECT 1 FROM tasks WHERE state='awaiting_review'"), [])
         self.assertEqual(len(self.rows('SELECT 1 FROM access_provisioning_receipts')), 1)
         # And it is now visible, which is the point of the operation.
         self.assertIn(str(asset_id), self.gallery(self.owner_token))
@@ -179,6 +182,8 @@ class PromotionTests(unittest.TestCase):
                          'incoming')
         self.assertEqual(self.rows('SELECT 1 FROM access_asset_libraries WHERE asset_id=?',
                                    (asset_id,)), [])
+        self.assertEqual(len(self.rows("SELECT 1 FROM tasks WHERE state='awaiting_review'")), 5)
+        self.assertEqual(self.rows("SELECT 1 FROM tasks WHERE state='pending'"), [])
         self.assertEqual(list(self.originals.rglob('*.png')), [])
 
     def test_promotion_failure_after_first_move_restores_all_files_and_rows(self):
