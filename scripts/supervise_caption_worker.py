@@ -29,6 +29,7 @@ FIELDS = frozenset(('format_version', 'worker_root', 'worker_commit',
     'manifest_sha256', 'database', 'expected_revision', 'derived', 'temporary',
     'stop_file', 'caption_url', 'environment_json', 'environment_sha256',
     'receipt_directory'))
+OPTIONAL_FIELDS = frozenset(('defer_non_caption_pending',))
 
 
 class Refused(ValueError):
@@ -125,7 +126,10 @@ def prepare(config_path, config_sha256):
     raw = read_bytes(path, 65536)
     digest(raw, config_sha256)
     config = json_object(raw)
-    if (set(config) != FIELDS or type(config['format_version']) is not int
+    if (set(config) not in (FIELDS, FIELDS | OPTIONAL_FIELDS)
+            or (config.get('defer_non_caption_pending', False) is not False
+                and config.get('defer_non_caption_pending') is not True)
+            or type(config['format_version']) is not int
             or config['format_version'] != 1
             or any(type(config[k]) is not str for k in FIELDS-{'format_version'})
             or not re.fullmatch('[0-9a-f]{40}', config['worker_commit'])):
@@ -158,8 +162,12 @@ def prepare(config_path, config_sha256):
     worker.run(args)  # read-only: exact revision, policy, paths, no running caption
     with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True, timeout=3)) as db:
         db.execute('PRAGMA query_only=ON')
-        if db.execute("SELECT 1 FROM tasks WHERE state IN ('pending','running') AND type!='caption' LIMIT 1").fetchone():
+        if db.execute("SELECT 1 FROM tasks WHERE state='running' AND type!='caption' LIMIT 1").fetchone():
             raise Refused('Other task families require an independent owner')
+        other_pending = db.execute("SELECT count(*) FROM tasks WHERE state='pending' AND type!='caption'").fetchone()[0]
+        if other_pending and not config.get('defer_non_caption_pending', False):
+            raise Refused('Other task families require an independent owner')
+        config['_deferred_other_pending_count'] = other_pending
     return config, worker, args
 
 
@@ -195,8 +203,11 @@ def supervise(args):
     sys.dont_write_bytecode = True
     config, worker, worker_args = prepare(args.config, args.config_sha256)
     if not args.execute:
-        return {'supervisor': 'preflight-pass', 'activated': False,
-                'revision': config['expected_revision']}
+        result = {'supervisor': 'preflight-pass', 'activated': False,
+                  'revision': config['expected_revision']}
+        if config.get('defer_non_caption_pending', False):
+            result['deferred_other_pending_count'] = config['_deferred_other_pending_count']
+        return result
     if not args.writers_fenced:
         raise Refused('Independent writer fencing confirmation required')
     # This assertion is authorization context, not detection of legacy writers.
@@ -209,7 +220,8 @@ def supervise(args):
     run_id = uuid.uuid4().hex
     receipt(directory, run_id, 'started', {'source_commit': config['worker_commit'],
         'revision': config['expected_revision'], 'pid': os.getpid(),
-        'clean_drain_confirmed': False})
+        'clean_drain_confirmed': False,
+        'deferred_other_pending_count': config['_deferred_other_pending_count']})
     try:
         with private_output():
             result = worker.run(worker_args)

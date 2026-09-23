@@ -86,6 +86,22 @@ class CaptionSupervisorTests(unittest.TestCase):
             db.execute("INSERT INTO tasks VALUES ('face','finished')"); db.commit()
         self.assertFalse(supervisor.supervise(self.args())['activated'])
 
+    def test_explicit_deferred_other_pending_never_claims_or_repairs_them(self):
+        with closing(sqlite3.connect(self.db)) as db:
+            db.executemany('INSERT INTO tasks VALUES (?,?)',
+                           [('embed', 'pending'), ('thumb', 'pending')]); db.commit()
+        before = self.db.read_bytes()
+        self.config['defer_non_caption_pending'] = True; self.save()
+        self.assertEqual(supervisor.supervise(self.args())['deferred_other_pending_count'], 2)
+        self.assertEqual(self.db.read_bytes(), before)
+        with closing(sqlite3.connect(self.db)) as db:
+            db.execute("INSERT INTO tasks VALUES ('phash','running')"); db.commit()
+        with self.assertRaises(ValueError): supervisor.supervise(self.args())
+
+    def test_deferred_other_pending_requires_boolean_pin(self):
+        self.config['defer_non_caption_pending'] = 'true'; self.save()
+        with self.assertRaises(ValueError): supervisor.supervise(self.args())
+
     def test_config_and_policy_hash_pins(self):
         self.path.write_text(self.path.read_text()+' ')
         with self.assertRaises(ValueError): supervisor.supervise(self.args())
