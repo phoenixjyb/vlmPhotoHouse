@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = Path('docs/contracts/protected-native-v2')
-SOURCE = 'eaf46ecb38c6a1c0622603c1c1949488472dd812'
+SOURCE = 'b18f4bb59e3802e846ef401bbe108cf12bbe008f'
 
 
 def verify(root=ROOT):
@@ -79,6 +79,7 @@ def verify(root=ROOT):
                          'backend/requirements-access-test.lock'}
     expected_sources |= {
         'docs/security/RESUMABLE_MEDIA_UPLOAD_V36.md',
+        'docs/security/SCHEMA_APPLICATION.md',
         'scripts/apply_access_schema.py', 'scripts/run_caption_worker.py',
         'scripts/run_face_worker.py', 'tests/security/test_resumable_upload.py',
         'tests/security/test_uploaded_video_tasks.py',

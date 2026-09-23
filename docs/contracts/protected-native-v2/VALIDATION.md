@@ -2,7 +2,7 @@
 
 ## Candidate.25 — bounded resumable photos and videos
 
-Source `eaf46ecb38c6a1c0622603c1c1949488472dd812`. The affected backend
+Source `b18f4bb59e3802e846ef401bbe108cf12bbe008f`. The affected backend
 suite passed 233 tests in the disposable dependency-complete Mac test environment.
 An actual synthetic MP4 passed bounded `ffprobe` and one 24,871-byte keyframe
 was extracted by the bounded `ffmpeg` command. Real ASGI/Chromium review flows

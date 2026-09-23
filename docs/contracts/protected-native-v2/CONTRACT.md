@@ -1,6 +1,6 @@
 # Protected native profile 2.0.0-candidate.25
 
-Backend source: `eaf46ecb38c6a1c0622603c1c1949488472dd812`.
+Backend source: `b18f4bb59e3802e846ef401bbe108cf12bbe008f`.
 Database migration head: `a8d4c2e6f901`. This is a backend-owned candidate
 handoff, not an adopted replacement for the mobile repository's frozen
 `contracts/v1` (`1.0.0-fixture.1`, backend `87a60b475b37b1d6873cd977bcb6e7254472da7e`).
