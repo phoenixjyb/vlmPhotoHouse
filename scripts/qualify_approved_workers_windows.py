@@ -8,6 +8,7 @@ qualification check, not a scheduled or live processing launcher.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -62,7 +63,7 @@ def _worker_once(script: str, arguments: list[str], timeout: int) -> None:
 
 
 def _require_finished(database: Path, kind: str) -> None:
-    with sqlite3.connect(database) as db:
+    with closing(sqlite3.connect(database)) as db:
         row = db.execute('SELECT state,last_error FROM tasks WHERE type=?', (kind,)).fetchone()
     if row is None or row[0] != 'finished':
         error = (row[1] if row is not None else None) or 'no_error_code'
@@ -92,7 +93,7 @@ def run(ffmpeg: Path, ffprobe: Path) -> dict:
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError('synthetic_video_generation_failed') from exc
-        with sqlite3.connect(database) as db:
+        with closing(sqlite3.connect(database)) as db:
             db.executescript(SCHEMA)
             _insert_asset(db, image, 1, 'image/png')
             _insert_asset(db, movie, 2, 'video/mp4')
@@ -110,7 +111,7 @@ def run(ffmpeg: Path, ffprobe: Path) -> dict:
         for kind in ('video_probe', 'video_keyframes'):
             _worker_once('run_approved_video_worker.py', video_args, 400)
             _require_finished(database, kind)
-        with sqlite3.connect(database) as db:
+        with closing(sqlite3.connect(database)) as db:
             statuses = dict(db.execute("SELECT type,state FROM tasks WHERE type IN ('thumb','phash','video_probe','video_keyframes')"))
             perceptual_hash = db.execute('SELECT perceptual_hash FROM assets WHERE id=1').fetchone()[0]
             chained = set(db.execute("SELECT type FROM tasks WHERE type IN ('caption','video_embed')"))
