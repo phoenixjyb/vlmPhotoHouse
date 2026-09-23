@@ -254,3 +254,16 @@ GiB free on the RTX 3090. This establishes detection and shadow embedding for
 approved uploads, not confident automatic identity assignment. The next lane
 needs reviewed same-library, manually named active reference vectors and
 calibrated thresholds before `person_auto_match` can be enabled.
+
+A read-only reference inventory after activation found 673 manually labeled
+faces across 46 people, but only 34 LVFace vectors for 10 people in the older
+aligned **shadow** cohort. The new upload lane has three vectors in its distinct
+SCRFD-crop **shadow** version; there are no active LVFace person references.
+The 665 manual vectors with a legacy unversioned 512-dimensional identity have
+unknown provenance and cannot be treated as matching LVFace references. The
+next implementation must regenerate and validate manually labeled references
+using the **same crop and LVFace version** as incoming uploads, restrict each
+candidate and reference to the same active library, evaluate false matches and
+unknown-person rejection on held-out labels, and activate only the calibrated
+cohort. Until then the app should offer manual face review rather than silently
+assigning a name.
