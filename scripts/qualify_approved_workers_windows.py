@@ -58,7 +58,17 @@ def _worker_once(script: str, arguments: list[str], timeout: int) -> None:
                             timeout=timeout, stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode != 0:
-        raise RuntimeError('Synthetic worker process failed')
+        raise RuntimeError(f'{script}:exit_{result.returncode}')
+
+
+def _require_finished(database: Path, kind: str) -> None:
+    with sqlite3.connect(database) as db:
+        row = db.execute('SELECT state,last_error FROM tasks WHERE type=?', (kind,)).fetchone()
+    if row is None or row[0] != 'finished':
+        error = (row[1] if row is not None else None) or 'no_error_code'
+        if not isinstance(error, str) or not error.replace('_', '').isalnum() or len(error) > 64:
+            error = 'unrecognized_error_code'
+        raise RuntimeError(f'{kind}:state_{row[0] if row else "missing"}:{error}')
 
 
 def run(ffmpeg: Path, ffprobe: Path) -> dict:
@@ -74,11 +84,14 @@ def run(ffmpeg: Path, ffprobe: Path) -> dict:
         image = originals / 'synthetic.png'
         Image.new('RGB', (96, 64), (30, 120, 170)).save(image)
         movie = originals / 'synthetic.mp4'
-        subprocess.run([str(ffmpeg), '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-                        '-f', 'lavfi', '-i', 'testsrc2=size=128x72:rate=5', '-t', '2',
-                        '-c:v', 'mpeg4', '-q:v', '5', str(movie)],
-                       check=True, timeout=30, stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            subprocess.run([str(ffmpeg), '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
+                            '-f', 'lavfi', '-i', 'testsrc2=size=128x72:rate=5', '-t', '2',
+                            '-c:v', 'mpeg4', '-q:v', '5', str(movie)],
+                           check=True, timeout=30, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError('synthetic_video_generation_failed') from exc
         with sqlite3.connect(database) as db:
             db.executescript(SCHEMA)
             _insert_asset(db, image, 1, 'image/png')
@@ -89,12 +102,14 @@ def run(ffmpeg: Path, ffprobe: Path) -> dict:
             db.commit()
         cpu_args = ['--database', str(database), '--originals-root', str(originals),
             '--derived-root', str(derived), '--stop-file', str(base / 'cpu.stop')]
-        for _ in range(2):
+        for kind in ('thumb', 'phash'):
             _worker_once('run_approved_cpu_worker.py', cpu_args, 120)
+            _require_finished(database, kind)
         video_args = ['--database', str(database), '--derived-root', str(derived),
             '--media-root', str(originals), '--ffprobe', str(ffprobe), '--ffmpeg', str(ffmpeg)]
-        for _ in range(2):
+        for kind in ('video_probe', 'video_keyframes'):
             _worker_once('run_approved_video_worker.py', video_args, 400)
+            _require_finished(database, kind)
         with sqlite3.connect(database) as db:
             statuses = dict(db.execute("SELECT type,state FROM tasks WHERE type IN ('thumb','phash','video_probe','video_keyframes')"))
             perceptual_hash = db.execute('SELECT perceptual_hash FROM assets WHERE id=1').fetchone()[0]
@@ -117,8 +132,11 @@ def main(argv=None) -> int:
     try:
         print(json.dumps(run(args.ffmpeg, args.ffprobe), sort_keys=True))
         return 0
+    except RuntimeError as exc:
+        print(json.dumps({'native_canary': 'failed', 'stage': str(exc)}), file=sys.stderr)
+        return 2
     except Exception:
-        print(json.dumps({'native_canary': 'failed', 'inspect_synthetic_worker_state': True}), file=sys.stderr)
+        print(json.dumps({'native_canary': 'failed', 'stage': 'unexpected_exception'}), file=sys.stderr)
         return 2
 
 
