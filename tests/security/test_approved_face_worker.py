@@ -23,7 +23,7 @@ def db_fixture(tmp_path):
           priority INTEGER DEFAULT 100,retry_count INTEGER DEFAULT 0,cancel_requested INTEGER DEFAULT 0,
           scheduled_at TEXT,started_at TEXT,finished_at TEXT,last_error TEXT);
         CREATE TABLE assets(id INTEGER PRIMARY KEY,path TEXT,hash_sha256 TEXT,file_size INTEGER,mime TEXT,status TEXT);
-        CREATE TABLE access_uploads(asset_id INTEGER,state TEXT);
+        CREATE TABLE access_uploads(asset_id INTEGER,state TEXT,sha256 TEXT,bytes INTEGER);
         CREATE TABLE access_asset_libraries(asset_id INTEGER,library_id TEXT);
         CREATE TABLE access_libraries(id TEXT,state TEXT);
         CREATE TABLE face_detections(id INTEGER PRIMARY KEY,asset_id INTEGER,bbox_x REAL,bbox_y REAL,
@@ -45,7 +45,7 @@ def test_schema_and_eligibility_only_supported_upload_faces(tmp_path):
     source = tmp_path / "approved.jpg"; Image.new("RGB", (2, 2)).save(source)
     digest = hashlib.sha256(source.read_bytes()).hexdigest()
     db.execute("INSERT INTO assets VALUES(1,?,?,?,?,?)", (str(source), digest, source.stat().st_size, "image/jpeg", "active"))
-    db.execute("INSERT INTO access_uploads VALUES(1,'assigned')")
+    db.execute("INSERT INTO access_uploads VALUES(1,'assigned',?,?)", (digest, source.stat().st_size))
     db.execute("INSERT INTO access_asset_libraries VALUES(1,'family')")
     db.execute("INSERT INTO access_libraries VALUES('family','active')")
     db.execute("INSERT INTO tasks(id,type,payload_json,state,scheduled_at) VALUES(1,'face','{\"asset_id\":1}','pending',datetime('now'))")
@@ -62,13 +62,42 @@ def test_approval_scope_and_hash_are_rechecked(tmp_path):
     digest = hashlib.sha256(source.read_bytes()).hexdigest()
     db = worker.connect(path, readonly=False)
     db.execute("INSERT INTO assets VALUES(1,?,?,?,?,?)", (str(source), digest, source.stat().st_size, "image/jpeg", "active"))
-    db.execute("INSERT INTO access_uploads VALUES(1,'assigned')")
+    db.execute("INSERT INTO access_uploads VALUES(1,'assigned',?,?)", (digest, source.stat().st_size))
     db.execute("INSERT INTO access_asset_libraries VALUES(1,'family')")
     db.execute("INSERT INTO access_libraries VALUES('family','active')")
     db.commit()
     assert worker.allowed_asset(db, 1, originals) == source
     source.write_bytes(b"changed")
     with pytest.raises(worker.Refused, match="source_changed|source_hash_mismatch"):
+        worker.allowed_asset(db, 1, originals)
+    db.close()
+
+
+def test_face_scope_requires_receipt_and_one_active_library(tmp_path):
+    path = db_fixture(tmp_path)
+    originals = tmp_path / 'originals'; originals.mkdir()
+    source = originals / 'photo.jpg'; Image.new('RGB', (4, 4)).save(source)
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    size = source.stat().st_size
+    db = worker.connect(path, readonly=False)
+    db.execute('INSERT INTO assets VALUES(1,?,?,?,?,?)',
+               (str(source), digest, size, 'image/jpeg', 'active'))
+    db.execute("INSERT INTO access_uploads VALUES(1,'assigned',?,?)", (digest, size))
+    db.execute("INSERT INTO access_libraries VALUES('family','active')")
+    db.execute("INSERT INTO access_asset_libraries VALUES(1,'family')")
+    db.commit()
+    assert worker.allowed_asset(db, 1, originals) == source
+    db.execute("UPDATE access_uploads SET sha256='wrong'"); db.commit()
+    with pytest.raises(worker.Refused, match='approval_scope'):
+        worker.allowed_asset(db, 1, originals)
+    db.execute('UPDATE access_uploads SET sha256=?', (digest,))
+    db.execute("INSERT INTO access_libraries VALUES('archived','inactive')")
+    db.execute("INSERT INTO access_asset_libraries VALUES(1,'archived')"); db.commit()
+    with pytest.raises(worker.Refused, match='approval_scope'):
+        worker.allowed_asset(db, 1, originals)
+    db.execute("DELETE FROM access_asset_libraries WHERE library_id='archived'")
+    db.execute('UPDATE assets SET status=NULL'); db.commit()
+    with pytest.raises(worker.Refused, match='approval_scope'):
         worker.allowed_asset(db, 1, originals)
     db.close()
 
@@ -99,7 +128,7 @@ def test_face_embed_scope_excludes_unapproved_asset(tmp_path):
     db.execute("INSERT INTO tasks(id,type,payload_json,state,scheduled_at) VALUES(8,'face_embed','{\"face_id\":9}','pending',datetime('now'))")
     db.execute("INSERT INTO face_detections(id,asset_id,bbox_x,bbox_y,bbox_w,bbox_h) VALUES(9,4,0,0,1,1)")
     db.execute("INSERT INTO assets VALUES(4,'/tmp/x.jpg','x',1,'image/jpeg','active')")
-    db.execute("INSERT INTO access_uploads VALUES(4,'incoming')")
+    db.execute("INSERT INTO access_uploads VALUES(4,'incoming','x',1)")
     db.commit()
     assert worker.eligible(db) is None
     db.close()

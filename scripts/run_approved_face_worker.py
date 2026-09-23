@@ -208,13 +208,17 @@ def load_image(path: Path) -> Image.Image:
 
 
 def allowed_asset(db, asset_id: int, originals: Path):
-    row = db.execute("""SELECT a.id,a.path,a.hash_sha256,a.file_size,a.mime,a.status,
-        u.state,m.library_id,l.state
+    rows = db.execute("""SELECT a.id,a.path,a.hash_sha256,a.file_size,a.mime,a.status,
+        u.state,u.sha256,u.bytes,m.library_id,l.state
         FROM assets a JOIN access_uploads u ON u.asset_id=a.id
         JOIN access_asset_libraries m ON m.asset_id=a.id
         JOIN access_libraries l ON l.id=m.library_id
-        WHERE a.id=?""", (asset_id,)).fetchone()
-    if not row or row[5] not in (None, "active") or row[6] != "assigned" or row[8] != "active":
+        WHERE a.id=?""", (asset_id,)).fetchall()
+    if len(rows) != 1:
+        raise Refused("approval_scope")
+    row = rows[0]
+    if (row[5] != "active" or row[6] != "assigned" or row[10] != "active" or
+            row[2] != row[7] or row[3] != row[8]):
         raise Refused("approval_scope")
     path = direct_path(row[1])
     if not path.is_relative_to(originals) or path == originals:
