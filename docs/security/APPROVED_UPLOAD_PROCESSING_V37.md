@@ -183,3 +183,32 @@ and follow-up tasks. It also needs a single-owner crash-recovery rule for
 `running` tasks and orphaned files. Native synthetic detection-to-embedding,
 timeout, memory-cap, and rollback tests are required before activation. The
 older mixed executor must remain off so it cannot race this lane.
+
+## Bounded face-lane source candidate
+
+`scripts/approved_face_inference_child.py` is an isolated one-operation process
+for SCRFD detection, LVFace embedding, or a synthetic provider probe. It has no
+database or network access. `scripts/approved_face_queue.py` admits only exact
+`face`/`face_embed` payloads for active, receipt-matched approved uploads in one
+active library, and marks only its own running tasks for crash recovery.
+`scripts/run_approved_face_pipeline.py` is the candidate parent: it pins both
+model hashes and the physical RTX 3090 UUID, starts the child under a four-GiB
+Windows Job Object with a deadline and host RAM floor, verifies receipts and
+source hashes, and publishes new face crops or **shadow-only** LVFace vectors in
+a short transaction. A task-scoped journal lets startup remove orphaned files
+after a crash while preserving any referenced artifact. It never writes a
+person assignment. The older `run_approved_face_worker.py` still refuses
+`--execute` and must not be substituted for this candidate.
+
+The installed Windows interpreter passed a synthetic-only strict CUDA probe:
+SCRFD and LVFace both reported `CUDAExecutionProvider` on physical GPU index 1
+(logical CUDA zero) under the four-GiB Job Object. The exact detector SHA-256 is
+`5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91`;
+LVFace SHA-256 is
+`9d834ed8e927fd35b9123b2bf97c40aad05785b1f9ecfb1c4c1f6242d38d1382`.
+The probe opened no family media or production database. Source tests and a
+native synthetic end-to-end task canary must pass before any face task is
+claimed on the live database. Scheduled-task activation also requires exact
+package verification and a queue-ownership inspection. Automatic name matching
+remains disabled until same-library, manually labeled, active references and
+a conservative threshold are qualified separately.

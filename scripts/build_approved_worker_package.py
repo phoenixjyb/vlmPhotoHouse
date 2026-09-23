@@ -28,6 +28,7 @@ FILES = tuple(sorted([
         'run_approved_cpu_worker', 'run_approved_video_worker',
         'run_approved_image_embed_worker', 'run_approved_video_embed_worker',
         'run_approved_face_worker', 'approved_face_inference_child',
+        'approved_face_queue', 'run_approved_face_pipeline',
         'qualify_approved_workers_windows')),
     'docs/security/APPROVED_UPLOAD_PROCESSING_V37.md',
 ]))
